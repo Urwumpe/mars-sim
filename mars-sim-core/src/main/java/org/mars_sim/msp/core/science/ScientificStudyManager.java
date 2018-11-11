@@ -35,9 +35,7 @@ implements Serializable {
     /**
      * Constructor.
      */
-    public ScientificStudyManager() { //}   
-	// 2015-02-04 Added run()
-	//public void run() {
+    public ScientificStudyManager() {
         studies = new ArrayList<ScientificStudy>();
 	}
     
@@ -369,7 +367,7 @@ implements Serializable {
                     
                     if (study.isAllResearchCompleted()) {
                         study.setPhase(ScientificStudy.PAPER_PHASE);
-                        logger.fine(study.toString() + " finished research and is starting data results compiling.");
+                        logger.info(study.toString() + " finished research and is starting data results compiling.");
                         continue;
                     }
                     else {
@@ -408,7 +406,7 @@ implements Serializable {
                     if (study.isAllPaperWritingCompleted()) {
                         study.setPhase(ScientificStudy.PEER_REVIEW_PHASE);
                         study.startingPeerReview();
-                        logger.fine(study.toString() + " has compiled data results and is starting peer review.");
+                        logger.info(study.toString() + " has compiled data results and is starting peer review.");
                         continue;
                     }
                 }
@@ -421,11 +419,11 @@ implements Serializable {
                             
                             // Provide scientific achievement to primary and collaborative researchers.
                             ScientificStudyUtil.provideCompletionAchievements(study);
-                            logger.fine(study.toString() + " is completed with a successful peer review.");
+                            logger.info(study.toString() + " is completed with a successful peer review.");
                         }
                         else {
                             study.setCompleted(ScientificStudy.FAILED_COMPLETION);
-                            logger.fine(study.toString() + " is completed with a failed peer review.");
+                            logger.info(study.toString() + " is completed with a failed peer review.");
                         }
                     }
                 }

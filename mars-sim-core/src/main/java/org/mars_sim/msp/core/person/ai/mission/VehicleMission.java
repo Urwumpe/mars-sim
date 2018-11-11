@@ -335,8 +335,7 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 
 				setPhaseEnded(true);
 				super.endMission(reason);
-
-
+				
 //				 if (EMBARKING.equals(getPhase())) { 
 //					 setPhaseEnded(true); 
 //				 }
@@ -349,9 +348,7 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 //					 logger.info("Can't be aborted. This mission is at the very last phase of the mission. "
 //							 + "Members are unloading resources and being disembarked. Please be patient!");
 //				 }
-				 //else { // setPhaseEnded(true); // super.endMission(reason); //}
-				 
-				 
+				 //else { // setPhaseEnded(true); // super.endMission(reason); //} 
 			}
 
 			else if (reason.equals(Mission.NOT_ENOUGH_RESOURCES) || reason.equals(Mission.UNREPAIRABLE_MALFUNCTION)
@@ -385,15 +382,15 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 //								logger.warning("[" + startingMember.getLocationTag().getShortLocationName() + "] " 
 //										+ startingMember + " turned on " + vehicle + "'s emergency beacon and request for towing. Reason : "
 //										+ reason);
-//								//don't end the mission yet
+//								// Note : don't end the mission yet
 //							}
 						}
 
 						else {
-							// is being towed, wait till the journey is over
+							// Note: the vehicle is being towed, wait till the journey is over
 							// don't end the mission yet
-							// logger.info(vehicle + " is currently being towed by " +
-							// vehicle.getTowingVehicle());
+//							 logger.info(vehicle + " is currently being towed by " +
+//							 vehicle.getTowingVehicle());
 							LogConsolidated.log(logger, Level.WARNING, 2000, sourceName,
 									"[" + vehicle + "] Currently being towed by " + vehicle.getTowingVehicle(), null);
 //									+ " Remaining distance : " + getClosestDistance() + " km.", null);
@@ -401,10 +398,9 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 					}
 
 					else {
-						// if the emergency beacon is on,
-						// don't end the mission yet
-						// logger.info(vehicle + "'s emergency beacon is on. awaiting the response for
-						// rescue right now.");
+						// Note : if the emergency beacon is on, don't end the mission yet
+//						 logger.info(vehicle + "'s emergency beacon is on. awaiting the response for
+//						 rescue right now.");
 					}
 				}
 
@@ -931,25 +927,24 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 			Simulation.instance().getEventManager().registerNewEvent(newEvent);
 		}
 
-		double oldDistance = getCurrentMissionLocation()
-				.getDistance(((Person) member).getAssociatedSettlement().getCoordinates());
 
+		Settlement oldHome = ((Person) member).getAssociatedSettlement();
+		
+		double oldDistance = getCurrentMissionLocation().getDistance(oldHome.getCoordinates());
+
+		
 		// Determine closest settlement.
 		Settlement newDestination = findClosestSettlement();
 		if (newDestination != null) {
 
-			double distance = getCurrentMissionLocation().getDistance(newDestination.getCoordinates());
+			double newDistance = getCurrentMissionLocation().getDistance(newDestination.getCoordinates());
 
 			// Check if enough resources to get to settlement.
-			if (distance > 0 && hasEnoughResources(getResourcesNeededForTrip(false, distance))) {
+			if (newDistance > 0 && hasEnoughResources(getResourcesNeededForTrip(false, newDistance))) {
 
-				double newTripTime = getEstimatedTripTime(false, distance);
-
-//				LogConsolidated.log(logger, Level.WARNING, 3000, sourceName,
-//						"The estimated trip time for re-routing to the new destination '" 
-//					+ newDestination.getName() + "' is " + Math.round(newTripTime * 100.0/1000.0)/100.0 + " sols", null);
-//				
-				// && !hasEmergencyAllCrew()) {
+				double newTripTime = getEstimatedTripTime(false, newDistance);
+				
+				// Check !hasEmergencyAllCrew() ? 
 
 				// Check if closest settlement is already the next navpoint.
 				boolean sameDestination = false;
@@ -959,24 +954,23 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 					sameDestination = true;
 
 					LogConsolidated.log(logger, Level.WARNING, 5000, sourceName,
-							"[" + vehicle.getName() + "]  Home Settlement : " + Math.round(distance * 100D) / 100D
-									+ " km    Duration : " + Math.round(newTripTime * 100.0 / 1000.0) / 100.0 + " sols",
+							"[" + vehicle.getName() + "]  Home Settlement (" + newDestination.getName() + ") : " 
+							+ Math.round(newDistance * 100D) / 100D
+							+ " km    Duration : " + Math.round(newTripTime * 100.0 / 1000.0) / 100.0 + " sols",
 							null);
+					
 					returnHome();
 
 				}
 
 				if (!sameDestination) {
-//					LogConsolidated.log(logger, Level.WARNING, 3000, sourceName,					
-//						vehicle.getName() + " at " 
-//							+ Math.round(distance*100D)/100D 
-//							+ " km away from its departing settlement is heading toward to the new destination '"
-//							+ newDestination.getName() + "'.", null);
 
 					LogConsolidated.log(logger, Level.WARNING, 5000, sourceName,
-							"[" + vehicle.getName() + "]  Home Settlement : " + Math.round(oldDistance * 100D) / 100D
-									+ " km    Nearest Settlement : " + Math.round(distance * 100D) / 100D
-									+ " km    Duration : " + Math.round(newTripTime * 100.0 / 1000.0) / 100.0 + " sols",
+							"[" + vehicle.getName() + "]  Home Settlement (" + oldHome.getName() + ") : " 
+							+ Math.round(oldDistance * 100D) / 100D
+							+ " km    Nearest Settlement (" + newDestination.getName() + ") : " 
+							+ Math.round(newDistance * 100D) / 100D
+							+ " km    Duration : " + Math.round(newTripTime * 100.0 / 1000.0) / 100.0 + " sols",
 							null);
 
 					// Creating emergency destination mission event.
@@ -998,12 +992,12 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 					endCollectionPhase();
 				}
 
-			} else if (distance > 0 && !hasEnoughResources(getResourcesNeededForTrip(false, distance * 2 / 3))
-					&& hasEnoughResources(getResourcesNeededForTrip(false, distance * 1 / 3))) {
+			} else if (newDistance > 0 && !hasEnoughResources(getResourcesNeededForTrip(false, newDistance * 2 / 3))
+					&& hasEnoughResources(getResourcesNeededForTrip(false, newDistance * 1 / 3))) {
 
 				// if it has enough resources to traverse between 2/3 and 1/3 of the distance
 				// toward the new destination
-				double newTripTime = getEstimatedTripTime(false, distance * 2 / 3);
+				double newTripTime = getEstimatedTripTime(false, newDistance * 2 / 3);
 
 				// && !hasEmergencyAllCrew()) {
 
@@ -1015,25 +1009,24 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 					sameDestination = true;
 
 					LogConsolidated.log(logger, Level.WARNING, 5000, sourceName,
-							"[" + vehicle.getName() + "]  Home Settlement : "
-									+ Math.round(distance * 2 / 3 * 100D) / 100D + " km    Duration : "
-									+ Math.round(newTripTime * 100.0 / 1000.0) / 100.0 + " sols",
+							"[" + vehicle.getName() 
+							+ "]  Home Settlement (" + newDestination.getName() + ") : " 
+							+ Math.round(newDistance * 2 / 3 * 100D) / 100D 
+							+ " km    Duration : "
+							+ Math.round(newTripTime * 100.0 / 1000.0) / 100.0 + " sols",
 							null);
 
 					returnHome();
 				}
 
 				if (!sameDestination) {
-//					LogConsolidated.log(logger, Level.WARNING, 3000, sourceName,					
-//						"Due to an emergency situation, " + vehicle.getName() + ", currently at " 
-//							+ Math.round(distance*100D)/100D 
-//							+ " km away from its origin, is heading toward to the closet settlement "
-//							+ newDestination.getName(), null);
 
 					LogConsolidated.log(logger, Level.WARNING, 5000, sourceName,
-							"[" + vehicle.getName() + "]  Home Settlement : " + Math.round(oldDistance * 100D) / 100D
-									+ " km    Next Routing Stop : " + Math.round(distance * 2 / 3 * 100D) / 100D
-									+ " km    Duration : " + Math.round(newTripTime * 100.0 / 1000.0) / 100.0 + " sols",
+							"[" + vehicle.getName() 
+							+ "]  Home Settlement (" + oldHome.getName() + ") : " 
+							+ Math.round(oldDistance * 100D) / 100D
+							+ " km    Next Routing Stop : " + Math.round(newDistance * 2 / 3 * 100D) / 100D
+							+ " km    Duration : " + Math.round(newTripTime * 100.0 / 1000.0) / 100.0 + " sols",
 							null);
 
 					// Creating emergency destination mission event.

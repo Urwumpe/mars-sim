@@ -18,7 +18,8 @@ Copyright (C) 2018 Scott Davis
    websites such as GitHub pages
 
 4. When clicking on a combobox to pick an option, the option list would pop up
-   at the far edge of the main window
+   at the far edge of the main window, unless the main window has been dragged
+   around the screen and repainted.
 
 
 
@@ -30,15 +31,20 @@ Copyright (C) 2018 Scott Davis
 
 3. Enable the use of Java 11 SE for running mars-sim (experimental).
 
-4. Add concept of mission planning and commander's approval on every mission.
+4. Add mission planning phase and seek approving a mission.
 
 5. Track/record settler's sleep time on each sol.
 
 6. Expand chat capability in headless mode.
 
-7. Implement basic emotion using two dimenional array.
+7. Implement basic emotion using two dimensional array.
 
 8. Add Commander Mode vs. Sandbox Mode.
+
+9. Compare settlement achievement using metrics (e.g. overall social score of 
+   a settlement)
+
+10. Add customizing desired logging level.
 
 
 
@@ -60,6 +66,7 @@ Copyright (C) 2018 Scott Davis
 
 5. Fix gaining mechanical skill in garage.
 
+6. Fix numerous mission bugs.
 
 
 -----------------------------------------------------------------------------------------

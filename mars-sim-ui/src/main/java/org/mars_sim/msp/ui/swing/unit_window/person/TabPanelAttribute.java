@@ -9,12 +9,8 @@ package org.mars_sim.msp.ui.swing.unit_window.person;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
@@ -179,42 +175,14 @@ extends AbstractTableModel {
          	person = (Person) unit;
          	n_manager = person.getNaturalAttributeManager();
 
-    		n_attributes = new ArrayList<Map<String, NaturalAttributeType>>();
-			for (NaturalAttributeType value : NaturalAttributeType.values()) {
-				Map<String,NaturalAttributeType> map = new TreeMap<String,NaturalAttributeType>();
-				map.put(value.getName(),value);
-				n_attributes.add(map);
-			}
-			Collections.sort(
-				n_attributes,
-				new Comparator<Map<String, NaturalAttributeType>>() {
-					@Override
-					public int compare(Map<String, NaturalAttributeType> o1,Map<String, NaturalAttributeType> o2) {
-						return o1.keySet().iterator().next().compareTo(o2.keySet().iterator().next());
-					}
-				}
-			);
+    		n_attributes = n_manager.getAttributes();
         }
 
         else if (unit instanceof Robot) {
         	robot = (Robot) unit;
         	r_manager = robot.getRoboticAttributeManager();
 
-    		r_attributes = new ArrayList<Map<String, RoboticAttributeType>>();
-			for (RoboticAttributeType value : RoboticAttributeType.values()) {
-				Map<String, RoboticAttributeType> map = new TreeMap<String, RoboticAttributeType>();
-				map.put(value.getName(),value);
-				r_attributes.add(map);
-			}
-			Collections.sort(
-				r_attributes,
-				new Comparator<Map<String,RoboticAttributeType>>() {
-					@Override
-					public int compare(Map<String,RoboticAttributeType> o1,Map<String,RoboticAttributeType> o2) {
-						return o1.keySet().iterator().next().compareTo(o2.keySet().iterator().next());
-					}
-				}
-			);
+    		r_attributes = r_manager.getAttributes();
         }
 
 

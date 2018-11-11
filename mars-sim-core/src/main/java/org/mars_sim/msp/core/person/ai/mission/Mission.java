@@ -52,27 +52,25 @@ public abstract class Mission implements Serializable {
 
 	protected static final int MAX_AMOUNT_RESOURCE = ResourceUtil.FIRST_ITEM_RESOURCE;
 
-	// Global mission identifier
-	private static int missionIdentifer = 0;
-
-	public static final String SUCCESSFULLY_ENDED_CONSTRUCTION = "Mission accomplished and all members successfully ended construction";
-	public static final String SUCCESSFULLY_DISEMBARKED = "Mission accomplished and all members successfully disembarked";
-	public static final String USER_ABORTED_MISSION = "Mission aborted by user";
-	public static final String UNREPAIRABLE_MALFUNCTION = "Unrepairable malfunction";
-	public static final String NO_RESERVABLE_VEHICLES = "No reservable vehicles";
-	public static final String NO_AVAILABLE_VEHICLES = "No available vehicles";
-	public static final String NOT_ENOUGH_RESOURCES = "Not enough resources";
-	public static final String NO_EMERGENCY_SETTLEMENT_DESTINATION_FOUND = "No emergency settlement destination found";
-	public static final String MEDICAL_EMERGENCY = "A member has a medical emergency";
-	public static final String NO_TRADING_SETTLEMENT = "No trading settlement";
-	public static final String NO_GOOD_EVA_SUIT = "No good EVA suit";
-	public static final String REQUEST_RESCUE = "Requesting rescue";
-	public static final String NO_ONGOING_SCIENTIFIC_STUDY = "No on-going Scientific study in this subject";
-	public static final String VEHICLE_NOT_LOADABLE = "Cannot load resources into the rover";
-	public static final String NO_EXPLORATION_SITES = "Exploration sites could not be determined";
-	public static final String NOT_ENOUGH_MEMBERS = "Not enough members";
-	public static final String NO_MEMBERS_ON_MISSION = "No members on mission";
-	public static final String MISSION_NOT_APPROVED = "Mission not approved";
+	public static final String SUCCESSFULLY_ENDED_CONSTRUCTION = "Construction ended.";
+	public static final String SUCCESSFULLY_DISEMBARKED = "All members disembarked.";
+	public static final String USER_ABORTED_MISSION = "Mission aborted by user.";
+	public static final String UNREPAIRABLE_MALFUNCTION = "Unrepairable malfunction.";
+	public static final String NO_RESERVABLE_VEHICLES = "No reservable vehicles.";
+	public static final String NO_AVAILABLE_VEHICLES = "No available vehicles.";
+	public static final String NOT_ENOUGH_RESOURCES = "Not enough resources.";
+	public static final String NO_EMERGENCY_SETTLEMENT_DESTINATION_FOUND = "No emergency settlement destination found.";
+	public static final String MEDICAL_EMERGENCY = "A member has a medical emergency.";
+	public static final String NO_TRADING_SETTLEMENT = "No trading settlement found.";
+	public static final String NO_GOOD_EVA_SUIT = "No good EVA suit.";
+	public static final String REQUEST_RESCUE = "Requesting rescue.";
+	public static final String NO_ONGOING_SCIENTIFIC_STUDY = "No on-going scientific study being conducted in this subject.";
+	public static final String VEHICLE_NOT_LOADABLE = "Cannot load resources into the rover.";
+	public static final String NO_EXPLORATION_SITES = "Exploration sites could not be determined.";
+	public static final String NOT_ENOUGH_MEMBERS = "Not enough members recruited.";
+	public static final String NO_MEMBERS_ON_MISSION = "No members available for mission.";
+	public static final String MISSION_NOT_APPROVED = "Mission not approved.";
+	public static final String TARGET_VEHICLE_NOT_FOUND = "Target vehicle not found.";
 	
 
 	public static final String MISSION = " mission";
@@ -101,7 +99,12 @@ public abstract class Mission implements Serializable {
 	 */
 	public final static double DESSERT_MARGIN = 1.5;
 
+	// Global mission identifier
+	private static int missionIdentifer = 0;
+
 	// Data members
+	/** mission type id */
+	private int missionID;
 	/** Unique identifier */
 	private int identifier;
 	/** The minimum number of members for mission. */
@@ -155,6 +158,9 @@ public abstract class Mission implements Serializable {
 		this.identifier = getNextIdentifier();
 		this.missionName = missionName;
 		this.startingMember = startingMember;
+		
+		missionID = MissionManager.matchMissionID(missionName);
+		
 		members = new ConcurrentLinkedQueue<MissionMember>();
 		done = false;
 		phase = null;
@@ -195,7 +201,7 @@ public abstract class Mission implements Serializable {
 			if(Conversion.isVowel(missionName))
 				article = "an ";
 
-			LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + person.getSettlement() + "] "
+			LogConsolidated.log(logger, Level.INFO, 500, sourceName, "[" + person.getSettlement() + "] "
 					+ startingMember.getName() + " is organizing " + article + missionName + " mission" + str, null);
 
 			// Add starting member to mission.
@@ -343,8 +349,8 @@ public abstract class Mission implements Serializable {
 					}
 
 				// Creating missing finishing event.
-				// HistoricalEvent newEvent = new MissionHistoricalEvent(member, this,
-				// EventType.MISSION_FINISH);
+//				 HistoricalEvent newEvent = new MissionHistoricalEvent(member, this,
+//				 EventType.MISSION_FINISH);
 
 				String loc0 = null;
 				String loc1 = null;
@@ -697,28 +703,56 @@ public abstract class Mission implements Serializable {
 	}
 
 	/**
+	 * Computes the mission experience score
+	 * 
+	 * @param reason
+	 */
+	public void addMissionScore(String reason) {
+		if (reason.equals(SUCCESSFULLY_DISEMBARKED)) {
+			for (MissionMember member : members) {
+				if (member instanceof Person) {
+					Person person = (Person) member;
+					
+					if (!person.isDeclaredDead()) {
+						if (!person.getPhysicalCondition().hasSeriousMedicalProblems()) {
+							person.addMissionExperience(missionID, 5);
+						}
+						else
+							// Note : there is a minor penalty for those who are sick 
+							// and thus unable to fully function during the mission
+							person.addMissionExperience(missionID, 2.5);
+						
+						if (person.equals(startingMember)) {
+							person.addMissionExperience(missionID, 2.5);
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	/**
 	 * Finalizes the mission. String reason Reason for ending mission. Mission can
 	 * override this to perform necessary finalizing operations.
 	 */
 	public void endMission(String reason) {
-		// logger.info("Mission's endMission() is in " +
-		// Thread.currentThread().getName() + " Thread");
+//		 if (!(this instanceof RescueSalvageVehicle)) {
+//		 returnHome();
+//		 goToNearestSettlement();
+//		 }
 
-		// if (!(this instanceof RescueSalvageVehicle)) {
-		// returnHome();
-		// goToNearestSettlement();
-		// }
+		// Add mission experience score
+		addMissionScore(reason);
+		
+		// Note: !done is very important to keep !
+		if (!done) {
+			// !reason.equals(USER_ABORTED_MISSION)
+			// reason.equals(SUCCESSFULLY_ENDED_CONSTRUCTION) 
+			// reason.equals(SUCCESSFULLY_DISEMBARKED)
+			// reason.equals(USER_ABORTED_MISSION)
 
-		if (!done) {// && !reason.equals(USER_ABORTED_MISSION) ) {
-			// & reason.equals(SUCCESSFULLY_ENDED_CONSTRUCTION) // Note: !done is very
-			// important to keep !
-			// || reason.equals(SUCCESSFULLY_DISEMBARKED)
-			// || reason.equals(USER_ABORTED_MISSION)) {
-
-			// Note : there can be custom reason such as "Equipment EVA Suit 12 cannot be
+			// TODO : there can be custom reason such as "Equipment EVA Suit 12 cannot be
 			// loaded in rover Rahu" with mission name 'Trade With Camp Bradbury'
-
-			// logger.info("Calling endMission(). Mission ended. Reason : " + reason);
 
 			LogConsolidated.log(logger, Level.INFO, 3000, sourceName,
 					"[" + startingMember.getLocationTag().getQuickLocation() + "] " + startingMember.getName()
@@ -743,12 +777,10 @@ public abstract class Mission implements Serializable {
 				}
 			}
 
-			// logger.info(description + " ending at the " + phase + " phase due to " +
-			// reason);
 		} else
-			LogConsolidated.log(logger, Level.INFO, 3000, sourceName,
+			LogConsolidated.log(logger, Level.INFO, 0, sourceName,
 					"[" + startingMember.getLocationTag().getQuickLocation() + "] " + startingMember.getName()
-							+ " is calling endMission() to end the " + missionName + ". Reason : '" + reason + "'",
+							+ " is ending the " + missionName + ". Reason : '" + reason + "'",
 					null);
 		
 		// Proactively call removeMission to update the list in MissionManager right away
@@ -1021,6 +1053,22 @@ public abstract class Mission implements Serializable {
 		return result;
 	}
 
+	public double[] computeAverage(List<Double> list) {
+		double ave = 0;
+		double total = 0;
+		int size = list.size();
+		if (!list.isEmpty()) {
+			for (double i : list) {
+				total += i;
+			}
+			ave = total/size;
+		}
+		else {
+			ave = 0;
+		}
+		return new double[] {size, ave};
+	}
+	
 	/**
 	 * Gets the mission qualification value for the member. Member is qualified in
 	 * joining the mission if the value is larger than 0. The larger the
@@ -1030,7 +1078,7 @@ public abstract class Mission implements Serializable {
 	 * @param member the member to check.
 	 * @return mission qualification value.
 	 */
-	protected double getMissionQualification(MissionMember member) {
+	public double getMissionQualification(MissionMember member) {
 
 		double result = 0D;
 
@@ -1038,12 +1086,29 @@ public abstract class Mission implements Serializable {
 
 		if (member instanceof Person) {
 			Person person = (Person) member;
-
+			
+			// Compute the mission experience score
+			if (person.getMissionExperiences().containsKey(missionID)) {
+				double[] score = new double[2];
+				
+				List<Double> list = person.getMissionExperiences().get(missionID);
+	
+				if (!list.isEmpty()) {
+					score = computeAverage(list);
+					result = score[0] * score[1] /2.0;
+				}
+				else
+					result = 5;
+			}
+			else
+				result = 5;
+			
 			// Get base result for job modifier.
 			Job job = person.getMind().getJob();
 			if (job != null) {
-				result = job.getJoinMissionProbabilityModifier(this.getClass());
+				result *= 5 * job.getJoinMissionProbabilityModifier(this.getClass());
 			}
+			
 		} else if (member instanceof Robot) {
 			Robot robot = (Robot) member;
 

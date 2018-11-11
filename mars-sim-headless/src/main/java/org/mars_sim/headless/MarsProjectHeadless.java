@@ -31,6 +31,8 @@ public class MarsProjectHeadless {
 
 	/** initialized logger for this class. */
 	private static Logger logger = Logger.getLogger(MarsProjectHeadless.class.getName());
+	
+	private static final String LOGGING_PROPERTIES = "/logging.properties";
 
 	static String[] args;
 
@@ -45,7 +47,7 @@ public class MarsProjectHeadless {
 	 * @param args command line arguments.
 	 */
 	public MarsProjectHeadless(String args[]) {
-		// logger.info("MarsProject's constructor is on
+		// logger.config("MarsProject's constructor is on
 		// "+Thread.currentThread().getName() + " Thread");
 		sim.startSimExecutor();
 		sim.getSimExecutor().submit(new SimulationTask());
@@ -56,9 +58,7 @@ public class MarsProjectHeadless {
 		public void run() {
 			// new Simulation(); // NOTE: NOT supposed to start another instance of the
 			// singleton Simulation
-			logger.info("Starting " + Simulation.title);
-			// Alert the user to see the interactive terminal 
-			logger.info("Please proceed to answering the question in the popped-up console.");
+			logger.config("Starting " + Simulation.title);
 			// Initialize the simulation.
 			initializeSimulation(args);
 
@@ -103,6 +103,8 @@ public class MarsProjectHeadless {
 			// If new argument, create new simulation.
 			handleNewSimulation(userTimeRatio); // if this fails we always exit, continuing is useless
 			result = true;
+			// Alert the user to see the interactive terminal 
+			logger.config("Please proceed to selecting the Game Mode in the popped-up console.");
 			// Load the menu choice
 			sim.getTerm().loadTerminalMenu();
 		} 
@@ -124,6 +126,8 @@ public class MarsProjectHeadless {
 				showError("Could not load the desired simulation. Staring a new Simulation instead. ", e);
 				handleNewSimulation(userTimeRatio);
 				result = true;
+				// Alert the user to see the interactive terminal 
+				logger.config("Please proceed to selecting the Game Mode in the popped-up console.");
 				// Load the menu choice
 				sim.getTerm().loadTerminalMenu();
 			}
@@ -136,6 +140,8 @@ public class MarsProjectHeadless {
 //                showError("Could not load the default simulation, trying to create a new Simulation...", e);
 			handleNewSimulation(userTimeRatio);
 			result = true;
+			// Alert the user to see the interactive terminal 
+			logger.config("Please proceed to selecting the Game Mode in the popped-up console.");
 			// Load the menu choice
 			sim.getTerm().loadTerminalMenu();
 		}
@@ -174,9 +180,6 @@ public class MarsProjectHeadless {
 	 * @throws Exception if error loading the default saved simulation.
 	 */
 	private void handleLoadDefaultSimulation() throws Exception {
-		// logger.info("handleLoadDefaultSimulation() is on
-		// "+Thread.currentThread().getName() + " Thread");
-
 		try {
 			// Load the default simulation
 			sim.loadSimulation(null);
@@ -195,9 +198,6 @@ public class MarsProjectHeadless {
 	 * Create a new simulation instance.
 	 */
 	private void handleNewSimulation(int userTimeRatio) {
-		// logger.info("MarsProject's handleNewSimulation() is on
-		// "+Thread.currentThread().getName() + " Thread");
-
 		try {
 			SimulationConfig.loadConfig();
 
@@ -220,9 +220,6 @@ public class MarsProjectHeadless {
 	 * Start the simulation instance.
 	 */
 	public void startSimulation(boolean useDefaultName) {
-		// logger.info("MarsProject's startSimulation() is on
-		// "+Thread.currentThread().getName() + " Thread");
-
 		// Start the simulation.
 		sim.start(useDefaultName);
 	}
@@ -234,7 +231,7 @@ public class MarsProjectHeadless {
 	 */
 	public static void main(String[] args) throws IOException, InterruptedException, URISyntaxException {
 
-		Logger.getLogger("").setLevel(Level.FINE);
+		Logger.getLogger("").setLevel(Level.ALL);//.FINE);
 
 		MarsProjectHeadless.args = args;
 
@@ -242,7 +239,7 @@ public class MarsProjectHeadless {
 
 		try {
 			LogManager.getLogManager()
-					.readConfiguration(MarsProjectHeadless.class.getResourceAsStream("/logging.properties"));
+					.readConfiguration(MarsProjectHeadless.class.getResourceAsStream(LOGGING_PROPERTIES));
 		} catch (IOException e) {
 			logger.log(Level.WARNING, "Could not load logging properties", e);
 			try {
@@ -266,7 +263,8 @@ public class MarsProjectHeadless {
 
 
 		// starting the simulation
-		MarsProjectHeadless mp = new MarsProjectHeadless(args);
+//		MarsProjectHeadless mp = 
+		new MarsProjectHeadless(args);
 
 	}
 }

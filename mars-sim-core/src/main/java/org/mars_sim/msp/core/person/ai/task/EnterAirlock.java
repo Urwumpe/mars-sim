@@ -143,7 +143,7 @@ public class EnterAirlock extends Task implements Serializable {
 		logger.finer(person + " waiting to enter airlock from outside.");
 
 		// If person is already inside, change to exit airlock phase.
-		if (!person.isOutside()) {
+		if (person.isInside()) {
 			setPhase(EXITING_AIRLOCK);
 			return remainingTime;
 		}
@@ -257,7 +257,7 @@ public class EnterAirlock extends Task implements Serializable {
 		if (airlock.inAirlock(person)) {
 			logger.finer(person + " is entering airlock, but is already in airlock.");
 			setPhase(WAITING_INSIDE_AIRLOCK);
-		} else if (!person.isOutside()) {
+		} else if (person.isInside()) {//!person.isOutside()) {
 			logger.finer(person + " is entering airlock, but is already inside.");
 			endTask();
 		} else if (LocalAreaUtil.areLocationsClose(personLocation, insideAirlockPos)) {
@@ -509,9 +509,9 @@ public class EnterAirlock extends Task implements Serializable {
 					logger.finer(airlockBuilding + " is null");
 				}
 
-				// logger.finest(person + " exiting airlock inside " + airlockBuilding);
-				// addSubTask(new WalkSettlementInterior(person, airlockBuilding,
-				// interiorAirlockPos.getX(), interiorAirlockPos.getY()));
+//				 logger.finest(person + " exiting airlock inside " + airlockBuilding);
+//				 addSubTask(new WalkSettlementInterior(person, airlockBuilding,
+//				 interiorAirlockPos.getX(), interiorAirlockPos.getY()));
 			} else if (airlock.getEntity() instanceof Rover) {
 
 				Rover airlockRover = (Rover) airlock.getEntity();
@@ -594,7 +594,11 @@ public class EnterAirlock extends Task implements Serializable {
 		if (suit != null) {
 			Inventory suitInv = suit.getInventory();
 			Inventory personInv = person.getInventory();
-			Inventory entityInv = person.getContainerUnit().getInventory();
+			if (person.getContainerUnit() == null)
+				System.err.println("storingEVASuitPhase: person.getContainerUnit() == null : " 
+									+ person + " is " 
+									+ person.getLocationStateType());
+			Inventory entityInv = person.getContainerUnit().getInventory(); // why NullPointerException ?
 
 			// Unload oxygen from suit.
 			double oxygenAmount = suitInv.getARStored(oxygenID, false);
@@ -625,13 +629,13 @@ public class EnterAirlock extends Task implements Serializable {
 			}
 
 			// Return suit to entity's inventory.
-			// logger.finer(person.getName() + " putting away EVA suit into " +
-			// entity.getName());
+//			 logger.finer(person.getName() + " putting away EVA suit into " +
+//			 entity.getName());
 			personInv.retrieveUnit(suit);
-			// suit.setLastOwner(person);
+//			 suit.setLastOwner(person);
 			entityInv.storeUnit(suit);
 		} else {
-			logger.severe("[" + person.getLocationTag().getExtendedLocations() + "] " 
+			logger.severe("[" + person.getLocationTag().getLocale() + "] " 
 					+ person.getName() + " doesn't have an EVA suit to put away.");
 		}
 

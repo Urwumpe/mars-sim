@@ -125,7 +125,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	public static double water_consumption;
 
 	public static double minimum_air_pressure;
-
+		
 	/** Amount of time (millisols) required for periodic maintenance. */
 	// private static final double MAINTENANCE_TIME = 1000D;
 
@@ -156,7 +156,13 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	private int numCitizens;
 	/**  Numbers of associated bots in this settlement. */
 	private int numBots;
-		
+	
+	/** The currently minimum passing score for mission approval. */
+	private double minimumPassingScore = 0;
+	/** The trending score for curving the minimum score for mission approval. */
+	private double trendingScore = 30D;
+	/** The recently computed average score of the missions. */
+	private double currentAverageScore = 0;
 	/** Goods manager update time. */
 	private double goodsManagerUpdateTime = 0D;
 	/** The settlement's current indoor temperature. */
@@ -242,6 +248,8 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	/** The settlement's location. */
 	private Coordinates location;
 
+	/** The last 20 mission scores */
+	private List<Double> missionScores;	
 	/** The settlement's achievement in scientific fields. */
 	private Map<ScienceType, Double> scientificAchievement;
 	/** The settlement's resource statistics. */
@@ -252,6 +260,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	private Collection<Robot> allAssociatedRobots = new ConcurrentLinkedQueue<Robot>();
 	/** The settlement's map of adjacent buildings. */
 	private Map<Building, List<Building>> adjacentBuildingMap = new HashMap<>();
+
 	/** The settlement's last dust storm. */
 	private DustStorm storm;
 
@@ -264,6 +273,11 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	private static Weather weather;
 	private static MarsClock marsClock;
 
+//	private static int oxygenID = ResourceUtil.oxygenID;
+//	private static int waterID = ResourceUtil.waterID;
+	private static int co2ID = ResourceUtil.co2ID;
+//	private static int foodID = ResourceUtil.foodID;
+	
 	/** 
 	 * Constructor 1 called by ConstructionStageTest 
 	 */
@@ -383,6 +397,9 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 //				"[" + this + "] Set development objective to " + objectiveType.toString() 
 //				+ " (based upon the '" + template + "' Template).", null);
 
+		// initialize the missionScores list
+		missionScores = new ArrayList<>();
+		missionScores.add(200D);
 	}
 
 	/**
@@ -556,6 +573,8 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 //        .filter(u -> u instanceof Person)
 //        .collect(Collectors.toList()).size();
 
+		// TODO: need to factor in those inside a vehicle parked inside a garage 
+		
 		int n = 0;
 		Iterator<Unit> i = getInventory().getAllContainedUnits().iterator();
 		while (i.hasNext()) {
@@ -812,7 +831,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 
 			double carbonDioxideProvided = oxygenTaken;
 			double carbonDioxideCapacity = getInventory()
-					.getAmountResourceRemainingCapacity(ResourceUtil.carbonDioxideAR, true, false);
+					.getAmountResourceRemainingCapacity(co2ID, true, false);
 			if (carbonDioxideProvided > carbonDioxideCapacity)
 				carbonDioxideProvided = carbonDioxideCapacity;
 			// Note: do NOT store CO2 here since calculateGasExchange() in CompositionOfAir
@@ -1851,18 +1870,25 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	}
 
 	/**
-	 * Gets number of deceased
+	 * Gets the number of deceased people
 	 * 
 	 * @return int
 	 */
 	public int getNumDeceased() {
+		return getDeceasedPeople().size();		
+	}
+	
+	/**
+	 * Returns a collection of deceased people buried outside this settlement
+	 * 
+	 * @return {@link Collection<Person>}
+	 */
+	public Collection<Person> getDeceasedPeople() {
 		// using java 8 stream
-		Collection<Person> result = Simulation.instance().getUnitManager()
+		return Simulation.instance().getUnitManager()
 				.getPeople().stream()
 				.filter(p -> p.getBuriedSettlement() == this)
 				.collect(Collectors.toList());
-
-		return result.size();		
 	}
 	
 	/**
@@ -3288,6 +3314,61 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 		return result;
 	}
 
+	/**
+	 * Checks if the last 20 mission scores are above the threshold
+	 * 
+	 * @param score
+	 * @return true/false
+	 */
+	public boolean passMissionScore(double score) {
+		double total = 0;
+		for (double s : missionScores) {
+			total += s;
+		}
+		currentAverageScore = total/ missionScores.size();
+		
+		minimumPassingScore = Math.round((currentAverageScore + trendingScore) * 10D) / 10D;
+		
+		if (score > currentAverageScore + trendingScore) {
+			trendingScore = (score - currentAverageScore + 2D * trendingScore) / 3D;
+			return true;
+		}
+		else {
+			trendingScore = (currentAverageScore - score + 2D * trendingScore) / 3D;
+			return false;
+		}
+	}
+
+	/**
+	 * Calculates the current minimum passing score
+	 * 
+	 * @return
+	 */
+	public double getMinimumPassingScore() {
+//		double total = 0;
+//		for (double s : missionScores) {
+//			total += s;
+//		}
+//		double ave = total/ missionScores.size();
+//		
+//		return Math.round((currentAverageScore + trendingScore) * 10D) / 10D;
+		
+		return minimumPassingScore;
+	}
+	
+	/**
+	 * Saves the mission score
+	 * 
+	 * @param score
+	 */
+	public void saveMissionScore(double score) {
+		missionScores.add(score);
+		
+		if (missionScores.size() > 20)
+			missionScores.remove(0);
+	}
+	
+	
 	public double getIceProbabilityValue() {
 		return iceProbabilityValue;
 	}

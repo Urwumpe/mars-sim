@@ -13,10 +13,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.mars_sim.msp.core.Coordinates;
@@ -30,7 +37,10 @@ import org.mars_sim.msp.core.mars.OrbitInfo;
 import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.mars.Weather;
 import org.mars_sim.msp.core.person.GenderType;
+import org.mars_sim.msp.core.person.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionMember;
 import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
@@ -38,6 +48,8 @@ import org.mars_sim.msp.core.person.health.Complaint;
 import org.mars_sim.msp.core.person.health.ComplaintType;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.robot.RoboticAttributeManager;
+import org.mars_sim.msp.core.robot.RoboticAttributeType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.time.MarsClock;
@@ -81,10 +93,9 @@ public class ChatUtils {
 	};
 	
 	public final static String[] PERSON_KEYS = new String[] {
-			"feeling", "status",
+			"feeling", "status", "skill", "attribute",
 			"birth", "age", "how old", "born",
 			"friend",
-			"relationship", "social", "relation",
 			"country", "nationality", 
 			"space agency", "sponsor", 
 			"specialty",
@@ -95,6 +106,7 @@ public class ChatUtils {
 	};
 	
 	public final static String[] ALL_PARTIES_KEYS = new String[] {
+			"relationship", "social", "relation",
 			"bed", "sleep", "lodging", "quarters", "time",
 			"where", "location", "located",	
 			"job", "role", "career",
@@ -103,7 +115,8 @@ public class ChatUtils {
 	};
 	
 	public final static String[] SYSTEM_KEYS = new String[] {
-			"settlement",
+			"settlement", "check size", 
+			"log all", "log fine", "log info", "log severe", "log finer", "log finest", "log warning", "log config",
 			"vehicle", "rover", 
 			"hi", "hello", "hey"
 	};
@@ -168,7 +181,8 @@ public class ChatUtils {
 	private static MarsClock marsClock;
 	private static OrbitInfo orbitInfo;
 	private static RelationshipManager relationshipManager;
-	
+	private static SkillManager skillManager;
+
 	private static DecimalFormat fmt = new DecimalFormat("##0");
 	private static DecimalFormat fmt1 = new DecimalFormat("#0.0");
 	private static DecimalFormat fmt2 = new DecimalFormat("#0.00");
@@ -449,6 +463,39 @@ public class ChatUtils {
 	}
 	
 	/**
+	 * Computes the overall relationship score of a settlement
+	 * 
+	 * @param s Settlement
+	 * @return the score
+	 */
+	public static double getRelationshipScore(Settlement s) {
+		double score = 0;
+		if (relationshipManager == null)
+			relationshipManager = Simulation.instance().getRelationshipManager();
+		
+		Collection<Person> col = s.getAllAssociatedPeople();
+
+		List<Person> list0 = new ArrayList<>(col);
+
+		int count = 0;
+		for (Person pp : list0) {
+			Map<Person, Double> friends = relationshipManager.getFriends(pp);
+			if (!friends.isEmpty()) {
+				List<Person> list = new ArrayList<>(friends.keySet());
+				for (int i = 0; i < list.size(); i++) {
+					Person p = list.get(i);
+					score += friends.get(p);
+					count++;
+				}
+			}
+		}
+		
+		score = Math.round(score/count *100.0)/100.0;
+		
+		return score;
+	}
+	
+	/**
 	 * Asks the settlement when the input is a string
 	 * 
 	 * @param text the input string
@@ -460,7 +507,20 @@ public class ChatUtils {
 		String questionText = "";
 		StringBuilder responseText = new StringBuilder();
 		
-		if (text.toLowerCase().contains("time")) {
+		if (text.toLowerCase().contains("relationship")
+				|| text.toLowerCase().contains("relation")
+				|| text.toLowerCase().contains("social")) {
+			questionText = YOU_PROMPT + "How is the overall social score in this settlement ?"; 
+
+			double score = getRelationshipScore(settlementCache);
+		
+			responseText.append(System.lineSeparator())	;		
+			responseText.append(settlementCache.getName() + "'s current overall social score is " + fmt1.format(score) + ".");
+			responseText.append(System.lineSeparator());
+		
+		}
+		
+		else if (text.toLowerCase().contains("time")) {
 			questionText = YOU_PROMPT + "What time is it ?"; 
 			responseText.append(settlementCache.getName() + " : ");
 			responseText.append("Here's the latest time info.");
@@ -883,15 +943,33 @@ public class ChatUtils {
 		else if (text.toLowerCase().contains("people") || text.toLowerCase().contains("settler") 
 				|| text.toLowerCase().contains("person")) {
 			
-			Collection<Person> list = settlementCache.getAllAssociatedPeople();
+//			Collection<Person> list = settlementCache.getAllAssociatedPeople();
 			int total = settlementCache.getNumCitizens();
-			int indoor = settlementCache.getIndoorPeopleCount();
-			int dead = settlementCache.getNumDeceased();
-			int outdoor = total - indoor - dead;
+//			int indoor = settlementCache.getIndoorPeopleCount();
+//			int dead = settlementCache.getNumDeceased();
+//			int outdoor = settlementCache.getNumOutsideEVAPeople(); //total - indoor - dead;
+			
+			List<Person> outdoorP = new ArrayList<>(settlementCache.getOutsideEVAPeople());
+			List<Person> indoorP = new ArrayList<>(settlementCache.getIndoorPeople());
+			List<Person> deceasedP = new ArrayList<>(settlementCache.getDeceasedPeople());
+			
+			Collections.sort(outdoorP);
+			Collections.sort(indoorP);
+			Collections.sort(deceasedP);
+			
+			int indoor = indoorP.size();//settlementCache.getIndoorPeopleCount();
+			int dead = deceasedP.size();//settlementCache.getNumDeceased();
+			int outdoor = outdoorP.size();//settlementCache.getNumOutsideEVAPeople(); //total - indoor - dead;
+	
 			questionText = YOU_PROMPT + "Who are the settlers ? ";
-			responseText.append(settlementCache + " : According to the registry,"); 
+			responseText.append(settlementCache + " : According to the Mars Registry,"); 
 			responseText.append(System.lineSeparator());
-			responseText.append("  - - - S t a t u s - - -");
+			responseText.append(System.lineSeparator());
+			responseText.append("  -----------------------");
+			responseText.append(System.lineSeparator());
+			responseText.append("          Status");
+			responseText.append(System.lineSeparator());
+			responseText.append("  -----------------------");
 			responseText.append(System.lineSeparator());
 			responseText.append("    Registered : " + total);
 			responseText.append(System.lineSeparator());
@@ -902,22 +980,41 @@ public class ChatUtils {
 			responseText.append("      Deceased : " + dead);
 			responseText.append(System.lineSeparator());
 			responseText.append(System.lineSeparator());
-			responseText.append("  - - - R o s t e r - - -");
-
-			List<Person> namelist = new ArrayList<>(list);
-			Collections.sort(namelist);
-			String s = "";
-			for (int i = 0; i < namelist.size(); i++) {
-				if (namelist.get(i).isDeclaredDead())
-					s = s + "(" + (i+1) + "). " + namelist.get(i).toString() + " (Deceased)"+ System.lineSeparator();
-				else
-					s = s + "(" + (i+1) + "). " + namelist.get(i).toString() + System.lineSeparator();					
-			}
-			//		.replace("[", "").replace("]", "");//.replaceAll(", ", ",\n");
-			//System.out.println("list : " + list);
+			
+			responseText.append("  -----------------------");
 			responseText.append(System.lineSeparator());
-			responseText.append(s);
+			responseText.append("          Roster");
 			responseText.append(System.lineSeparator());
+			responseText.append("  -----------------------");
+			responseText.append(System.lineSeparator());
+						
+			// Indoor
+			responseText.append(System.lineSeparator());
+			responseText.append("  A. Indoor ");
+			responseText.append(System.lineSeparator());
+			responseText.append("  -----------");
+			responseText.append(System.lineSeparator());
+			
+			responseText.append(printList(indoorP));
+			
+			// Outdoor
+			responseText.append(System.lineSeparator());
+			responseText.append("  B. Outdoor ");
+			responseText.append(System.lineSeparator());
+			responseText.append("  ------------");
+			responseText.append(System.lineSeparator());
+			
+			responseText.append(printList(outdoorP));
+			
+			// Deceased
+			responseText.append(System.lineSeparator());
+			responseText.append("  C. Deceased ");
+			responseText.append(System.lineSeparator());
+			responseText.append("  -------------");
+			responseText.append(System.lineSeparator());
+			
+			responseText.append(printList(deceasedP));
+		
 		}
 		
 		else if (text.toLowerCase().contains("bed") || text.toLowerCase().contains("sleep") 
@@ -1104,7 +1201,110 @@ public class ChatUtils {
 		responseText.append(name);
 		responseText.append(": ");
 
-		if (text.toLowerCase().contains("time")) {
+		if (text.toLowerCase().contains("attribute")) {
+			questionText = YOU_PROMPT + "What are your natural attributes ?"; 
+			
+	        
+			responseText.append("here's a list of my natural attributes with scores ");
+			responseText.append(System.lineSeparator());
+			responseText.append(System.lineSeparator());
+			responseText.append("          Attributes | Score");
+			responseText.append(System.lineSeparator());
+			responseText.append(" --------------------------");	
+			responseText.append(System.lineSeparator());
+			
+			if (personCache != null) {
+				NaturalAttributeManager n_manager = personCache.getNaturalAttributeManager();		
+				Hashtable<NaturalAttributeType, Integer> n_attributes = n_manager.getAttributeTable();
+				List<String> attributeList = n_manager.getAttributeList();
+				int max = 20;
+//				String space = "";		
+				for (int i=0; i< attributeList.size(); i++) {
+					String n = attributeList.get(i);
+					int size = n.length();
+//					if (i+1 <= 9)
+//						space = " ";
+					for (int j=0; j< (max-size); j++) {
+						responseText.append(" ");
+					}
+//					responseText.append(space + "(" + (i+1) + ") ");
+					responseText.append(n);
+					responseText.append(" : ");
+					responseText.append(n_attributes.get(NaturalAttributeType.valueOfIgnoreCase(n)));
+					responseText.append(System.lineSeparator());			
+				}
+				
+			}
+			else if (robotCache != null) {
+				RoboticAttributeManager r_manager = robotCache.getRoboticAttributeManager();	
+				Hashtable<RoboticAttributeType, Integer> r_attributes = r_manager.getAttributeTable();
+				List<String> attributeList = r_manager.getAttributeList();
+				int max = 20;
+//				String space = "";		
+				for (int i=0; i< attributeList.size(); i++) {
+					String n = attributeList.get(i);
+					int size = n.length();
+//					if (i+1 <= 9)
+//						space = " ";
+					for (int j=0; j< (max-size); j++) {
+						responseText.append(" ");
+					}
+//					responseText.append(space + "(" + (i+1) + ") ");
+					responseText.append(n);
+					responseText.append(" : ");
+					responseText.append(r_attributes.get(RoboticAttributeType.valueOfIgnoreCase(n)));
+					responseText.append(System.lineSeparator());			
+				}
+				
+			}			
+	
+		}
+		
+		else if (text.toLowerCase().contains("skill")) {
+			questionText = YOU_PROMPT + "What are your skills ?"; 
+			
+			if (personCache != null) {
+				skillManager = personCache.getMind().getSkillManager();	
+			}
+			
+			else if (robotCache != null) {
+				skillManager = robotCache.getBotMind().getSkillManager();			
+			}			
+			
+			responseText.append("here's a list of my skills with level : ");
+			responseText.append(System.lineSeparator());
+			responseText.append(System.lineSeparator());
+			responseText.append("       Type of Skill | Level");
+			responseText.append(System.lineSeparator());
+			responseText.append("     ------------------------");	
+			responseText.append(System.lineSeparator());
+			
+			Map<String, Integer> skills = skillManager.getSkillsMap();
+			List<String> skillNames = skillManager.getSkillNames();
+			Collections.sort(skillNames);
+//			SkillType[] keys = skillManager.getKeys();
+			
+			int max = 20;
+//			String space = "";		
+			for (int i=0; i< skillNames.size(); i++) {
+				String n = skillNames.get(i);
+				int size = n.length();
+//				if (i+1 <= 9)
+//					space = " ";
+				for (int j=0; j< (max-size); j++) {
+					responseText.append(" ");
+				}
+//				responseText.append(space + "(" + (i+1) + ") ");
+				responseText.append(n);
+				responseText.append(" : ");
+				responseText.append(skills.get(n));
+				responseText.append(System.lineSeparator());			
+			}
+			
+		}
+		
+
+		else if (text.toLowerCase().contains("time")) {
 			questionText = YOU_PROMPT + "What time is it ?"; 
 			
 //			responseText.append(personCache.getName() + " : ");
@@ -1200,45 +1400,111 @@ public class ChatUtils {
 			if (friends.isEmpty()) {
 				responseText.append("I don't have any friends yet.");
 			}
-			else { 
+			else {
+				responseText.append(" See the table below ");
+				responseText.append(System.lineSeparator());	
+				responseText.append(System.lineSeparator());
 				List<Person> list = new ArrayList<>(friends.keySet());
 				int size = list.size();
+				
+				responseText.append("                   Friend | Score | Attitude "
+						+ System.lineSeparator());
+				responseText.append("      -----------------------------------------"
+						+ System.lineSeparator());		
+				
+				int max = 25;
+				int max1 = 16;
+				int max2 = 7;
+				String SPACE = " ";
 				
 				if (size == 1) {
 					Person p = list.get(0);
 					double score = friends.get(p);
-					String pronoun = "him";
 					String relation = RelationshipManager.describeRelationship(score);
-					if (!relation.equals("trusting") && !relation.equals("hating"))
-						relation = relation + " to ";
-					else
-						relation = relation + " ";
-					if (p.getGender() == GenderType.FEMALE)
-						pronoun = "her";
-					responseText.append("My relationship is simple with " + p + ". ");
-					responseText.append("I'm " + relation + pronoun + " (");
-					responseText.append("score : " + fmt1.format(score) + ").");
+					int size0 = max - p.getName().length();
+					for (int i=0; i<size0; i++) {
+						responseText.append(SPACE);
+					}
+					responseText.append(p);
+					
+					int size2 = max2 - fmt1.format(score).length();
+					for (int i=0; i<size2; i++) {
+						responseText.append(SPACE);
+					}
+					responseText.append(fmt1.format(score));
+					
+					int size1 = max1 - relation.length();
+					for (int i=0; i<size1; i++) {
+						responseText.append(SPACE);
+					}
+					responseText.append(relation);
+					
+					responseText.append(System.lineSeparator());	
 				}
 				else if (size >= 2) {
-					responseText.append("My relationship with those I know are : ");
-					responseText.append(System.lineSeparator());	
-					for (int i = 0; i < size; i++) {
-						Person p = list.get(i);
+//					responseText.append(System.lineSeparator());	
+					for (int x = 0; x < size; x++) {
+						Person p = list.get(x);
 						double score = friends.get(p);
-						String pronoun = "him";
 						String relation = RelationshipManager.describeRelationship(score);
-						if (!relation.equals("trusting") && !relation.equals("hating"))
-							relation = relation + " to ";
-						else
-							relation = relation + " ";
-						if (p.getGender() == GenderType.FEMALE)
-							pronoun = "her";					
-						responseText.append("(" + (i+1) + "). " + p + " -- ");
-						responseText.append("I'm " + relation + pronoun + " (");
-						responseText.append("score : " + fmt1.format(score) + ").");
-						responseText.append(System.lineSeparator());
+						int size0 = max - p.getName().length();
+						for (int i=0; i<size0; i++) {
+							responseText.append(SPACE);
+						}
+						responseText.append(p);
+						
+						int size2 = max2 - fmt1.format(score).length();
+						for (int i=0; i<size2; i++) {
+							responseText.append(SPACE);
+						}
+						responseText.append(fmt1.format(score));
+						
+//						int size1 = max1 - relation.length();
+//						for (int i=0; i<size1; i++) {
+//							responseText.append(SPACE);
+//						}
+						responseText.append("    ");
+						responseText.append(relation);
+					
+						responseText.append(System.lineSeparator());	
 					}
 				}	
+				
+//				if (size == 1) {
+//					Person p = list.get(0);
+//					double score = friends.get(p);
+//					String pronoun = "him";
+//					String relation = RelationshipManager.describeRelationship(score);
+//					if (!relation.equals("trusting") && !relation.equals("hating"))
+//						relation = relation + " to ";
+//					else
+//						relation = relation + " ";
+//					if (p.getGender() == GenderType.FEMALE)
+//						pronoun = "her";
+//					responseText.append("My relationship is simple with " + p + ". ");
+//					responseText.append("I'm " + relation + pronoun + " (");
+//					responseText.append("score : " + fmt1.format(score) + ").");
+//				}
+//				else if (size >= 2) {
+//					responseText.append("My relationship with those I know are : ");
+//					responseText.append(System.lineSeparator());	
+//					for (int i = 0; i < size; i++) {
+//						Person p = list.get(i);
+//						double score = friends.get(p);
+//						String pronoun = "him";
+//						String relation = RelationshipManager.describeRelationship(score);
+//						if (!relation.equals("trusting") && !relation.equals("hating"))
+//							relation = relation + " to ";
+//						else
+//							relation = relation + " ";
+//						if (p.getGender() == GenderType.FEMALE)
+//							pronoun = "her";					
+//						responseText.append("(" + (i+1) + "). " + p + " -- ");
+//						responseText.append("I'm " + relation + pronoun + " (");
+//						responseText.append("score : " + fmt1.format(score) + ").");
+//						responseText.append(System.lineSeparator());
+//					}
+//				}	
 			}
 		}
 
@@ -1920,6 +2186,29 @@ public class ChatUtils {
 
 	}
 
+//	public static <T extends Comparable<? super T>> void customSort(List<T> list) {
+//		Object[] a = list.toArray();
+//	    Arrays.sort(a);
+//	    ListIterator<T> i = list.listIterator();
+//	    for (int j=0; j<a.length; j++) {
+//	    	i.next();
+//	        i.set((T)a[j]);
+//	    }
+//	}
+	
+	public static void setDebugLevel(Level newLvl) {
+		// Java 8 stream
+//		Arrays.stream(LogManager.getLogManager().getLogger("").getHandlers()).forEach(h -> h.setLevel(newLvl));
+		
+	    Logger rootLogger = LogManager.getLogManager().getLogger("");
+	    Handler[] handlers = rootLogger.getHandlers();
+	    rootLogger.setLevel(newLvl);
+	    for (Handler h : handlers) {
+	        if (h instanceof ConsoleHandler)
+	            h.setLevel(newLvl);
+	    }
+	}
+	
 	/*
 	 * Asks the system a question
 	 * 
@@ -1950,6 +2239,219 @@ public class ChatUtils {
 			proceed = true;
 		}
 
+		else if (text.toLowerCase().contains("log")) {			
+			
+			if (text.equalsIgnoreCase("log")) {		
+				
+				Level level = LogManager.getLogManager().getLogger("").getLevel();
+				
+				responseText.append("Current logging level is : " + level);
+				responseText.append(System.lineSeparator());
+				responseText.append(System.lineSeparator());
+
+//				SEVERE (highest value)
+//				WARNING
+//				INFO
+//				CONFIG
+//				FINE
+//				FINER
+//				FINEST (lowest value)
+				
+//				responseText.append(System.lineSeparator());
+				responseText.append("Please specify the Logging Level as follows : ");
+				responseText.append(System.lineSeparator());
+				responseText.append(" 1. log off");
+				responseText.append(System.lineSeparator());
+				responseText.append(" 2. log severe");
+				responseText.append(System.lineSeparator());
+				responseText.append(" 3. log warning");
+				responseText.append(System.lineSeparator());
+				responseText.append(" 4. log info");
+				responseText.append(System.lineSeparator());
+				responseText.append(" 5. log config");
+				responseText.append(System.lineSeparator());
+				responseText.append(" 6. log fine");
+				responseText.append(System.lineSeparator());
+				responseText.append(" 7. log finer");
+				responseText.append(System.lineSeparator());
+				responseText.append(" 8. log finest");
+				responseText.append(System.lineSeparator());
+				responseText.append(" 9. log all");
+				
+				responseText.append(System.lineSeparator());				
+				responseText.append(System.lineSeparator());
+				responseText.append("See https://docs.oracle.com/javase/8/docs/api/java/util/logging/Level.html");
+				
+					
+				responseText.append(System.lineSeparator());
+				responseText.append(System.lineSeparator());
+				responseText.append("e.g. Type 'log info' at the prompt to set it to the INFO level");
+//				responseText.append(System.lineSeparator());
+				
+				return responseText.toString();						
+			}
+			
+			if (text.equalsIgnoreCase("log off")) {			
+				
+				setDebugLevel(Level.OFF);
+				
+//				responseText.append(System.lineSeparator());
+				responseText.append("Logging is set to OFF");	
+				
+				return responseText.toString();						
+			}
+			
+			
+			else if (text.equalsIgnoreCase("log config")) {			
+				
+				setDebugLevel(Level.CONFIG);
+				
+//				responseText.append(System.lineSeparator());
+				responseText.append("Logging is set to CONFIG");	
+				
+				return responseText.toString();						
+			}
+
+
+			
+			else if (text.equalsIgnoreCase("log warning")) {			
+				
+				setDebugLevel(Level.WARNING);
+				
+//				responseText.append(System.lineSeparator());
+				responseText.append("Logging is set to WARNING");	
+				
+				return responseText.toString();						
+			}
+			
+			else if (text.equalsIgnoreCase("log fine")) {			
+				
+				setDebugLevel(Level.FINE);
+				
+//				responseText.append(System.lineSeparator());
+				responseText.append("Logging is set to FINE");	
+				
+				return responseText.toString();						
+			}
+			
+			else if (text.equalsIgnoreCase("log finer")) {			
+				
+				setDebugLevel(Level.FINER);
+				
+//				responseText.append(System.lineSeparator());
+				responseText.append("Logging is set to FINER");	
+				
+				return responseText.toString();						
+			}
+			
+			else if (text.equalsIgnoreCase("log finest")) {			
+				
+				setDebugLevel(Level.FINEST);
+				
+//				responseText.append(System.lineSeparator());
+				responseText.append("Logging is set to FINEST");	
+				
+				return responseText.toString();						
+			}
+			
+			else if (text.equalsIgnoreCase("log severe")) {			
+				
+				setDebugLevel(Level.SEVERE);
+				
+//				responseText.append(System.lineSeparator());
+				responseText.append("Logging is set to SEVERE");	
+				
+				return responseText.toString();
+			}
+			
+			else if (text.equalsIgnoreCase("log info")) {			
+				
+				setDebugLevel(Level.INFO);
+						
+//				responseText.append(System.lineSeparator());
+				responseText.append("Logging is set to INFO");
+				
+				return responseText.toString();
+			}
+					
+			else if (text.equalsIgnoreCase("log all")) {			
+				
+				setDebugLevel(Level.ALL);
+				
+//				responseText.append(System.lineSeparator());
+				responseText.append("Logging is set to ALL");	
+				
+				return responseText.toString();						
+			}
+		}
+		
+		else if (text.equalsIgnoreCase("check size")) {			
+			responseText.append(System.lineSeparator());
+			responseText.append(Simulation.instance().printObjectSize());
+			
+			return responseText.toString();
+		}
+		
+		else if (text.toLowerCase().contains("relationship")
+				|| text.toLowerCase().contains("relation")
+				|| text.toLowerCase().contains("social")) {
+
+			double ave = 0;
+			Map<Double, String> map = new HashMap<>();
+//			List<String> list = new ArrayList<>();
+			List<Double> scores = new ArrayList<>();
+			Collection<Settlement> col = sim.getUnitManager().getSettlements();
+			for (Settlement s : col) {
+				double score = getRelationshipScore(s);
+				ave += score;
+//				list.add(s.getName());
+				scores.add(score);
+				map.put(score, s.getName());
+			}	
+			int size = scores.size();
+			ave = ave / size;
+			
+			responseText.append("Current overall social score for all " + size + " settlements : " + fmt1.format(ave));
+			responseText.append(System.lineSeparator());
+			responseText.append(System.lineSeparator());
+			
+			responseText.append("   Rank | Score | Settlement");
+			responseText.append(System.lineSeparator());
+			responseText.append(" -----------------------------------");
+			responseText.append(System.lineSeparator());
+			
+			scores.sort((Double d1, Double d2) -> -d1.compareTo(d2)); 
+			
+			for (int i=0; i<size; i++) {
+				double score = scores.get(i);
+				String space = "";
+				String scoreStr = score + "";
+				int num = scoreStr.length();
+				if (num == 2)
+					space = "   ";
+				else if (num == 3)
+					space = "  ";
+				else if (num == 4)
+					space = " ";
+				else if (num == 5)
+					space = "";
+				
+				String name = map.get(scores.get(i));			
+				responseText.append("    #" + (i+1) + "    " + space + fmt1.format(score) + "    " + name );
+				// Note : remove the pair will prevent the case when when 2 or more settlements have the exact same score from reappearing
+				map.remove(score, name);
+				responseText.append(System.lineSeparator());
+			}
+			
+//			responseText.append(System.lineSeparator());
+			
+//			map.entrySet().stream()
+//			   .sorted(Map.Entry.comparingByValue())
+//			   .forEach(System.out::println);
+			
+			return responseText.toString();
+		}
+		
 		else if (text.toLowerCase().contains("time")) {
 			
 			responseText.append(SYSTEM_PROMPT);
@@ -2361,6 +2863,76 @@ public class ChatUtils {
 		return responseText.toString();
 	}
 
+	/**
+     * Generates and prints the list that needs to be processed
+     * 
+     * @param indoorP
+     * @return String
+     */
+    public static StringBuilder printList(List<?> indoorP) {
+      	StringBuilder sb = new StringBuilder();
+      	
+    	if (indoorP.isEmpty()) {
+    		sb.append("    None");
+    		sb.append(System.lineSeparator());
+    		return sb;
+    	}
+    		
+      	List<String> list = new ArrayList<>();
+      	for (Object o : indoorP) {
+      		list.add(o.toString());
+      	}
+      	
+    	StringBuffer s = new StringBuffer();
+    	int SPACES = 22;
+    	//int row = 0;
+        for (int i=0; i< list.size(); i++) {
+        	int column = 0;
+        	
+        	String c = "";
+        	int num = 0;        	
+        	
+        	// Find out what column
+        	if ((i - 1) % 3 == 0)
+        		column = 1;
+        	else if ((i - 2) % 3 == 0)
+        		column = 2;
+
+        	// Look at how many whitespaces needed before printing each column
+			if (column == 0) {
+				c = list.get(i).toString();
+				num = SPACES - c.length();
+	
+			}
+			
+			else if (column == 1 || column == 2) {
+	        	c = list.get(i).toString();
+	        	num = SPACES - list.get(i-1).toString().length();
+
+	        	// Handle the extra space before the parenthesis
+	            for (int j=0; j < num; j++) { 
+	            	s.append(" ");
+	            }    			
+    		}
+
+        	if (i+1 < 10)
+        		s.append(" ");
+        	s.append("(");
+        	s.append(i+1);
+        	s.append("). ");
+        	s.append(c);        		
+            
+            // if this is the last column
+            if (column == 2 || i == list.size()-1) {
+                sb.append(s);
+                sb.append(System.lineSeparator());
+                s = new StringBuffer();
+            }
+        }
+      
+        return sb;    
+    }
+    
 	public static void setConnectionMode(int value) {
 		connectionMode = value;
 	}
