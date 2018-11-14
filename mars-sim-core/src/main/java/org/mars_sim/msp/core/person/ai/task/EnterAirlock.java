@@ -10,10 +10,12 @@ import java.awt.geom.Point2D;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.LocalAreaUtil;
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.equipment.EVASuit;
 import org.mars_sim.msp.core.person.NaturalAttributeType;
@@ -39,6 +41,9 @@ public class EnterAirlock extends Task implements Serializable {
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(EnterAirlock.class.getName());
 
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			logger.getName().length());
+	
 //    private static final double INGRESS_TIME = .05; // in millisols
 
 	/** Task name */
@@ -143,7 +148,7 @@ public class EnterAirlock extends Task implements Serializable {
 		logger.finer(person + " waiting to enter airlock from outside.");
 
 		// If person is already inside, change to exit airlock phase.
-		if (!person.isOutside()) {
+		if (person.isInside()) {
 			setPhase(EXITING_AIRLOCK);
 			return remainingTime;
 		}
@@ -257,7 +262,7 @@ public class EnterAirlock extends Task implements Serializable {
 		if (airlock.inAirlock(person)) {
 			logger.finer(person + " is entering airlock, but is already in airlock.");
 			setPhase(WAITING_INSIDE_AIRLOCK);
-		} else if (!person.isOutside()) {
+		} else if (person.isInside()) {//!person.isOutside()) {
 			logger.finer(person + " is entering airlock, but is already inside.");
 			endTask();
 		} else if (LocalAreaUtil.areLocationsClose(personLocation, insideAirlockPos)) {
@@ -509,9 +514,9 @@ public class EnterAirlock extends Task implements Serializable {
 					logger.finer(airlockBuilding + " is null");
 				}
 
-				// logger.finest(person + " exiting airlock inside " + airlockBuilding);
-				// addSubTask(new WalkSettlementInterior(person, airlockBuilding,
-				// interiorAirlockPos.getX(), interiorAirlockPos.getY()));
+//				 logger.finest(person + " exiting airlock inside " + airlockBuilding);
+//				 addSubTask(new WalkSettlementInterior(person, airlockBuilding,
+//				 interiorAirlockPos.getX(), interiorAirlockPos.getY()));
 			} else if (airlock.getEntity() instanceof Rover) {
 
 				Rover airlockRover = (Rover) airlock.getEntity();
@@ -588,51 +593,64 @@ public class EnterAirlock extends Task implements Serializable {
 		double remainingTime = time;
 
 //        if (person != null) {
-		logger.finer(person + " is stowing away the EVA suit");
-		// Store EVA suit in settlement or rover.
+		
+
 		EVASuit suit = (EVASuit) person.getInventory().findUnitOfClass(EVASuit.class);
 		if (suit != null) {
+			
 			Inventory suitInv = suit.getInventory();
 			Inventory personInv = person.getInventory();
-			Inventory entityInv = person.getContainerUnit().getInventory();
-
-			// Unload oxygen from suit.
-			double oxygenAmount = suitInv.getARStored(oxygenID, false);
-			double oxygenCapacity = entityInv.getARRemainingCapacity(oxygenID, true, false);
-			if (oxygenAmount > oxygenCapacity)
-				oxygenAmount = oxygenCapacity;
-			try {
-				suitInv.retrieveAR(oxygenID, oxygenAmount);
-				entityInv.storeAR(oxygenID, oxygenAmount, true);
-				entityInv.addAmountSupplyAmount(oxygenID, oxygenAmount);
-
-			} catch (Exception e) {
-				logger.severe("Oxygen is not available : " + e.getMessage());
+			if (person.getContainerUnit() == null) {
+				LogConsolidated.log(logger, Level.WARNING, 0, sourceName,
+						"[" + person.getLocationTag().getLocale() + "] "  
+									+ person + " has no container. Location state type : " 
+									+ person.getLocationStateType()
+									, null);
 			}
-
-			// Unload water from suit.
-			double waterAmount = suitInv.getARStored(waterID, false);
-			double waterCapacity = entityInv.getARRemainingCapacity(waterID, true, false);
-			if (waterAmount > waterCapacity)
-				waterAmount = waterCapacity;
-			try {
-				suitInv.retrieveAR(waterID, waterAmount);
-				entityInv.storeAR(waterID, waterAmount, true);
-				entityInv.addAmountSupplyAmount(waterID, waterAmount);
-
-			} catch (Exception e) {
-				logger.severe("Water is not available : " + e.getMessage());
+			else {
+				// Empty the EVA suit
+				logger.finer(person + " is stowing away " + suit.getName());
+				Inventory entityInv = person.getContainerUnit().getInventory(); // why NullPointerException ?
+	
+				// Unload oxygen from suit.
+				double oxygenAmount = suitInv.getARStored(oxygenID, false);
+				double oxygenCapacity = entityInv.getARRemainingCapacity(oxygenID, true, false);
+				if (oxygenAmount > oxygenCapacity)
+					oxygenAmount = oxygenCapacity;
+				try {
+					suitInv.retrieveAR(oxygenID, oxygenAmount);
+					entityInv.storeAR(oxygenID, oxygenAmount, true);
+					entityInv.addAmountSupplyAmount(oxygenID, oxygenAmount);
+	
+				} catch (Exception e) {
+					logger.severe("Oxygen is not available : " + e.getMessage());
+				}
+	
+				// Unload water from suit.
+				double waterAmount = suitInv.getARStored(waterID, false);
+				double waterCapacity = entityInv.getARRemainingCapacity(waterID, true, false);
+				if (waterAmount > waterCapacity)
+					waterAmount = waterCapacity;
+				try {
+					suitInv.retrieveAR(waterID, waterAmount);
+					entityInv.storeAR(waterID, waterAmount, true);
+					entityInv.addAmountSupplyAmount(waterID, waterAmount);
+	
+				} catch (Exception e) {
+					logger.severe("Water is not available : " + e.getMessage());
+				}
+	
+				// Return suit to entity's inventory.
+	//			 logger.finer(person.getName() + " putting away EVA suit into " +
+	//			 entity.getName());
+				personInv.retrieveUnit(suit);
+	//			 suit.setLastOwner(person);
+				entityInv.storeUnit(suit);
 			}
-
-			// Return suit to entity's inventory.
-			// logger.finer(person.getName() + " putting away EVA suit into " +
-			// entity.getName());
-			personInv.retrieveUnit(suit);
-			// suit.setLastOwner(person);
-			entityInv.storeUnit(suit);
 		} else {
-			logger.severe("[" + person.getLocationTag().getExtendedLocations() + "] " 
-					+ person.getName() + " doesn't have an EVA suit to put away.");
+			LogConsolidated.log(logger, Level.WARNING, 0, sourceName,
+					"[" + person.getLocationTag().getLocale() + "] " 
+					+ person.getName() + " doesn't have an EVA suit to put away.", null);
 		}
 
 //        }

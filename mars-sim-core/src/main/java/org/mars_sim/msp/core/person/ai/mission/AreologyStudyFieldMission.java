@@ -363,7 +363,7 @@ public class AreologyStudyFieldMission extends RoverMission implements Serializa
 	}
 
 	@Override
-	protected double getMissionQualification(MissionMember member) {
+	public double getMissionQualification(MissionMember member) {
 		double result = super.getMissionQualification(member);
 
 		if ((result > 0D) && (member instanceof Person)) {
@@ -445,7 +445,7 @@ public class AreologyStudyFieldMission extends RoverMission implements Serializa
 			setPhaseDescription(
 					Msg.getString("Mission.phase.travelling.description", getNextNavpoint().getDescription())); // $NON-NLS-1$
 		} else if (DISEMBARKING.equals(getPhase())) {
-			endMission(SUCCESSFULLY_DISEMBARKED);
+			endMission(ALL_DISEMBARKED);
 		}
 	}
 

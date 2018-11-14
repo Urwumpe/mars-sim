@@ -125,7 +125,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	public static double water_consumption;
 
 	public static double minimum_air_pressure;
-
+		
 	/** Amount of time (millisols) required for periodic maintenance. */
 	// private static final double MAINTENANCE_TIME = 1000D;
 
@@ -156,7 +156,13 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	private int numCitizens;
 	/**  Numbers of associated bots in this settlement. */
 	private int numBots;
-		
+	
+	/** The currently minimum passing score for mission approval. */
+	private double minimumPassingScore = 0;
+	/** The trending score for curving the minimum score for mission approval. */
+	private double trendingScore = 30D;
+	/** The recently computed average score of the missions. */
+	private double currentAverageScore = 0;
 	/** Goods manager update time. */
 	private double goodsManagerUpdateTime = 0D;
 	/** The settlement's current indoor temperature. */
@@ -202,7 +208,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	/** The Flag showing if the settlement has been exposed to the last radiation event. */
 	private boolean[] exposed = { false, false, false };
 	/** The settlement life support requirements. */
-	private double[][] life_support_value = new double[2][7];
+	public static double[][] life_support_value = new double[2][7];
 	/** The settlement sponsor. */
 	private String sponsor;
 	/** The settlement template name. */
@@ -242,6 +248,8 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	/** The settlement's location. */
 	private Coordinates location;
 
+	/** The last 20 mission scores */
+	private List<Double> missionScores;	
 	/** The settlement's achievement in scientific fields. */
 	private Map<ScienceType, Double> scientificAchievement;
 	/** The settlement's resource statistics. */
@@ -252,6 +260,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	private Collection<Robot> allAssociatedRobots = new ConcurrentLinkedQueue<Robot>();
 	/** The settlement's map of adjacent buildings. */
 	private Map<Building, List<Building>> adjacentBuildingMap = new HashMap<>();
+
 	/** The settlement's last dust storm. */
 	private DustStorm storm;
 
@@ -264,6 +273,11 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	private static Weather weather;
 	private static MarsClock marsClock;
 
+	private static int oxygenID = ResourceUtil.oxygenID;
+	private static int waterID = ResourceUtil.waterID;
+	private static int co2ID = ResourceUtil.co2ID;
+//	private static int foodID = ResourceUtil.foodID;
+	
 	/** 
 	 * Constructor 1 called by ConstructionStageTest 
 	 */
@@ -383,6 +397,9 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 //				"[" + this + "] Set development objective to " + objectiveType.toString() 
 //				+ " (based upon the '" + template + "' Template).", null);
 
+		// initialize the missionScores list
+		missionScores = new ArrayList<>();
+		missionScores.add(200D);
 	}
 
 	/**
@@ -556,6 +573,8 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 //        .filter(u -> u instanceof Person)
 //        .collect(Collectors.toList()).size();
 
+		// TODO: need to factor in those inside a vehicle parked inside a garage 
+		
 		int n = 0;
 		Iterator<Unit> i = getInventory().getAllContainedUnits().iterator();
 		while (i.hasNext()) {
@@ -594,6 +613,25 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 
 	}
 
+	/**
+	 * Gets a collection of people who are doing EVA outside the settlement.
+	 * 
+	 * @return Collection of people
+	 */
+	public Collection<Person> getOnMissionPeople() {
+			
+		return allAssociatedPeople.stream()
+				.filter(p -> p.getMind().getMission() != null
+					&& !p.getMind().getMission().getPhase().equals(VehicleMission.APPROVAL)
+//					&& p.isInVehicle() && !p.isInVehicleInGarage()
+//					&& p.getAssociatedVehicle() != null 	
+//				p.getLocationStateType() == LocationStateType.OUTSIDE_SETTLEMENT_VICINITY
+//						|| p.getLocationStateType() == LocationStateType.OUTSIDE_ON_MARS
+						)
+				.collect(Collectors.toList());
+
+	}
+	
 	/**
 	 * Gets the number of people currently doing EVA outside the settlement
 	 * 
@@ -757,7 +795,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 			// System.out.println("life_support_req[1][0] is " + life_support_req[1][0]);
 			// if (p < life_support_value[0][0] - SAFETY_PRESSURE || p >
 			// life_support_value[1][0] + SAFETY_PRESSURE) {
-			if (p > PhysicalCondition.MAXIMUM_AIR_PRESSURE || p <= minimum_air_pressure) {
+			if (p > PhysicalCondition.MAXIMUM_AIR_PRESSURE || p < Settlement.minimum_air_pressure) {
 				LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
 						this.getName() + " detected improper air pressure at " + Math.round(p * 10D) / 10D + " kPa",
 						null);
@@ -799,33 +837,34 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	public double provideOxygen(double amountRequested) {
 		double oxygenTaken = amountRequested;
 		try {
-			double oxygenLeft = getInventory().getARStored(ResourceUtil.oxygenID, false);
+			double oxygenLeft = getInventory().getARStored(oxygenID, false);
 			// System.out.println("oxygenLeft : " + oxygenLeft);
 			if (oxygenTaken > oxygenLeft)
 				oxygenTaken = oxygenLeft;
 			// Note: do NOT retrieve O2 here since calculateGasExchange() in
 			// CompositionOfAir
 			// is doing it for all inhabitants once per frame.
-			// getInventory().retrieveAmountResource(oxygenAR, oxygenTaken);
-			// getInventory().addAmountDemandTotalRequest(oxygenAR);
-			// getInventory().addAmountDemand(oxygenAR, oxygenTaken);
+			 getInventory().retrieveAmountResource(oxygenID, oxygenTaken);
+			 getInventory().addAmountDemandTotalRequest(oxygenID);
+			 getInventory().addAmountDemand(oxygenID, oxygenTaken);
 
 			double carbonDioxideProvided = oxygenTaken;
 			double carbonDioxideCapacity = getInventory()
-					.getAmountResourceRemainingCapacity(ResourceUtil.carbonDioxideAR, true, false);
+					.getAmountResourceRemainingCapacity(co2ID, true, false);
 			if (carbonDioxideProvided > carbonDioxideCapacity)
 				carbonDioxideProvided = carbonDioxideCapacity;
 			// Note: do NOT store CO2 here since calculateGasExchange() in CompositionOfAir
 			// is doing it for all inhabitants once per frame.
-			// getInventory().storeAmountResource(carbonDioxideAR, carbonDioxideProvided,
-			// true);
-			// getInventory().addAmountSupplyAmount(carbonDioxideAR, carbonDioxideProvided);
+			 getInventory().storeAmountResource(co2ID, carbonDioxideProvided, true);
+			 getInventory().addAmountSupplyAmount(co2ID, carbonDioxideProvided);
+			 
 		} catch (Exception e) {
 			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
 					name + " - Error in providing O2/removing CO2: " + e.getMessage(), null);
 		}
 
 		return oxygenTaken;
+		//return oxygenTaken * (malfunctionManager.geOxygenFlowModifier() / 100D);
 	}
 
 	/**
@@ -838,20 +877,21 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	public double provideWater(double amountRequested) {
 		double waterTaken = amountRequested;
 		try {
-			double waterLeft = getInventory().getARStored(ResourceUtil.waterID, false);
+			double waterLeft = getInventory().getARStored(waterID, false);
 			if (waterTaken > waterLeft)
 				waterTaken = waterLeft;
 			// Storage.retrieveAnResource(waterTaken, waterAR, getInventory(), true);//,
 			// sourceName + "::provideWater");
-			// getInventory().retrieveAmountResource(waterAR, waterTaken);
-			// getInventory().addAmountDemandTotalRequest(waterAR);
-			// getInventory().addAmountDemand(waterAR, waterTaken);
+			 getInventory().retrieveAmountResource(waterID, waterTaken);
+			 getInventory().addAmountDemandTotalRequest(waterID);
+			 getInventory().addAmountDemand(waterID, waterTaken);
 		} catch (Exception e) {
 			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
 					name + " - Error in providing H2O needs: " + e.getMessage(), null);
 		}
 
 		return waterTaken;
+//		return waterTaken * (malfunctionManager.getWaterFlowModifier() / 100D);
 	}
 
 	/**
@@ -1851,18 +1891,25 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 	}
 
 	/**
-	 * Gets number of deceased
+	 * Gets the number of deceased people
 	 * 
 	 * @return int
 	 */
 	public int getNumDeceased() {
+		return getDeceasedPeople().size();		
+	}
+	
+	/**
+	 * Returns a collection of deceased people buried outside this settlement
+	 * 
+	 * @return {@link Collection<Person>}
+	 */
+	public Collection<Person> getDeceasedPeople() {
 		// using java 8 stream
-		Collection<Person> result = Simulation.instance().getUnitManager()
+		return Simulation.instance().getUnitManager()
 				.getPeople().stream()
 				.filter(p -> p.getBuriedSettlement() == this)
 				.collect(Collectors.toList());
-
-		return result.size();		
 	}
 	
 	/**
@@ -3288,6 +3335,61 @@ public class Settlement extends Structure implements Serializable, LifeSupportTy
 		return result;
 	}
 
+	/**
+	 * Checks if the last 20 mission scores are above the threshold
+	 * 
+	 * @param score
+	 * @return true/false
+	 */
+	public boolean passMissionScore(double score) {
+		double total = 0;
+		for (double s : missionScores) {
+			total += s;
+		}
+		currentAverageScore = total/ missionScores.size();
+		
+		minimumPassingScore = Math.round((currentAverageScore + trendingScore) * 10D) / 10D;
+		
+		if (score > currentAverageScore + trendingScore) {
+			trendingScore = (score - currentAverageScore + 2D * trendingScore) / 3D;
+			return true;
+		}
+		else {
+			trendingScore = (currentAverageScore - score + 2D * trendingScore) / 3D;
+			return false;
+		}
+	}
+
+	/**
+	 * Calculates the current minimum passing score
+	 * 
+	 * @return
+	 */
+	public double getMinimumPassingScore() {
+//		double total = 0;
+//		for (double s : missionScores) {
+//			total += s;
+//		}
+//		double ave = total/ missionScores.size();
+//		
+//		return Math.round((currentAverageScore + trendingScore) * 10D) / 10D;
+		
+		return minimumPassingScore;
+	}
+	
+	/**
+	 * Saves the mission score
+	 * 
+	 * @param score
+	 */
+	public void saveMissionScore(double score) {
+		missionScores.add(score);
+		
+		if (missionScores.size() > 20)
+			missionScores.remove(0);
+	}
+	
+	
 	public double getIceProbabilityValue() {
 		return iceProbabilityValue;
 	}

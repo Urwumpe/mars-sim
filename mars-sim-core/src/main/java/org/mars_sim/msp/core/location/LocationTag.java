@@ -24,11 +24,11 @@ public class LocationTag implements LocationState, Serializable {
 
 	private static final long serialVersionUID = 1L;
 
-	public static final String OUTSIDE_ON_MARS = "Outside on Mars";
+	public static final String OUTSIDE_ON_MARS = "outside on Mars";
 
 	public static final String VICINITY = " vicinity";
 
-	private static final String UNKNOWN = "Unknown";
+	private static final String UNKNOWN = "unknown";
 
 	private static final String IN = " in ";
 
@@ -274,9 +274,9 @@ public class LocationTag implements LocationState, Serializable {
 				if (p.getBuildingLocation() != null) {
 					return p.getBuildingLocation().getNickName();
 				}
-//				else {
-//					return ...;
-//				}
+				else {
+					return p.getLocationStateType().getName();
+				}
 			} else if (p.getVehicle() != null) {
 				Vehicle v = p.getVehicle();
 				if (v.getBuildingLocation() == null) {
