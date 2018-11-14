@@ -338,7 +338,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		}
 
 		else if (DISEMBARKING.equals(getPhase())) {
-			endMission(SUCCESSFULLY_DISEMBARKED);
+			endMission(ALL_DISEMBARKED);
 		}
 	}
 
@@ -450,17 +450,26 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 			towedVehicle.setTowingVehicle(null);
 			logger.info(rover + " is being unhooked from " + towedVehicle + " at " + disembarkSettlement);
 
-			// Re-orient the location/position of the vehicle to avoid being placed inside a
-			// garage.
-			rover.determinedSettlementParkedLocationAndFacing();
-			towedVehicle.determinedSettlementParkedLocationAndFacing();
+			// Store towing and towed vehicle in settlement.
+			disembarkSettlement.getInventory().storeUnit(towedVehicle);		
+			//disembarkSettlement.getInventory().storeUnit(rover);
 
-			// Store towed vehicle in settlement.
-			disembarkSettlement.getInventory().storeUnit(towedVehicle);
+			// Add towed vehicle to a garage if available.
+	        boolean	garaged = false;
+	        if (towedVehicle.getGarage() == null) 
+	        	garaged = BuildingManager.addToGarage((GroundVehicle) towedVehicle, disembarkSettlement);
 
-			// Add vehicle to a garage if available.
-			BuildingManager.addToRandomBuilding((GroundVehicle) towedVehicle, disembarkSettlement);
-
+			// Make sure the rover chasis is not overlapping a building structure in the settlement map
+	        if (!garaged)
+	        	towedVehicle.determinedSettlementParkedLocationAndFacing();
+	        
+//			// Add towing vehicle to a garage if available.
+//	        garaged = BuildingManager.addToRandomBuilding((GroundVehicle) rover, disembarkSettlement);
+//
+//			// Make sure the rover chasis is not overlapping a building structure in the settlement map
+//	        if (!garaged)
+//	        	rover.determinedSettlementParkedLocationAndFacing();
+	        
 			// towedVehicle.determinedSettlementParkedLocationAndFacing();
 			logger.info(towedVehicle + " has been towed to " + disembarkSettlement.getName());
 

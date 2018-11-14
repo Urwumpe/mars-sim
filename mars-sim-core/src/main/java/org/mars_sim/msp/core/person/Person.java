@@ -184,7 +184,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 
 	private Vehicle vehicle;
 
-	private Vehicle associatedVehicle;
+//	private Vehicle associatedVehicle;
 
 	private Relax relax;
 
@@ -1406,13 +1406,12 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 * @return building
 	 */
 	public Building computeCurrentBuilding() {
-		if (currentBuilding != null) {
-			return currentBuilding;
-		} else if (getLocationStateType() == LocationStateType.INSIDE_SETTLEMENT) {//isInSettlement()) {
-			currentBuilding = getSettlement().getBuildingManager().getBuildingAtPosition(getXLocation(),
-					getYLocation());
-		}
-
+//		if (currentBuilding != null) {
+//			return currentBuilding;
+//		} else if (getLocationStateType() == LocationStateType.INSIDE_SETTLEMENT) {//isInSettlement()) {
+//			currentBuilding = getSettlement().getBuildingManager().getBuildingAtPosition(getXLocation(),
+//					getYLocation());
+//		}
 		return currentBuilding;
 	}
 
@@ -1515,13 +1514,13 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		return vehicle;
 	}
 
-	public Vehicle getAssociatedVehicle() {
-		return associatedVehicle;
-	}
-
-	public void setAssociatedVehicle(Vehicle v) {
-		associatedVehicle = v;
-	}
+//	public Vehicle getAssociatedVehicle() {
+//		return associatedVehicle;
+//	}
+//
+//	public void setAssociatedVehicle(Vehicle v) {
+//		associatedVehicle = v;
+//	}
 
 	public CircadianClock getCircadianClock() {
 		return circadian;
@@ -1721,7 +1720,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		walk = null;
 		circadian = null;
 		vehicle = null;
-		associatedVehicle = null;
+//		associatedVehicle = null;
 		associatedSettlement = null;
 		buriedSettlement = null;
 		quarters = null;

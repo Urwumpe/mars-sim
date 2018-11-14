@@ -52,8 +52,8 @@ public abstract class Mission implements Serializable {
 
 	protected static final int MAX_AMOUNT_RESOURCE = ResourceUtil.FIRST_ITEM_RESOURCE;
 
-	public static final String SUCCESSFULLY_ENDED_CONSTRUCTION = "Construction ended.";
-	public static final String SUCCESSFULLY_DISEMBARKED = "All members disembarked.";
+	public static final String CONSTRUCTION_ENDED = "Construction ended.";
+	public static final String ALL_DISEMBARKED = "All members disembarked.";
 	public static final String USER_ABORTED_MISSION = "Mission aborted by user.";
 	public static final String UNREPAIRABLE_MALFUNCTION = "Unrepairable malfunction.";
 	public static final String NO_RESERVABLE_VEHICLES = "No reservable vehicles.";
@@ -376,7 +376,6 @@ public abstract class Mission implements Serializable {
 				if ((members.size() == 0) && !done) {
 					endMission(NOT_ENOUGH_MEMBERS);
 				}
-
 				// logger.fine(member.getName() + " removed from mission : " + name);
 			}
 		}
@@ -708,7 +707,7 @@ public abstract class Mission implements Serializable {
 	 * @param reason
 	 */
 	public void addMissionScore(String reason) {
-		if (reason.equals(SUCCESSFULLY_DISEMBARKED)) {
+		if (reason.equals(ALL_DISEMBARKED)) {
 			for (MissionMember member : members) {
 				if (member instanceof Person) {
 					Person person = (Person) member;
@@ -756,13 +755,17 @@ public abstract class Mission implements Serializable {
 
 			LogConsolidated.log(logger, Level.INFO, 3000, sourceName,
 					"[" + startingMember.getLocationTag().getQuickLocation() + "] " + startingMember.getName()
-							+ " ended the " + missionName + " mission. Reason : " + reason,
+							+ " ended the " + missionName + " mission. Reason : " + reason + ".",
 					null);
 
 			done = true; // Note: done = true is very important to keep !
 			fireMissionUpdate(MissionEventType.END_MISSION_EVENT);
 			// logger.info("done firing End_Mission_Event");
 
+			// Deregister the vehicle
+			if (startingMember.getVehicle() != null)
+				startingMember.getVehicle().correctVehicleReservation();
+			
 			if (members != null) {
 				if (!members.isEmpty()) {
 					LogConsolidated.log(logger, Level.INFO, 3000, sourceName,
@@ -776,12 +779,15 @@ public abstract class Mission implements Serializable {
 					}
 				}
 			}
+			
+
 
 		} else
 			LogConsolidated.log(logger, Level.INFO, 0, sourceName,
 					"[" + startingMember.getLocationTag().getQuickLocation() + "] " + startingMember.getName()
 							+ " is ending the " + missionName + ". Reason : '" + reason + "'",
 					null);
+		
 		
 		// Proactively call removeMission to update the list in MissionManager right away
 //		missionManager.removeMission(this); // not legit ! will crash the mission tab in monitor tool
@@ -1276,7 +1282,7 @@ public abstract class Mission implements Serializable {
 			
 			LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + p.getSettlement().getName() + "] " 
 					+ p.getName() + " (" + p.getRole().getType() 
-					+ ") is requesting approval for " + getDescription(), null);
+					+ ") is requesting approval for " + getDescription() + ".", null);
 
 			 Simulation.instance().getMissionManager().requestMissionApproval(plan);
 		}

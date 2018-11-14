@@ -54,9 +54,9 @@ public class MaintainGroundVehicleEVAMeta implements MetaTask, Serializable {
 
 
         // Determine if settlement has a garage.
-       	if (person.isInSettlement()) {
+       	if (person.isInSettlement() || person.isRightOutsideSettlement()) {
        		
-        	Settlement settlement = person.getSettlement();
+        	Settlement settlement = person.getAssociatedSettlement();
         	
        		if (settlement.getBuildingManager().getBuildings(FunctionType.GROUND_VEHICLE_MAINTENANCE).size() > 0) {
 	
@@ -72,8 +72,7 @@ public class MaintainGroundVehicleEVAMeta implements MetaTask, Serializable {
 		    		return 0;
 	
 	            // Check if it is night time.
-	            if (surface == null)
-	                surface = Simulation.instance().getMars().getSurfaceFeatures();
+	            surface = Simulation.instance().getMars().getSurfaceFeatures();
 	
 	            if (surface.getSolarIrradiance(person.getCoordinates()) == 0D)
 	                if (!surface.inDarkPolarRegion(person.getCoordinates()))

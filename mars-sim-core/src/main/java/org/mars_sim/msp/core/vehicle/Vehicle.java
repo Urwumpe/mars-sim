@@ -447,9 +447,10 @@ public abstract class Vehicle extends Unit
 	private void updateStatus() {
 
 		// Update status based on current situation.
-		StatusType newStatus = StatusType.PARKED;
-		if (getGarage() != null)
+		StatusType newStatus = null;//StatusType.PARKED;
+		if (getGarage() != null) {
 			newStatus = StatusType.GARAGED;
+		}
 		
 		if (reservedForMaintenance)
 			newStatus = StatusType.MAINTENANCE;
@@ -459,7 +460,9 @@ public abstract class Vehicle extends Unit
 			newStatus = StatusType.MALFUNCTION;
 		else if (speed > 0D)
 			newStatus = StatusType.MOVING;
-
+		else
+			newStatus = StatusType.PARKED;
+		
 		if (status != newStatus) {
 			status = newStatus;
 			fireUnitUpdate(UnitEventType.STATUS_EVENT, newStatus);
@@ -763,7 +766,7 @@ public abstract class Vehicle extends Unit
 	public void timePassing(double time) {
 
 		// Update status if necessary.
-		updateStatus();
+		//updateStatus();
 
 		if (status == StatusType.MOVING)
 			malfunctionManager.activeTimePassing(time);
@@ -777,21 +780,7 @@ public abstract class Vehicle extends Unit
 
 		addToTrail(getCoordinates());
 
-		if (isReservedMission) {
-			// Set reserved for mission to false if the vehicle is not associated with a
-			// mission.
-			if (missionManager.getMissionForVehicle(this) == null) {
-				LogConsolidated.log(logger, Level.WARNING, 1000, sourceName,
-						getName() + " was found reserved for an non-existing mission. Untagging it...",
-						null);
-				setReservedForMission(false);
-			}
-		} else {
-			if (missionManager.getMissionForVehicle(this) != null) {
-				LogConsolidated.log(logger, Level.WARNING, 1000, sourceName, getName()
-						+ " is on a mission but is not mission reserved. Correcting it...", null);
-			}
-		}
+		correctVehicleReservation();
 
 		// If operator is dead, remove operator and stop vehicle.
 		VehicleOperator operator = vehicleOperator;
@@ -807,6 +796,29 @@ public abstract class Vehicle extends Unit
 
 	}
 
+	/**
+	 * Resets the vehicle reservation status
+	 */
+	public void correctVehicleReservation() {
+		if (isReservedMission) {
+			// Set reserved for mission to false if the vehicle is not associated with a
+			// mission.
+			if (missionManager.getMissionForVehicle(this) == null) {
+				LogConsolidated.log(logger, Level.FINE, 500, sourceName,
+						"[" + getLocationTag().getLocale() + "] " + getName() 
+						+ " was found reserved for an non-existing mission. Untagging it.",
+						null);
+				setReservedForMission(false);
+			}
+		} else {
+			if (missionManager.getMissionForVehicle(this) != null) {
+				LogConsolidated.log(logger, Level.FINE, 500, sourceName,
+						"[" + getLocationTag().getLocale() + "] " + getName()
+						+ " is on a mission but is not registered as mission reserved. Correcting it.", null);
+			}
+		}
+	}
+	
 	/**
 	 * Gets a collection of people affected by this entity.
 	 * 
