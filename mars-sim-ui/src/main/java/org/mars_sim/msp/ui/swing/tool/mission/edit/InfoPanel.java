@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * InfoPanel.java
- * @version 3.1.0 2015-07-02
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -22,12 +22,15 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
+import javax.swing.JInternalFrame;
 import javax.swing.JList;
+import javax.swing.JPanel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.mission.CollectResourcesMission;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
@@ -44,7 +47,6 @@ import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 
 import com.alee.laf.button.WebButton;
-import com.alee.laf.desktoppane.WebInternalFrame;
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
@@ -53,8 +55,8 @@ import com.alee.laf.text.WebTextField;
 /**
  * The mission info panel for the edit mission dialog.
  */
-public class InfoPanel
-extends WebPanel {
+@SuppressWarnings("serial")
+public class InfoPanel extends JPanel {
 
 	/** action text. */
 	final static String ACTION_NONE = "None";
@@ -67,7 +69,7 @@ extends WebPanel {
 	
 	// Data members.
 	protected Mission mission;
-	protected WebInternalFrame parent;
+	protected JInternalFrame parent;
 	protected MainDesktopPane desktop;	
 	
 	protected WebTextField descriptionField;
@@ -77,12 +79,14 @@ extends WebPanel {
 	protected WebButton addMembersButton;
 	protected WebButton removeMembersButton;
 	
+	private static UnitManager unitManager = Simulation.instance().getUnitManager();
+	
 	/**
 	 * Constructor.
 	 * @param mission {@link Mission} the mission to edit.
 	 * @param parent {@link Dialog} the parent dialog.
 	 */
-	public InfoPanel(Mission mission, MainDesktopPane desktop, WebInternalFrame parent) {
+	public InfoPanel(Mission mission, MainDesktopPane desktop, JInternalFrame parent) {
 		
 		// Data members
 		this.mission = mission;
@@ -154,7 +158,7 @@ extends WebPanel {
         			@Override
         			public void valueChanged(ListSelectionEvent e) {
         				// Enable remove members button if there are members in the list.
-        				removeMembersButton.setEnabled(memberList.getSelectedValues().length > 0);
+        				removeMembersButton.setEnabled(memberList.getSelectedValuesList().size() > 0);
         			}
         		}
         	);
@@ -330,7 +334,7 @@ extends WebPanel {
 		
 		// Add people and robots who are outside at this location as well.
 		Coordinates missionLocation = mission.getCurrentMissionLocation();
-		Iterator<Person> i = Simulation.instance().getUnitManager().getPeople().iterator();
+		Iterator<Person> i = unitManager.getPeople().iterator();
 		while (i.hasNext()) {
 		    Person person = i.next();
 		    if (person.isOutside()) {
@@ -342,7 +346,7 @@ extends WebPanel {
 		    }
 		}
 		
-		Iterator<Robot> j = Simulation.instance().getUnitManager().getRobots().iterator();
+		Iterator<Robot> j = unitManager.getRobots().iterator();
         while (j.hasNext()) {
             Robot robot = j.next();
             if (robot.isOutside()) {
@@ -357,7 +361,7 @@ extends WebPanel {
 		return result;
 	}
 	
-	public WebInternalFrame getParent() {
+	public JInternalFrame getParent() {
 		return parent;
 	}
 	

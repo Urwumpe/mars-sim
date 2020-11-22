@@ -1,8 +1,7 @@
 /**
  * Mars Simulation Project
  * PartSalvage.java
- * @version 3.07 2014-12-06
-
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.manufacture;
@@ -14,7 +13,9 @@ import java.io.Serializable;
  */
 public class PartSalvage implements Serializable {
 
-    // Data members
+	private static final long serialVersionUID = 1L;
+	
+	// Data members
     private String name;
     private int number;
     

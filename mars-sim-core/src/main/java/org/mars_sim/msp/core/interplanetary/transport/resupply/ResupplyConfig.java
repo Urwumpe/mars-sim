@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ResupplyConfig.java
- * @version 3.1.0 2017-02-02
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.interplanetary.transport.resupply;
@@ -14,9 +14,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.jdom.Document;
-import org.jdom.Element;
+import org.jdom2.Document;
+import org.jdom2.Element;
 import org.mars_sim.msp.core.resource.AmountResource;
+import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.resource.PartPackageConfig;
 import org.mars_sim.msp.core.resource.ResourceUtil;
@@ -74,7 +75,6 @@ public class ResupplyConfig implements Serializable {
      * @param resupplyDoc DOM document for resupply configuration.
      * @param partPackageConfig the part package configuration.
      */
-    @SuppressWarnings("unchecked")
     private void loadResupplyTemplates(Document resupplyDoc,
             PartPackageConfig partPackageConfig) {
 
@@ -116,7 +116,6 @@ public class ResupplyConfig implements Serializable {
                 //	scenario = "A";
                 // TODO: need to rework how "scenario" and "scenarioID" are applied
 
-                // 2014-10-28 Added buildingType (at the buildingNickName position)
                 template.buildings.add(new BuildingTemplate(template.name, 0, scenario, buildingType,
                         buildingType, width, length, xLoc, yLoc, facing));
 
@@ -158,7 +157,7 @@ public class ResupplyConfig implements Serializable {
             for (Element resourceElement : resourceNodes) {
                 String resourceName = resourceElement.getAttributeValue(NAME);
                 //System.out.println("resourceName is " + resourceName);
-                AmountResource resource = AmountResource.findAmountResource(resourceName);
+                AmountResource resource = ResourceUtil.findAmountResource(resourceName);
                 double resourceAmount = Double.parseDouble(resourceElement
                         .getAttributeValue(AMOUNT));
                 if (template.resources.containsKey(resource))
@@ -170,7 +169,7 @@ public class ResupplyConfig implements Serializable {
             List<Element> partNodes = resupplyElement.getChildren(PART);
             for (Element partElement : partNodes) {
                 String partType = partElement.getAttributeValue(TYPE);
-                Part part = (Part) Part.findItemResource(partType);
+                Part part = (Part) (ItemResourceUtil.findItemResource(partType));
                 int partNumber = Integer.parseInt(partElement
                         .getAttributeValue(NUMBER));
                 if (template.parts.containsKey(part))

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MissionWindow.java
- * @version 3.1.0 2017-02-03
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -11,12 +11,15 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.List;
 
 import javax.swing.JList;
 import javax.swing.ListSelectionModel;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.ui.javafx.MainScene;
+import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.tool.mission.create.CreateMissionWizard;
 import org.mars_sim.msp.ui.swing.tool.mission.edit.EditMissionDialog;
@@ -30,46 +33,69 @@ import com.alee.laf.tabbedpane.WebTabbedPane;
 /**
  * Window for the mission tool.
  */
-public class MissionWindow
-extends ToolWindow {
+@SuppressWarnings("serial")
+public class MissionWindow extends ToolWindow implements ListSelectionListener {
 
 	/** Tool name. */
 	public static final String NAME = "Mission Tool";
 
 	// Private members
 	private double previous;
-	
+
 	private WebTabbedPane tabPane;
+	private JList<Settlement> settlementList;
 	private JList<Mission> missionList;
+
+	private SettlementListModel settlementListModel;
+	private MissionListModel missionListModel;
 	
+	private Settlement settlement;
+    
 	private NavpointPanel navpointPane;
-	private MainScene mainScene;
+//	private MainScene mainScene;
 	private CreateMissionWizard createMissionWizard;
 	private EditMissionDialog editMissionDialog;
-	
 
 	/**
 	 * Constructor.
+	 * 
 	 * @param desktop {@link MainDesktopPane} the main desktop panel.
 	 */
 	public MissionWindow(MainDesktopPane desktop) {
 
 		// Use ToolWindow constructor
 		super(NAME, desktop);
-		mainScene = desktop.getMainScene();
+//		mainScene = desktop.getMainScene();
 
 		// Create content panel.
 		WebPanel mainPane = new WebPanel(new BorderLayout());
 		mainPane.setBorder(MainDesktopPane.newEmptyBorder());
 		setContentPane(mainPane);
 
+		// Create the left panel.
+		WebPanel leftPane = new WebPanel(new BorderLayout());
+		mainPane.add(leftPane, BorderLayout.WEST);
+		
+		// Create the settlement list panel.
+		WebPanel settlementListPane = new WebPanel(new BorderLayout());
+		settlementListPane.setPreferredSize(new Dimension(200, 150));
+		leftPane.add(settlementListPane, BorderLayout.NORTH);
+		
 		// Create the mission list panel.
 		WebPanel missionListPane = new WebPanel(new BorderLayout());
-		missionListPane.setPreferredSize(new Dimension(200, 200));
-		mainPane.add(missionListPane, BorderLayout.WEST);
+		missionListPane.setPreferredSize(new Dimension(200, 300));
+		leftPane.add(missionListPane, BorderLayout.CENTER);
 
+		// Create the settlement list.
+		settlementListModel = new SettlementListModel();
+		settlementList = new JList<Settlement>(settlementListModel);
+		settlementList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		settlementListPane.add(new WebScrollPane(settlementList), BorderLayout.CENTER);
+		settlementList.addListSelectionListener(this);
+		
 		// Create the mission list.
-		missionList = new JList<Mission>(new MissionListModel());
+		missionListModel = new MissionListModel(this);
+		missionList = new JList<Mission>(missionListModel);
 		missionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		missionListPane.add(new WebScrollPane(missionList), BorderLayout.CENTER);
 
@@ -93,13 +119,12 @@ extends ToolWindow {
 
 		// Create the create mission button.
 		WebButton createButton = new WebButton("Create New Mission");
-		createButton.addActionListener(
-				new ActionListener() {
-					public void actionPerformed(ActionEvent e) {
-						// Create new mission.
-						createNewMission();
-					}
-				});
+		createButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				// Create new mission.
+				createNewMission();
+			}
+		});
 		buttonPane.add(createButton);
 
 		// Create the edit mission button.
@@ -128,7 +153,7 @@ extends ToolWindow {
 		// Create the abort mission button.
 		final WebButton abortButton = new WebButton("Abort Mission");
 		abortButton.setEnabled(false);
-		
+
 //		abortButton.addActionListener(
 //				new ActionListener() {
 //					public void actionPerformed(ActionEvent e) {
@@ -146,49 +171,77 @@ extends ToolWindow {
 
 		buttonPane.add(abortButton);
 
-		setSize(new Dimension(640, 640));//736));
+		setSize(new Dimension(640, 512));
 		setMaximizable(true);
 		setResizable(false);
 
-		if (desktop.getMainScene() != null) {
-			//setClosable(false);
-		}
+//		if (desktop.getMainScene() != null) {
+//			//setClosable(false);
+//		}
 
 		setVisible(true);
-		//pack();
+		// pack();
 
 		Dimension desktopSize = desktop.getSize();
-	    Dimension jInternalFrameSize = this.getSize();
-	    int width = (desktopSize.width - jInternalFrameSize.width) / 2;
-	    int height = (desktopSize.height - jInternalFrameSize.height) / 2;
-	    setLocation(width, height);
+		Dimension jInternalFrameSize = this.getSize();
+		int width = (desktopSize.width - jInternalFrameSize.width) / 2;
+		int height = (desktopSize.height - jInternalFrameSize.height) / 2;
+		setLocation(width, height);
 
 	}
 
 	/**
 	 * Selects a mission for display.
+	 * 
 	 * @param mission the mission to select.
 	 */
 	public void selectMission(Mission mission) {
 		MissionListModel model = (MissionListModel) missionList.getModel();
-		if (model.containsMission(mission)) missionList.setSelectedValue(mission, true);
+		if (model.containsMission(mission)) {
+			settlementList.setSelectedValue(mission.getAssociatedSettlement(), true);
+			missionList.setSelectedValue(mission, true);
+		}
 	}
 
+//	/**
+//	 * Selects a mission for display.
+//	 * 
+//	 * @param mission the mission to select.
+//	 */
+//	public void selectSettlement(Settlement settlement) {
+//		SettlementListModel model = (SettlementListModel) settlementList.getModel();
+//		if (model.containsSettlement(settlement)) {
+//			settlementList.setSelectedValue(settlement.getAssociatedSettlement(), true);
+////			missionList.setSelectedValue(mission, true);
+//		}
+//	}
+//	
 	/**
 	 * Open wizard to create a new mission.
 	 */
 	private void createNewMission() {
-		if (mainScene != null)  {
-			previous = mainScene.slowDownTimeRatio();
-			createMissionWizard = new CreateMissionWizard(desktop, this);
-			mainScene.speedUpTimeRatio(previous);
-		} 
-		else {
-			createMissionWizard = new CreateMissionWizard(desktop, this);
-		}
+//		if (mainScene != null)  {
+//			previous = mainScene.slowDownTimeRatio();
+//			createMissionWizard = new CreateMissionWizard(desktop, this);
+//			mainScene.speedUpTimeRatio(previous);
+//		} 
+//		else {
+		createMissionWizard = new CreateMissionWizard(desktop, this);
+//		}
 
 	}
 
+	@Override
+	public void valueChanged(ListSelectionEvent e){
+		if ((JList) e.getSource() == settlementList) {
+		    List<Settlement> list = settlementList.getSelectedValuesList();
+		    for(int i = 0; i < list.size(); i++) {
+		    	settlement = list.get(i);
+		    }
+		    ((MissionListModel)missionList.getModel()).populateMissions();
+		}
+	}
+	    
 //	/**
 //	 * Open wizard to edit a mission.
 //	 * @param mission the mission to edit.
@@ -208,7 +261,6 @@ extends ToolWindow {
 //			editMissionDialog = new EditMissionDialog(desktop, mission, this);
 //	}
 
-	
 //	/**
 //	 * Ends the mission.
 //	 * @param mission the mission to end.
@@ -218,7 +270,7 @@ extends ToolWindow {
 //		mission.endMission(Mission.USER_ABORTED_MISSION);
 //		repaint();
 //	}
-		
+
 	public CreateMissionWizard getCreateMissionWizard() {
 		return createMissionWizard;
 	}
@@ -226,12 +278,16 @@ extends ToolWindow {
 	public MainDesktopPane getDesktop() {
 		return desktop;
 	}
-	
+
 	public boolean isNavPointsMapTabOpen() {
 		if (tabPane.getSelectedIndex() == 1)
 			return true;
 		else
 			return false;
+	}
+
+	public Settlement getSettlement() {
+		return settlement;
 	}
 	
 	/**
@@ -241,6 +297,8 @@ extends ToolWindow {
 	public void destroy() {
 		missionList.clearSelection();
 		((MissionListModel) missionList.getModel()).destroy();
+		settlementList.clearSelection();
+		((SettlementListModel) settlementList.getModel()).destroy();
 		navpointPane.destroy();
 	}
 }

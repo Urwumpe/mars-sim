@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MobileLaboratory.java
- * @version 3.1.0 2017-09-07
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -112,18 +112,17 @@ public class MobileLaboratory implements Lab, Serializable {
         }
     }
 
-    /**
-     * Adds a researcher to the laboratory.
-     * @throws Exception if person cannot be added.
-   
-    public void addResearcher() {
-    	researcherNum ++;
-        if (researcherNum > laboratorySize) {
-        	 researcherNum = laboratorySize;
-            throw new IllegalStateException("Lab already full of researchers.");
-        }
-    }
- */
+//    /**
+//     * Adds a researcher to the laboratory.
+//     * @throws Exception if person cannot be added.
+//     */
+//    public void addResearcher() {
+//    	researcherNum ++;
+//        if (researcherNum > laboratorySize) {
+//        	 researcherNum = laboratorySize;
+//            throw new IllegalStateException("Lab already full of researchers.");
+//        }
+//    }
     
     /**
      * Removes a researcher from the laboratory.

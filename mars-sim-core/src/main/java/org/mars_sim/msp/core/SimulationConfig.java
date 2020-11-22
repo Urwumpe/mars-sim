@@ -1,41 +1,60 @@
 /**
  * Mars Simulation Project
  * SimulationConfig.java
- * @version 3.1.0 2017-11-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.jdom.Document;
-import org.jdom.Element;
-import org.jdom.JDOMException;
-import org.jdom.input.SAXBuilder;
+import org.apache.commons.io.FileUtils;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.JDOMException;
+import org.jdom2.input.SAXBuilder;
 import org.mars_sim.msp.core.foodProduction.FoodProductionConfig;
 import org.mars_sim.msp.core.interplanetary.transport.resupply.ResupplyConfig;
 import org.mars_sim.msp.core.malfunction.MalfunctionConfig;
 import org.mars_sim.msp.core.manufacture.ManufactureConfig;
 import org.mars_sim.msp.core.mars.LandmarkConfig;
 import org.mars_sim.msp.core.mars.MineralMapConfig;
+import org.mars_sim.msp.core.person.CrewConfig;
 import org.mars_sim.msp.core.person.PersonConfig;
+import org.mars_sim.msp.core.person.ai.mission.ExperimentConfig;
 import org.mars_sim.msp.core.person.health.MedicalConfig;
 import org.mars_sim.msp.core.quotation.QuotationConfig;
 import org.mars_sim.msp.core.resource.AmountResourceConfig;
 import org.mars_sim.msp.core.resource.PartConfig;
 import org.mars_sim.msp.core.resource.PartPackageConfig;
 import org.mars_sim.msp.core.robot.RobotConfig;
+import org.mars_sim.msp.core.science.ScienceConfig;
 import org.mars_sim.msp.core.structure.SettlementConfig;
 import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.function.cooking.MealConfig;
 import org.mars_sim.msp.core.structure.building.function.farming.CropConfig;
 import org.mars_sim.msp.core.structure.construction.ConstructionConfig;
+import org.mars_sim.msp.core.tool.Hash;
 import org.mars_sim.msp.core.vehicle.VehicleConfig;
 
 /**
@@ -47,31 +66,49 @@ public class SimulationConfig implements Serializable {
 
 	private static final long serialVersionUID = -5348007442971644450L;
 
-	private static final Logger logger = Logger.getLogger(SimulationConfig.class.getName());
+	private final Logger logger = Logger.getLogger(SimulationConfig.class.getName());
 
+	private final String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			logger.getName().length());
+	
 	// Configuration files to load.
-	public static final String SIMULATION_FILE = "simulation";
-	public static final String PEOPLE_FILE = "people";
-	public static final String VEHICLE_FILE = "vehicles";
-	public static final String SETTLEMENT_FILE = "settlements";
-	public static final String RESUPPLY_FILE = "resupplies";
-	public static final String MEDICAL_FILE = "medical";
-	public static final String MALFUNCTION_FILE = "malfunctions";
-	public static final String CROP_FILE = "crops";
-	public static final String LANDMARK_FILE = "landmarks";
-	public static final String MINERAL_MAP_FILE = "minerals";
-	public static final String BUILDING_FILE = "buildings";
-	public static final String PART_FILE = "parts";
-	public static final String PART_PACKAGE_FILE = "part_packages";
-	public static final String RESOURCE_FILE = "resources";
-	public static final String MANUFACTURE_FILE = "manufacturing";
-	public static final String CONSTRUCTION_FILE = "construction";
-	public static final String FOODPRODUCTION_FILE = "foodProduction";
-	public static final String MEAL_FILE = "meals";
-	public static final String ROBOT_FILE = "robots";
-	public static final String QUOTATION_FILE = "quotations";
-	public static final String VALUE = "value";
+	public final String xmlDir = Simulation.XML_DIR;
+	public final String backupDir = Simulation.BACKUP_DIR;
+	public final String versionFilePathStr = Simulation.XML_DIR + File.separator + Simulation.VERSION_FILE;
+	public final String exceptionFilePathStr = Simulation.XML_DIR + File.separator + Simulation.EXCEPTION_FILE;
+	
+	public final File xmlLocation = new File(xmlDir);		
+	public final File versionFile = new File(versionFilePathStr);
+	public final File exceptionFile = new File(exceptionFilePathStr);
+	public File backupLocation = new File(backupDir);
+	
+	public final String XML_FOLDER = "/" + Msg.getString("Simulation.xmlFolder") + "/";
+	public final String XML_EXTENSION = ".xml";
+	public final String SIMULATION_FILE = "simulation";
+	public final String PEOPLE_FILE = "people";
+	public final String CREW_FILE = "crew";
+	public final String VEHICLE_FILE = "vehicles";
+	public final String SETTLEMENT_FILE = "settlements";
+	public final String RESUPPLY_FILE = "resupplies";
+	public final String MEDICAL_FILE = "medical";
+	public final String MALFUNCTION_FILE = "malfunctions";
+	public final String CROP_FILE = "crops";
+	public final String LANDMARK_FILE = "landmarks";
+	public final String MINERAL_MAP_FILE = "minerals";
+	public final String BUILDING_FILE = "buildings";
+	public final String PART_FILE = "parts";
+	public final String PART_PACKAGE_FILE = "part_packages";
+	public final String RESOURCE_FILE = "resources";
+	public final String MANUFACTURE_FILE = "manufacturing";
+	public final String CONSTRUCTION_FILE = "construction";
+	public final String FOODPRODUCTION_FILE = "foodProduction";
+	public final String MEAL_FILE = "meals";
+	public final String ROBOT_FILE = "robots";
+	public final String QUOTATION_FILE = "quotations";
+	public final String VALUE = "value";
 
+    public final String EXPERIMENTS_FILE = "/json/experiments.json";
+    
 	// Simulation element names.
 	private static final String TIME_CONFIGURATION = "time-configuration";
 
@@ -86,16 +123,13 @@ public class SimulationConfig implements Serializable {
 	private static final String EARTH_START_DATE_TIME = "earth-start-date-time";
 	private static final String MARS_START_DATE_TIME = "mars-start-date-time";
 
-	private double tbu = 0;
+	private transient double tbu = 0;
+	private transient double tr = 0;
 
-	private double tr = 0;
+	private transient int[] data = new int[] { 0, 0, 0, 0 };
 
-	private int[] data = new int[] { 0, 0, 0, 0 };
-
-	public String build;
-
-	public String marsStartDate = null;
-	public String earthStartDate = null;
+	public transient String marsStartDate = null;
+	public transient String earthStartDate = null;
 
 	/*
 	 * -----------------------------------------------------------------------------
@@ -104,29 +138,33 @@ public class SimulationConfig implements Serializable {
 	 */
 
 	/** DOM documents. */
-	private Document simulationDoc;
+	private transient static Document simulationDoc;
 
 	// Subset configuration classes
-	private PartConfig partConfig;
-	private PartPackageConfig partPackageConfig;
-	private AmountResourceConfig resourceConfig;
-	private PersonConfig personConfig;
-	private MedicalConfig medicalConfig;
-	private LandmarkConfig landmarkConfig;
-	private MineralMapConfig mineralMapConfig;
-	private MalfunctionConfig malfunctionConfig;
-	private CropConfig cropConfig;
-	private VehicleConfig vehicleConfig;
-	private BuildingConfig buildingConfig;
-	private SettlementConfig settlementConfig;
-	private ManufactureConfig manufactureConfig;
-	private ResupplyConfig resupplyConfig;
-	private ConstructionConfig constructionConfig;
+	private transient static PartConfig partConfig;
+	private transient static PartPackageConfig partPackageConfig;
+	private transient static AmountResourceConfig resourceConfig;
+	private transient static PersonConfig personConfig;
+	private transient static CrewConfig crewConfig;
+	private transient static MedicalConfig medicalConfig;
+	private transient static LandmarkConfig landmarkConfig;
+	private transient static MineralMapConfig mineralMapConfig;
+	private transient static MalfunctionConfig malfunctionConfig;
+	private transient static CropConfig cropConfig;
+	private transient static VehicleConfig vehicleConfig;
+	private transient static BuildingConfig buildingConfig;
+	private transient static SettlementConfig settlementConfig;
+	private transient static ManufactureConfig manufactureConfig;
+	private transient static ResupplyConfig resupplyConfig;
+	private transient static ConstructionConfig constructionConfig;
 
-	private FoodProductionConfig foodProductionConfig;
-	private MealConfig mealConfig;
-	private RobotConfig robotConfig;
-	private QuotationConfig quotationConfig;
+	private transient static FoodProductionConfig foodProductionConfig;
+	private transient static MealConfig mealConfig;
+	private transient static RobotConfig robotConfig;
+	private transient static QuotationConfig quotationConfig;
+	
+	private transient static ExperimentConfig experimentConfig;
+	private transient static ScienceConfig scienceConfig;	
 
 	/*
 	 * -----------------------------------------------------------------------------
@@ -138,30 +176,30 @@ public class SimulationConfig implements Serializable {
 	private SimulationConfig() {
 	}
 
-	/**
-	 * Gets a Bill Pugh Singleton instance of the simulation.
-	 * 
-	 * @return Simulation instance
-	 */
-	// public static SimulationConfig instance() {
-	// logger.info("Simulation's instance() is on " +
-	// Thread.currentThread().getName() + " Thread");
-	// NOTE: Simulation.instance() is accessible on any threads or by any threads
-	// return SingletonHelper.INSTANCE;
-	// }
+//	/**
+//	 * Gets a Bill Pugh Singleton instance of the simulation.
+//	 * 
+//	 * @return Simulation instance
+//	 */
+//	 public static SimulationConfig instance() {
+//	 logger.info("Simulation's instance() is on " +
+//	 Thread.currentThread().getName() + " Thread");
+//	 NOTE: Simulation.instance() is accessible on any threads or by any threads
+//	 return SingletonHelper.INSTANCE;
+//	 }
 
-	/**
-	 * Initializes an inner static helper class for Bill Pugh Singleton Pattern
-	 * Note: as soon as the instance() method is called the first time, the class is
-	 * loaded into memory and an instance gets created. Advantage: it supports
-	 * multiple threads calling instance() simultaneously with no synchronized
-	 * keyword needed (which slows down the VM) {@link SingletonHelper} is loaded on
-	 * the first execution of {@link Singleton#instance()} or the first access to
-	 * {@link SingletonHelper#INSTANCE}, not before.
-	 */
-	// private static class SingletonHelper{
-	// private static final SimulationConfig INSTANCE = new SimulationConfig();
-	// }
+//	/**
+//	 * Initializes an inner static helper class for Bill Pugh Singleton Pattern
+//	 * Note: as soon as the instance() method is called the first time, the class is
+//	 * loaded into memory and an instance gets created. Advantage: it supports
+//	 * multiple threads calling instance() simultaneously with no synchronized
+//	 * keyword needed (which slows down the VM) {@link SingletonHelper} is loaded on
+//	 * the first execution of {@link Singleton#instance()} or the first access to
+//	 * {@link SingletonHelper#INSTANCE}, not before.
+//	 */
+//	 private static class SingletonHelper{
+//	 private static final SimulationConfig INSTANCE = new SimulationConfig();
+//	 }
 
 	/**
 	 * Prevents the singleton pattern from being destroyed at the time of
@@ -206,27 +244,266 @@ public class SimulationConfig implements Serializable {
 		SimulationConfig.instance = instance;
 	}
 
-	// public String getBuildVersion() {
-	// return build;
-	// }
-
-	// public String getBuild(){
-	// return build;
-	// }
-
 	/**
 	 * Reloads all of the configuration files.
 	 * 
 	 * @throws Exception if error loading or parsing configuration files.
 	 */
-	public static void loadConfig() {
-		// logger.info("loadConfig() is on " + Thread.currentThread().getName());
-		if (instance.simulationDoc != null) {
+	public void loadConfig() {
+//		logger.config("Staring loadConfig() on " + Thread.currentThread().getName());
+		SimulationConfig.instance();
+
+		if (simulationDoc != null) {
 			instance.destroyOldConfiguration();
 		}
-		instance.loadDefaultConfiguration();
+		
+		checkXMLFileVersion();
+    	
+		loadDefaultConfiguration();
+		
+//		logger.config("Done with loadConfig() on " + Thread.currentThread().getName());
+	}
+	
+	/**
+	 * Checks if the xml files are of the same version of the core engine.
+	 */
+	public void checkXMLFileVersion() {
+		boolean sameBuild = false;
+		    
+        FileSystem fileSys = FileSystems.getDefault();
+        Path versionPath = fileSys.getPath(versionFile.getPath());
+        Path exceptionPath = fileSys.getPath(exceptionFile.getPath());
+		Path xmlPath = fileSys.getPath(xmlLocation.getPath());
+		
+		// Query if the xml folder exists in user home directory
+		// Query if the xml version matches
+		// If not, copy all xml over
+
+        boolean xmlDirExist = xmlPath.toFile().exists();
+		
+		// if "xml" exits as a file, delete it
+		if (xmlDirExist && xmlLocation.isFile()) {
+			LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, "'" + xmlLocation +  "'" 
+					+ " is a folder and NOT supposed to exist as a file. Deleting it.");
+			try {
+				FileUtils.forceDelete(xmlLocation);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		// Check again xmlDirExist
+		xmlDirExist = xmlLocation.exists();
+		String buildText = "";
+		boolean versionFileExist = false;
+		boolean exceptionFileExist = false;
+		boolean xmlDirDeleted = false;
+		boolean invalid = false;
+		
+
+		// if the "xml" directory exists, back up everything inside and clean the directory
+		if (xmlDirExist && xmlLocation.isDirectory()) {
+			LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+			"The xml folder already existed.");		
+			
+			versionFileExist = versionFile.exists();
+			exceptionFileExist = exceptionFile.exists();
+			
+			if (versionFileExist) {
+				BufferedReader buffer;
+				try {
+					buffer = new BufferedReader(new FileReader(versionFile));    
+				    if ((buildText = buffer.readLine()) != null) {
+				    	// If the version.txt's build version tag is the same as the core engine's
+					    if (buildText.equals(Simulation.BUILD)) {
+					    	sameBuild = true;
+					    }				    
+				    }
+				    
+					buffer.close();
+				} catch (FileNotFoundException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		
+		if (!xmlDirExist)
+			LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+				"The xml folder does not exist in user home.");	
+		else if (!versionFileExist)
+			LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+				"The version.txt does not exist.");	
+		else if (sameBuild)
+			LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+					"The version.txt has the same BUILD " + buildText
+					+ " as the core engine's.");
+		else if (!hasNonDigit(buildText))
+	    	LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+					"The version.txt in your home xml folder shows BUILD " + buildText 
+					+ ". The core engine uses BUILD " + Simulation.BUILD + ".");
+		else {
+			LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+				"The version.txt is invalid.");
+			invalid = true;
+		}
+		
+//		if (xmlDirExist && (!versionFileExist || !sameBuild)) {
+//			LogConsolidated.log(Level.CONFIG, 0, sourceName, 
+//					"Backing up existing xml files into a 'backup' folder. Cleaning the xml folder.");
+//		}
+		
+		if (xmlDirExist) {
+			
+			if (!versionFileExist || buildText.equals("") || !sameBuild || hasNonDigit(buildText)) {
+			
+				try {
+	
+					if (versionFileExist && !buildText.equals("") && !invalid) {
+						
+						String s0 = backupDir + File.separator + buildText;		
+				        File dir = new File(s0.trim());
+				        if (!dir.exists()) {
+				        	// Case A1 : Copy it to /.mars-sim/backup/buildText/
+							LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+									"Case A1 : (The build folder doesn't exist yet) " +
+									"Back up to " + s0);
+							// Make a copy everything in the /xml to the /{$version}
+							FileUtils.moveDirectoryToDirectory(xmlLocation, dir, true);   	
+				        }
+				        else {
+				        	// Case A2 :  Copy it to /.mars-sim/backup/{$buildText}/{$timestamp}/
+				        	// if that buildText directory already exists
+				        	// Get timestamp in UTC
+//				            Instant timestamp = Instant.now();
+				            String timestamp = LocalDateTime.now().toString().replace(":", "").replace("-", "");
+				            int lastIndxDot = timestamp.lastIndexOf('.');
+				            timestamp = timestamp.substring(0, lastIndxDot);				            
+				            String s1 = s0 + File.separator + timestamp;
+				            dir = new File(s1.trim());
+							LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+									"Case A2 : (The build folder " +
+									s0 + " already exists) Back up to " + s1);
+							// Make a copy everything in the /xml to the /{$version}
+							FileUtils.moveDirectoryToDirectory(xmlLocation, dir, true);
+				        }
+					}
+	
+					else {
+						
+						if (!backupLocation.exists()) {
+							// Case B1 : Copy it to /.mars-sim/backup/
+							LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+									"Case B1 : (The backup folder doesn't exist) " +
+									"Back up to " + backupDir);
+							// Make a copy everything in the /xml to the /backup/xml
+							FileUtils.moveDirectoryToDirectory(xmlLocation, backupLocation, true);
+				        }
+						
+						else {
+							// Case B2 : Copy it to /.mars-sim/backup/{$timestamp}/
+//				            Instant timestamp = Instant.now();
+				            String timestamp = LocalDateTime.now().toString().replace(":", "").replace("-", "");
+				            int lastIndxDot = timestamp.lastIndexOf('.');
+				            timestamp = timestamp.substring(0, lastIndxDot);			            
+				            String s2 = backupDir + File.separator + "unknown" + File.separator + timestamp;
+				            
+				            backupLocation = new File(s2);
+							LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+									"Case B2 : (The backup folder " +
+									backupDir + " already exists. Back up to " + s2);	
+							// Make a copy everything in the /xml to the /backup/xml
+							FileUtils.moveDirectoryToDirectory(xmlLocation, backupLocation, true);
+
+						}
+					}
+					
+//					if (buildText.equals("") || isNotNumber(buildText) || !sameBuild)
+//						// delete the version.txt file 
+//						versionFile.delete();
+	
+					// delete everything in the xml folder
+	//				FileUtils.deleteDirectory(xmlLocation);
+					xmlDirDeleted = deleteDirectory(xmlLocation);
+	
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		
+		xmlDirExist = xmlLocation.exists();
+
+		// if the "xml" folder does NOT exist
+		if (!xmlLocation.exists() || xmlDirDeleted) {
+			// Create the xml folder
+			versionFile.getParentFile().mkdirs();
+			LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, "A new xml folder was just created.");
+		}
+		
+//		if (!sameBuild || invalid || !xmlDirExist) {
+			if (!versionFileExist) {
+				List<String> lines = Arrays.asList(Simulation.BUILD);
+				try {
+					// Create the version.txt file
+					Files.write(versionPath, lines, StandardCharsets.UTF_8);
+					LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, "A new version.txt file was just created.");
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+			if (!exceptionFileExist) {				
+				List<String> lines = new ArrayList<>();
+				try {
+					// Create the exception.txt file
+					Files.write(exceptionPath, lines, StandardCharsets.UTF_8);
+					LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, "A new exception.txt file was just created.");
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+//		}
 	}
 
+	/**
+	 * Checks if the string contains non-digits
+	 * 
+	 * @param name
+	 * @return true if it contains non-digits
+	 */
+	public boolean hasNonDigit(String name) {
+	    char[] chars = name.toCharArray();
+
+	    for (char c : chars) {
+	        if(!Character.isDigit(c)) {
+	            return true;
+	        }
+	    }
+
+	    return false;
+	}
+	
+	/* 
+	* Delete a non empty directory 
+	*/ 
+	public static boolean deleteDirectory(File dir) {
+		if (dir.isDirectory()) {
+			File[] children = dir.listFiles();
+			for (int i = 0; i < children.length; i++) {
+				boolean success = deleteDirectory(children[i]);
+				if (!success) {
+					return false;
+				}
+			}
+		}
+		 
+		// either file or an empty directory 
+//		System.out.println("removing file or directory : " + dir.getName());
+		return true; 
+	}
+    
+	
 	/*
 	 * -----------------------------------------------------------------------------
 	 * Getter
@@ -261,10 +538,10 @@ public class SimulationConfig implements Serializable {
 					// System.out.println("double d = " + d);
 
 					if (d < 16 && d > 2048)
-						throw new IllegalStateException("time_ratio must be between 64.0 and 1024.0");
+						throw new IllegalStateException("time_ratio must be between 16.0 and 2048.0");
 
 				} catch (NumberFormatException nfe) {
-					System.out.println("NumberFormatException found in time_ratio : " + nfe.getMessage());
+					System.out.println("SimulationConfig : NumberFormatException found in time_ratio : " + nfe.getMessage());
 				}
 			}
 			// if (ratio < 0D) throw new IllegalStateException("Simulation time ratio must
@@ -306,7 +583,7 @@ public class SimulationConfig implements Serializable {
 						throw new IllegalStateException("time-between-updates must be between 40 and 250");
 
 				} catch (NumberFormatException nfe) {
-					System.out.println("NumberFormatException found in time-between-updates : " + nfe.getMessage());
+					System.out.println("SimulationConfig : NumberFormatException found in time-between-updates : " + nfe.getMessage());
 				}
 			}
 
@@ -348,10 +625,10 @@ public class SimulationConfig implements Serializable {
 					result = Integer.parseInt(str);
 
 					if (result > 100 || result < 1)
-						throw new IllegalStateException("no-delays-per-yield must be between 1 and 200.");
+						throw new IllegalStateException("no-delays-per-yield must be between 1 and 100.");
 
 				} catch (NumberFormatException nfe) {
-					System.out.println("NumberFormatException found in time-between-updates : " + nfe.getMessage());
+					System.out.println("SimulationConfig : NumberFormatException found in time-between-updates : " + nfe.getMessage());
 				}
 			}
 
@@ -394,10 +671,10 @@ public class SimulationConfig implements Serializable {
 					result = Integer.parseInt(str);
 
 					if (result > 50 || result < 1)
-						throw new IllegalStateException("max-frame-skips must be between 1 and 200.");
+						throw new IllegalStateException("max-frame-skips must be between 1 and 50.");
 
 				} catch (NumberFormatException nfe) {
-					System.out.println("NumberFormatException found in max-frame-skips : " + nfe.getMessage());
+					System.out.println("SimulationConfig : NumberFormatException found in max-frame-skips : " + nfe.getMessage());
 				}
 			}
 
@@ -489,7 +766,7 @@ public class SimulationConfig implements Serializable {
 						throw new IllegalStateException("autosave_interval must be between 1 and 1440.");
 
 				} catch (NumberFormatException nfe) {
-					System.out.println("NumberFormatException found in autosave_interval : " + nfe.getMessage());
+					System.out.println("SimulationConfig : NumberFormatException found in autosave_interval : " + nfe.getMessage());
 				}
 
 			}
@@ -530,7 +807,7 @@ public class SimulationConfig implements Serializable {
 						throw new IllegalStateException("average-transit-time must be between 0 and 430.");
 
 				} catch (NumberFormatException nfe) {
-					System.out.println("NumberFormatException found in average-transit-time : " + nfe.getMessage());
+					System.out.println("SimulationConfig : NumberFormatException found in average-transit-time : " + nfe.getMessage());
 				}
 
 			}
@@ -564,7 +841,6 @@ public class SimulationConfig implements Serializable {
 	 * @return resource config
 	 */
 	public AmountResourceConfig getResourceConfiguration() {
-		// System.out.println("SimulationConfig : caling getResourceConfiguration()");
 		return resourceConfig;
 	}
 
@@ -573,10 +849,19 @@ public class SimulationConfig implements Serializable {
 	 * 
 	 * @return person config
 	 */
-	public PersonConfig getPersonConfiguration() {
+	public PersonConfig getPersonConfig() {
 		return personConfig;
 	}
 
+	/**
+	 * Gets the crew config subset.
+	 * 
+	 * @return crew config
+	 */
+	public CrewConfig getCrewConfig() {
+		return crewConfig;
+	}
+	
 	/**
 	 * Gets the robot config subset.
 	 * 
@@ -646,7 +931,6 @@ public class SimulationConfig implements Serializable {
 	 * @return building config
 	 */
 	public BuildingConfig getBuildingConfiguration() {
-		// System.out.println("right before calling getBuildingConfiguration()");
 		return buildingConfig;
 	}
 
@@ -692,7 +976,6 @@ public class SimulationConfig implements Serializable {
 	 * @return meal config
 	 */
 	public MealConfig getMealConfiguration() {
-		// logger.info("calling getMealConfiguration()");
 		return mealConfig;
 	}
 
@@ -714,6 +997,15 @@ public class SimulationConfig implements Serializable {
 		return quotationConfig;
 	}
 
+	/**
+	 * Gets the science config subset.
+	 * 
+	 * @return science config
+	 */
+	public ScienceConfig getScienceConfig() {
+		return scienceConfig;
+	}
+			
 	/**
 	 * Parses an XML file into a DOM document.
 	 * 
@@ -738,6 +1030,22 @@ public class SimulationConfig implements Serializable {
 //	  		return result; 
 //		}
 
+//	public static Document parseXMLFileAsJDOMDocument(String filename, boolean useDTD)
+//			throws IOException, JDOMException {
+//		InputStream stream = getInputStream(filename);
+//		
+////		bug 2909888: read the inputstream with a specific encoding instead of the
+////		system default.	 
+//		InputStreamReader reader = new InputStreamReader(stream, "UTF-8");
+//		SAXBuilder saxBuilder = new SAXBuilder(useDTD);
+//		
+////		[landrus, 26.11.09]: Use an entity resolver to load dtds from the classpath	 
+//		saxBuilder.setEntityResolver(new ClasspathEntityResolver());
+//		Document result = saxBuilder.build(reader);
+//		stream.close();
+//
+//		return result;
+//	}
 
 	/**
 	 * Parses an XML file into a DOM document.
@@ -749,23 +1057,159 @@ public class SimulationConfig implements Serializable {
 	 * @throws JDOMException
 	 * @throws Exception     if XML could not be parsed or file could not be found.
 	 */
-	public static Document parseXMLFileAsJDOMDocument(String filename, boolean useDTD)
-			throws IOException, JDOMException {
-		InputStream stream = getInputStream(filename);
+	private Document parseXMLFileAsJDOMDocument(String filename, boolean useDTD) {
+//	    SAXBuilder builder = new SAXBuilder(useDTD);
+	    SAXBuilder builder = new SAXBuilder(null, null, null);
+	    
+	    Document document = null;
+	    
+	    boolean exceptionFileExist = exceptionFile.exists();
+	    
+		String fullPathName = XML_FOLDER + filename + XML_EXTENSION;
 		
-//		bug 2909888: read the inputstream with a specific encoding instead of the
-//		system default.	 
-		InputStreamReader reader = new InputStreamReader(stream, "UTF-8");
-		SAXBuilder saxBuilder = new SAXBuilder(useDTD);
+		File f = new File(Simulation.XML_DIR, filename + XML_EXTENSION);
+		String checksumOldFile = null;
 		
-//		[landrus, 26.11.09]: Use an entity resolver to load dtds from the classpath	 
-		saxBuilder.setEntityResolver(new ClasspathEntityResolver());
-		Document result = saxBuilder.build(reader);
-		stream.close();
+		File testf = new File(Simulation.XML_DIR, filename); // no xml extension
+		String checksumTestFile = null;
+				
+//		if (!f.exists()) {
+			// Since the xml file does NOT exist in the home directory, start the input stream for copying
+			InputStream stream = SimulationConfig.class.getResourceAsStream(fullPathName);
+			int bytes = 0;
+			try {
+				bytes = stream.available();
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}		
+			
+			if (bytes != 0) {
+//				File targetFile = new File(Simulation.XML_DIR + File.separator + filename + XML_EXTENSION);
+				Path testPath = testf.getAbsoluteFile().toPath();
+				try {
+					// Copy the xml files from within the jar to user home's xml directory
+					Files.copy(stream, testPath, StandardCopyOption.REPLACE_EXISTING);
+					
+					// Obtain the checksum of this file
+					checksumTestFile = Hash.MD5.getChecksumString(testf);
+									
+//					LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+//							"Copying " + filename + XML_EXTENSION + " to the xml folder.");
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+//		}
+		
+			
+		if (f.exists()) {
+			try {
+				checksumOldFile = Hash.MD5.getChecksumString(f);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		else {
+			// if the xml file doesn't exist
+			if(testf.renameTo(f)) {
+				logger.config("Case C1 : " + f.getName() + " didn't exist. Just got created.");
+			} else {
+				logger.config("Case C1 : " + "Error in renaming the test xml file " + testf.getName());
+			}  
+		}
+			
+		if (f.exists() && f.canRead()) {
+	        
+	        try {
 
-		return result;
+				if (checksumOldFile != null && !checksumOldFile.equals(checksumTestFile)) {
+					// need to back it up.
+					logger.config("Old MD5: "+ checksumOldFile + "  New MD5: "+ checksumTestFile);
+
+					boolean xmlFileMentioned = false;
+					if (exceptionFileExist) {
+						// Read the exception.txt file to see if it mentions this particular xml file
+						BufferedReader buffer;
+						String line = "";
+						try {
+							buffer = new BufferedReader(new FileReader(exceptionFile));
+							line = buffer.readLine();
+							
+						    while (line != null && !line.equals("")) {
+						    	// If the exception.txt does mention this xml file
+							    if (line.equals(filename)) {						
+							    	xmlFileMentioned = true;
+							    	break;
+							    }
+							    line = buffer.readLine();
+						    }
+						    
+							buffer.close();
+						} catch (FileNotFoundException e) {
+							e.printStackTrace();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+					
+					if (!xmlFileMentioned) {
+				    	
+							String backupDir = Simulation.BACKUP_DIR;
+							String s0 = backupDir + File.separator + Simulation.BUILD;		
+					        File dir = null;//new File(s0.trim());
+					        
+							// Case C2 :  Copy it to /.mars-sim/backup/{$buildText}/{$timestamp}/
+				        	// if that buildText directory already exists
+				        	// Get timestamp in UTC
+//				            Instant timestamp = Instant.now();
+				            String timestamp = LocalDateTime.now().toString().replace(":", "").replace("-", "");
+				            int lastIndxDot = timestamp.lastIndexOf('.');
+				            timestamp = timestamp.substring(0, lastIndxDot);		            
+				            String s1 = s0 + File.separator + timestamp;
+
+				            dir = new File(s1.trim());
+				            
+							LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, 
+									"Case C2 : checksum mismatched on " + f.getName() + ". "
+									+ s0 + " folder already exists. Back up " 
+									+ f.toString() + " to " + s1);
+							
+							// Backup this old (checksum failed) xml file
+							FileUtils.copyFileToDirectory(f, dir, true);
+							FileUtils.deleteQuietly(f);
+							
+							if(testf.renameTo(f)) {
+								logger.config("A new version of " + f.getName() + " just got created.");
+							} else {
+								logger.config("Error in renaming the test xml file " + testf.getName());
+							}		
+					    	
+					}
+					else {
+				    	// The xml file is found
+						logger.config(filename + " was found being referenced inside exception.txt, thus bypassing its checksum.");
+
+					}
+
+				}
+				else {
+					FileUtils.deleteQuietly(testf);
+				}
+				
+//	        	FileInputStream fi = new FileInputStream(Simulation.XML_DIR);
+		        document = builder.build(f);
+		    }
+		    catch (JDOMException | IOException e)
+		    {
+		        e.printStackTrace();
+		    }
+		}
+		
+	    return document;
 	}
-
+	
 	/*
 	 * -----------------------------------------------------------------------------
 	 * Private Methods
@@ -774,14 +1218,15 @@ public class SimulationConfig implements Serializable {
 
 	private void loadDefaultConfiguration() {
 		try {
-			// System.out.println("Setting SimulationConfig.build to Build " + build);
+//			logger.config("Loading xml files...");
 			// Load simulation document
 			simulationDoc = parseXMLFileAsJDOMDocument(SIMULATION_FILE, true);
 			// Load subset configuration classes.
-			resourceConfig = new AmountResourceConfig(parseXMLFileAsJDOMDocument(RESOURCE_FILE, true));
+			resourceConfig = new AmountResourceConfig(parseXMLFileAsJDOMDocument(RESOURCE_FILE, true));	
 			partConfig = new PartConfig(parseXMLFileAsJDOMDocument(PART_FILE, true));
 			partPackageConfig = new PartPackageConfig(parseXMLFileAsJDOMDocument(PART_PACKAGE_FILE, true));
 			personConfig = new PersonConfig(parseXMLFileAsJDOMDocument(PEOPLE_FILE, true));
+			crewConfig = new CrewConfig(parseXMLFileAsJDOMDocument(CREW_FILE, true));
 			medicalConfig = new MedicalConfig(parseXMLFileAsJDOMDocument(MEDICAL_FILE, true));
 			landmarkConfig = new LandmarkConfig(parseXMLFileAsJDOMDocument(LANDMARK_FILE, true));
 			mineralMapConfig = new MineralMapConfig(parseXMLFileAsJDOMDocument(MINERAL_MAP_FILE, true));
@@ -790,63 +1235,65 @@ public class SimulationConfig implements Serializable {
 			vehicleConfig = new VehicleConfig(parseXMLFileAsJDOMDocument(VEHICLE_FILE, true));
 			buildingConfig = new BuildingConfig(parseXMLFileAsJDOMDocument(BUILDING_FILE, true));
 			resupplyConfig = new ResupplyConfig(parseXMLFileAsJDOMDocument(RESUPPLY_FILE, true), partPackageConfig);
-			settlementConfig = new SettlementConfig(parseXMLFileAsJDOMDocument(SETTLEMENT_FILE, true),
-					partPackageConfig);
+			settlementConfig = new SettlementConfig(parseXMLFileAsJDOMDocument(SETTLEMENT_FILE, true), partPackageConfig);
 			manufactureConfig = new ManufactureConfig(parseXMLFileAsJDOMDocument(MANUFACTURE_FILE, true));
 			constructionConfig = new ConstructionConfig(parseXMLFileAsJDOMDocument(CONSTRUCTION_FILE, true));
-			// 2014-11-23 Added Food Production
 			foodProductionConfig = new FoodProductionConfig(parseXMLFileAsJDOMDocument(FOODPRODUCTION_FILE, true));
-			// 2014-12-06 Added mealConfig
 			mealConfig = new MealConfig(parseXMLFileAsJDOMDocument(MEAL_FILE, true));
-			// 2015-01-21 Added robotConfig
 			robotConfig = new RobotConfig(parseXMLFileAsJDOMDocument(ROBOT_FILE, true));
-			// 2016-06-08 Added quotationConfig
 			quotationConfig = new QuotationConfig(parseXMLFileAsJDOMDocument(QUOTATION_FILE, true));
-			// logger.info("Done loading all xml files");
+			
+			experimentConfig = new ExperimentConfig(EXPERIMENTS_FILE);
+			scienceConfig = new ScienceConfig();
+			
+			logger.config("Done loading all xml files.");
+			logger.config("Please go to the mars-sim console's Main Menu to choose an option.");
+			
 		} catch (Exception e) {
 			logger.log(Level.SEVERE, "Error reading config file(s) below : " + e.getMessage());
 			e.printStackTrace();
 		}
 	}
 
-	/**
-	 * Gets a configuration file as an input stream.
-	 * 
-	 * @param filename the filename of the configuration file.
-	 * @return input stream
-	 * @throws IOException if file cannot be found.
-	 */
-	private static InputStream getInputStream(String filename) throws IOException {
-		/*
-		 * [landrus, 28.11.09]: dont use filesystem separators in classloader loading
-		 * envs.
-		 */
-		String fullPathName = "/conf/" + filename + ".xml";
-		InputStream stream = SimulationConfig.class.getResourceAsStream(fullPathName);
-		if (stream == null)
-			throw new IOException(fullPathName + " failed to load");
-		return stream;
-	}
+//	/**
+//	 * Gets a configuration file as an input stream.
+//	 * 
+//	 * @param filename the filename of the configuration file.
+//	 * @return input stream
+//	 * @throws IOException if file cannot be found.
+//	 */
+//	private static InputStream getInputStream(String filename) throws IOException {
+//		/*
+//		 * [landrus, 28.11.09]: dont use filesystem separators in classloader loading
+//		 * envs.
+//		 */
+//		String fullPathName = CONF + filename + XML;
+//		InputStream stream = SimulationConfig.class.getResourceAsStream(fullPathName);
+//		if (stream == null)
+//			throw new IOException(fullPathName + " failed to load");
+//		return stream;
+//	}
 
-	/*
-	 * public int testValue(String str, String name) { int result = 0;
-	 * 
-	 * if ((str == null) || str.trim().length() == 0) throw new
-	 * IllegalStateException(name +
-	 * " must be greater than zero and cannot be blank."); else { try { result =
-	 * Integer.parseInt(str);
-	 * 
-	 * if (result > 200 || result < 1) throw new IllegalStateException(name +
-	 * " must be between 1 and 200.");
-	 * 
-	 * 
-	 * } catch (NumberFormatException nfe) { System.out.println(name +
-	 * " has NumberFormatException : " + nfe.getMessage()); } }
-	 * 
-	 * return result;
-	 * 
-	 * }
-	 */
+		
+//	 public int testValue(String str, String name) {
+//		int result = 0;
+//	 	if ((str == null) || str.trim().length() == 0) 
+//			throw new IllegalStateException(name + " must be greater than zero and cannot be blank."); 
+//		else {
+//			try {
+//				result = Integer.parseInt(str);
+//		 
+//			if (result > 200 || result < 1) 
+//				throw new IllegalStateException(name + " must be between 1 and 200.");
+//
+//			} catch (NumberFormatException nfe) { 
+//				System.out.println(name + " has NumberFormatException : " + nfe.getMessage()); 
+//			}
+//		}
+//		 
+//		 return result;
+//	 
+//	 } 
 
 	/**
 	 * Prepares all configuration objects for garbage collection.
@@ -889,5 +1336,9 @@ public class SimulationConfig implements Serializable {
 		robotConfig = null;
 		quotationConfig.destroy();
 		quotationConfig = null;
+//		experimentConfig.destroy();
+//		experimentConfig = null;
+//		scienceConfig.destroy();
+//		scienceConfig = null;
 	}
 }

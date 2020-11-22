@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * LegendDisplay.java
- * @version 3.1.0 2018-07-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  * @author Greg Whelan
  */
@@ -64,5 +64,12 @@ extends WebLabel {
 	 */
 	public void setUSGSMode(boolean useUSGSLegend) {
 		this.useUSGSLegend = useUSGSLegend;
+	}
+	
+	public void destroy() {
+		legend = null;
+		colorImg = null;
+		distanceImg = null;
+		usgsDistanceImg = null;
 	}
 }

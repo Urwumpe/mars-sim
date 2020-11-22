@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Msg.java
- * @version 3.1.0 2017-11-06
+ * @version 3.1.2 2020-09-02
  * @author stpa
  */
 package org.mars_sim.msp.core;
@@ -69,8 +69,12 @@ public class Msg {
 		try {
 			return RESOURCE_BUNDLE.getString(key);
 		} catch (MissingResourceException e) {
+//			Log.warn(e.getStackTrace()[1].getClassName());
 			return handle(e,key);
 		}
+		
+
+		
 	}
 
 	/*

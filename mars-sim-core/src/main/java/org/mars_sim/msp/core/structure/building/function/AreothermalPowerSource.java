@@ -1,13 +1,11 @@
 /**
  * Mars Simulation Project
  * WindPowerSource.java
- * @version 3.07 2014-12-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 
@@ -31,18 +29,16 @@ extends PowerSource {
 
 	@Override
 	public double getCurrentPower(Building building) {
-		Coordinates location = building.getBuildingManager().getSettlement().getCoordinates();
-		double areothermalHeat = Simulation.instance().getMars().getSurfaceFeatures()
-				.getAreothermalPotential(location);
+//		Coordinates location = building.getSettlement().getCoordinates();
+		double areothermalHeat = surface.getAreothermalPotential(building.getSettlement().getCoordinates());
 
 		return getMaxPower() * (areothermalHeat / 100D);
 	}
 
 	@Override
 	public double getAveragePower(Settlement settlement) {
-		Coordinates location = settlement.getCoordinates();
-		double areothermalHeat = Simulation.instance().getMars().getSurfaceFeatures()
-				.getAreothermalPotential(location);
+//		Coordinates location = settlement.getCoordinates();
+		double areothermalHeat =surface.getAreothermalPotential(settlement.getCoordinates());
 
 		return getMaxPower() * (areothermalHeat / 100D);
 	}
@@ -55,13 +51,11 @@ extends PowerSource {
 	@Override
 	public void removeFromSettlement() {
 		// TODO Auto-generated method stub
-
 	}
 
 	@Override
 	public void setTime(double time) {
 		// TODO Auto-generated method stub
-		
 	}
 	
 	@Override

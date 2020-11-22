@@ -1,15 +1,13 @@
 /**
  * Mars Simulation Project
  * Communication.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 
 import java.io.Serializable;
 import java.util.Iterator;
@@ -25,9 +23,7 @@ implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private static final FunctionType FUNCTION = FunctionType.COMMUNICATION;
-
-    private static BuildingConfig buildingConfig;
-    
+  
     // Data members
     private int populationSupport;
     private int user;
@@ -42,7 +38,6 @@ implements Serializable {
         super(FUNCTION, building);
 
         // Load activity spots
-        buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
         loadActivitySpots(buildingConfig.getCommunicationActivitySpots(building.getBuildingType()));
     }
 

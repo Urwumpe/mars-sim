@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * EquipmentDisplayInfo.java
- * @version 3.1.0 2017-10-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -20,13 +20,14 @@ import java.awt.*;
 class EquipmentDisplayInfoBean implements UnitDisplayInfo {
 
     // Data members
-    private Icon buttonIcon;
+    private Icon buttonIcon = ImageLoader.getIcon("EquipmentIcon");
 
     /**
      * Constructor
      */
     EquipmentDisplayInfoBean() {
-        buttonIcon = ImageLoader.getIcon("EquipmentIcon");
+    	super();
+//        buttonIcon = ImageLoader.getIcon("EquipmentIcon");
     }
 
     /**
@@ -138,4 +139,22 @@ class EquipmentDisplayInfoBean implements UnitDisplayInfo {
     public String getSound(Unit unit) {
     	return SoundConstants.SND_EQUIPMENT;
     }
+
+	@Override
+	public Icon getGeologyMapIcon(Unit unit) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Color getGeologyMapLabelColor() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Color getGeologyGlobeColor() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

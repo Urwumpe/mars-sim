@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TeachMeta.java
- * @version 3.08 2015-06-08
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -11,11 +11,14 @@ import java.util.Collection;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.task.Teach;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * Meta task for the Teach task.
@@ -46,12 +49,37 @@ public class TeachMeta implements MetaTask, Serializable {
 
         if (person.isInside()) {
 
-	        // Find potential students.
-	        Collection<Person> potentialStudents = Teach.getBestStudents(person);
-	        if (potentialStudents.size() > 0) {
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double fatigue = condition.getFatigue();
+            double stress = condition.getStress();
+            double hunger = condition.getHunger();
+            
+            if (fatigue > 1000 || stress > 75 || hunger > 750)
+            	return 0;          
 
-	            result = 50D;
+            // Find potential students.
+            Collection<Person> potentialStudents = Teach.getBestStudents(person);
+            if (potentialStudents.size() == 0)
+            	return 0;
 
+            else {
+
+	            result = potentialStudents.size() * 20D;
+
+	            if (person.isInVehicle()) {	
+	    	        // Check if person is in a moving rover.
+	    	        if (Vehicle.inMovingRover(person)) {
+	    		        // the bonus for proposing scientific study inside a vehicle, 
+	    	        	// rather than having nothing to do if a person is not driving
+	    	        	result += 30;
+	    	        } 	       
+	    	        else
+	    		        // the bonus for proposing scientific study inside a vehicle, 
+	    	        	// rather than having nothing to do if a person is not driving
+	    	        	result += 10;
+	            }
+	            
 	            Person student = (Person) potentialStudents.toArray()[0];
                 Building building = BuildingManager.getBuilding(student);
 
@@ -63,7 +91,7 @@ public class TeachMeta implements MetaTask, Serializable {
 
                 }
                 
-    	        // 2015-06-07 Added Preference modifier
+    	        // Add Preference modifier
     	        if (result > 0)
     	         	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
     	    	
@@ -78,8 +106,7 @@ public class TeachMeta implements MetaTask, Serializable {
 
 	@Override
 	public Task constructInstance(Robot robot) {
-		// TODO Auto-generated method stub
-		return null;
+		return new Teach(robot);
 	}
 
 	@Override

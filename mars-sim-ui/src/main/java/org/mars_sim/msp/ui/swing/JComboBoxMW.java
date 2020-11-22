@@ -1,7 +1,8 @@
 /**
  * Mars Simulation Project
  * JComboBoxMW.java
- * @version 3.1.0 2017-09-14
+ * @version 3.1.2 2020-09-02
+ * @version 3.1.2 2020-09-02
  * @author stpa
  */
 package org.mars_sim.msp.ui.swing;
@@ -11,17 +12,17 @@ import java.awt.event.MouseWheelListener;
 import java.util.Vector;
 
 import javax.swing.ComboBoxModel;
-
-import com.alee.laf.combobox.WebComboBox;
+import javax.swing.JComboBox;
 
 /**
- * A Combobox that is mousewheel-enabled.
+ * A Combobox that is mouse wheel-enabled.
  */
-public class JComboBoxMW<T> extends WebComboBox implements MouseWheelListener {
+@SuppressWarnings({ "serial", "rawtypes" })
+public class JComboBoxMW<T> extends JComboBox implements MouseWheelListener {
 
 //	private static final long serialVersionUID = -3527247980947082803L;
 
-	private boolean layingOut = false;
+//	private boolean layingOut = false;
 
 	private boolean wide = true;
 
@@ -40,6 +41,7 @@ public class JComboBoxMW<T> extends WebComboBox implements MouseWheelListener {
 	 * 
 	 * @param items {@link Vector}<T> the initial items.
 	 */
+	@SuppressWarnings("unchecked")
 	public JComboBoxMW(Vector<T> items) {
 		super(items);
 		this.addMouseWheelListener(this);
@@ -50,6 +52,7 @@ public class JComboBoxMW<T> extends WebComboBox implements MouseWheelListener {
 	 * 
 	 * @param model {@link ComboBoxModel}<T>
 	 */
+	@SuppressWarnings("unchecked")
 	public JComboBoxMW(ComboBoxModel<T> model) {
 		super(model);
 		this.addMouseWheelListener(this);
@@ -60,6 +63,7 @@ public class JComboBoxMW<T> extends WebComboBox implements MouseWheelListener {
 	 * 
 	 * @param items T[]
 	 */
+	@SuppressWarnings("unchecked")
 	public JComboBoxMW(T[] items) {
 		super(items);
 		this.addMouseWheelListener(this);
@@ -77,10 +81,10 @@ public class JComboBoxMW<T> extends WebComboBox implements MouseWheelListener {
 
 	public void doLayout() {
 		try {
-			layingOut = true;
+//			layingOut = true;
 			super.doLayout();
 		} finally {
-			layingOut = false;
+//			layingOut = false;
 		}
 	}
 

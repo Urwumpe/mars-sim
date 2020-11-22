@@ -1,5 +1,13 @@
+/**
+ * Mars Simulation Project
+ * CheckSerializedSize.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 package org.mars_sim.msp.core.tool;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
@@ -9,6 +17,19 @@ import java.io.Serializable;
 
 public class CheckSerializedSize extends OutputStream {
 
+	 public static long getSerializedSizeByteArray(Serializable obj) {
+	    try {
+		    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		    ObjectOutputStream oos = new ObjectOutputStream(baos);
+		    oos.writeObject(obj);
+            oos.close();
+		    return baos.size();//toByteArray();
+	        } catch (Exception e) {
+	            // Serialization failed
+	            return 0;
+	        }
+		}
+	 
     /** Serialize obj and count the bytes */
     public static long getSerializedSize(Serializable obj) {
         try {

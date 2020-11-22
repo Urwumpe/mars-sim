@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RepairEmergencyMalfunction.java
- * @version 3.1.0 2017-08-30
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -10,8 +10,10 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
@@ -20,12 +22,16 @@ import org.mars_sim.msp.core.malfunction.MalfunctionFactory;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
 import org.mars_sim.msp.core.person.EventType;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.task.meta.RepairMalfunctionMeta;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskEvent;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.robot.RoboticAttributeType;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.vehicle.Rover;
@@ -42,6 +48,9 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(RepairEmergencyMalfunction.class.getName());
 
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			logger.getName().length());
+
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.repairEmergencyMalfunction"); //$NON-NLS-1$
 
@@ -50,7 +59,7 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 
 	// Static members
 	/** The stress modified per millisol. */
-	private static final double STRESS_MODIFIER = 1D;
+	private static final double STRESS_MODIFIER = .5D;
 
 	// Data members
 	/** The entity being repaired. */
@@ -58,7 +67,7 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 	/** Problem being fixed. */
 	private Malfunction malfunction;
 	private Person person = null;
-	// private Robot robot = null;
+	private Robot robot = null;
 
 	/**
 	 * Constructs a RepairEmergencyMalfunction object.
@@ -66,7 +75,7 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 	 * @param person the person to perform the task
 	 */
 	public RepairEmergencyMalfunction(Unit unit) {
-		super(NAME, unit, true, true, STRESS_MODIFIER, false, 5D);
+		super(NAME, unit, true, true, STRESS_MODIFIER, false, 25D);
 
 		if (unit instanceof Person) {
 			this.person = (Person) unit;
@@ -76,8 +85,8 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 			super.setStressModifier(score / 10D + STRESS_MODIFIER);
 		}
         else if (unit instanceof Robot) {
-        	//this.robot = (Robot) unit;
-        	endTask();
+        	this.robot = (Robot) unit;
+//        	endTask();
         }
 
 		claimMalfunction();
@@ -86,6 +95,7 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 			addPersonOrRobotToMalfunctionLocation(entity);
 		} else {
 			endTask();
+			return;
 		}
 
 		// Create starting task event if needed.
@@ -93,13 +103,14 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 		if (getCreateEvents() && !isDone()) {
 			if (person != null)
 				startingEvent = new TaskEvent(person, this, entity, EventType.TASK_START,
-						person.getSettlement().getName(), "Repair Emergency Malfunction");
-//        	else if (robot != null)
-//                startingEvent = new TaskEvent(robot, 
-//                		this, 
-//                		EventType.TASK_START, 
-//                		robot.getAssociatedSettlement().getName(), 
-//                		"");
+						person.getLocationTag().getImmediateLocation(), "Repair Emergency Malfunction");
+        	else if (robot != null)
+                startingEvent = new TaskEvent(robot, 
+                		this, 
+                		entity,
+                		EventType.TASK_START, 
+                		robot.getLocationTag().getImmediateLocation(), 
+                		"Repair Emergency Malfunction");
 
 			Simulation.instance().getEventManager().registerNewEvent(startingEvent);
 		}
@@ -110,13 +121,17 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 
 		if (malfunction != null) {
 			if (person != null) {
-				logger.fine(person.getName() + " starting work on emergency malfunction: " + malfunction.getName() + "@"
-						+ Integer.toHexString(malfunction.hashCode()));
+				LogConsolidated.log(logger, Level.INFO, 10_000, sourceName,
+						"[" + person.getLocationTag().getLocale() + "] " + person.getName() + " started repairing on emergency malfunction: " 
+				+ malfunction.getName() + " in "+ entity + ".");
+//				+ "@"+ Integer.toHexString(malfunction.hashCode()));
 			}
-//        	else if (robot != null) {
-//                //logger.fine(robot.getName() + " starting work on emergency malfunction: " +
-//                        //malfunction.getName() + "@" + Integer.toHexString(malfunction.hashCode()));
-//        	}
+        	else if (robot != null) {
+				LogConsolidated.log(logger, Level.INFO, 10_000, sourceName,
+						"[" + robot.getLocationTag().getLocale() + "] " + robot.getName() + " started repairing on emergency malfunction: " 
+				+ malfunction.getName() + " in "+ entity + ".");
+//				+ "@" + Integer.toHexString(malfunction.hashCode()));
+        	}
 		}
 	}
 
@@ -139,12 +154,6 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 	 */
 	private double repairingPhase(double time) {
 		String name = null;
-
-		// Check if the emergency malfunction work is fixed.
-		double workTimeLeft = malfunction.getEmergencyWorkTime() - malfunction.getCompletedEmergencyWorkTime();
-		if (workTimeLeft == 0) {
-			endTask();
-		}
 
 		if (isDone()) {
 			return time;
@@ -172,9 +181,29 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 		// Add work to emergency malfunction.
 		double remainingWorkTime = malfunction.addEmergencyWorkTime(workTime, name);
 
-		// Add experience
+		// Add experience points
 		addExperience(time);
 
+		// Check if an accident happens during repair.
+//		checkForAccident(time);
+
+		// Check if the emergency malfunction work is fixed.
+		if (malfunction.needEmergencyRepair() && malfunction.isEmergencyRepairDone()) {
+			if (person != null) {
+			LogConsolidated.log(logger, Level.INFO, 10_000, sourceName,
+					"[" + person.getLocationTag().getLocale() + "] " + person.getName() 
+					+ " wrapped up the emergency repair of " + malfunction.getName() 
+					+ " in "+ entity + " (" + Math.round(malfunction.getCompletedEmergencyWorkTime()*10.0)/10.0 + " millisols spent).");
+			}
+			else {
+				LogConsolidated.log(logger, Level.INFO, 10_000, sourceName,
+						"[" + robot.getLocationTag().getLocale() + "] " + robot.getName() 
+						+ " wrapped up the emergency repair of " + malfunction.getName() 
+						+ " in "+ entity + " (" + Math.round(malfunction.getCompletedEmergencyWorkTime()*10.0)/10.0 + " millisols spent).");
+			}
+			endTask();
+		}
+		
 		return remainingWorkTime;
 	}
 
@@ -189,16 +218,16 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 					.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
 			newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
 			newPoints *= getTeachingExperienceModifier();
-			person.getMind().getSkillManager().addExperience(SkillType.MECHANICS, newPoints);
+			person.getSkillManager().addExperience(SkillType.MECHANICS, newPoints, time);
 		} 
-//		else if (robot != null) {
-			// int experienceAptitude = robot.getNaturalAttributeManager().getAttribute(
-			// NaturalAttribute.EXPERIENCE_APTITUDE);
-			// newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
-			// newPoints *= getTeachingExperienceModifier();
-			// robot.getBotMind().getSkillManager().addExperience(SkillType.MECHANICS,
-			// newPoints);
-//		}
+		else if (robot != null) {
+			 int experienceAptitude = robot.getRoboticAttributeManager().getAttribute(
+					 RoboticAttributeType.EXPERIENCE_APTITUDE);
+			 newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
+			 newPoints *= getTeachingExperienceModifier();
+			 robot.getSkillManager().addExperience(SkillType.MECHANICS,
+			 newPoints, time);
+		}
 
 	}
 
@@ -227,14 +256,14 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 
 		boolean result = false;
 
-//        Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(robot).iterator();
-//        while (i.hasNext()) {
-//            Malfunctionable entity = i.next();
-//            MalfunctionManager manager = entity.getMalfunctionManager();
-//            if (manager.hasEmergencyMalfunction()) {
-//                result = true;
-//            }
-//        }
+        Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(robot).iterator();
+        while (i.hasNext()) {
+            Malfunctionable entity = i.next();
+            MalfunctionManager manager = entity.getMalfunctionManager();
+            if (manager.hasEmergencyMalfunction()) {
+                result = true;
+            }
+        }
 
 		return result;
 	}
@@ -259,21 +288,18 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 		} 
 		
 		else if (robot != null) {
-
-//            Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(robot).iterator();
-//            while (i.hasNext() && (malfunction == null)) {
-//                Malfunctionable e = i.next();
-//                MalfunctionManager manager = e.getMalfunctionManager();
-//                if (manager.hasEmergencyMalfunction()) {
-//                    malfunction = manager.getMostSeriousEmergencyMalfunction();
-//                    entity = e;
-//                    setDescription(Msg.getString("Task.description.repairEmergencyMalfunction.detail",
-//                            malfunction.getName(), entity.getName())); //$NON-NLS-1$
-//                }
-//            }
-
+            Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(robot).iterator();
+            while (i.hasNext() && (malfunction == null)) {
+                Malfunctionable e = i.next();
+                MalfunctionManager manager = e.getMalfunctionManager();
+                if (manager.hasEmergencyMalfunction()) {
+                    malfunction = manager.getMostSeriousEmergencyMalfunction();
+                    entity = e;
+                    setDescription(Msg.getString("Task.description.repairEmergencyMalfunction.detail",
+                            malfunction.getName(), entity.getNickName())); //$NON-NLS-1$
+                }
+            }
 		}
-
 	}
 
 	/**
@@ -318,9 +344,9 @@ public class RepairEmergencyMalfunction extends Task implements Repair, Serializ
 	public int getEffectiveSkillLevel() {
 		SkillManager manager = null;
 		if (person != null)
-			manager = person.getMind().getSkillManager();
+			manager = person.getSkillManager();
 		else if (robot != null)
-			;// manager = robot.getBotMind().getSkillManager();
+			manager = robot.getSkillManager();
 		return manager.getEffectiveSkillLevel(SkillType.MECHANICS);
 	}
 

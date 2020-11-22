@@ -1,14 +1,13 @@
 /**
  * Mars Simulation Project
  * BuildingPanelFoodProduction.java
- * @version 3.1.0 2017-10-18
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.ui.swing.unit_window.structure.building.food;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -24,7 +23,6 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JComponent;
@@ -80,6 +78,7 @@ public class BuildingPanelFoodProduction extends BuildingFunctionPanel {
 	 * @param foodFactory the manufacturing building function.
 	 * @param desktop     the main desktop.
 	 */
+	@SuppressWarnings("unchecked")
 	public BuildingPanelFoodProduction(FoodProduction foodFactory, MainDesktopPane desktop) {
 		// Use BuildingFunctionPanel constructor.
 		super(foodFactory.getBuilding(), desktop);
@@ -114,7 +113,7 @@ public class BuildingPanelFoodProduction extends BuildingFunctionPanel {
 		scrollPanel = new WebScrollPane();
 		scrollPanel.setPreferredSize(new Dimension(170, 90));
 		add(scrollPanel, BorderLayout.CENTER);
-		scrollPanel.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+//		scrollPanel.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
 
 		// Create process list main panel
 		WebPanel processListMainPane = new WebPanel(new BorderLayout(0, 0));
@@ -179,6 +178,7 @@ public class BuildingPanelFoodProduction extends BuildingFunctionPanel {
 		interactionPanel.add(btnPanel);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public void update() {
 
@@ -215,7 +215,7 @@ public class BuildingPanelFoodProduction extends BuildingFunctionPanel {
 		// Update all process panels.
 		Iterator<FoodProductionProcess> i = processes.iterator();
 		while (i.hasNext()) {
-			FoodProductionPanel panel = getFoodProductionPanel(i.next());
+			FoodProductionPanel panel = getFoodProductionPanel(i.next()); // java.util.ConcurrentModificationException
 			if (panel != null)
 				panel.update();
 
@@ -279,12 +279,12 @@ public class BuildingPanelFoodProduction extends BuildingFunctionPanel {
 		if (foodFactory.getProcesses().size() < foodFactory.getConcurrentProcesses()) {
 
 			// Determine highest materials science skill level at settlement.
-			Settlement settlement = foodFactory.getBuilding().getBuildingManager().getSettlement();
+			Settlement settlement = foodFactory.getBuilding().getSettlement();
 			int highestSkillLevel = 0;
 			Iterator<Person> i = settlement.getAllAssociatedPeople().iterator();
 			while (i.hasNext()) {
 				Person tempPerson = i.next();
-				SkillManager skillManager = tempPerson.getMind().getSkillManager();
+				SkillManager skillManager = tempPerson.getSkillManager();
 				int skill = skillManager.getSkillLevel(SkillType.COOKING);
 				if (skill > highestSkillLevel) {
 					highestSkillLevel = skill;

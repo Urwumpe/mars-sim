@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RobotJob.java
- * @version 3.1.0 2017-08-30
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.robot.ai.job;
@@ -11,6 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.RobotType;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -39,6 +42,10 @@ public abstract class RobotJob implements Serializable {
 	/** List of missions to be joined by a person with this job. */
 	protected List<Class<?>> jobMissionJoins;
 
+	private static Simulation sim = Simulation.instance();
+	public static MissionManager missionManager = sim.getMissionManager();
+	protected static UnitManager unitManager = sim.getUnitManager();
+	
 	/**
 	 * Constructor.
 	 * 
@@ -156,5 +163,16 @@ public abstract class RobotJob implements Serializable {
 	 */
 	public boolean isJobRelatedTask(Class<?> taskClass) {
 		return jobTasks.contains(taskClass);
+	}
+	
+	/**
+	 * Reloads instances after loading from a saved sim
+	 * 
+	 * @param u {@link UnitManager}
+	 * @param m {@link MissionManager}
+	 */
+	public static void initializeInstances(UnitManager u, MissionManager m) {
+		unitManager = u;
+		missionManager = m;
 	}
 }

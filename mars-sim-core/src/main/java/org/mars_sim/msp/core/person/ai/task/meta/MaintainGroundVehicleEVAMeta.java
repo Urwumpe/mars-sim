@@ -1,27 +1,31 @@
 /**
  * Mars Simulation Project
  * MaintainGroundVehicleEVAMeta.java
- * @version 3.1.0 2017-10-16
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
 import java.io.Serializable;
 import java.util.Iterator;
+import java.util.List;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.task.EVAOperation;
 import org.mars_sim.msp.core.person.ai.task.MaintainGroundVehicleEVA;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
+import org.mars_sim.msp.core.structure.building.function.VehicleMaintenance;
+import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
@@ -35,8 +39,6 @@ public class MaintainGroundVehicleEVAMeta implements MetaTask, Serializable {
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.maintainGroundVehicleEVA"); //$NON-NLS-1$
-
-    private static SurfaceFeatures surface;
 
     @Override
     public String getName() {
@@ -56,11 +58,41 @@ public class MaintainGroundVehicleEVAMeta implements MetaTask, Serializable {
         // Determine if settlement has a garage.
        	if (person.isInSettlement() || person.isRightOutsideSettlement()) {
        		
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double fatigue = condition.getFatigue();
+            double stress = condition.getStress();
+            double hunger = condition.getHunger();
+            
+            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            	return 0;
+            
         	Settlement settlement = person.getAssociatedSettlement();
-        	
-       		if (settlement.getBuildingManager().getBuildings(FunctionType.GROUND_VEHICLE_MAINTENANCE).size() > 0) {
+			// Determine if settlement has available space in garage.
+			boolean garageSpace = false;
+			
+			List<Building> garages = settlement.getBuildingManager().getBuildings(FunctionType.GROUND_VEHICLE_MAINTENANCE);
+			
+			Iterator<Building> j = garages.iterator();
+			while (j.hasNext() && !garageSpace) {
+				try {
+					Building building = j.next();
+					VehicleMaintenance garage = building.getGroundVehicleMaintenance();
+					if (garage.getCurrentVehicleNumber() < garage.getVehicleCapacity()) {
+						garageSpace = true;
+					}
+					
+				} catch (Exception e) {
+				}
+			}
+			
+			if (garageSpace) {
+				return 0D;
+			}
+			
+       		if (garages.size() == 0) {
 	
-	        	//2016-10-04 Checked for radiation events
+	        	// Check for radiation events
 	        	boolean[] exposed = settlement.getExposed();
 	
 	    		if (exposed[2]) {// SEP can give lethal dose of radiation
@@ -72,13 +104,17 @@ public class MaintainGroundVehicleEVAMeta implements MetaTask, Serializable {
 		    		return 0;
 	
 	            // Check if it is night time.
-	            surface = Simulation.instance().getMars().getSurfaceFeatures();
-	
-	            if (surface.getSolarIrradiance(person.getCoordinates()) == 0D)
-	                if (!surface.inDarkPolarRegion(person.getCoordinates()))
-	                    return 0;
-	
-	
+				if (EVAOperation.isGettingDark(person))
+					return 0;
+				
+	            // Checks if the person's settlement is at meal time and is hungry
+	            if (EVAOperation.isHungryAtMealTime(person))
+	            	return 0;
+	            
+	            // Checks if the person is physically drained
+				if (EVAOperation.isExhausted(person))
+					return 0;
+				
 	            if (settlement.getIndoorPeopleCount() > settlement.getPopulationCapacity())
 	                result *= 2D;
 	
@@ -105,10 +141,10 @@ public class MaintainGroundVehicleEVAMeta implements MetaTask, Serializable {
 	
 	            // Modify if tinkering is the person's favorite activity.
 	            if (person.getFavorite().getFavoriteActivity() == FavoriteType.TINKERING) {
-	                result *= 1.5D;
+	                result += RandomUtil.getRandomInt(1, 20);
 	            }
 	
-	            // 2015-06-07 Added Preference modifier
+	            // Add Preference modifier
 	            if (result > 0D) {
 	                result = result + result * person.getPreference().getPreferenceScore(this)/5D;
 	            }
@@ -120,7 +156,6 @@ public class MaintainGroundVehicleEVAMeta implements MetaTask, Serializable {
 	        	if (exposed[1]) {// GCR can give nearly lethal dose of radiation
 	    			result = result/4D;
 	    		}
-	
 	
 	            if (result < 0D) {
 	                result = 0D;

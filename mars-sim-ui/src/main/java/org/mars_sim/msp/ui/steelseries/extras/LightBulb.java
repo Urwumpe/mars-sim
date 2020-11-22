@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * LightBulb.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 /*
  * Copyright (c) 2012, Gerrit Grunwald
  * All rights reserved.

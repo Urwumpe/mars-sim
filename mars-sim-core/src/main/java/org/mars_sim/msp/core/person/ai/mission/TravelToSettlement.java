@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TravelToSettlement.java
- * @version 3.1.0 2017-08-08
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -16,11 +16,10 @@ import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.job.Driver;
+import org.mars_sim.msp.core.person.ai.job.Pilot;
 import org.mars_sim.msp.core.person.ai.job.Job;
-import org.mars_sim.msp.core.person.ai.job.JobManager;
+import org.mars_sim.msp.core.person.ai.job.JobUtil;
 import org.mars_sim.msp.core.person.ai.job.Politician;
 import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
 import org.mars_sim.msp.core.robot.Robot;
@@ -41,11 +40,14 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(TravelToSettlement.class.getName());
+	private static final Logger logger = Logger.getLogger(TravelToSettlement.class.getName());
 
 	/** Default description. */
 	public static final String DEFAULT_DESCRIPTION = Msg.getString("Mission.description.travelToSettlement"); //$NON-NLS-1$
 
+	/** Mission Type enum. */
+	public static final MissionType missionType = MissionType.TRAVEL_TO_SETTLEMENT;
+	
 	// Static members
 	public static final double BASE_MISSION_WEIGHT = 1D;
 
@@ -69,7 +71,7 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 	 */
 	public TravelToSettlement(MissionMember startingMember) {
 		// Use RoverMission constructor
-		super(DEFAULT_DESCRIPTION, startingMember);
+		super(DEFAULT_DESCRIPTION, missionType, startingMember);
 
 		Settlement s = startingMember.getSettlement();
 
@@ -95,7 +97,9 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 				setDescription(Msg.getString("Mission.description.travelToSettlement.detail",
 						destinationSettlement.getName())); // $NON-NLS-1$)
 			} else {
-				endMission("Destination is null.");
+				logger.warning(MissionStatus.DESTINATION_IS_NULL.getName());
+				addMissionStatus(MissionStatus.DESTINATION_IS_NULL);
+				endMission();
 			}
 
 			// Check mission available space
@@ -110,18 +114,20 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 
 			// Recruit additional members to mission.
 			if (!isDone()) {
-				recruitMembersForMission(startingMember);
+				if (!recruitMembersForMission(startingMember))
+					return;
 			}
 
 			// Check if vehicle can carry enough supplies for the mission.
 			if (hasVehicle() && !isVehicleLoadable()) {
-				endMission(VEHICLE_NOT_LOADABLE);// "Vehicle is not loadable. (TravelToSettlement)");
+				addMissionStatus(MissionStatus.VEHICLE_NOT_LOADABLE);
+				endMission();
 			}
 
 			// Set initial phase
-			setPhase(VehicleMission.APPROVAL);//.EMBARKING);
+			setPhase(VehicleMission.REVIEWING);
 			setPhaseDescription(
-					Msg.getString("Mission.phase.approval.description", getStartingSettlement().getName())); // $NON-NLS-1$
+					Msg.getString("Mission.phase.reviewing.description", getStartingSettlement().getName())); // $NON-NLS-1$
 		}
 		// logger.info("Travel to Settlement mission");
 	}
@@ -129,7 +135,7 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 	public TravelToSettlement(Collection<MissionMember> members, Settlement startingSettlement,
 			Settlement destinationSettlement, Rover rover, String description) {
 		// Use RoverMission constructor.
-		super(description, (MissionMember) members.toArray()[0], RoverMission.MIN_GOING_MEMBERS, rover);
+		super(description, missionType, (MissionMember) members.toArray()[0], RoverMission.MIN_GOING_MEMBERS, rover);
 
 		// Initialize data members
 		setStartingSettlement(startingSettlement);
@@ -154,18 +160,19 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 				Person person = (Person) member;
 				person.getMind().setMission(this);
 			} else if (member instanceof Robot) {
-				Robot robot = (Robot) member;
-				robot.getBotMind().setMission(this);
+//				Robot robot = (Robot) member;
+//				robot.getBotMind().setMission(this);
 			}
 		}
 
 		// Set initial phase
-		setPhase(VehicleMission.APPROVAL);//.EMBARKING);
-		setPhaseDescription(Msg.getString("Mission.phase.approval.description", getStartingSettlement().getName())); // $NON-NLS-1$
+		setPhase(VehicleMission.EMBARKING);
+		setPhaseDescription(Msg.getString("Mission.phase.embarking.description"));//, getStartingSettlement().getName())); // $NON-NLS-1$
 
 		// Check if vehicle can carry enough supplies for the mission.
 		if (hasVehicle() && !isVehicleLoadable()) {
-			endMission(VEHICLE_NOT_LOADABLE);// "Vehicle is not loadable. (TravelToSettlement)");
+			addMissionStatus(MissionStatus.VEHICLE_NOT_LOADABLE);
+			endMission();
 		}
 	}
 
@@ -176,7 +183,7 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 	 */
 	@Override
 	protected void determineNewPhase() {
-		if (APPROVAL.equals(getPhase())) {
+		if (REVIEWING.equals(getPhase())) {
 			setPhase(VehicleMission.EMBARKING);
 			setPhaseDescription(
 					Msg.getString("Mission.phase.embarking.description", getCurrentNavpoint().getDescription()));//startingMember.getSettlement().toString())); // $NON-NLS-1$
@@ -187,7 +194,7 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 			setPhase(VehicleMission.TRAVELLING);
 			setPhaseDescription(
 					Msg.getString("Mission.phase.travelling.description", getNextNavpoint().getDescription())); // $NON-NLS-1$
-			associateAllMembersWithSettlement(destinationSettlement);
+//			associateAllMembersWithSettlement(destinationSettlement);
 		} 
 		
 		else if (TRAVELLING.equals(getPhase())) {
@@ -198,8 +205,19 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 			}
 		} 
 		
-		else if (DISEMBARKING.equals(getPhase()))
-			endMission(ALL_DISEMBARKED);
+//		else if (DISEMBARKING.equals(getPhase()))
+//			endMission(ALL_DISEMBARKED);
+		
+		else if (DISEMBARKING.equals(getPhase())) {
+			setPhase(VehicleMission.COMPLETED);
+			setPhaseDescription(
+					Msg.getString("Mission.phase.completed.description")); // $NON-NLS-1$
+		}
+		
+		else if (COMPLETED.equals(getPhase())) {
+			addMissionStatus(MissionStatus.MISSION_ACCOMPLISHED);
+			endMission();
+		}
 	}
 
 	/**
@@ -230,7 +248,7 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 	 */
 	private Settlement getRandomDestinationSettlement(MissionMember member, Settlement startingSettlement) {
 
-		double range = getVehicle().getRange();
+		double range = getVehicle().getRange(missionType);
 		Settlement result = null;
 
 		// Find all desirable destination settlements.
@@ -273,7 +291,6 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 			double range) {
 		Map<Settlement, Double> result = new HashMap<Settlement, Double>();
 
-		UnitManager unitManager = startingSettlement.getUnitManager();
 		Iterator<Settlement> i = unitManager.getSettlements().iterator();
 
 		while (i.hasNext()) {
@@ -354,7 +371,8 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 		// Determine relationship factor in destination settlement relative to
 		// starting settlement.
 		double relationshipFactor = 0D;
-		RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
+		if (relationshipManager == null)
+			relationshipManager = Simulation.instance().getRelationshipManager();
 		if (member instanceof Person) {
 			Person person = (Person) member;
 			double currentOpinion = relationshipManager.getAverageOpinionOfPeople(person,
@@ -370,13 +388,13 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 		if (member instanceof Person) {
 			Person person = (Person) member;
 			Job currentJob = person.getMind().getJob();
-			double currentJobProspect = JobManager.getJobProspect(person, currentJob, startingSettlement, true);
+			double currentJobProspect = JobUtil.getJobProspect(person, currentJob, startingSettlement, true);
 			double destinationJobProspect = 0D;
 
 			if (person.getMind().getJobLock()) {
-				destinationJobProspect = JobManager.getJobProspect(person, currentJob, destinationSettlement, false);
+				destinationJobProspect = JobUtil.getJobProspect(person, currentJob, destinationSettlement, false);
 			} else {
-				destinationJobProspect = JobManager.getBestJobProspect(person, destinationSettlement, false);
+				destinationJobProspect = JobUtil.getBestJobProspect(person, destinationSettlement, false);
 			}
 
 			if (destinationJobProspect > currentJobProspect) {
@@ -536,7 +554,7 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 			}
 
 			// If person has the "Driver" job, add 1 to their qualification.
-			if (person.getMind().getJob() instanceof Driver) {
+			if (person.getMind().getJob() instanceof Pilot) {
 				result += 1D;
 			}
 
@@ -609,9 +627,9 @@ public class TravelToSettlement extends RoverMission implements Serializable {
 
 			// Vehicle with superior range should be ranked higher.
 			if (result == 0) {
-				if (firstVehicle.getRange() > secondVehicle.getRange()) {
+				if (firstVehicle.getRange(missionType) > secondVehicle.getRange(missionType)) {
 					result = 1;
-				} else if (firstVehicle.getRange() < secondVehicle.getRange()) {
+				} else if (firstVehicle.getRange(missionType) < secondVehicle.getRange(missionType)) {
 					result = -1;
 				}
 			}

@@ -1,29 +1,37 @@
 /**
  * Mars Simulation Project
  * TabPanelConstruction.java
- * @version 3.1.0 2017-09-22
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
+
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+import javax.swing.JCheckBox;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.construction.ConstructionManager;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
-import javax.swing.*;
-
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-
+@SuppressWarnings("serial")
 public class TabPanelConstruction
 extends TabPanel {
 
 	// Data members
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	/** The Settlement instance. */
 	private Settlement settlement;
 	private ConstructionSitesPanel sitesPanel;
 	private ConstructedBuildingsPanel buildingsPanel;
@@ -44,6 +52,16 @@ extends TabPanel {
 		);
 
 		settlement = (Settlement) unit;
+
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
 		ConstructionManager manager = settlement.getConstructionManager();
 
 		JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
@@ -65,7 +83,7 @@ extends TabPanel {
 
 		// Create bottom panel.
 		JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		bottomPanel.setBorder(new MarsPanelBorder());
+//		bottomPanel.setBorder(new MarsPanelBorder());
 		centerContentPanel.add(bottomPanel, BorderLayout.SOUTH);
 
 		// Create override check box.
@@ -90,6 +108,9 @@ extends TabPanel {
 
 	@Override
 	public void update() {
+		if (!uiDone)
+			this.initializeUI();
+		
 		sitesPanel.update();
 		buildingsPanel.update();
 

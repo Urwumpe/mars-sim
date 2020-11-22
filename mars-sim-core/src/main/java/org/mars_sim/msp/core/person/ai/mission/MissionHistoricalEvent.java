@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MissionHistoricalEvent.java
- * @version 3.1.0 2017-10-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission;
@@ -32,8 +32,8 @@ public class MissionHistoricalEvent extends HistoricalEvent implements Serializa
 	 * @param location1  the settlement/coordinate where it occurs.
 	 */
 	public MissionHistoricalEvent(EventType eventType, Mission mission, String cause, String whileDoing, String member,
-			String location0, String location1) {
+			String location0, String location1, String associatedsettlement) {
 		// Use HistoricalEvent constructor.
-		super(HistoricalEventCategory.MISSION, eventType, mission, cause, whileDoing, member, location0, location1);
+		super(HistoricalEventCategory.MISSION, eventType, mission, cause, whileDoing, member, location0, location1, associatedsettlement);
 	}
 }

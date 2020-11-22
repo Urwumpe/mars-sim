@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SolarPowerSource.java
- * @version 3.1.0 2017-08-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -10,10 +10,6 @@ import java.io.Serializable;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.Mars;
-import org.mars_sim.msp.core.mars.OrbitInfo;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
@@ -31,8 +27,7 @@ implements Serializable {
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(SolarPowerSource.class.getName());
 	
-	private static final double MAINTENANCE_FACTOR = 2.5D;
-	
+	private static final double MAINTENANCE_FACTOR = 2.5D;	
 	/** NASA MER has an observable solar cell degradation rate of 0.14% per sol, 
 	 	Here we tentatively set to 0.04% per sol instead of 0.14%, since that in 10 earth years,
 	 	the efficiency will	drop down to 23.21% of the initial 100%
@@ -49,6 +44,8 @@ implements Serializable {
 	public static double PI = Math.PI;
 	public static double HALF_PI = PI / 2D;
 
+	private static final String SOLAR_PHOTOVOLTAIC_ARRAY = "Solar Photovoltaic Array";
+
 	// Notes :
 	// 1. The solar Panel is made of triple-junction solar cells with theoretical max eff of 68%  
 	// 2. the flat-plate single junction has max theoretical efficiency at 29%
@@ -59,7 +56,7 @@ implements Serializable {
 	/*
 	 * The theoretical max efficiency of the triple-junction solar cells 
 	 */
-	private double efficiency_solar_panel = .68;
+	private double efficiency_solar_panel = .55;
 
 	/**
 	 * The dust deposition rates is proportional to the dust loading. Here we use MER program's extended the analysis 
@@ -71,9 +68,6 @@ implements Serializable {
 	// an atmospheric opacity (Tau) of 0.748 and a solar array dust factor of 0.549.
 	
 	private Coordinates location ;
-	private SurfaceFeatures surface ;
-	private Mars mars;
-	private OrbitInfo orbitInfo;
 	
 	/**
 	 * Constructor.
@@ -93,17 +87,14 @@ implements Serializable {
 
 		if (location == null)
 			location = settlement.getCoordinates();
-        if (mars == null)
-        	mars = Simulation.instance().getMars();
-		if (surface == null)
-			surface = mars.getSurfaceFeatures();
+
 		double tau = surface.getOpticalDepth(location);		
 	
 		// e.g. The Material Adherence Experiement (MAE) on Pathfinder indicate steady dust accumulation on the Martian 
 		// surface at a rate of ~ 0.28% of the surface area per day (Landis and Jenkins, 1999)
 		dust_deposition_rate = .0018 * tau /.5;
 		
-		// during relatively periods of clear sky, typical values for optical depth were between 0.2 and 0.5
+		// during relatively periods of clear sky, typical values for tau (optical depth) were between 0.2 and 0.5
 	}
 	
 	/**
@@ -114,16 +105,14 @@ implements Serializable {
 	@Override
 	public double getCurrentPower(Building building) {
 		BuildingManager manager = building.getBuildingManager();
+		
 		if (location == null)
 			location = manager.getSettlement().getCoordinates();
-        if (mars == null)
-        	mars = Simulation.instance().getMars();
-		if (surface == null)
-			surface = mars.getSurfaceFeatures();
+
 		double area = AUXILLARY_PANEL_AREA;
-		if (building.getBuildingType().equalsIgnoreCase("Solar Photovoltaic Array")) {
-	        if (orbitInfo == null)
-	            orbitInfo = mars.getOrbitInfo();
+		if (building.getBuildingType().equalsIgnoreCase(SOLAR_PHOTOVOLTAIC_ARRAY)) {
+//	        if (orbitInfo == null)
+//	            orbitInfo = mars.getOrbitInfo();
 			double angle = orbitInfo.getSolarZenithAngle(location);
 			//logger.info("angle : " + angle/ Math.PI*180D);
 			// assuming the total area will change from 3 full panels to 1 panel based on the solar zenith angle 
@@ -145,17 +134,23 @@ implements Serializable {
 			//logger.info("area : " + area);
 		}
 		
-		double available = surface.getSolarIrradiance(location) /1000D * area * efficiency_solar_panel; // add noise with * (.99 + RandomUtil.getRandomDouble(.2));
-		double capable = getMaxPower();
-		if (available >= capable)
+		double available = surface.getSolarIrradiance(location) 
+				/1000D * area * efficiency_solar_panel; 
+		// add noise with * (.99 + RandomUtil.getRandomDouble(.2));
+		double capable = getMaxPower() * efficiency_solar_panel;
+		if (available >= capable) {
+//			logger.info(building.getNickName() + " solar power capable : " + Math.round(capable * 100.0)/100.0 + " kW");
 			return capable;
-		else
+		}
+		else {
+//			logger.info(building.getNickName() + " solar power available : " + Math.round(available * 100.0)/100.0 + " kW");
 			return available;
+		}
 	}
 
 	@Override
 	public double getAveragePower(Settlement settlement) {
-		return getMaxPower() / 2.5;
+		return getMaxPower() * 0.707;
 	}
 
 	@Override
@@ -186,11 +181,7 @@ implements Serializable {
 	@Override
 	public void destroy() {
 		super.destroy();
-		location = null;
-		surface = null;
-		mars = null;
-		orbitInfo = null;
-		
+		location = null;	
 	}
 
 

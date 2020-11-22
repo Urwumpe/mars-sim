@@ -1,0 +1,3836 @@
+<?xml version = "1.0" encoding = "UTF-8" standalone = "yes" ?>
+<!DOCTYPE manufacturing-processes [
+	<!ELEMENT manufacturing-processes (process*, salvage*)>
+	<!ELEMENT process (description?, inputs, outputs)>
+	<!ATTLIST process name CDATA #REQUIRED>
+	<!ATTLIST process tech CDATA #REQUIRED>
+	<!ATTLIST process skill CDATA #REQUIRED>
+	<!ATTLIST process work-time CDATA #REQUIRED>
+	<!ATTLIST process process-time CDATA #REQUIRED>
+	<!ATTLIST process power-required CDATA #REQUIRED>
+	<!ELEMENT description (#PCDATA)>
+	<!ELEMENT inputs (resource*, part*)>
+	<!ELEMENT outputs (resource*, part*, equipment*, vehicle*)>
+	<!ELEMENT resource EMPTY>
+	<!ATTLIST resource name CDATA #REQUIRED>
+	<!ATTLIST resource amount CDATA #REQUIRED>
+	<!ELEMENT part EMPTY>
+	<!ATTLIST part name CDATA #REQUIRED>
+	<!ATTLIST part number CDATA #REQUIRED>
+	<!ELEMENT equipment EMPTY>
+	<!ATTLIST equipment name CDATA #REQUIRED>
+	<!ATTLIST equipment number CDATA #REQUIRED>
+	<!ELEMENT vehicle EMPTY>
+	<!ATTLIST vehicle name CDATA #REQUIRED>
+	<!ATTLIST vehicle number CDATA #REQUIRED>
+	<!ELEMENT salvage (part-salvage*)>
+	<!ATTLIST salvage item-name CDATA #REQUIRED>
+	<!ATTLIST salvage type (equipment|vehicle) #REQUIRED>
+	<!ATTLIST salvage tech CDATA #REQUIRED>
+	<!ATTLIST salvage skill CDATA #REQUIRED>
+	<!ATTLIST salvage work-time CDATA #REQUIRED>
+	<!ELEMENT part-salvage EMPTY>
+	<!ATTLIST part-salvage name CDATA #REQUIRED>
+	<!ATTLIST part-salvage number CDATA #REQUIRED>
+]>
+
+<!--
+1. A Chemical Approach to C02 Util on Mars
+http://www.uapress.arizona.edu/onlinebks/ResourcesNearEarthSpace/resources28.pdf
+
+2. Regolith composition :
+http://canada.marssociety.org/winnipeg/soil.html
+ -->
+
+<!-- List of all manufacturing processes. -->
+<manufacturing-processes>
+	
+	<process name="extract minerals from basaltic deposits" tech="1" skill="1" work-time="10" process-time="100"
+			power-required="0.2">
+		<inputs>
+			<resource name="basaltic" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="aluminum oxide" amount="9.0" />
+			<resource name="magnesium" amount="7.0" />	
+			<resource name="sodium oxide" amount="5.0" />	
+			<resource name="potassium" amount="3.0" />	
+			<resource name="titanium" amount="3.0" />
+			<resource name="iron oxide" amount="3.0" />
+			<resource name="sand" amount="5.0" />	
+			<resource name="grey water" amount="10.0" />			
+		</outputs>
+	</process>
+	
+	<process name="extract minerals from smectite deposits" tech="1" skill="1" work-time="10" process-time="100"
+			power-required="0.2">
+		<inputs>
+			<resource name="smectite" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="aluminum oxide" amount="9.0" />
+			<resource name="magnesium" amount="4.0" />	
+			<resource name="sodium oxide" amount="2.0" />	
+			<resource name="potassium" amount="2.0" />	
+			<resource name="calcium" amount="4.0" />
+			<resource name="iron oxide" amount="2.0" />
+			<resource name="rock salt" amount="4.0" />
+			<resource name="sand" amount="10.0" />				
+			<resource name="grey water" amount="2.0" />	
+		</outputs>
+	</process>	
+
+	<process name="extract minerals from allophane deposits" tech="1" skill="1" work-time="10" process-time="100"
+			power-required="0.2">
+		<inputs>
+			<resource name="allophane" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="aluminum oxide" amount="30.0" />
+			<resource name="silicon dioxide" amount="1.0" />
+			<resource name="sand" amount="6.0" />				
+			<resource name="grey water" amount="10.0" />	
+		</outputs>
+	</process>	
+	
+	<process name="extract minerals from akaganeite deposits" tech="1" skill="1" work-time="10" process-time="100"
+			power-required="0.2">
+		<inputs>
+			<resource name="akaganeite" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="iron oxide" amount="20.0" />
+			<resource name="iron hydroxide" amount="10.0" />
+			<resource name="iron chloride" amount="10.0" />				
+			<resource name="grey water" amount="6.0" />	
+		</outputs>
+	</process>
+
+	<process name="extract minerals from bassanite deposits" tech="1" skill="1" work-time="10" process-time="100"
+			power-required="0.2">
+		<inputs>
+			<resource name="bassanite" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="calcium sulfate" amount="45.0" />		
+			<resource name="grey water" amount="3.0" />	
+		</outputs>
+	</process>
+					
+	<!-- Purify Rock Salt to Food Grade Table Salt -->
+	<process name="purify rock salt into table/epsom salt and other compounds"
+	tech="1" skill="1" work-time="10.0" process-time="100"
+			power-required=".4">
+		<inputs>
+			<resource name="Rock Salt" amount="10.0" />
+		</inputs>
+		<outputs>
+			<!--TODO: need research to determine the average amount-->
+			<resource name="Table Salt" amount="4" />
+			<resource name="Calcium" amount="0.5" />
+			<resource name="Magnesium" amount="0.5" />
+			<resource name="Potassium" amount="0.5" />
+			<resource name="Calcium Carbonate" amount="0.5" />
+			<resource name="Epsom Salt" amount="4" />
+			<!--Epsom Salt is Magnesium Sulfate-->
+		</outputs>
+	</process>
+
+<!-- http://www.madehow.com/Volume-2/Salt.html
+	One method of evaporating brine is solar evaporation.
+	Most brine is processed by a multiple-effect vacuum evaporator.
+	This device consists of three or more closed metal cylinders with conical bottoms. Brine is first treated chemically to remove calcium and magnesium compounds. It then fills the bottom
+	Brine may also be processed in a grainer.
+
+	In earth's ocean, the most common compound found in brine water are magnesium chloride, magnesium sulfate,
+	calcium sulfate, potassium chloride, magnesium bromide, and calcium carbonate.
+-->
+
+	<process name="extract nitrogen compounds from regolith (large batch)"
+			tech="1" skill="2"
+			work-time="50"
+			process-time="500"
+			power-required=".5">
+		<inputs>
+			<resource name="regolith" amount="500.0" />
+		</inputs>
+		<outputs>
+			<resource name="Nitrate" amount="10.0" />
+			<resource name="Nitrite" amount="2.0" />
+			<resource name="Nitrogen" amount="10.0" />
+			<resource name="Ammonia" amount="10.0" />
+			<resource name="argon" amount="1.0" />
+			<resource name="regolith" amount="450.0" />
+		</outputs>
+	</process>
+	<!-- A Mars Aqueous Regolith Extract (MARE) was prepared from the Phoenix
+	analogue regolith and analyzed by ion chromatography.
+	The MARE contained (mg/L) Nitrogen-containing species NO3- has 773
+	and NO2- has 6.9 -->
+
+
+	<process name="extract nitrogen compounds from regolith"
+			tech="1" skill="2"
+			work-time="10"
+			process-time="100"
+			power-required="0.1">
+		<inputs>
+			<resource name="regolith" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="Nitrate" amount="1.0" />
+			<resource name="Nitrite" amount="0.2" />
+			<resource name="Nitrogen" amount="1.0" />
+			<resource name="Ammonia" amount="1.0" />
+			<resource name="argon" amount="0.1" />			
+			<resource name="regolith" amount="45.0" />
+		</outputs>
+	</process>
+
+	<process name="turn compost into soil"
+			tech="2" skill="2"
+			work-time="50"
+			process-time="1000"
+			power-required=".025">
+		<inputs>
+			<resource name="compost" amount="10" />
+		</inputs>
+		<outputs>
+			<resource name="Soil" amount="10" />
+		</outputs>
+	</process>
+
+	<process name="turn compost into soil (large batch)"
+			tech="2" skill="2"
+			work-time="150"
+			process-time="3000"
+			power-required=".1">
+		<inputs>
+			<resource name="compost" amount="100" />
+		</inputs>
+		<outputs>
+			<resource name="Soil" amount="100" />
+		</outputs>
+	</process>
+
+	<process name="make pulp from cane fiber and crop waste"
+			tech="2" skill="2"
+			work-time="50"
+			process-time="300"
+			power-required=".1">
+		<inputs>
+			<resource name="cane fiber" amount="2.5" />
+			<resource name="crop waste" amount="2.5" />
+			<resource name="water" amount="1" />
+		</inputs>
+		<outputs>
+			<resource name="pulp" amount="5.5" />
+			<resource name="grey water" amount=".4" />
+			<resource name="solid waste" amount=".1" />			
+		</outputs>
+	</process>
+
+	<process name="make pulp from cane fiber and crop waste (large batch)"
+			tech="2" skill="2"
+			work-time="200"
+			process-time="800"
+			power-required=".5">
+		<inputs>
+			<resource name="cane fiber" amount="25" />
+			<resource name="crop waste" amount="25" />
+			<resource name="water" amount="10" />
+		</inputs>
+		<outputs>
+			<resource name="pulp" amount="55" />
+			<resource name="grey water" amount="4" />
+			<resource name="solid waste" amount="1" />
+		</outputs>
+	</process>
+
+	<process name="make paper, napkin and toilet tissue from pulp"
+			tech="1" skill="1"
+			work-time="50"
+			process-time="100"
+			power-required=".1">
+		<inputs>
+			<resource name="pulp" amount="5" />
+			<resource name="bleaching chemical" amount=".05" />
+		</inputs>
+		<outputs>
+			<resource name="paper" amount="1" />
+			<resource name="napkin" amount="2" />
+			<resource name="toilet tissue" amount="2" />
+		</outputs>
+	</process>
+
+	<process name="make paper, napkin and toilet tissue from pulp (large batch)"
+			tech="1" skill="1"
+			work-time="150"
+			process-time="500"
+			power-required=".5">
+		<inputs>
+			<resource name="pulp" amount="50" />
+			<resource name="bleaching chemical" amount=".5" />
+		</inputs>
+		<outputs>
+			<resource name="paper" amount="10" />
+			<resource name="napkin" amount="20" />
+			<resource name="toilet tissue" amount="20" />
+		</outputs>
+	</process>
+
+	<!-- http://www.paperonweb.com/chemical.htm
+		CHEMICALS USED IN PULP &PAPER MANUFACTURING AND COATING
+		Over 3000 different types of chemicals "can be used" in papermaking, in practice only about 200 individual chemicals
+		 are typically used, each satisfying a specific need.
+TODO 1: need to check the amount needed
+TODO 2: need to recruit chemist to monitor the process
+		 -->
+	<process name="make bleaching chemical for paper making"
+			tech="2" skill="3"
+			work-time="10"
+			process-time="50"
+			power-required=".05">
+		<inputs>
+			<resource name="oxygen" amount=".2" />
+			<resource name="sulfur" amount=".05" />
+			<resource name="ammonia" amount=".05" />
+			<resource name="sodium hypochlorite" amount=".05" />
+			<resource name="calcium carbonate" amount=".1" />
+			<resource name="magnesium" amount=".05" />
+		</inputs>
+		<outputs>
+			<resource name="bleaching chemical" amount=".5" />
+		</outputs>
+	</process>
+
+	<process name="make bleaching chemical for paper making (large batch)"
+			tech="2" skill="3"
+			work-time="50"
+			process-time="200"
+			power-required=".3">
+		<inputs>
+			<resource name="oxygen" amount="2" />
+			<resource name="sulfur" amount=".5" />
+			<resource name="ammonia" amount=".5" />
+			<resource name="sodium hypochlorite" amount=".5" />
+			<resource name="calcium carbonate" amount="1" />
+			<resource name="magnesium" amount=".5" />
+		</inputs>
+		<outputs>
+			<resource name="bleaching chemical" amount="5" />
+		</outputs>
+	</process>
+
+
+<!-- https://en.wiki2.org/wiki/Electrochlorination
+		NaCl + H2O + ENERGY → NaOCl + H2 energy is added to sodium chloride (table salt) in water, resulting in sodium hypochlorite and hydrogen gas.
+TODO: need to recruit chemist to monitor the process
+Note: 1 kg of H2 is 14.13 liter
+
+-->
+	<process name="make sodium hypochlorite for bleaching and sanitation"
+			tech="2" skill="3"
+			work-time="10"
+			process-time="100"
+			power-required=".1">
+		<inputs>
+			<resource name="Table Salt" amount="5.85" />
+			<resource name="water" amount="1.8" />
+
+		</inputs>
+		<outputs>
+			<resource name="sodium hypochlorite" amount="7.45" />
+			<resource name="hydrogen" amount=".2" />
+		</outputs>
+	</process>
+
+	<process name="make sodium hypochlorite for bleaching and sanitation (large batch)"
+			tech="2" skill="3"
+			work-time="50"
+			process-time="400"
+			power-required=".5">
+		<inputs>
+			<resource name="Table Salt" amount="58.5" />
+			<resource name="water" amount="18" />
+
+		</inputs>
+		<outputs>
+			<resource name="sodium hypochlorite" amount="74.5" />
+			<resource name="hydrogen" amount="2" />
+		</outputs>
+	</process>
+
+	<process name="make compost by mixing crop waste and food waste"
+			tech="1" skill="0"
+			work-time="10"
+			process-time="100"
+			power-required=".1">
+		<inputs>
+			<resource name="crop waste" amount="7.0" />
+			<resource name="food waste" amount="3.0" />
+		</inputs>
+		<outputs>
+			<resource name="compost" amount="10" />
+		</outputs>
+	</process>
+
+	<process name="make compost by mixing crop waste and food waste (large batch)"
+			tech="1" skill="0"
+			work-time="50"
+			process-time="1000"
+			power-required=".3">
+		<inputs>
+			<resource name="crop waste" amount="70.0" />
+			<resource name="food waste" amount="30.0" />
+		</inputs>
+		<outputs>
+			<resource name="compost" amount="100" />
+		</outputs>
+	</process>
+
+	<process name="make fertilizers for growing crops"
+			tech="2" skill="2"
+			work-time="25"
+			process-time="250"
+			power-required="0.2">
+		<inputs>
+		<!-- TODO:
+		1. Chemists may tweak the input amount and the yield
+		2. Arbitrary figures are used. Need research
+		-->
+			<resource name="Methane" amount="1" />
+			<resource name="Hydrogen" amount="0.5" />
+			<resource name="Nitrogen" amount="0.5" />
+			<resource name="Nitrate" amount="1" />
+			<resource name="Nitrite" amount="0.5" />
+			<resource name="Ammonia" amount="2" />
+			<resource name="Potassium" amount="0.5" />
+			<resource name="Phosphorus" amount="0.5" />
+			<resource name="Zinc" amount="0.02" />
+			<resource name="Calcium" amount="0.02" />
+			<resource name="Sulfur" amount="0.02" />
+			<resource name="Magnesium" amount="0.02" />
+			<resource name="Iron Powder" amount="0.02" />
+		</inputs>
+		<outputs>
+			<resource name="Fertilizer" amount="7.0" />
+		</outputs>
+	</process>
+
+	<process name="make fertilizers for growing crops (large batch)"
+			tech="2" skill="2"
+			work-time="50"
+			process-time="500"
+			power-required="1">
+		<inputs>
+		<!-- TODO:
+		1. Chemists may tweak the input amount and the yield
+		2. Arbitrary figures are used. Need research
+		-->
+			<resource name="Methane" amount="10" />
+			<resource name="Hydrogen" amount="5" />
+			<resource name="Nitrogen" amount="5" />
+			<resource name="Nitrate" amount="10" />
+			<resource name="Nitrite" amount="5" />
+			<resource name="Ammonia" amount="20" />
+			<resource name="Potassium" amount="5" />
+			<resource name="Phosphorus" amount="5" />
+			<resource name="Zinc" amount="0.2" />
+			<resource name="Calcium" amount="0.2" />
+			<resource name="Sulfur" amount="0.2" />
+			<resource name="Magnesium" amount="0.2" />
+			<resource name="Iron Powder" amount="0.2" />
+		</inputs>
+		<outputs>
+			<resource name="Fertilizer" amount="70.0" />
+		</outputs>
+	</process>
+
+<!--	DISABLE THIS PROCESS AND USE IRON POWDER INSTEAD OF IRON
+        ALSO IRON POWDER IS PRODUCED IN TWO PROCESSES ALREADY
+	<process name="extract iron from iron oxide"
+			tech="2" skill="2"
+			work-time="100"
+			process-time="300"
+			power-required="3.0">
+		<inputs>
+			<resource name="Iron Oxide" amount="5.0" />
+			<resource name="Carbon" amount="5.0" />
+		</inputs>
+		<outputs>
+			<resource name="Iron" amount="7.0" />
+			<resource name="Carbon Monoxide" amount="3.0" />
+		</outputs>
+	</process>
+	 TODO: Need to find the real molecular mass of the initial and resulting product
+			Fe2O3 + 3C → 2Fe + 3CO
+-->
+
+	<process name="extract aluminum oxide from regolith"
+			tech="1" skill="0"
+			work-time="50"
+			process-time="100"
+			power-required="0.2">
+		<inputs>
+			<resource name="regolith" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="aluminum oxide" amount="2.0" />
+			<resource name="silicon" amount="1.0" />
+			<resource name="sulfur" amount="1.0" />				
+			<resource name="sand" amount="40.0" />		
+		</outputs>
+	</process>
+
+	<process name="extract aluminum oxide from regolith (large batch)"
+			tech="1" skill="2"
+			work-time="250"
+			process-time="500"
+			power-required="1.0">
+		<inputs>
+			<resource name="regolith" amount="500.0" />
+		</inputs>
+		<outputs>
+			<resource name="aluminum oxide" amount="20.0" />
+			<resource name="silicon" amount="10.0" />
+			<resource name="sulfur" amount="10.0" />						
+			<resource name="sand" amount="400.0" />	
+		</outputs>
+	</process>
+
+	<process name="extract silicon dioxide from sand"
+	tech="1" skill="0"
+			work-time="20"
+			process-time="100"
+			power-required="0.2">
+		<inputs>
+			<resource name="sand" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="aluminum" amount="5.0" />
+			<resource name="silicon dioxide" amount="45.0" />				
+		</outputs>
+	</process>
+	
+	<process name="extract silicon dioxide from sand (large batch)"
+	tech="1" skill="2"
+			work-time="100"
+			process-time="500"
+			power-required="1.0">
+		<inputs>
+			<resource name="sand" amount="500.0" />
+		</inputs>
+		<outputs>
+			<resource name="aluminum" amount="50.0" />
+			<resource name="silicon dioxide" amount="450.0" />
+		</outputs>
+	</process>
+
+<!-- Typically, manufactured glass contains around 15% sodium oxide, 70% silica 
+     (silicon dioxide) and 9% lime (calcium oxide). The sodium carbonate "soda" 
+     serves as a flux to lower the temperature at which the silica melts.  
+     https://en.wikipedia.org/wiki/Sodium_oxide -->
+	<process name="make glass from sand"
+	tech="1" skill="0"
+			work-time="50"
+			process-time="100"
+			power-required="0.2">
+		<inputs>
+			<resource name="sand" amount="50.0" />
+			<resource name="sodium carbonate" amount="5.0" />
+			
+		</inputs>
+		<outputs>
+			<resource name="glass" amount="30.0" />
+			<resource name="silicon dioxide" amount="10.0" />			
+		</outputs>
+	</process>
+
+	<process name="make quartz from silicon dioxide"
+	tech="1" skill="0"
+			work-time="50"
+			process-time="100"
+			power-required="0.2">
+		<inputs>
+			<resource name="silicon dioxide" amount="45.0" />
+			<resource name="calcium carbonate" amount="1.0" />
+			<resource name="sodium carbonate" amount="1.0" />
+			
+		</inputs>
+		<outputs>
+			<resource name="quartz" amount="40.0" />		
+		</outputs>
+	</process>	
+<!-- 
+	<process name="extract aluminum and oxide from sand"
+	tech="1" skill="0"
+			work-time="50"
+			process-time="100"
+			power-required="0.2">
+		<inputs>
+			<resource name="sand" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="aluminum oxide" amount="2.0" />
+			<resource name="aluminum" amount="1.0" />
+			<resource name="silicon" amount="1.0" />			
+		</outputs>
+	</process>
+	
+	<process name="extract aluminum and oxide from sand (large batch)"
+	tech="1" skill="2"
+			work-time="250"
+			process-time="500"
+			power-required="1.0">
+		<inputs>
+			<resource name="sand" amount="500.0" />
+		</inputs>
+		<outputs>
+			<resource name="aluminum oxide" amount="20.0" />
+			<resource name="aluminum" amount="10.0" />
+			<resource name="silicon" amount="10.0" />			
+		</outputs>
+	</process>
+ -->
+	
+	<process name="do carbon monoxide iron reduction"
+			tech="1" skill="1"
+			work-time="50"
+			process-time="200"
+			power-required=".2">
+		<description>Fe&lt;sub&gt;2&lt;/sub&gt;O&lt;sub&gt;3&lt;/sub&gt; + 3CO -> 2Fe + 3CO&lt;sub&gt;2&lt;/sub&gt;</description>
+		<inputs>
+			<resource name="iron oxide" amount="50.0" />
+			<resource name="carbon monoxide" amount="26.4" />
+		</inputs>
+		<outputs>
+			<resource name="iron powder" amount="34.9" />
+			<resource name="carbon dioxide" amount="41.3" />
+		</outputs>
+	</process>
+
+	<process name="do carbon monoxide iron reduction (large batch)"
+			tech="1" skill="3"
+			work-time="250"
+			process-time="1000"
+			power-required="1.0">
+		<description>Fe&lt;sub&gt;2&lt;/sub&gt;O&lt;sub&gt;3&lt;/sub&gt; + 3CO -> 2Fe + 3CO&lt;sub&gt;2&lt;/sub&gt;</description>
+		<inputs>
+			<resource name="iron oxide" amount="500.0" />
+			<resource name="carbon monoxide" amount="264.0" />
+		</inputs>
+		<outputs>
+			<resource name="iron powder" amount="349.0" />
+			<resource name="carbon dioxide" amount="413.0" />
+		</outputs>
+	</process>
+
+	<process name="do hydrogen iron reduction"
+			tech="1" skill="1"
+			work-time="50"
+			process-time="200"
+			power-required=".2">
+		<description>Fe&lt;sub&gt;2&lt;/sub&gt;O&lt;sub&gt;3&lt;/sub&gt; + 3H&lt;sub&gt;2&lt;/sub&gt; 
+		-> 2Fe + 3H&lt;sub&gt;2&lt;/sub&gt;O</description>
+		<inputs>
+			<resource name="iron oxide" amount="50.0" />
+			<resource name="hydrogen" amount="2.5" />
+		</inputs>
+		<outputs>
+			<resource name="iron powder" amount="34.9" />
+			<resource name="grey water" amount="16.9" />
+		</outputs>
+	</process>
+
+	<process name="do hydrogen iron reduction (large batch)"
+			tech="1" skill="3"
+			work-time="250"
+			process-time="1000"
+			power-required="1">
+		<description>Fe&lt;sub&gt;2&lt;/sub&gt;O&lt;sub&gt;3&lt;/sub&gt; + 3H&lt;sub&gt;2&lt;/sub&gt; 
+		-> 2Fe + 3H&lt;sub&gt;2&lt;/sub&gt;O</description>
+		<inputs>
+			<resource name="iron oxide" amount="500.0" />
+			<resource name="hydrogen" amount="25.0" />
+		</inputs>
+		<outputs>
+			<resource name="iron powder" amount="349.0" />
+			<resource name="grey water" amount="169.0" />
+		</outputs>
+	</process>
+
+	<!-- Produces 5 5kg iron ingots. -->
+	<process name="cast iron ingot" tech="2" skill="2" work-time="50" process-time="200"
+			power-required=".2">
+		<inputs>
+			<resource name="iron powder" amount="25.0" />
+		</inputs>
+		<outputs>
+			<part name="iron ingot" number="5" />
+		</outputs>
+	</process>
+
+	<!-- Produces 50 5kg iron ingots. -->
+	<process name="cast iron ingot (large batch)" tech="2" skill="4" work-time="250" process-time="1000"
+			power-required="1.0">
+		<inputs>
+			<resource name="iron powder" amount="250.0" />
+		</inputs>
+		<outputs>
+			<part name="iron ingot" number="50" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1m x 2m x 1mm (15kg) sheet of iron. -->
+	<process name="make iron sheet" tech="2" skill="2" work-time="50" process-time="200"
+			power-required=".7">
+		<inputs>
+			<resource name="iron powder" amount="15.0" />
+		</inputs>
+		<outputs>
+			<part name="iron sheet" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1m x 2m x 1mm (15kg) sheet of iron. -->
+	<process name="do iron sheet rolling" tech="2" skill="2" work-time="50" process-time="200"
+			power-required=".5">
+		<inputs>
+			<part name="iron ingot" number="3" />
+		</inputs>
+		<outputs>
+			<part name="iron sheet" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Produces 5 1kg aluminum ingots. -->
+	<process name="cast aluminum ingot"
+			tech="1" skill="1"
+			work-time="50"
+			process-time="50"
+			power-required=".2">
+		<description>Al&lt;sub&gt;2&lt;/sub&gt;O&lt;sub&gt;3&lt;/sub&gt; + 3C -> 2Al + 3CO</description>
+		<inputs>
+			<resource name="aluminum oxide" amount="9.5" />
+			<resource name="carbon" amount="3.0" />
+		</inputs>
+		<outputs>
+			<resource name="carbon monoxide" amount="7.5" />
+			<part name="aluminum ingot" number="5" />
+		</outputs>
+	</process>
+
+	<!-- Produces 50 1kg aluminum ingots. -->
+	<process name="cast aluminum ingot (large batch)" tech="1" skill="1" work-time="250" process-time="250"
+			power-required="1">
+		<description>Al&lt;sub&gt;2&lt;/sub&gt;O&lt;sub&gt;3&lt;/sub&gt; + 3C -> 2Al + 3CO</description>
+		<inputs>
+			<resource name="aluminum oxide" amount="95.0" />
+			<resource name="carbon" amount="30.0" />
+		</inputs>
+		<outputs>
+			<resource name="carbon monoxide" amount="75.0" />
+			<part name="aluminum ingot" number="50" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1m x 2m x 1mm (5kg) sheet of aluminum. -->
+	<process name="make aluminum sheet" tech="1" skill="1" work-time="50" process-time="20"
+			power-required=".7">
+		<description>Al&lt;sub&gt;2&lt;/sub&gt;O&lt;sub&gt;3&lt;/sub&gt; + 3C -> 2Al + 3CO</description>
+		<inputs>
+			<resource name="aluminum oxide" amount="9.5" />
+			<resource name="carbon" amount="3.0" />
+		</inputs>
+		<outputs>
+			<resource name="carbon monoxide" amount="7.5" />
+			<part name="aluminum sheet" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1m x 2m x 1mm (5kg) sheet of aluminum. -->
+	<process name="do aluminum sheet rolling" tech="1" skill="1" work-time="50" process-time="20"
+			power-required=".4">
+		<inputs>
+			<part name="aluminum ingot" number="5" />
+		</inputs>
+		<outputs>
+			<part name="aluminum sheet" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1kg spool of thin aluminum wire. -->
+	<process name="do aluminum wire drawing" tech="1" skill="1" work-time="50" process-time="20"
+			power-required=".3">
+		<inputs>
+			<part name="aluminum sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="aluminum wire" number="5" />
+		</outputs>
+	</process>
+
+	<process name="do pyrolyze reaction" tech="1" skill="1" work-time="25" process-time="200"
+			power-required=".1">
+		<description>CH&lt;sub&gt;4&lt;/sub&gt; -> C + 2H&lt;sub&gt;2&lt;/sub&gt;</description>
+		<inputs>
+			<resource name="methane" amount="1.3" />
+		</inputs>
+		<outputs>
+			<resource name="carbon" amount="1.0" />
+			<resource name="hydrogen" amount=".3" />
+		</outputs>
+	</process>
+
+	<process name="do advanced pyrolyze reaction" tech="2" skill="2" work-time="50" process-time="400"
+			power-required=".5">
+		<description>CH&lt;sub&gt;4&lt;/sub&gt; -> C + 2H&lt;sub&gt;2&lt;/sub&gt;</description>
+		<inputs>
+			<resource name="methane" amount="13.0" />
+		</inputs>
+		<outputs>
+			<resource name="carbon" amount="10.0" />
+			<resource name="hydrogen" amount="3.0" />
+		</outputs>
+	</process>
+
+	<!-- Produces 5 5kg steel ingots. -->
+	<process name="do steel ingot alloying" tech="1" skill="1" work-time="10" process-time="20"
+			power-required=".1">
+		<inputs>
+			<resource name="iron powder" amount="25.0" />
+			<resource name="carbon" amount=".5" />
+		</inputs>
+		<outputs>
+			<part name="steel ingot" number="5" />
+		</outputs>
+	</process>
+
+	<!-- Produces 50 5kg steel ingots. -->
+	<process name="do steel ingot alloying (large batch)" tech="1" skill="1" work-time="50" process-time="100"
+			power-required=".5">
+		<inputs>
+			<resource name="iron powder" amount="250.0" />
+			<resource name="carbon" amount="5.0" />
+		</inputs>
+		<outputs>
+			<part name="steel ingot" number="50" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1m x 2m x 1mm (15kg) sheet of steel. -->
+	<process name="make steel sheet" tech="0" skill="0" work-time="50" process-time="10"
+			power-required=".3">
+		<inputs>
+			<resource name="iron powder" amount="15.0" />
+			<resource name="carbon" amount=".5" />
+		</inputs>
+		<outputs>
+			<part name="steel sheet" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1m x 2m x 1mm (15kg) sheet of steel. -->
+	<process name="roll steel sheet" tech="0" skill="0" work-time="50" process-time="10"
+			power-required=".3">
+		<inputs>
+			<part name="steel ingot" number="3" />
+		</inputs>
+		<outputs>
+			<part name="steel sheet" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1kg spool of thick steel wire. -->
+	<process name="draw steel wire" tech="0" skill="0" work-time="50" process-time="20"
+			power-required=".2">
+		<inputs>
+			<part name="steel sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="steel wire" number="15" />
+		</outputs>
+	</process>
+
+	<!-- Produces 5kg of steel cable. -->
+	<process name="do steel cable winding" tech="0" skill="0" work-time="50" process-time="20"
+			power-required="0.1">
+		<inputs>
+			<part name="steel wire" number="5" />
+		</inputs>
+		<outputs>
+			<part name="steel cable" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Produces 10kg steel pipe. -->
+	<process name="make steel pipe" tech="0" skill="0" work-time="50" process-time="20"
+			power-required=".1">
+		<inputs>
+			<part name="steel sheet" number="2" />
+		</inputs>
+		<outputs>
+			<part name="steel pipe" number="3" />
+		</outputs>
+	</process>
+
+	<!-- Produces 10kg iron pipe. -->
+	<process name="make iron pipe" tech="0" skill="0" work-time="50" process-time="20"
+			power-required=".1">
+		<inputs>
+			<part name="iron sheet" number="2" />
+		</inputs>
+		<outputs>
+			<part name="iron pipe" number="3" />
+		</outputs>
+	</process>
+
+	<!-- Produces 10kg steel canister. -->
+	<process name="make steel canister" tech="1" skill="1" work-time="50" process-time="20"
+			 power-required=".1">
+		<inputs>
+			<part name="steel sheet" number="2" />
+		</inputs>
+		<outputs>
+			<part name="steel canister" number="3" />
+		</outputs>
+	</process>
+
+	<process name="make gas canister" tech="1" skill="1" work-time="10" process-time="10"
+			power-required="0.1">
+		<inputs>
+			<part name="steel canister" number="1" />
+			<part name="valve" number="2" />
+			<part name="gasket" number="4" />
+		</inputs>
+		<outputs>
+			<equipment name="gas canister" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make fire extinguisher" tech="2" skill="1" work-time="100" process-time="50"
+			power-required="0.1">
+		<inputs>
+			<resource name="carbon dioxide" amount="10.0" />
+			<part name="steel canister" number="1" />
+			<part name="valve" number="2" />
+			<part name="gasket" number="4" />
+			<part name="plastic tubing" number="1" />
+		</inputs>
+		<outputs>
+			<part name="fire extinguisher" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make steel valve" tech="2" skill="1" work-time="200" process-time="200"
+			power-required="0.1">
+		<inputs>
+			<part name="steel ingot" number="1" />
+		</inputs>
+		<outputs>
+			<part name="valve" number="25" />
+		</outputs>
+	</process>
+
+	<!-- Using reinforced fiberglass wrapped in aluminum sheeting to make satellite dish. -->
+	<process name="make satellite dish" tech="2" skill="3" work-time="200" process-time="200"
+			power-required="0.4">
+		<inputs>
+			<resource name="polyester resin" amount=".5" />
+			<resource name="styrene" amount=".5" />
+			<part name="fiberglass" number="1" />
+			<part name="aluminum sheet" number="1" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+			<part name="optical cable" number="2" />			
+		</inputs>
+		<outputs>
+			<part name="satellite dish" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make steel barrel" tech="1" skill="1" work-time="25" process-time="20"
+			power-required="0.1">
+		<inputs>
+			<part name="steel sheet" number="2" />
+		</inputs>
+		<outputs>
+			<equipment name="barrel" number="3" />
+		</outputs>
+	</process>
+
+	<!-- Using reinforced fiberglass wrapped in aluminum sheeting to make antenna. -->
+	<process name="make radio antenna" tech="2" skill="2" work-time="100" process-time="100"
+			power-required=".3">
+		<inputs>
+			<resource name="polyester resin" amount=".5" />
+			<resource name="styrene" amount=".5" />
+			<part name="fiberglass" number="1" />
+			<part name="aluminum sheet" number="1" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+			<part name="optical cable" number="1" />			
+		</inputs>
+		<outputs>
+			<part name="radio antenna" number="5" />
+		</outputs>
+	</process>
+
+	<process name="make suit heating unit" tech="2" skill="2" work-time="100" process-time="100"
+			power-required="0.3">
+		<inputs>
+			<part name="steel sheet" number="1" />
+			<part name="heating element" number="1" />
+			<part name="heat pipe" number="1" />
+			<part name="electrical wire" number="20" />
+			<part name="wire connector" number="20" />
+		</inputs>
+		<outputs>
+			<part name="suit heating unit" number="5" />
+		</outputs>
+	</process>
+
+	<process name="make steel specimen box" tech="2" skill="2" work-time="300" process-time="200"
+			power-required=".1">
+		<inputs>
+			<part name="steel sheet" number="1" />
+		</inputs>
+		<outputs>
+			<equipment name="specimen box" number="30" />
+		</outputs>
+	</process>
+
+	<process name="produce ethylene"
+			tech="3" skill="2"
+			work-time="50"
+			process-time="400"
+			power-required="0.2">
+		<description>
+			2CO + 4H&lt;sub&gt;2&lt;/sub&gt; -> C&lt;sub&gt;2&lt;/sub&gt;H&lt;sub&gt;4&lt;/sub&gt; (ethylene) + 2H&lt;sub&gt;2&lt;/sub&gt;O
+			Requires iron catalyst.
+		</description>
+		<inputs>
+			<resource name="carbon dioxide" amount="100.0" />
+			<resource name="hydrogen" amount="15.0" />
+			<resource name="iron powder" amount="1.0" />
+		</inputs>
+		<outputs>
+			<resource name="ethylene" amount="50.0" />
+			<resource name="grey water" amount="64.2" />
+			<resource name="iron powder" amount="1.0" />
+		</outputs>
+	</process>
+
+	<process name="produce ethylene (large batch)" tech="3" skill="4" work-time="250" process-time="2000"
+			power-required="1.0">
+		<description>
+			2CO + 4H&lt;sub&gt;2&lt;/sub&gt; -> C&lt;sub&gt;2&lt;/sub&gt;H&lt;sub&gt;4&lt;/sub&gt; (ethylene) + 2H&lt;sub&gt;2&lt;/sub&gt;O
+			Requires iron catalyst.
+		</description>
+		<inputs>
+			<resource name="carbon dioxide" amount="1000.0" />
+			<resource name="hydrogen" amount="150.0" />
+			<resource name="iron powder" amount="10.0" />
+		</inputs>
+		<outputs>
+			<resource name="ethylene" amount="500.0" />
+			<resource name="grey water" amount="642" />
+			<resource name="iron powder" amount="10.0" />
+		</outputs>
+	</process>
+
+	<!-- Assuming 10% loss during production. -->
+	<!-- but where does it go?? into atmosphere? into life support? -->
+	<process name="produce polyethylene" tech="3" skill="2" work-time="50" process-time="400"
+			power-required="0.1">
+		<description>Assuming 10% loss during production.</description>
+		<inputs>
+			<resource name="ethylene" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="polyethylene" amount="45.0" />
+		</outputs>
+	</process>
+
+	<!-- Assuming 10% loss during production. -->
+	<process name="produce polyethylene (large batch)" tech="3" skill="4" work-time="250" process-time="2000"
+			power-required="0.5">
+		<inputs>
+			<resource name="ethylene" amount="500.0" />
+		</inputs>
+		<outputs>
+			<resource name="polyethylene" amount="450.0" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1kg plastic pipe. -->
+	<process name="make plastic pipe" tech="4" skill="3" work-time="100" process-time="400"
+			power-required=".1">
+		<inputs>
+			<resource name="polyethylene" amount="10.0" />
+		</inputs>
+		<outputs>
+			<part name="plastic pipe" number="10" />
+		</outputs>
+	</process>
+
+	<process name="make plastic specimen box" tech="4" skill="3" work-time="100" process-time="200"
+			power-required=".1">
+		<inputs>
+			<resource name="polyethylene" amount="5.0" />
+		</inputs>
+		<outputs>
+			<equipment name="specimen box" number="10" />
+		</outputs>
+	</process>
+
+	<process name="make plastic bottle" tech="4" skill="3" work-time="100" process-time="100"
+			power-required=".1">
+		<inputs>
+			<resource name="polyethylene" amount="1.0" />
+		</inputs>
+		<outputs>
+			<part name="bottle" number="10" />
+		</outputs>
+	</process>
+
+	<process name="make clear glass bottle" tech="2" skill="2" work-time="200" process-time="200"
+			power-required=".1">
+		<inputs>
+			<resource name="sand" amount="1.0" />
+		</inputs>
+		<outputs>
+			<part name="bottle" number="10" />
+		</outputs>
+	</process>
+	
+<!-- Soda is sodium carbonate. That is a salt. Sodium exists in Martian regolith as an 
+oxide or super oxide and can be converted into soda. Just dissolve the sodium oxide
+ in water, then bubble carbon dioxide through the water. Oxygen will be released and soda created.
+  Boil down the result to extract the water and you have soda. -->
+	<process name="make soda from sodium oxide" tech="2" skill="1" work-time="50" process-time="50"
+			power-required=".1">
+		<inputs>
+			<resource name="sodium oxide" amount="10.0" />
+			<resource name="water" amount="1.0" />			
+			<resource name="carbon dioxide" amount="1.0" />	
+		</inputs>
+		<outputs>
+			<resource name="sodium carbonate" amount="5.0" />							
+		</outputs>
+	</process>
+	
+	<!-- 
+		NASA Mars ISRU Water Study
+		Case B : 
+				Deposit Type : Poly-hydrated 
+					40% gypsum
+					3% allophane
+					3% akaganeite
+					3 smectite 
+					
+	-->
+	<process name="process regolith-B rich in poly-hydrated sulfate" tech="1" skill="1" work-time="100" process-time="0"
+			power-required="0.1">
+		<description>
+			Gypsum is CaSO&lt;sub&gt;4&lt;/sub&gt; * 2H&lt;sub&gt;2&lt;/sub&gt;O. 
+			This is Case B (Deposit Type : Poly-hydrated) in NASA Mars ISRU Water Study,
+					40% gypsum; 
+					3% allophane; 
+					3% akaganeite; 
+					3% smectite;  
+		</description>
+		<inputs>
+			<resource name="regolith-B" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="gypsum" amount="20.0" />
+			<resource name="allophane" amount="1.5" />
+			<resource name="akaganeite" amount="1.5" />	
+			<resource name="smectite" amount="1.5" />	
+			<resource name="sand" amount="20.0" />
+		</outputs>
+	</process>
+
+	<process name="process regolith-C rich in phyllo-silicate" tech="1" skill="1" work-time="100" process-time="0"
+			power-required="0.1">
+		<description>
+			Gypsum is CaSO&lt;sub&gt;4&lt;/sub&gt; * 2H&lt;sub&gt;2&lt;/sub&gt;O. 
+			This is Case C (Deposit Type : Clay) in NASA Mars ISRU Water Study,
+					40% smectite; 
+					3% allophane; 
+					3% akaganeite; 
+					3% bassanite;  
+		</description>
+		<inputs>
+			<resource name="regolith-C" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="smectite" amount="20.0" />
+			<resource name="allophane" amount="1.5" />
+			<resource name="akaganeite" amount="1.5" />	
+			<resource name="bassanite" amount="1.5" />	
+			<resource name="sand" amount="20.0" />
+		</outputs>
+	</process>
+
+	<process name="process regolith-D basaltic" tech="1" skill="1" work-time="100" process-time="0"
+			power-required="0.1">
+		<description>
+			Gypsum is CaSO&lt;sub&gt;4&lt;/sub&gt; * 2H&lt;sub&gt;2&lt;/sub&gt;O. 
+			This is Case D (Deposit Type : typical regolith) in NASA Mars ISRU Water Study,
+					23.5% basaltic; 
+					3% allophane; 
+					3% akaganeite; 
+					3% bassanite;
+					3% smectite;  
+		</description>
+		<inputs>
+			<resource name="regolith-D" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="basaltic" amount="11.75" />
+			<resource name="smectite" amount="1.5" />
+			<resource name="allophane" amount="1.5" />
+			<resource name="akaganeite" amount="1.5" />	
+			<resource name="bassanite" amount="1.5" />	
+			<resource name="sand" amount="25.0" />
+			<!-- According to http://canada.marssociety.org/winnipeg/soil.html
+			regolith is estimated to contain 11.3% sodium bicarbonate (baking
+			soda) and 1.15% of sodium chloride (table salt) -->
+			<resource name="baking powder" amount="4.0" />	
+			<resource name="table salt" amount="0.4" />	
+		</outputs>
+	</process>					
+
+	<!-- Process for reducing gypsum to calcium carbonate using carbon. -->
+	<process name="reduce gypsum to calcium carbonate with carbon" tech="1" skill="1" work-time="100"
+			process-time="200" power-required=".1">
+		<description>
+			Wrapping two processes:
+			CaSO&lt;sub&gt;4&lt;/sub&gt; * 2H&lt;sub&gt;2&lt;/sub&gt;O (gypsum) + 2C -> CaS + 2CO&lt;sub&gt;2&lt;/sub&gt; + 2H&lt;sub&gt;2&lt;/sub&gt;O
+			CaS + H&lt;sub&gt;2&lt;/sub&gt;O + CO&lt;sub&gt;2&lt;/sub&gt; -> CaCO&lt;sub&gt;3&lt;/sub&gt; (calcium carbonate) + H&lt;sub&gt;2&lt;/sub&gt;S
+			Note: ignoring hydrogen sulfide as waste for now.
+			
+			Gypsum has up to 8.6 % water
+		</description>
+		<inputs>
+			<resource name="gypsum" amount="50.0" />
+			<resource name="carbon" amount="7.0" />
+		</inputs>
+		<outputs>
+			<resource name="calcium carbonate" amount="29.0" />
+			<resource name="carbon dioxide" amount="12.7" />
+			<resource name="grey water" amount="5.2" />
+		</outputs>
+	</process>
+
+	<!-- Process for reducing gypsum to calcium carbonate using carbon. -->
+	<!-- Wrapping two processes: -->
+	<!-- CaSO4*2H2O (gypsum) + 2C -> CaS + 2CO2 + 2H2O -->
+	<!-- CaS + H2O + CO2 -> CaCO3 (calcium carbonate) + H2S -->
+	<!-- Note: ignoring hydrogen sulfide as waste for now. -->
+	<process name="reduce gypsum to calcium carbonate with carbon (large batch)" tech="1" skill="3" work-time="500"
+			process-time="1000" power-required=".5">
+		<description>
+			Wrapping two processes:
+			CaSO&lt;sub&gt;4&lt;/sub&gt; * 2H&lt;sub&gt;2&lt;/sub&gt;O (gypsum) + 2C -> CaS + 2CO&lt;sub&gt;2&lt;/sub&gt; + 2H&lt;sub&gt;2&lt;/sub&gt;O
+			CaS + H&lt;sub&gt;2&lt;/sub&gt;O + CO&lt;sub&gt;2&lt;/sub&gt; -> CaCO&lt;sub&gt;3&lt;/sub&gt; (calcium carbonate) + H&lt;sub&gt;2&lt;/sub&gt;S
+			Note: ignoring hydrogen sulfide as waste for now.
+			
+			Gypsum has up to 8.6 % water
+		</description>			
+		<inputs>
+			<resource name="gypsum" amount="500.0" />
+			<resource name="carbon" amount="70.0" />
+		</inputs>
+		<outputs>
+			<resource name="calcium carbonate" amount="290.0" />
+			<resource name="carbon dioxide" amount="127.0" />
+			<resource name="grey water" amount="52.0" />
+		</outputs>
+	</process>
+
+	<!-- Process for reducing gypsum to calcium carbonate using carbon monoxide. -->
+	<!-- Wrapping two processes: -->
+	<!-- CaSO4*2H2O (gypsum) + 4CO -> CaS + 4CO2 + 2H2O -->
+	<!-- CaS + H2O + CO2 -> CaCO3 (calcium carbonate) + H2S -->
+	<!-- Note: ignoring hydrogen sulfide as waste for now. -->
+	<process name="reduce gypsum to calcium carbonate with carbon monoxide" tech="1" skill="1" work-time="100"
+			process-time="200" power-required=".1">
+		<inputs>
+			<resource name="gypsum" amount="50.0" />
+			<resource name="carbon monoxide" amount="32.5" />
+		</inputs>
+		<outputs>
+			<resource name="calcium carbonate" amount="29.0" />
+			<resource name="carbon dioxide" amount="38.1" />
+			<resource name="grey water" amount="5.2" />
+		</outputs>
+	</process>
+
+	<!-- Process for reducing gypsum to calcium carbonate using carbon monoxide. -->
+	<!-- Wrapping two processes: -->
+	<!-- CaSO4*2H2O (gypsum) + 4CO -> CaS + 4CO2 + 2H2O -->
+	<!-- CaS + H2O + CO2 -> CaCO3 (calcium carbonate) + H2S -->
+	<!-- Note: ignoring hydrogen sulfide as waste for now. -->
+	<process name="reduce gypsum to calcium carbonate with carbon monoxide (large batch)" tech="1" skill="3" work-time="500"
+			process-time="1000" power-required=".5">
+		<inputs>
+			<resource name="gypsum" amount="500.0" />
+			<resource name="carbon monoxide" amount="325.0" />
+		</inputs>
+		<outputs>
+			<resource name="calcium carbonate" amount="290.0" />
+			<resource name="carbon dioxide" amount="381.0" />
+			<resource name="grey water" amount="52.0" />
+		</outputs>
+	</process>
+
+	<!-- Process for reducing gypsum to calcium carbonate using hydrogen. -->
+	<!-- Wrapping two processes: -->
+	<!-- CaSO4*2H2O (gypsum) + 4H2 -> CaS + 6H2O -->
+	<!-- CaS + H2O + CO2 -> CaCO3 (calcium carbonate) + H2S -->
+	<!-- Note: ignoring hydrogen sulfide as waste for now. -->
+	<process name="reduce gypsum to calcium carbonate with hydrogen" tech="1" skill="1" work-time="100"
+			process-time="200" power-required=".1">
+		<inputs>
+			<resource name="gypsum" amount="50.0" />
+			<resource name="hydrogen" amount="2.3" />
+			<resource name="carbon dioxide" amount="12.8" />
+		</inputs>
+		<outputs>
+			<resource name="calcium carbonate" amount="29.0" />
+			<resource name="grey water" amount="26.0" />
+		</outputs>
+	</process>
+
+	<!-- Process for reducing gypsum to calcium carbonate using hydrogen. -->
+	<!-- Wrapping two processes: -->
+	<!-- CaSO4*2H2O (gypsum) + 4H2 -> CaS + 6H2O -->
+	<!-- CaS + H2O + CO2 -> CaCO3 (calcium carbonate) + H2S -->
+	<!-- Note: ignoring hydrogen sulfide as waste for now. -->
+	<process name="reduce gypsum to calcium carbonate with hydrogen (large batch)" tech="1" skill="3" work-time="500"
+			process-time="1000" power-required="0.5">
+		<inputs>
+			<resource name="gypsum" amount="500.0" />
+			<resource name="hydrogen" amount="23.0" />
+			<resource name="carbon dioxide" amount="128.0" />
+		</inputs>
+		<outputs>
+			<resource name="calcium carbonate" amount="290.0" />
+			<resource name="grey water" amount="260.0" />
+		</outputs>
+	</process>
+
+	<!-- CaCO3 (calcium carbonate) -> CaO (lime) + CO2 -->
+	<process name="bake calcium carbonate to lime" tech="1" skill="1" work-time="50" process-time="400"
+			power-required=".1">
+		<inputs>
+			<resource name="calcium carbonate" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="lime" amount="27.8" />
+			<resource name="carbon dioxide" amount="21.8" />
+		</outputs>
+	</process>
+
+	<!-- CaCO3 (calcium carbonate) -> CaO (lime) + CO2 -->
+	<process name="bake calcium carbonate to lime (large batch)" tech="1" skill="3" work-time="250" process-time="2000"
+			power-required=".4">
+		<inputs>
+			<resource name="calcium carbonate" amount="500.0" />
+		</inputs>
+		<outputs>
+			<resource name="lime" amount="278.0" />
+			<resource name="carbon dioxide" amount="218.0" />
+		</outputs>
+	</process>
+
+	<!-- Wrapping four processes: -->
+	<!-- 3C + CaO -> CaC2 + CO -->
+	<!-- CaC2 + H2O -> C2H2 (acetylene) + CaO -->
+	<!-- 3C2H2 (acetylene) -> (condensed) C6H6 (benzene) -->
+	<!-- C6H6 (benzene) + C2H4 (ethylene) -> C2H3C6H5 (styrene) -->
+	<process name="produce styrene" tech="3" skill="3" work-time="100" process-time="400"
+			power-required=".1">
+		<inputs>
+			<resource name="carbon" amount="32.12" />
+			<resource name="lime" amount="2.0" />
+			<resource name="water" amount="16.05" />
+			<resource name="ethylene" amount="8.34" />
+		</inputs>
+		<outputs>
+			<resource name="carbon monoxide" amount="24.97" />
+			<resource name="styrene" amount="30.95" />
+		</outputs>
+	</process>
+
+	<!-- Wrapping four processes: -->
+	<!-- 3C + CaO -> CaC2 + CO -->
+	<!-- CaC2 + H2O -> C2H2 (acetylene) + CaO -->
+	<!-- 3C2H2 (acetylene) -> (condensed) C6H6 (benzene) -->
+	<!-- C6H6 (benzene) + C2H4 (ethylene) -> C2H3C6H5 (styrene) -->
+	<process name="produce styrene (large batch)" tech="3" skill="5" work-time="500" process-time="2000"
+			power-required=".5">
+		<inputs>
+			<resource name="carbon" amount="321.2" />
+			<resource name="lime" amount="20.0" />
+			<resource name="water" amount="160.5" />
+			<resource name="ethylene" amount="83.4" />
+		</inputs>
+		<outputs>
+			<resource name="carbon monoxide" amount="249.7" />
+			<resource name="styrene" amount="309.5" />
+		</outputs>
+	</process>
+
+	<process name="make gasket" tech="4" skill="2" work-time="100" process-time="200"
+			power-required=".1">
+		<inputs>
+			<resource name="styrene" amount="2.0" />
+		</inputs>
+		<outputs>
+			<part name="gasket" number="20" />
+		</outputs>
+	</process>
+
+	<!-- Use fiberglass & styrene to make belt. -->
+	<process name="make timing belt" tech="4" skill="2" work-time="100" process-time="200"
+			power-required=".2">
+		<inputs>
+			<resource name="styrene" amount="1.0" />
+			<part name="fiberglass cloth" number="1" />
+		</inputs>
+		<outputs>
+			<part name="timing belt" number="5" />
+		</outputs>
+	</process>
+
+	<process name="make electrical wire" tech="4" skill="3" work-time="200" process-time="400"
+			power-required=".1">
+		<inputs>
+			<resource name="styrene" amount="1.0" />
+			<part name="aluminum wire" number="1" />
+		</inputs>
+		<outputs>
+			<part name="electrical wire" number="10" />
+		</outputs>
+	</process>
+
+	<process name="make power cable" tech="4" skill="3" work-time="200" process-time="400"
+			power-required=".1">
+		<inputs>
+			<resource name="styrene" amount="1.0" />
+			<part name="aluminum wire" number="1" />
+		</inputs>
+		<outputs>
+			<part name="power cable" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make wire connector" tech="4" skill="3" work-time="200" process-time="400"
+			power-required=".1">
+		<inputs>
+			<resource name="styrene" amount=".5" />
+			<part name="aluminum wire" number="1" />
+		</inputs>
+		<outputs>
+			<part name="wire connector" number="15" />
+		</outputs>
+	</process>
+
+	<process name="make plastic tubing" tech="4" skill="2" work-time="100" process-time="200"
+			power-required=".05">
+		<inputs>
+			<resource name="styrene" amount="1.0" />
+		</inputs>
+		<outputs>
+			<part name="plastic tubing" number="10" />
+		</outputs>
+	</process>
+
+	<process name="produce polyester resin" tech="3" skill="3" work-time="100" process-time="400"
+			power-required="0.05">
+		<description>
+			This is to produce unsaturated polyester resin (C&lt;sub&gt;10&lt;/sub&gt;H&lt;sub&gt;8&lt;/sub&gt;O&lt;sub&gt;4&lt;/sub&gt;).
+			We don't have a detailed process for producing polyester, so we're just using component elements.
+		</description>
+		<inputs>
+			<resource name="carbon" amount="30.0" />
+			<resource name="water" amount="20.0" />
+		</inputs>
+		<outputs>
+			<resource name="polyester resin" amount="50.0" />
+		</outputs>
+	</process>
+
+	<!-- This is to produce unsaturated polyester resin (C10H8O4). -->
+	<!-- We don't have a detailed process for producing polyester, so we're just using component elements. -->
+	<process name="produce polyester resin (large batch)" tech="3" skill="5" work-time="500" process-time="2000"
+			power-required="0.1">
+		<inputs>
+			<resource name="carbon" amount="300.0" />
+			<resource name="water" amount="200.0" />
+		</inputs>
+		<outputs>
+			<resource name="polyester resin" amount="500.0" />
+		</outputs>
+	</process>
+
+	<!-- Epoxy uses bisphenol-a (C15H16O2) -->
+	<process name="make epoxy resin bottle" tech="3" skill="3" work-time="100" process-time="300"
+			power-required="0.1">
+		<inputs>
+			<resource name="bisphenol-a" amount=".5" />
+			<part name="bottle" number="5" />
+		</inputs>
+		<outputs>
+			<part name="epoxy resin bottle" number="5" />
+		</outputs>
+	</process>
+
+	<!-- Using polyester resin as a lubricant. -->
+	<process name="make lubricant bottle" tech="3" skill="3" work-time="100" process-time="300"
+			power-required="0.1">
+		<inputs>
+			<resource name="polyester resin" amount=".5" />
+			<part name="bottle" number="5" />
+		</inputs>
+		<outputs>
+			<part name="lubricant bottle" number="5" />
+		</outputs>
+	</process>
+
+	<process name="make coolant bottle" tech="3" skill="3" work-time="100" process-time="300"
+			power-required="0.1">
+		<description>
+			Using ethylene glycol as a coolant.
+			C&lt;sub&gt;2&lt;/sub&gt;H&lt;sub&gt;4&lt;/sub&gt;O + H&lt;sub&gt;2&lt;/sub&gt;O -> HOCH&lt;sub&gt;2&lt;/sub&gt;CH&lt;sub&gt;2&lt;/sub&gt;OH
+		</description>
+		<inputs>
+			<resource name="ethylene" amount=".35" />
+			<resource name="water" amount=".15" />
+			<part name="bottle" number="5" />
+		</inputs>
+		<outputs>
+			<part name="coolant bottle" number="5" />
+		</outputs>
+	</process>
+
+	<process name="make airleak patch" tech="3" skill="3" work-time="100" process-time="100"
+			power-required="0.1">
+		<inputs>
+			<resource name="polyester resin" amount="7.5" />
+			<resource name="styrene" amount="7.5" />
+			<part name="epoxy resin bottle" number="5" />
+		</inputs>
+		<outputs>
+			<part name="airleak patch" number="10" />
+		</outputs>
+	</process>
+
+	<!-- Spark plug insulator uses aluminum oxide ceramic -->
+	<process name="make spark plug" tech="2" skill="2" work-time="200" process-time="200"
+			power-required=".1">
+		<inputs>
+			<resource name="aluminum oxide" amount=".5" />
+			<resource name="lime" amount="2" />
+			<resource name="iron" amount="2" />
+			<resource name="copper" amount="2" />
+			<part name="steel ingot" number="1" />
+		</inputs>
+		<outputs>
+			<part name="spark plug" number="100" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1kg spool of fiber glass. -->
+	<process name="draw optical fiber glass" tech="3" skill="1" work-time="300" process-time="300"
+			power-required=".1">
+		<inputs>
+			<resource name="sand" amount="2.0" />
+		</inputs>
+		<outputs>
+			<part name="fiberglass" number="1" />
+		</outputs>
+	</process>
+
+    <!-- Produces 10 1kg spools of fiber glass. -->
+	<process name="draw optical fiber glass (large batch)" tech="3" skill="2" work-time="1500" process-time="1500"
+			power-required=".5">
+		<inputs>
+			<resource name="sand" amount="20.0" />
+		</inputs>
+		<outputs>
+			<part name="fiberglass" number="10" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1m x 1m woven fiberglass cloth. -->
+	<process name="weave fiberglass cloth" tech="2" skill="1" work-time="400" process-time="400"
+			power-required="0">
+		<inputs>
+			<part name="fiberglass" number="1" />
+		</inputs>
+		<outputs>
+			<part name="fiberglass cloth" number="10" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1m x 1m thin sheet of plastic. -->
+	<process name="do plastic sheet extrusion" tech="1" skill="1" work-time="200" process-time="200"
+			power-required=".2">
+		<inputs>
+			<resource name="polyester resin" amount="10.0" />
+		</inputs>
+		<outputs>
+			<part name="plastic sheet" number="10" />
+		</outputs>
+	</process>
+
+	<!-- Creating 10 bags sewn together with fiberglass cloth and plastic sheet liner. -->
+	<process name="maufacture bags" tech="2" skill="2" work-time="100" process-time="0"
+			power-required="0.0">
+		<inputs>
+			<resource name="cane fiber" amount="0.5" />
+			<part name="fiberglass cloth" number="5" />
+			<part name="plastic sheet" number="5" />
+		</inputs>
+		<outputs>
+			<equipment name="bag" number="10" />
+		</outputs>
+	</process>
+
+	<!-- Creating a large bag sewn together with a fiberglass cloth and a plastic sheet liner. -->
+	<process name="maufacture large bags" tech="2" skill="2" work-time="400" process-time="0"
+			power-required="0.0">
+		<inputs>
+			<resource name="cane fiber" amount="0.2" />
+			<part name="fiberglass cloth" number="2" />
+			<part name="plastic sheet" number="2" />
+		</inputs>
+		<outputs>
+			<equipment name="large bag" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1m x 1m x 1cm (26kg) sheet of glass. -->
+	<process name="make sheet glass" tech="3" skill="3" work-time="200" process-time="300"
+			power-required=".2">
+		<inputs>
+			<resource name="sand" amount="26.0" />
+		</inputs>
+		<outputs>
+			<part name="glass sheet" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make eva helmet" tech="2" skill="2" work-time="400" process-time="300"
+			power-required=".2">
+		<inputs>
+			<resource name="cane fiber" amount="0.2" />
+			<resource name="polyethylene" amount="2.0" />
+			<part name="plastic tubing" number="2" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+			<part name="gasket" number="2" />
+		</inputs>
+		<outputs>
+			<part name="eva helmet" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make helmet visor" tech="2" skill="2" work-time="300" process-time="200"
+			power-required=".1">
+		<inputs>
+			<resource name="polycarbonate resin" amount=".2" />
+			<part name="glass sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="helmet visor" number="13" />
+		</outputs>
+	</process>
+
+	<process name="make counter pressure suit" tech="2" skill="2" work-time="400" process-time="300"
+			power-required=".2">
+		<inputs>
+			<resource name="polyethylene" amount="1.0" />
+			<resource name="cane fiber" amount="0.3" />
+		</inputs>
+		<outputs>
+			<part name="counter pressure suit" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make coveralls" tech="2" skill="2" work-time="200" process-time="100"
+			power-required=".2">
+		<inputs>
+			<resource name="cane fiber" amount="0.2" />
+			<resource name="polyurethane" amount="0.1" />	
+			<part name="fiberglass cloth" number="5" />
+			<part name="fiberglass" number="1" />
+		</inputs>
+		<outputs>
+			<part name="coveralls" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make eva gloves" tech="3" skill="3" work-time="200" process-time="100"
+			power-required=".1">
+		<inputs>
+			<resource name="cane fiber" amount="0.1" />
+			<resource name="polyurethane" amount="0.05" />			
+			<part name="fiberglass cloth" number="1" />
+			<part name="fiberglass" number="1" />
+		</inputs>
+		<outputs>
+			<part name="eva gloves" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make eva boots" tech="3" skill="3" work-time="300" process-time="100"
+			power-required=".1">
+		<inputs>
+			<resource name="cane fiber" amount="0.2" />
+			<resource name="polyurethane" amount="0.1" />			
+			<part name="steel ingot" number="1" />
+			<part name="fiberglass cloth" number="2" />
+			<part name="fiberglass" number="2" />
+		</inputs>
+		<outputs>
+			<part name="eva boots" number="2" />
+		</outputs>
+	</process>
+
+	<process name="make eva pads" tech="3" skill="3" work-time="300" process-time="100"
+			power-required=".7">
+		<inputs>
+			<resource name="cane fiber" amount="0.1" />
+			<resource name="polyurethane" amount="0.05" />			
+			<part name="steel ingot" number="1" />
+			<part name="fiberglass" number="1" />
+		</inputs>
+		<outputs>
+			<part name="eva pads" number="3" />
+		</outputs>
+	</process>
+
+	<process name="make eva backpack" tech="2" skill="2" work-time="400" process-time="200"
+			power-required=".5">
+		<description>Polyethylene box with steel frame and fiberglass cloth straps.</description>
+		<inputs>
+			<resource name="polyethylene" amount="5.0" />
+			<resource name="cane fiber" amount="0.5" />
+			<part name="steel ingot" number="1" />
+			<part name="fiberglass cloth" number="1" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+			<part name="plastic tubing" number="3" />
+			<part name="valve" number="1" />
+			<part name="gasket" number="3" />
+			<part name="steel canister" number="1" />
+
+		</inputs>
+		<outputs>
+			<part name="eva backpack" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Using reinforced fiberglass wrapped in aluminum sheeting to make antenna. -->
+	<process name="make eva antenna" tech="2" skill="2" work-time="50" process-time="50"
+			power-required=".3">
+		<inputs>
+			<resource name="polyester resin" amount=".5" />
+			<resource name="styrene" amount=".5" />
+			<part name="fiberglass" number="1" />
+			<part name="aluminum sheet" number="1" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+			<part name="optical cable" number="1" />			
+		</inputs>
+		<outputs>
+			<part name="eva antenna" number="20" />
+		</outputs>
+	</process>
+
+	<process name="assemble eva suit" tech="2" skill="3" work-time="200" process-time="0"
+			power-required="0.5">
+		<inputs>
+			<part name="eva helmet" number="1" />
+			<part name="helmet visor" number="1" />
+			<part name="counter pressure suit" number="1" />
+			<part name="coveralls" number="1" />
+			<part name="eva gloves" number="1" />
+			<part name="eva boots" number="1" />
+			<part name="eva pads" number="1" />
+			<part name="eva backpack" number="1" />
+			<part name="eva antenna" number="1" />
+			<part name="eva radio" number="1" />
+			<part name="eva battery" number="1" />
+			<part name="suit heating unit" number="1" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+		</inputs>
+		<outputs>
+			<equipment name="eva suit" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make work gloves" tech="1" skill="1" work-time="100" process-time="100"
+			power-required=".05">
+		<inputs>
+			<resource name="cane fiber" amount="0.1" />
+			<part name="fiberglass cloth" number="1" />
+			<part name="fiberglass" number="1" />
+		</inputs>
+		<outputs>
+			<part name="work gloves" number="2" />
+		</outputs>
+	</process>
+	
+	<!-- Small wheels are made with steel and steel wire. -->
+	<process name="make small wheels" tech="2" skill="2" work-time="100" process-time="200"
+			power-required="0.5">
+		<inputs>
+			<part name="steel sheet" number="1" />
+			<part name="steel wire" number="15" />
+		</inputs>
+		<outputs>
+			<part name="small wheel" number="2" />
+		</outputs>
+	</process>
+
+
+	<!-- Rover tires are made with steel and steel wire. -->
+	<process name="make rover wheels" tech="2" skill="2" work-time="200" process-time="400"
+			power-required="0.5">
+		<inputs>
+			<part name="steel sheet" number="3" />
+			<part name="steel wire" number="45" />
+		</inputs>
+		<outputs>
+			<part name="rover wheel" number="2" />
+		</outputs>
+	</process>
+
+	<process name="create small vehicle frame" tech="2" skill="3" work-time="550" process-time="550"
+			power-required="3.0">
+		<inputs>
+			<part name="steel ingot" number="30" />
+		</inputs>
+		<outputs>
+			<part name="small vehicle frame" number="1" />
+		</outputs>
+	</process>
+
+	<process name="create large vehicle frame" tech="2" skill="3" work-time="700" process-time="700"
+			power-required="5.0">
+		<inputs>
+			<part name="steel ingot" number="50" />
+		</inputs>
+		<outputs>
+			<part name="large vehicle frame" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture rover chassis panel" tech="3" skill="3" work-time="200" process-time="400"
+			power-required=".1">
+		<inputs>
+			<resource name="polyester resin" amount="25.0" />
+			<resource name="styrene" amount="25.0" />
+			<part name="fiberglass" number="50" />
+		</inputs>
+		<outputs>
+			<part name="rover chassis panel" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture rover windshield" tech="3" skill="3" work-time="400" process-time="600"
+			power-required=".1">
+		<inputs>
+			<part name="glass sheet" number="4" />
+		</inputs>
+		<outputs>
+			<part name="rover windshield" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture rover window" tech="1" skill="3" work-time="400" process-time="600"
+			power-required=".1">
+		<inputs>
+			<part name="glass sheet" number="2" />
+		</inputs>
+		<outputs>
+			<part name="rover window" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make winch" tech="2" skill="3" work-time="200" process-time="100"
+			power-required=".1">
+		<inputs>
+			<part name="steel sheet" number="2" />
+			<part name="steel cable" number="9" />
+		</inputs>
+		<outputs>
+			<part name="winch" number="1" />
+		</outputs>
+	</process>
+
+	<process name="assemble rover generator" tech="2" skill="3" work-time="600" process-time="600"
+			power-required="1.0">
+		<inputs>
+			<part name="steel ingot" number="90" />
+			<part name="valve" number="6" />
+			<part name="gasket" number="6" />
+			<part name="plastic tubing" number="6" />
+			<part name="steel pipe" number="4" />
+			<part name="power cable" number="2" />
+			<part name="spark plug" number="6" />
+			<part name="lubricant bottle" number="5" />
+			<part name="coolant bottle" number="2" />
+			<part name="electrical wire" number="6" />
+			<part name="wire connector" number="6" />
+			<part name="timing belt" number="1" />
+			<part name="fuel cell stack" number="3" />
+		</inputs>
+		<outputs>
+			<part name="rover generator" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture turbine generator" tech="3" skill="3" work-time="300" process-time="300"
+			power-required="1.0">
+		<inputs>
+			<part name="iron sheet" number="1" />
+			<part name="iron ingot" number="2" />
+			<part name="copper wire" number="15" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="8" />
+			<part name="wire connector" number="8" />
+		</inputs>
+		<outputs>
+			<part name="turbine generator" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture small stepper motor" tech="3" skill="3" work-time="200" process-time="200"
+			power-required=".2">
+		<inputs>
+			<part name="iron sheet" number="1" />
+			<part name="iron ingot" number="1" />
+			<part name="copper wire" number="10" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="8" />
+			<part name="wire connector" number="8" />
+			<part name="logic board" number="4" />
+			
+		</inputs>
+		<outputs>
+			<part name="small stepper motor" number="4" />
+		</outputs>
+	</process>
+	
+	<process name="manufacture small motor" tech="3" skill="3" work-time="200" process-time="200"
+			power-required=".2">
+		<inputs>
+			<part name="iron sheet" number="1" />
+			<part name="iron ingot" number="1" />
+			<part name="copper wire" number="10" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="8" />
+			<part name="wire connector" number="8" />
+		</inputs>
+		<outputs>
+			<part name="small motor" number="4" />
+		</outputs>
+	</process>
+
+	<process name="manufacture large motor" tech="2" skill="3" work-time="800" process-time="400"
+			power-required=".3">
+		<inputs>
+			<part name="iron sheet" number="2" />
+			<part name="iron ingot" number="2" />
+			<part name="copper wire" number="25" />
+			<part name="steel sheet" number="2" />
+			<part name="electrical wire" number="4" />
+			<part name="wire connector" number="4" />
+		</inputs>
+		<outputs>
+			<part name="large motor" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture rover control panel" tech="2" skill="3" work-time="400" process-time="400"
+			power-required="1.0">
+		<inputs>
+			<resource name="polyethylene" amount="3.0" />
+			<resource name="polyester resin" amount="20.0" />
+			<resource name="styrene" amount="20.0" />
+			<part name="fiberglass" number="40" />
+			<part name="navigation circuit board" number="1" />
+			<part name="communications circuit board" number="1" />
+			<part name="electrical wire" number="20" />
+			<part name="wire connector" number="20" />
+			<part name="epoxy resin bottle" number="1" />
+		</inputs>
+		<outputs>
+			<part name="rover control panel" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture fuel tank" tech="2" skill="1" work-time="50" process-time="200"
+			power-required=".3">
+		<inputs>
+			<part name="steel sheet" number="4" />
+			<part name="valve" number="1" />
+			<part name="gasket" number="1" />
+			<part name="plastic tubing" number="1" />
+			<part name="epoxy resin bottle" number="1" />
+		</inputs>
+		<outputs>
+			<part name="fuel tank" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture gas tank" tech="2" skill="1" work-time="50" process-time="200"
+			power-required=".3">
+		<inputs>
+			<part name="steel sheet" number="2" />
+			<part name="valve" number="1" />
+			<part name="gasket" number="1" />
+			<part name="plastic tubing" number="1" />
+			<part name="epoxy resin bottle" number="1" />
+		</inputs>
+		<outputs>
+			<part name="gas tank" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2014-11-19 Added water tank -->
+	<process name="manufacture water tank" tech="2" skill="1" work-time="50" process-time="200"
+			power-required=".3">
+		<inputs>
+			<part name="steel sheet" number="2" />
+			<part name="valve" number="1" />
+			<part name="gasket" number="1" />
+			<part name="plastic tubing" number="1" />
+			<part name="epoxy resin bottle" number="1" />
+		</inputs>
+		<outputs>
+			<part name="water tank" number="1" />
+		</outputs>
+	</process>
+
+	
+	<process name="make fuel pump" tech="4" skill="3" work-time="200" process-time="100"
+			power-required="1.0">
+		<inputs>
+			<part name="iron ingot" number="3" />
+			<part name="aluminum wire" number="1" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+		</inputs>
+		<outputs>
+			<part name="fuel pump" number="5" />
+		</outputs>
+	</process>
+
+	<process name="make oxygen pump" tech="4" skill="3" work-time="200" process-time="100"
+			power-required="1.0">
+		<inputs>
+			<part name="iron ingot" number="3" />
+			<part name="aluminum wire" number="1" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+		</inputs>
+		<outputs>
+			<part name="oxygen pump" number="5" />
+		</outputs>
+	</process>
+
+	<!-- 2014-11-19 Added carbon dioxide pump -->
+	<process name="make carbon dioxide pump" tech="4" skill="3" work-time="200" process-time="100"
+			power-required="1.0">
+		<inputs>
+			<part name="iron ingot" number="3" />
+			<part name="aluminum wire" number="1" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+		</inputs>
+		<outputs>
+			<part name="carbon dioxide pump" number="5" />
+		</outputs>
+	</process>
+
+	<!-- values are not based on fact but pure conjecture
+	<process name="algae tank manufacturing" tech="2" skill="2" work-time="200" process-time="200" power-required="5.0">
+		<inputs>
+			<resource name="water" amount="150.0" />
+			<part name="glass tube" number="5" />
+			<part name="oxygen pump" number="1" />
+			<part name="plastic pipe" number="2" />
+			<part name="steel truss" number="1" />
+		</inputs>
+		<outputs>
+			<part name="algae tank" number="1" />
+		</outputs>
+	</process>-->
+
+
+	<process name="manufacture utility vehicle control panel" tech="3" skill="3" work-time="500" process-time="200"
+			power-required="1.0">
+		<inputs>
+			<resource name="polyethylene" amount=".5" />
+			<resource name="polyester resin" amount="3.0" />
+			<resource name="styrene" amount="1.0" />
+			<part name="fiberglass" number="5" />
+			<part name="electrical wire" number="5" />
+			<part name="wire connector" number="5" />
+			<part name="epoxy resin bottle" number="1" />
+		</inputs>
+		<outputs>
+			<part name="utility vehicle control panel" number="1" />
+		</outputs>
+	</process>
+
+	<!--process name="vehicle assembly remote controlled prospector"
+			tech="3" skill="3"
+			work-time="1000"
+			process-time="0"
+			power-required="0.0">
+		<inputs>
+			<part name="small vehicle frame" number="1" />
+			<part name="large motor" number="1" />
+			<part name="rover battery" number="1" />
+			<part name="utility vehicle control panel" number="1" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+			<part name="epoxy resin bottle" number="1" />
+			<part name="lubricant bottle" number="1" />
+			<part name="small wheel" number="4" />
+			<part name="radio antenna" number="1" />
+			<part name="satellite dish" number="1" />
+		</inputs>
+		<outputs>
+			<vehicle name="remote controlled prospector" number="1" />
+		</outputs>
+	</process>-->
+
+	<process name="assemble light utility vehicle" tech="3" skill="3" work-time="1000" process-time="500"
+			power-required="2.0">
+		<inputs>
+			<part name="small vehicle frame" number="1" />
+
+			<part name="large motor" number="2" />
+			<part name="rover battery" number="1" />
+			<part name="utility vehicle control panel" number="1" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+			<part name="epoxy resin bottle" number="1" />
+			<part name="lubricant bottle" number="1" />
+			<part name="small wheel" number="8" />
+			<part name="radio antenna" number="1" />
+			<part name="optical cable" number="4" />			
+		</inputs>
+		<outputs>
+			<vehicle name="light utility vehicle" number="1" />
+		</outputs>
+	</process>
+	
+	<process name="assemble explorer rover" tech="3" skill="4" work-time="1300" process-time="1000"
+			power-required="4.0">
+		<inputs>
+			<part name="large vehicle frame" number="1" />
+			
+			<part name="rover chassis panel" number="10" />
+			<part name="rover windshield" number="1" />
+			<part name="rover window" number="5" />
+			<part name="winch" number="1" />
+			<part name="rover generator" number="1" />
+			<part name="large motor" number="3" />
+			<part name="rover battery" number="2" />
+			<part name="rover control panel" number="1" />
+			<part name="fuel tank" number="1" />
+			<part name="gas tank" number="1" />
+			<part name="water tank" number="1" />
+			<part name="fuel pump" number="1" />
+			<part name="oxygen pump" number="1" />
+			<part name="satellite dish" number="1" />
+			<part name="radio antenna" number="1" />
+			<part name="electrical wire" number="20" />
+			<part name="wire connector" number="20" />
+			<part name="plastic tubing" number="5" />
+			<part name="plastic pipe" number="2" />
+			<part name="steel pipe" number="2" />
+			<part name="epoxy resin bottle" number="5" />
+			<part name="lubricant bottle" number="2" />
+			<part name="rover wheel" number="12" />
+			<part name="optical cable" number="6" />			
+		</inputs>
+		<outputs>
+			<vehicle name="explorer rover" number="1" />
+		</outputs>
+	</process>
+
+	<process name="assemble transport rover" tech="3" skill="4" work-time="1500" process-time="1000"
+			power-required="5.0">
+		<inputs>
+			<part name="large vehicle frame" number="1" />
+			<part name="rover chassis panel" number="10" />
+			<part name="rover windshield" number="1" />
+			<part name="rover window" number="7" />
+			<part name="winch" number="1" />
+			<part name="rover generator" number="1" />
+			<part name="large motor" number="4" />
+			<part name="rover battery" number="3" />
+			<part name="rover control panel" number="1" />
+			<part name="fuel tank" number="1" />
+			<part name="gas tank" number="1" />
+			<part name="water tank" number="1" />
+			<part name="fuel pump" number="1" />
+			<part name="oxygen pump" number="1" />
+			<part name="satellite dish" number="1" />
+			<part name="radio antenna" number="1" />
+			<part name="electrical wire" number="20" />
+			<part name="wire connector" number="20" />
+			<part name="plastic tubing" number="5" />
+			<part name="plastic pipe" number="2" />
+			<part name="steel pipe" number="2" />
+			<part name="epoxy resin bottle" number="5" />
+			<part name="lubricant bottle" number="2" />
+			<part name="rover wheel" number="16" />
+			<part name="optical cable" number="8" />			
+		</inputs>
+		<outputs>
+			<vehicle name="transport rover" number="1" />
+		</outputs>
+	</process>
+
+	<process name="assemble cargo rover" tech="3" skill="4" work-time="1700" process-time="1000"
+			power-required="6.0">
+		<inputs>
+			<part name="large vehicle frame" number="1" />
+			<part name="rover chassis panel" number="10" />
+			<part name="rover windshield" number="1" />
+			<part name="rover window" number="7" />
+			<part name="winch" number="1" />
+			<part name="rover generator" number="1" />
+			<part name="large motor" number="5" />
+			<part name="rover battery" number="4" />
+			<part name="rover control panel" number="1" />
+			<part name="fuel tank" number="1" />
+			<part name="gas tank" number="1" />
+			<part name="water tank" number="1" />
+			<part name="fuel pump" number="1" />
+			<part name="oxygen pump" number="1" />
+			<part name="satellite dish" number="1" />
+			<part name="radio antenna" number="1" />
+			<part name="electrical wire" number="20" />
+			<part name="wire connector" number="20" />
+			<part name="plastic tubing" number="5" />
+			<part name="plastic pipe" number="2" />
+			<part name="steel pipe" number="2" />
+			<part name="epoxy resin bottle" number="5" />
+			<part name="lubricant bottle" number="2" />
+			<part name="rover wheel" number="14" />
+			<part name="optical cable" number="10" />			
+		</inputs>
+		<outputs>
+			<vehicle name="cargo rover" number="1" />
+		</outputs>
+	</process>
+
+	<process name="do hematite smelting" tech="1" skill="1" work-time="100" process-time="100"
+			power-required="5.0">
+		<inputs>
+			<resource name="hematite" amount="50.0" />
+			<resource name="carbon monoxide" amount=".5" />
+		</inputs>
+		<outputs>
+			<resource name="iron powder" amount="25.0" />
+			<resource name="carbon dioxide" amount="1.0" />
+		</outputs>
+	</process>
+
+	<process name="do magnetite smelting" tech="1" skill="1" work-time="150" process-time="150"
+			power-required="5.0">
+		<inputs>
+			<resource name="magnetite" amount="50.0" />
+			<resource name="carbon monoxide" amount=".5" />
+		</inputs>
+		<outputs>
+			<resource name="iron powder" amount="30.0" />
+			<resource name="carbon dioxide" amount="1.0" />
+		</outputs>
+	</process>
+
+	<process name="do goethite smelting" tech="1" skill="1" work-time="150" process-time="150"
+			power-required="5.0">
+		<inputs>
+			<resource name="goethite" amount="50.0" />
+			<resource name="carbon monoxide" amount=".5" />
+		</inputs>
+		<outputs>
+			<resource name="iron powder" amount="27.0" />
+			<resource name="carbon dioxide" amount="1.0" />
+		</outputs>
+	</process>
+
+	<process name="do olivine smelting" tech="1" skill="1" work-time="150" process-time="150"
+			power-required="5.0">
+		<inputs>
+			<resource name="olivine" amount="50.0" />
+			<resource name="carbon monoxide" amount="32.5" />
+		</inputs>
+		<outputs>
+			<resource name="magnesium" amount="11.6" />
+			<resource name="iron powder" amount="11.6" />
+			<resource name="silicon" amount="8.1" />
+			<resource name="carbon dioxide" amount="51.2" />
+		</outputs>
+	</process>
+
+	<process name="do magnesite smelting" tech="1" skill="1" work-time="200" process-time="200"
+			power-required="5.0">
+		<inputs>
+			<resource name="magnesite" amount="50.0" />
+			<resource name="carbon monoxide" amount="16.6" />
+		</inputs>
+		<outputs>
+			<resource name="magnesium" amount="14.4" />
+			<resource name="carbon dioxide" amount="52.2" />
+			<resource name="silicon dioxide" amount="5" />			
+		</outputs>
+	</process>
+
+	<process name="do kamacite smelting" tech="1" skill="1" work-time="100" process-time="100"
+			power-required="5.0">
+		<inputs>
+			<resource name="kamacite" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="iron powder" amount="45.0" />
+			<resource name="nickel" amount="5.0" />
+		</outputs>
+	</process>
+
+	<process name="do taenite smelting" tech="1" skill="1" work-time="100" process-time="100"
+			power-required="5.0">
+		<inputs>
+			<resource name="taenite" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="iron powder" amount="20.0" />
+			<resource name="nickel" amount="30.0" />
+		</outputs>
+	</process>
+
+	<process name="do chalcopyrite smelting" tech="1" skill="1" work-time="200" process-time="200"
+			power-required="5.0">
+		<inputs>
+			<resource name="chalcopyrite" amount="50.0" />
+		</inputs>
+		<outputs>
+			<resource name="copper" amount="17.3" />
+			<resource name="iron powder" amount="15.2" />
+			<resource name="sulfur" amount="17.5" />
+		</outputs>
+	</process>
+
+	<process name="do malachite smelting" tech="1" skill="1" work-time="150" process-time="200"
+			power-required="5.0">
+		<inputs>
+			<resource name="malachite" amount="50.0" />
+			<resource name="carbon" amount="2.7" />
+		</inputs>
+		<outputs>
+			<resource name="copper" amount="28.7" />
+			<resource name="carbon dioxide" amount="19.9" />
+			<resource name="grey water" amount="4.1" />
+		</outputs>
+	</process>
+
+	<!-- Produces 5 5kg ingots of steel. -->
+	<process name="do steel ingot nickel alloying" tech="1" skill="1" work-time="100" process-time="50"
+			power-required="1.0">
+		<inputs>
+			<resource name="iron powder" amount="22.5" />
+			<resource name="nickel" amount="2.5" />
+			<resource name="carbon" amount=".3" />
+		</inputs>
+		<outputs>
+			<part name="steel ingot" number="5" />
+		</outputs>
+	</process>
+
+	<!-- Produces 50 5kg ingots of steel. -->
+	<process name="do steel ingot nickel alloying (large batch)" tech="1" skill="1" work-time="500" process-time="250"
+			power-required="5.0">
+		<inputs>
+			<resource name="iron powder" amount="225.0" />
+			<resource name="nickel" amount="25.0" />
+			<resource name="carbon" amount="3.0" />
+		</inputs>
+		<outputs>
+			<part name="steel ingot" number="50" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1m x 2m x 1mm (5kg) sheet of copper. -->
+	<process name="make copper sheet" tech="1" skill="1" work-time="200" process-time="20"
+			power-required=".5">
+		<inputs>
+			<resource name="copper" amount="5.0" />
+		</inputs>
+		<outputs>
+			<part name="copper sheet" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Produces 1kg spool of thin copper wire. -->
+	<process name="draw copper wire" tech="1" skill="1" work-time="300" process-time="20"
+			power-required="2.0">
+		<inputs>
+			<part name="copper sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="copper wire" number="5" />
+		</outputs>
+	</process>
+
+	<process name="make copper electrical wire" tech="1" skill="1" work-time="200" process-time="40"
+			power-required=".5">
+		<inputs>
+			<resource name="styrene" amount="1.0" />
+			<part name="copper wire" number="1" />
+		</inputs>
+		<outputs>
+			<part name="electrical wire" number="10" />
+		</outputs>
+	</process>
+
+	<process name="make copper power cable" tech="1" skill="1" work-time="200" process-time="40"
+			power-required=".5">
+		<inputs>
+			<resource name="styrene" amount="1.0" />
+			<part name="copper wire" number="1" />
+		</inputs>
+		<outputs>
+			<part name="power cable" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make copper wire connector" tech="1" skill="1" work-time="200" process-time="40"
+			power-required=".3">
+		<inputs>
+			<resource name="styrene" amount=".5" />
+			<part name="copper wire" number="1" />
+		</inputs>
+		<outputs>
+			<part name="wire connector" number="15" />
+		</outputs>
+	</process>
+
+	<!-- Produces 10kg copper pipe. -->
+	<process name="make copper pipe" tech="1" skill="1" work-time="200" process-time="20"
+			power-required=".5">
+		<inputs>
+			<part name="copper sheet" number="2" />
+		</inputs>
+		<outputs>
+			<part name="copper pipe" number="3" />
+		</outputs>
+	</process>
+
+	<process name="make heating element" tech="4" skill="3" work-time="200" process-time="400"
+			power-required="1.0">
+		<inputs>
+			<resource name="magnesium" amount=".25" />
+			<resource name="lime" amount=".25" />
+			<resource name="sand" amount=".25" />
+			<part name="copper wire" number="1" />
+			<part name="electrical wire" number="2" />
+			<part name="wire connector" number="2" />
+		</inputs>
+		<outputs>
+			<part name="heating element" number="2" />
+		</outputs>
+	</process>
+
+	<process name="roll heat pipe from copper sheet" tech="2" skill="1" work-time="100" process-time="100"
+			power-required="1.0">
+		<inputs>
+			<part name="copper sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="heat pipe" number="4" />
+		</outputs>
+	</process>
+
+	<process name="roll heat pipe from aluminum sheet" tech="2" skill="1" work-time="100" process-time="100"
+			power-required="1.0">
+		<inputs>
+			<part name="aluminum sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="heat pipe" number="4" />
+		</outputs>
+	</process>
+	
+	<process name="manufacture pneumatic drill" tech="3" skill="4" work-time="400" process-time="400"
+			power-required="1.0">
+		<inputs>
+			<part name="steel sheet" number="1" />
+			<part name="steel ingot" number="1" />
+			<part name="electrical wire" number="2" />
+			<part name="wire connector" number="2" />
+			<part name="gasket" number="5" />
+			<part name="valve" number="5" />
+			<part name="plastic tubing" number="5" />
+			<part name="oxygen pump" number="1" />
+		</inputs>
+		<outputs>
+			<part name="pneumatic drill" number="1" />
+		</outputs>
+	</process>
+
+	<process name="assemble backhoe" tech="3" skill="4" work-time="400" process-time="400"
+			power-required="1.0">
+		<inputs>
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="2" />
+			<part name="wire connector" number="2" />
+			<part name="small motor" number="1" />
+			<part name="steel wire" number="1" />
+		</inputs>
+		<outputs>
+			<part name="backhoe" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture bulldozer blade" tech="2" skill="3" work-time="300" process-time="300"
+			power-required="1.0">
+		<inputs>
+			<part name="steel sheet" number="2" />
+			<part name="steel ingot" number="2" />
+		</inputs>
+		<outputs>
+			<part name="bulldozer blade" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture crane boom" tech="3" skill="4" work-time="400" process-time="100"
+			power-required="1.0">
+		<inputs>
+			<part name="steel sheet" number="4" />
+			<part name="electrical wire" number="2" />
+			<part name="wire connector" number="2" />
+			<part name="small motor" number="1" />
+			<part name="steel wire" number="5" />
+		</inputs>
+		<outputs>
+			<part name="crane boom" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture soil compactor" tech="2" skill="3" work-time="300" process-time="100"
+			power-required="1.0">
+		<inputs>
+			<part name="steel sheet" number="2" />
+			<part name="steel ingot" number="14" />
+		</inputs>
+		<outputs>
+			<part name="soil compactor" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture steel truss" tech="0" skill="0" work-time="10" process-time="20"
+			power-required="1.0">
+		<inputs>
+			<part name="steel ingot" number="10" />
+		</inputs>
+		<outputs>
+			<part name="steel truss" number="1" />
+		</outputs>
+	</process>
+
+	<process name="manufacture steel post" tech="0" skill="0" work-time="10" process-time="20"
+			power-required="1.0">
+		<inputs>
+			<part name="steel ingot" number="10" />
+		</inputs>
+		<outputs>
+			<part name="steel post" number="10" />
+		</outputs>
+	</process>
+
+	<process name="fabricate turbine blade" tech="2" skill="3" work-time="200" process-time="200"
+			power-required="1.0">
+		<inputs>
+			<resource name="polyester resin" amount=".5" />
+			<resource name="styrene" amount=".5" />
+			<part name="fiberglass" number="1" />
+		</inputs>
+		<outputs>
+			<part name="wind turbine blade" number="1" />
+		</outputs>
+	</process>
+
+	<process name="fabricate solar panel" tech="3" skill="4" work-time="200" process-time="200"
+			power-required="1.0">
+		<inputs>
+			<resource name="silicon" amount="25.0" />
+			<part name="aluminum sheet" number="1" />
+			<part name="electrical wire" number="9" />
+			<part name="wire connector" number="9" />
+			<part name="fiberglass" number="2" />
+			<part name="small semiconductor wafer" number="2" />
+			<part name="logic board" number="2" />			
+		</inputs>
+		<outputs>
+			<part name="solar panel" number="3" />
+		</outputs>
+	</process>
+
+	<process name="fabricate solar parabolic mirror" tech="3" skill="4" work-time="300" process-time="300"
+			power-required="1.0">
+		<inputs>
+			<part name="steel sheet" number="1" />
+			<part name="aluminum sheet" number="2" />
+			<part name="glass sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="solar parabolic mirror" number="1" />
+		</outputs>
+	</process>
+
+	<!-- glass tube forming -->
+	<process name="fabricate glass tube" tech="2" skill="2" work-time="100" process-time="200"
+			power-required=".7">
+		<inputs>
+			<resource name="sand" amount="10.0" />
+		</inputs>
+		<outputs>
+			<part name="glass tube" number="2" />
+		</outputs>
+	</process>
+
+	<process name="make cement" tech="1" skill="1" work-time="50" process-time="0"
+			power-required="0.1">
+		<inputs>
+			<resource name="calcium carbonate" amount="40.0" />
+			<resource name="gypsum" amount="8.0" />
+			<resource name="aluminum oxide" amount="1.0" />
+			<resource name="iron oxide" amount="1.0" />
+		</inputs>
+		<outputs>
+			<resource name="cement" amount="50.0" />
+		</outputs>
+	</process>
+
+	<process name="make cement (large batch)" tech="1" skill="3" work-time="250" process-time="0"
+			power-required="0.5">
+		<inputs>
+			<resource name="calcium carbonate" amount="400.0" />
+			<resource name="gypsum" amount="80.0" />
+			<resource name="aluminum oxide" amount="10.0" />
+			<resource name="iron oxide" amount="10.0" />
+		</inputs>
+		<outputs>
+			<resource name="cement" amount="500.0" />
+		</outputs>
+	</process>
+
+	<process name="mix regolith mortar" tech="1" skill="1" work-time="100" process-time="0"
+			power-required="0.1">
+		<description>Makes dry mortar mix with cement and regolith (1:5 mixture).</description>
+		<inputs>
+			<resource name="cement" amount="17.0" />
+			<resource name="regolith" amount="83.0" />
+		</inputs>
+		<outputs>
+			<resource name="mortar" amount="100.0" />
+		</outputs>
+	</process>
+
+	<!-- Makes dry mortar mix with cement and regolith (1:5 mixture). -->
+	<process name="mix regolith mortar (large batch)" tech="1" skill="3" work-time="500" process-time="0"
+			power-required="0.5">
+		<inputs>
+			<resource name="cement" amount="170.0" />
+			<resource name="regolith" amount="830.0" />
+		</inputs>
+		<outputs>
+			<resource name="mortar" amount="1000.0" />
+		</outputs>
+	</process>
+
+	<!-- Makes dry mortar mix with cement and sand (1:5 mixture). -->
+	<process name="mix sand mortar" tech="1" skill="1" work-time="100" process-time="0"
+			power-required="0.1">
+		<inputs>
+			<resource name="cement" amount="17.0" />
+			<resource name="sand" amount="83.0" />
+		</inputs>
+		<outputs>
+			<resource name="mortar" amount="100.0" />
+		</outputs>
+	</process>
+
+	<!-- Makes dry mortar mix with cement and sand (1:5 mixture). -->
+	<process name="sand mortar mixing (large batch)" tech="1" skill="3" work-time="500" process-time="0"
+			power-required="0.5">
+		<inputs>
+			<resource name="cement" amount="170.0" />
+			<resource name="sand" amount="830.0" />
+		</inputs>
+		<outputs>
+			<resource name="mortar" amount="1000.0" />
+		</outputs>
+	</process>
+
+	<!-- Makes sulfur concrete using sulfur as the cement, with sand and regolith as aggregates. 
+	     https://phys.org/news/2016-01-martian-concrete-materials-red-planet.html
+	     http://sffsymposium.engr.utexas.edu/sites/default/files/2015/2015-141-Khoshnevis.pdf -->
+	<process name="mix sulfur concrete" tech="1" skill="1" work-time="50" process-time="0"
+			power-required="0.1">
+		<inputs>
+			<resource name="sulfur" amount="25.0" />
+			<resource name="sand" amount="5.0" />
+			<resource name="regolith" amount="20.0" />
+		</inputs>
+		<outputs>
+			<resource name="concrete" amount="50.0" />
+		</outputs>
+	</process>
+
+	<!-- Makes sulfur concrete using sulfur as the cement, with sand and regolith as aggregates.  -->
+	<process name="mix sulfur concrete (large batch)" tech="1" skill="5" work-time="250" process-time="0"
+			power-required="0.5">
+		<inputs>
+			<resource name="sulfur" amount="250.0" />
+			<resource name="sand" amount="50.0" />
+			<resource name="regolith" amount="200.0" />
+		</inputs>
+		<outputs>
+			<resource name="concrete" amount="500.0" />
+		</outputs>
+	</process>
+	
+	<!-- Makes dry concrete using cement with sand and regolith as aggregates. -->
+	<process name="mix concrete" tech="1" skill="1" work-time="50" process-time="0"
+			power-required="0.1">
+		<inputs>
+			<resource name="cement" amount="10.0" />
+			<resource name="sand" amount="15.0" />
+			<resource name="regolith" amount="25.0" />
+		</inputs>
+		<outputs>
+			<resource name="concrete" amount="50.0" />
+		</outputs>
+	</process>
+
+	<!-- Makes dry concrete using cement with sand and regolith as aggregates. -->
+	<process name="mix concrete (large batch)" tech="1" skill="5" work-time="250" process-time="0"
+			power-required="0.5">
+		<inputs>
+			<resource name="cement" amount="100.0" />
+			<resource name="sand" amount="150.0" />
+			<resource name="regolith" amount="250.0" />
+		</inputs>
+		<outputs>
+			<resource name="concrete" amount="500.0" />
+		</outputs>
+	</process>
+
+	<!-- Same as concrete mixing but using lime in place of cement. -->
+	<process name="mix limecrete" tech="1" skill="1" work-time="50" process-time="0"
+			power-required="0.1">
+		<inputs>
+			<resource name="lime" amount="10" />
+			<resource name="sand" amount="15" />
+			<resource name="regolith" amount="25" />
+		</inputs>
+		<outputs>
+			<resource name="concrete" amount="50.0" />
+		</outputs>
+	</process>
+
+	<!-- Same as concrete mixing but using lime in place of cement. -->
+	<process name="mix limecrete (large batch)" tech="1" skill="5" work-time="250" process-time="0"
+			power-required="0.5">
+		<inputs>
+			<resource name="lime" amount="100" />
+			<resource name="sand" amount="150" />
+			<resource name="regolith" amount="250" />
+		</inputs>
+		<outputs>
+			<resource name="concrete" amount="500.0" />
+		</outputs>
+	</process>
+
+	<!-- Brick manufacturing with regolith, water, heat and pressure. -->
+	<process name="bake regolith brick" tech="0" skill="0" work-time="5" process-time="50"
+			power-required=".1">
+		<inputs>
+			<resource name="regolith" amount="32.6" />
+			<resource name="water" amount="1.0" />
+		</inputs>
+		<outputs>
+			<resource name="grey water" amount="0.6" />			
+			<part name="brick" number="10" />		
+		</outputs>
+	</process>
+
+	<!-- Brick manufacturing with sand, water, heat and pressure. -->
+	<process name="bake sand brick" tech="0" skill="0" work-time="5" process-time="50"
+			power-required=".5">
+		<inputs>
+			<resource name="sand" amount="32.6" />
+			<resource name="water" amount="1.0" />
+		</inputs>
+		<outputs>
+			<resource name="grey water" amount="0.6" />	
+			<part name="brick" number="10" />
+		</outputs>
+	</process>
+
+	<!-- Brick manufacturing with regolith, water, heat and pressure. -->
+	<process name="bake regolith brick (large batch)" tech="0" skill="1" work-time="25" process-time="200"
+			power-required=".1">
+		<inputs>
+			<resource name="regolith" amount="326.0" />
+			<resource name="water" amount="10.0" />
+		</inputs>
+		<outputs>
+			<resource name="grey water" amount="6" />			
+			<part name="brick" number="100" />			
+		</outputs>
+	</process>
+
+	<!-- Brick manufacturing with sand, water, heat and pressure. -->
+	<process name="bake sand brick (large batch)" tech="0" skill="1" work-time="25" process-time="250"
+			power-required=".5">
+		<inputs>
+			<resource name="sand" amount="326.0" />
+			<resource name="water" amount="10.0" />
+		</inputs>
+		<outputs>
+			<resource name="grey water" amount="6" />			
+			<part name="brick" number="100" />			
+		</outputs>
+	</process>
+
+	<!-- Melting permafrost ice and filtering the water. 
+	     Note : Melting ice requires 450kJ/kg exraction energy
+	     
+		Specific heat capacity of ice is 2.09 J/g/C
+		
+		e.g. For 1 mol of ice, from -25 C to 0 C
+		= 18 g * 2.09 * (0 -(-25)) = 0.941 kJ
+
+		.941 kJ /mol
+
+		To transition from ice to liquid, it takes a total of 6.02 kJ/mol
+		
+		Specific heat capacity of water is 4.18 J/g/C
+		
+		To warm liquid water to vapor, it takes a total of 7.52 kJ/mol
+				
+		It's (.941 + 6.02) kJ / 18 g = 386.7 kJ / kg
+		
+		For 1 kg, heating for 25 millisols, 
+		Heat req = 386.7 kJ/(88.775244*25) = 0.1742 kW / kg 
+
+		or 1.3939 kW for 8 kg of ice
+		
+		Note: assume using vacuum chamber/microwaving/other techniques to reduce
+		      power usage and speed up melting by 5-fold
+	     -->
+	<process name="melt and filter ice" tech="1" skill="0" work-time="2" process-time="5"
+			power-required="1.39">
+		<inputs>
+			<resource name="ice" amount="10.0" />
+		</inputs>
+		<outputs>
+			<resource name="grey water" amount="8.0" />
+			<resource name="regolith" amount="1.5" />
+			<!-- Amount of Rock Salt or Halite is arbitrary. Need more research -->
+			<resource name="rock Salt" amount=".5" />
+		</outputs>
+	</process>
+
+		<!-- Melting permafrost ice and filtering the water (large batch). -->
+	<process name="melt and filter ice (large batch)" tech="1" skill="0" work-time="2" process-time="5"
+			power-required="13.9">
+		<inputs>
+			<resource name="ice" amount="100.0" />
+		</inputs>
+		<outputs>
+			<resource name="grey water" amount="80.0" />
+			<resource name="regolith" amount="15" />
+			<!-- Amount of Rock Salt or Halite is arbitrary. Need more research -->
+			<resource name="rock Salt" amount="5" />
+		</outputs>
+	</process>
+
+	<!-- see "Water and Brines on Mars: Current Evidence and Implications for MSL", 2013
+	see http://download.springer.com/static/pdf/858/art%253A10.1007%252Fs11214-012-9956-3.pdf?auth66=1421432558_9bf0c795e4178cf6a503949883374ecf&ext=.pdf
+	-->
+
+
+	<!-- Electrolysis of potassium chloride (sylvite) in water to produce potassium hydroxide (potash lye) -->
+	<!-- and chlorine gas  -->
+	<!-- 2 K+(aq) + 2H2O(l) + 2e− → H2(g) + 2 KOH(aq) -->
+	<!-- 2 Cl– — 2e− → Cl2(g) -->
+	<process name="do potassium chloride electrolysis" tech="1" skill="2" work-time="10.0"
+			process-time="100" power-required="1.0">
+		<description>
+			2 K+(aq) + 2H&lt;sub&gt;2&lt;/sub&gt;O(l) + 2e− → H&lt;sub&gt;2&lt;/sub&gt;(g) + 2 KOH(aq)
+			2 Cl– — 2e− → Cl&lt;sub&gt;2&lt;/sub&gt;(g)
+		</description>
+		<inputs>
+			<resource name="sylvite" amount="10.0" />
+			<resource name="water" amount="17.8" />
+		</inputs>
+		<outputs>
+			<resource name="potash lye" amount="7.5" />
+			<resource name="hydrogen" amount=".5" />
+ 			<resource name="chlorine" amount="0.1" />
+		</outputs>
+	</process>
+
+	<!-- Manufacturing a nickel-iron (NiFe) battery for use with vehicles and settlement battery arrays. -->
+	<!-- http://en.wikipedia.org/wiki/Nickel-iron_battery -->
+	<process name="manufacture rover battery" tech="2" skill="3" work-time="500" process-time="50"
+			power-required="1.0">
+		<inputs>
+			<resource name="nickel" amount="5.0" />
+			<resource name="potash lye" amount="10.0" />
+			<resource name="polyethylene" amount="5.0" />
+			<part name="iron sheet" number="2" />
+			<part name="wire connector" number="2" />
+			<part name="logic board" number="2" />
+		</inputs>
+		<outputs>
+			<part name="rover battery" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Manufacturing a nickel-iron (NiFe) battery for use in EVA suits. -->
+	<!-- http://en.wikipedia.org/wiki/Nickel-iron_battery -->
+	<process name="manufacture eva battery" tech="2" skill="3" work-time="200" process-time="50"
+			power-required="1.0">
+		<inputs>
+			<resource name="nickel" amount="3.0" />
+			<resource name="potash lye" amount="7.0" />
+			<resource name="polyethylene" amount="4.0" />
+			<part name="iron sheet" number="1" />
+			<part name="wire connector" number="6" />
+		</inputs>
+		<outputs>
+			<part name="eva battery" number="3" />
+		</outputs>
+	</process>
+
+	<!-- Recycling steel scrap back into steel ingots. -->
+	<process name="recycle steel scrap" tech="0" skill="0" work-time="10" process-time="10"
+			power-required=".2">
+		<inputs>
+			<part name="steel scrap" number="1" />
+		</inputs>
+		<outputs>
+			<part name="steel ingot" number="5" />
+		</outputs>
+	</process>
+
+	<!-- Recycling aluminum scrap back into aluminum ingots. -->
+	<process name="recycle aluminum scrap" tech="0" skill="0" work-time="10" process-time="10"
+			power-required=".3">
+		<inputs>
+			<part name="aluminum scrap" number="1" />
+		</inputs>
+		<outputs>
+			<part name="aluminum ingot" number="5" />
+		</outputs>
+	</process>
+
+	<!-- Manufacturing a steel drill bit. -->
+	<process name="manufacture bore drill bit" tech="3" skill="3" work-time="300" process-time="150"
+			power-required=".2">
+		<inputs>
+			<part name="steel ingot" number="5" />
+		</inputs>
+		<outputs>
+			<part name="bore drill bit" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Manufacturing a steel drill pipe. -->
+	<process name="manufacture bore drill pipe" tech="2" skill="3" work-time="100" process-time="150"
+			power-required=".2">
+		<inputs>
+			<part name="steel sheet" number="3" />
+		</inputs>
+		<outputs>
+			<part name="bore drill pipe" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Assembling a drilling rig (light utility vehicle crane boom attachment). -->
+	<process name="assemble drilling rig" tech="3" skill="3" work-time="50" process-time="0.0"
+			power-required="1.0">
+		<inputs>
+			<part name="large motor" number="1" />
+			<part name="steel cable" number="4" />
+			<part name="steel sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="drilling rig" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Manufacturing a copper condenser coil. -->
+	<process name="make condenser coil" tech="2" skill="2" work-time="150" process-time="25.0"
+			power-required=".5">
+		<inputs>
+			<part name="copper pipe" number="2" />
+		</inputs>
+		<outputs>
+			<part name="condenser coil" number="1" />
+		</outputs>
+	</process>
+
+	<!-- Manufacturing a water pump. -->
+	<process name="make water pump" tech="1" skill="1" work-time="200" process-time="100"
+			power-required=".2">
+		<inputs>
+			<part name="iron ingot" number="3" />
+			<part name="aluminum wire" number="1" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+		</inputs>
+		<outputs>
+			<part name="water pump" number="5" />
+		</outputs>
+	</process>
+
+	<!-- Pumping carbon dioxide in from the ambient atmosphere. -->
+	<!-- Note: Commenting out for now due to over use and limited value. - Scott -->
+	<!--
+	<process name="co2 pumping" tech="1" skill="0" work-time="10" process-time="100" power-required="4.0">
+		<inputs />
+		<outputs>
+			<resource name="carbon dioxide" amount="10.0" />
+		</outputs>
+	</process>
+	-->
+
+	<!-- Electrolyzing water into oxygen and hydrogen. -->
+	<process name="do water electrolysis" tech="1" skill="1" work-time="10" process-time="100" power-required="2.0">
+		<inputs>
+			<resource name="water" amount="10.0" />
+		</inputs>
+		<outputs>
+			<resource name="oxygen" amount="8.9" />
+			<resource name="hydrogen" amount="1.1" />
+		</outputs>
+	</process>
+
+	<!-- Sabatier process converting co2 and hydrogen into water and methane. -->
+	<process name="do sabatier processing" tech="1" skill="1" work-time="10" process-time="100" power-required="2.0">
+		<inputs>
+			<resource name="carbon dioxide" amount="10.0" />
+			<resource name="hydrogen" amount="1.7" />
+		</inputs>
+		<outputs>
+			<resource name="water" amount="8.3" />
+			<resource name="methane" amount="3.75" />
+		</outputs>
+	</process>
+
+	<!-- Reducing carbon dioxide in oxygen and carbon monoxide. -->
+	<process name="do CO2 reduction" tech="2" skill="2" work-time="10" process-time="100" 
+	power-required="1.0">
+		<inputs>
+			<resource name="carbon dioxide" amount="10.0" />
+		</inputs>
+		<outputs>
+			<resource name="oxygen" amount="3.6" />
+			<resource name="carbon monoxide" amount="6.4" />
+		</outputs>
+	</process>
+
+	<!-- 2014-11-19 Added manufacturing a small water pump. -->
+	<process name="make small water pump" tech="1" skill="1" work-time="200" process-time="50"
+			power-required="1.0">
+		<inputs>
+			<part name="iron ingot" number="1" />
+			<part name="aluminum wire" number="1" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="3" />
+			<part name="wire connector" number="3" />
+		</inputs>
+		<outputs>
+			<part name="small water pump" number="2" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-19 Added manufacturing heat pump. -->
+	<process name="make heat pump" tech="1" skill="1" work-time="200" process-time="50"
+			power-required="1.0">
+		<inputs>
+			<part name="iron ingot" number="1" />
+			<part name="aluminum wire" number="1" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="3" />
+			<part name="wire connector" number="5" />
+			<part name="ventilation fan" number="1" />
+			<part name="condenser coil" number="1" />
+			<part name="steel pipe" number="2" />
+		</inputs>
+		<outputs>
+			<part name="heat pump" number="2" />
+		</outputs>
+	</process>
+
+	<!-- 2014-11-19 Added manufacturing an air compressor. -->
+	<process name="make air compressor" tech="1" skill="1" work-time="200" process-time="50"
+			power-required="1.0">
+		<inputs>
+			<part name="aluminum wire" number="1" />
+			<part name="electrical wire" number="3" />
+			<part name="wire connector" number="3" />
+			<part name="small motor" number="1" />
+		</inputs>
+		<outputs>
+			<part name="air compressor" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2014-11-19 Added manufacturing a food blender. -->
+	<process name="manufacture food blender" tech="1" skill="2" work-time="400" process-time="50"
+			power-required="1">
+		<inputs>
+			<part name="aluminum wire" number="1" />
+			<part name="electrical wire" number="1" />
+			<part name="wire connector" number="5" />
+			<part name="plastic sheet" number="1" />
+			<part name="small motor" number="1" />
+		</inputs>
+		<outputs>
+			<part name="blender" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2014-11-19 Added manufacturing an oven. -->
+	<process name="manufacture oven" tech="1" skill="2" work-time="500" process-time="50"
+			power-required="1.0">
+		<inputs>
+			<part name="aluminum wire" number="1" />
+			<part name="steel sheet" number="2" />
+			<part name="electrical wire" number="1" />
+			<part name="wire connector" number="5" />
+			<part name="plastic sheet" number="1" />
+			<part name="valve" number="4" />
+			<part name="steel pipe" number="3" />
+		</inputs>
+		<outputs>
+			<part name="oven" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2014-11-19 Added Manufacturing a microwave. -->
+	<process name="manufacture microwave" tech="1" skill="2" work-time="500" process-time="20"
+			power-required="1.0">
+		<inputs>
+			<part name="steel sheet" number="2" />
+			<part name="electrical wire" number="1" />
+			<part name="wire connector" number="5" />
+			<part name="plastic sheet" number="1" />
+			<part name="microcontroller" number="1" />
+			<part name="small transformer" number="1" />
+<!--		<part name="magnetron tube" number="1" /> 		-->	
+			<part name="power transistor" number="1" />
+			<part name="logic board" number="1" />			
+		</inputs>
+		<outputs>
+			<part name="microwave" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2014-11-19 Added manufacturing a ventilation fan. -->
+	<process name="manufacture ventilation fan" tech="1" skill="1" work-time="100" process-time="20"
+			power-required=".5">
+		<inputs>
+			<part name="aluminum wire" number="1" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="1" />
+			<part name="wire connector" number="3" />
+			<part name="plastic sheet" number="1" />
+			<part name="small motor" number="1" />
+		</inputs>
+		<outputs>
+			<part name="ventilation fan" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2014-11-19 Added manufacturing a kitchen stove. -->
+	<process name="manufacture kitchen stove" tech="1" skill="1" work-time="300" process-time="20"
+			power-required="1.0">
+		<inputs>
+			<part name="aluminum wire" number="2" />
+			<part name="steel sheet" number="2" />
+			<part name="electrical wire" number="3" />
+			<part name="wire connector" number="6" />
+			<part name="plastic sheet" number="1" />
+			<part name="heating element" number="4" />
+			<part name="ventilation fan" number="1" />
+		</inputs>
+		<outputs>
+			<part name="stove" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2014-11-19 Added manufacturing a refrigerator. -->
+	<process name="manufacture refrigerator" tech="1" skill="2" work-time="700" process-time="50"
+			power-required="2.0">
+		<inputs>
+			<part name="aluminum wire" number="2" />
+			<part name="steel sheet" number="2" />
+			<part name="electrical wire" number="3" />
+			<part name="wire connector" number="6" />
+			<part name="plastic sheet" number="2" />
+			<part name="small water pump" number="4" />
+			<part name="heat pump" number="1" />
+		</inputs>
+		<outputs>
+			<part name="refrigerator" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2014-11-19 Added manufacturing an autoclave. -->
+	<process name="manufacture autoclave" tech="1" skill="2" work-time="700" process-time="50"
+			power-required="2.0">
+		<inputs>
+			<part name="aluminum wire" number="2" />
+			<part name="steel sheet" number="2" />
+			<part name="electrical wire" number="3" />
+			<part name="wire connector" number="6" />
+			<part name="plastic sheet" number="2" />
+			<part name="small water pump" number="4" />
+			<part name="heating element" number="4" />
+			<part name="microcontroller" number="1" />
+			<part name="ventilation fan" number="1" />
+			<part name="logic board" number="1" />			
+		</inputs>
+		<outputs>
+			<part name="autoclave" number="1" />
+		</outputs>
+	</process>
+
+
+	<!-- 2015-02-16 Added making a mushroom containment kit. -->
+	<process name="make mushroom containment kit" tech="1" skill="2" work-time="50" process-time="50"
+			power-required=".2">
+		<inputs>
+			<part name="oxygen pump" number="2" />
+			<part name="carbon dioxide pump" number="2" />
+			<part name="small water pump" number="2" />
+			<part name="heating element" number="3" />
+			<part name="electrical wire" number="3" />
+			<part name="wire connector" number="3" />
+			<part name="fiberglass cloth" number="3" />
+			<part name="ventilation fan" number="2" />
+			<part name="valve" number="5" />
+			<part name="gasket" number="2" />
+			<part name="plastic tubing" number="10" />
+			<part name="flexible hose" number="3" />
+		</inputs>
+		<outputs>
+			<part name="mushroom containment kit" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-19 Added manufacturing navigation circuit board. -->
+	<process name="manufacture navigation circuit board" tech="3" skill="4" work-time="400" process-time="500"
+			power-required="1.0">
+		<inputs>
+			<part name="microcontroller" number="1" />
+			<part name="logic board" number="2" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="1" />
+			<part name="wire connector" number="1" />
+			<part name="light emitting diode bulb" number="10" />
+			<part name="plastic sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="navigation circuit board" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-19 Added manufacturing communications circuit board. -->
+	<process name="manufacture communications circuit board" tech="3" skill="4" work-time="400" process-time="500"
+			power-required="1.0">
+		<inputs>
+			<part name="microcontroller" number="1" />
+			<part name="logic board" number="2" />			
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="1" />
+			<part name="wire connector" number="1" />
+			<part name="light emitting diode bulb" number="10" />
+			<part name="plastic sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="communications circuit board" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-19 Added manufacturing small semiconductor wafer. -->
+	<process name="fabricate small semiconductor wafer" tech="3" skill="4" work-time="400" process-time="800"
+			power-required="1.0">
+		<inputs>
+			<resource name="silicon" amount="1.2" />
+		</inputs>
+		<outputs>
+			<part name="small semiconductor wafer" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-19 Added manufacturing led bulb. -->
+	<process name="manufacture light emitting diode bulb" tech="3" skill="3" work-time="200" process-time="500"
+			power-required="0.5">
+		<inputs>
+			<part name="small semiconductor wafer" number="1" />
+		</inputs>
+		<outputs>
+			<part name="light emitting diode bulb" number="40" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-19 Added manufacturing lED kit assembly. -->
+	<process name="make light emitting diode kit" tech="3" skill="3" work-time="200" process-time="500"
+			power-required="0.5">
+		<inputs>
+			<part name="aluminum ingot" number="1" />
+			<part name="electrical wire" number="1" />
+			<part name="wire connector" number="1" />
+			<part name="light emitting diode bulb" number="20" />
+			<part name="glass sheet" number="1" />
+			<part name="logic board" number="1" />
+		</inputs>
+		<outputs>
+			<part name="light emitting diode kit" number="5" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-19 Added manufacturing carbon dioxide laser. -->
+	<process name="manufacture carbon dioxide laser" tech="3" skill="4" work-time="400" process-time="600"
+			power-required="1.0">
+		<inputs>
+			<part name="small semiconductor wafer" number="1" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="1" />
+			<part name="wire connector" number="1" />
+			<part name="light emitting diode kit" number="1" />
+			<part name="glass sheet" number="1" />
+			<part name="optical lens" number="3" />
+			<part name="plastic sheet" number="1" />
+			<part name="diode" number="3" />			
+		</inputs>
+		<outputs>
+			<part name="carbon dioxide laser" number="5" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-19 Added manufacturing optical lens . -->
+	<process name="manufacture optical lens" tech="2" skill="2" work-time="200" process-time="300"
+			power-required="0.5">
+		<inputs>
+			<part name="glass sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="optical lens" number="5" />
+		</outputs>
+	</process>
+
+	<!-- 2019-10-14 Added manufacturing optical cable . -->
+	<process name="manufacture optical cable" tech="2" skill="2" work-time="200" process-time="200"
+			power-required="0.5">
+		<inputs>
+			<part name="glass sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="optical cable" number="20" />
+		</outputs>
+	</process>
+	
+	<!-- 2015-05-19 Added manufacturing a helium–neon laser. -->
+	<process name="manufacture helium neon laser" tech="3" skill="4" work-time="400" process-time="600"
+			power-required="2.0">
+		<inputs>
+			<part name="small semiconductor wafer" number="1" />
+			<part name="steel sheet" number="1" />
+			<part name="electrical wire" number="1" />
+			<part name="wire connector" number="1" />
+			<part name="light emitting diode kit" number="1" />
+			<part name="glass sheet" number="1" />
+			<part name="optical lens" number="3" />
+			<part name="optical prism" number="3" />
+			<part name="plastic sheet" number="1" />
+			<part name="diode" number="3" />				
+		</inputs>
+		<outputs>
+			<part name="helium neon laser" number="5" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-19 Added manufacturing an ls 3D printer. -->
+	<process name="manufacture laser sintering 3D printer" tech="3" skill="4" work-time="1000" process-time="1000"
+			power-required="5.0">
+		<inputs>
+			<part name="aluminum wire" number="10" />
+			<part name="steel sheet" number="10" />
+			<part name="electrical wire" number="10" />
+			<part name="wire connector" number="10" />
+			<part name="plastic sheet" number="2" />
+			<part name="small water pump" number="2" />
+			<part name="heating element" number="2" />
+			<part name="heat pipe" number="2" />
+			<part name="microcontroller" number="2" />
+			<part name="logic board" number="3" />			
+			<part name="ventilation fan" number="1" />
+			<part name="carbon dioxide laser" number="2" />
+			<part name="fiberglass" number="2" />
+			<part name="glass sheet" number="1" />
+			<part name="small stepper motor" number="3" />
+			<part name="timing belt" number="3" />
+			<part name="optical prism" number="3" />	
+			<part name="diode" number="5" />	
+			<part name="optical cable" number="3" />	
+			<part name="power cable" number="1" />										
+		</inputs>
+		<outputs>
+			<part name="laser sintering 3d printer" number="1" />
+		</outputs>
+	</process>
+
+	<process name="make activated charcoal" tech="2" skill="2" work-time="100" process-time="100"
+			power-required="0.1">
+		<inputs>
+			<resource name="carbon" amount="1" />
+			<resource name="sodium hypochlorite" amount=".1" />
+		</inputs>
+		<outputs>
+			<resource name="activated charcoal" amount="1" />	
+		</outputs>
+	</process>
+
+
+	<!-- 2015-05-22 Added manufacturing pathogen filtering system. -->
+	<process name="manufacture pathogen filtering system" tech="2" skill="2" work-time="500" process-time="200"
+			power-required=".1">
+		<inputs>
+			<part name="electrostatic precipitator" number="2" />
+			<part name="electrical wire" number="1" />
+			<part name="wire connector" number="1" />
+			<part name="charcoal filter" number="2" />
+			<part name="plastic sheet" number="1" />
+			<part name="flexible hose" number="2" />
+			<part name="valve" number="4" />
+
+		</inputs>
+		<outputs>
+			<part name="pathogen filtering system" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-22 Added manufacturing charcoal filter. -->
+	<process name="make charcoal filter" tech="2" skill="2" work-time="100" process-time="50"
+			power-required=".2">
+		<inputs>
+			<resource name="activated charcoal" amount="1" />
+			<resource name="calcium carbonate" amount="1" />
+			<part name="fiberglass cloth" number="1" />
+		</inputs>
+		<outputs>
+			<part name="charcoal filter" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-22 Added manufacturing electrostatic precipitator. -->
+	<process name="manufacture electrostatic precipitator" tech="3" skill="3" work-time="300" process-time="200"
+			power-required=".5">
+		<inputs>
+			<part name="steel sheet" number="2" />
+			<part name="electrical wire" number="2" />
+			<part name="wire connector" number="5" />
+			<part name="small transformer" number="1" />
+			<part name="steel pipe" number="2" />
+		</inputs>
+		<outputs>
+			<part name="electrostatic precipitator" number="1" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-22 Added manufacturing air duct. -->
+	<process name="manufacture large air duct" tech="1" skill="0" work-time="50" process-time="50"
+			power-required=".3">
+		<inputs>
+			<part name="steel sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="large air duct" number="2" />
+		</outputs>
+	</process>
+
+	<!-- 2015-05-22 Added manufacturing flexible hose. -->
+	<process name="manufacture flexible hose" tech="1" skill="0" work-time="50" process-time="50"
+			power-required=".3">
+		<inputs>
+			<resource name="polyethylene" amount=".5" />
+		</inputs>
+		<outputs>
+			<part name="flexible hose" number="5" />
+		</outputs>
+	</process>
+
+	<process name="produce polycarbonate resin" tech="3" skill="3" work-time="100" process-time="200"
+			power-required="0.5">
+		<inputs>
+			<resource name="ethylene" amount="1.0" />
+			<resource name="food waste" amount="2.0" />
+			<resource name="carbon dioxide" amount="2.0" />
+			<resource name="bisphenol-a" amount="1.0" />
+		</inputs>
+		<outputs>
+			<resource name="polycarbonate resin" amount="3.0" />
+		</outputs>
+	</process>
+
+	<process name="produce polyurethane" tech="3" skill="3" work-time="100" process-time="200"
+			power-required="0.5">
+		<inputs>
+			<resource name="crop waste" amount="2.0" />
+			<resource name="carbon dioxide" amount="3.0" />
+		</inputs>
+		<outputs>
+			<resource name="polyurethane" amount="2.0" />
+		</outputs>
+	</process>
+	
+	<!-- Produces polycarbonate roofing. -->
+	<process name="manufacture polycarbonate roofing" tech="3" skill="3" work-time="100" process-time="200"
+			power-required="1.0">
+		<description>
+			Asahi/Chi Mei produces DPC (polycarbonate) from DMC which is produced via 
+			methanolysis of ethylene carbonate. Ethylene carbonate is produced by the 
+			reaction between ethylene oxide and carbon dioxide.
+		</description>	
+		<inputs>
+			<resource name="polycarbonate resin" amount="3.5" />
+		</inputs>
+		<outputs>
+			<part name="polycarbonate roofing" number="3" />
+		</outputs>
+	</process>
+
+	<process name="produce bisphenol-a" tech="3" skill="3" work-time="100" process-time="600"
+			power-required="0.2">
+		<description>
+			Bisphenol A (BPA), a colourless crystalline solid belonging to the family of organic compounds;
+			its molecular formula is C15H16O2. BPA is best known for its use in the manufacture of polycarbonate plastics and epoxy resins
+		</description>
+		<inputs>
+			<resource name="hydrogen" amount="1.6" />
+			<resource name="carbon" amount="18" />
+			<resource name="oxygen" amount="3.2" />
+		</inputs>
+		<outputs>
+			<resource name="bisphenol-a" amount="22.8" />
+		</outputs>
+	</process>
+
+	<!-- 2015-09-28 Added manufacturing fuel cell stack. -->
+	<process name="manufacture fuel cell stack" tech="3" skill="4" work-time="1000" process-time="100"
+			power-required="5">
+		<description>
+			Each fuel cell stack comprises 25 solid oxide fuel cells at 5 kWe.
+		</description>	
+		<inputs>
+			<part name="steel sheet" number="1" />
+			<part name="plastic sheet" number="1" />
+			<part name="electrical wire" number="5" />
+			<part name="wire connector" number="5" />
+			<part name="steel pipe" number="2" />
+			<part name="microcontroller" number="1" />
+			<part name="solid oxide fuel cell" number="25" />
+			<part name="logic board" number="2" />			
+		</inputs>
+		<outputs>
+			<part name="fuel cell stack" number="1" />
+		</outputs>
+	</process>
+
+		<!-- 2016-05-08 Added turbopump manufacturing -->
+	<process name="manufacture turbopump" tech="3" skill="4" work-time="500" process-time="100"
+			power-required="1">
+		<inputs>
+			<part name="steel sheet" number="1" />
+			<part name="plastic sheet" number="1" />
+			<part name="electrical wire" number="8" />
+			<part name="wire connector" number="20" />
+			<part name="steel pipe" number="3" />
+		</inputs>
+		<outputs>
+			<part name="turbopump" number="1" />
+		</outputs>
+	</process>
+
+		<!-- 2017-09-11 Added make decontamination kit -->
+	<process name="make decontamination kit" tech="2" skill="2" work-time="100" process-time="100"
+			power-required="0.1">
+		<inputs>
+			<resource name="calcium carbonate" amount="0.1" />
+			<resource name="activated charcoal" amount="3" />			
+			<part name="plastic sheet" number="1" />
+		</inputs>
+		<outputs>
+			<part name="decontamination kit" number="3" />
+		</outputs>
+	</process>
+
+		<!-- 2017-09-11 Added manufacture resisters -->
+	<process name="manufacture resistors" tech="1" skill="2" work-time="50" process-time="200"
+			power-required="1">
+		<inputs>
+			<resource name="aluminum" amount="0.1" />
+			<resource name="aluminum oxide" amount="0.1" />
+			<resource name="zinc" amount="0.1" />
+			<resource name="nickel" amount="0.1" />					
+			<resource name="iron" amount="0.1" />	
+			<resource name="carbon" amount="1" />		
+		</inputs>
+		<outputs>
+			<part name="resistor" number="200" />
+		</outputs>
+	</process>
+
+		<!-- 2017-09-11 Added manufacture capacitors -->
+	<process name="manufacture capacitors" tech="1" skill="2" work-time="75" process-time="300"
+			power-required="2">
+		<inputs>
+			<resource name="aluminum" amount="0.1" />
+			<resource name="aluminum oxide" amount="0.1" />		
+			<resource name="zinc" amount="0.05" />
+			<resource name="nickel" amount="0.05" />					
+			<resource name="iron" amount="0.05" />	
+			<resource name="carbon" amount="1" />		
+			<resource name="silicon" amount="1" />	
+		</inputs>
+		<outputs>
+			<part name="capacitor" number="150" />
+		</outputs>
+	</process>
+		
+<!-- 2017-09-11 Added manufacture diodes
+	https://en.wikipedia.org/wiki/Diode
+	Today, most diodes are made of silicon, but other semiconductors 
+	such as selenium and germanium are sometimes used.	-->
+	<process name="manufacture diodes" tech="1" skill="2" work-time="200" process-time="500"
+			power-required="5">
+		<inputs>
+			<resource name="aluminum" amount="0.1" />
+			<resource name="aluminum oxide" amount="0.1" />		
+			<resource name="silicon" amount="1" />				
+			<resource name="iron" amount="0.1" />			
+		</inputs>
+		<outputs>
+			<part name="diode" number="200" />
+		</outputs>
+	</process>
+			
+		<!-- 2017-09-11 Added manufacture logic board -->
+	<process name="manufacture logic board" tech="3" skill="2" work-time="200" process-time="300"
+			power-required="5">
+		<inputs>
+			<resource name="copper" amount="0.2" />
+			<resource name="iron" amount="0.2" />					
+			<resource name="aluminum" amount="0.1" />
+			<part name="glass sheet" number="1" />
+			<part name="plastic sheet" number="1" />			
+			<part name="resistor" number="40" />
+			<part name="capacitor" number="20" />
+			<part name="diode" number="10" />
+		</inputs>
+		<outputs>
+			<part name="logic board" number="4" />
+		</outputs>
+	</process>
+
+
+	<!-- To be added :
+
+	1. Zirconia, Silicon Nittride Si3N4, 	manufacturing ceramic tile.
+	2. utility knife
+	3. kitchen knives set
+	4. water heater, from heating elements
+	5. laser headlights, laser diodes
+
+	-->
+
+
+
+	<!-- Salvage process for an EVA suit. -->
+	<salvage item-name="eva suit" type="equipment" tech="2" skill="2" work-time="200">
+		<part-salvage name="eva helmet" number="1" />
+		<part-salvage name="helmet visor" number="1" />
+		<part-salvage name="counter pressure suit" number="1" />
+		<part-salvage name="coveralls" number="1" />
+		<part-salvage name="eva gloves" number="1" />
+		<part-salvage name="eva boots" number="1" />
+		<part-salvage name="eva backpack" number="1" />
+		<part-salvage name="eva antenna" number="1" />
+		<part-salvage name="eva radio" number="1" />
+		<part-salvage name="eva battery" number="1" />
+		<part-salvage name="suit heating unit" number="1" />
+		<part-salvage name="electrical wire" number="10" />
+		<part-salvage name="wire connector" number="10" />
+	</salvage>
+
+	<!-- Salvage process for an explorer rover. -->
+	<salvage item-name="explorer rover" type="vehicle" tech="3" skill="4" work-time="1000">
+		<part-salvage name="large vehicle frame" number="1" />
+		<part-salvage name="rover chassis panel" number="10" />
+		<part-salvage name="rover windshield" number="1" />
+		<part-salvage name="rover window" number="5" />
+		<part-salvage name="winch" number="1" />
+		<part-salvage name="rover generator" number="1" />
+		<part-salvage name="large motor" number="3" />
+		<part-salvage name="rover battery" number="2" />
+		<part-salvage name="rover control panel" number="1" />
+		<part-salvage name="fuel tank" number="1" />
+		<part-salvage name="gas tank" number="1" />
+		<part-salvage name="water tank" number="1" />
+		<part-salvage name="fuel pump" number="1" />
+		<part-salvage name="oxygen pump" number="1" />
+		<part-salvage name="satellite dish" number="1" />
+		<part-salvage name="radio antenna" number="1" />
+		<part-salvage name="electrical wire" number="20" />
+		<part-salvage name="wire connector" number="20" />
+		<part-salvage name="plastic tubing" number="5" />
+		<part-salvage name="plastic pipe" number="2" />
+		<part-salvage name="steel pipe" number="2" />
+		<part-salvage name="epoxy resin bottle" number="5" />
+		<part-salvage name="lubricant bottle" number="2" />
+		<part-salvage name="rover wheel" number="12" />
+		<part-salvage name="steel scrap" number="4" />		
+		<part-salvage name="aluminum scrap" number="7" />
+		<part-salvage name="optical cable" number="10" />				
+	</salvage>
+
+	<!-- Salvage process for a transport rover. -->
+	<salvage item-name="transport rover" type="vehicle" tech="3" skill="4" work-time="1000">
+		<part-salvage name="large vehicle frame" number="1" />
+		<part-salvage name="rover chassis panel" number="10" />
+		<part-salvage name="rover windshield" number="1" />
+		<part-salvage name="rover window" number="5" />
+		<part-salvage name="winch" number="1" />
+		<part-salvage name="rover generator" number="1" />
+		<part-salvage name="large motor" number="4" />
+		<part-salvage name="rover battery" number="3" />
+		<part-salvage name="rover control panel" number="1" />
+		<part-salvage name="fuel tank" number="1" />
+		<part-salvage name="gas tank" number="1" />
+		<part-salvage name="water tank" number="1" />
+		<part-salvage name="fuel pump" number="1" />
+		<part-salvage name="oxygen pump" number="1" />
+		<part-salvage name="satellite dish" number="1" />
+		<part-salvage name="radio antenna" number="1" />
+		<part-salvage name="electrical wire" number="20" />
+		<part-salvage name="wire connector" number="20" />
+		<part-salvage name="plastic tubing" number="5" />
+		<part-salvage name="plastic pipe" number="2" />
+		<part-salvage name="steel pipe" number="2" />
+		<part-salvage name="epoxy resin bottle" number="5" />
+		<part-salvage name="lubricant bottle" number="2" />
+		<part-salvage name="rover wheel" number="16" />
+		<part-salvage name="steel scrap" number="5" />		
+		<part-salvage name="aluminum scrap" number="7" />	
+		<part-salvage name="optical cable" number="10" />			
+	</salvage>
+
+	<!-- Salvage process for a cargo rover. -->
+	<salvage item-name="cargo rover" type="vehicle" tech="3" skill="4" work-time="1000">
+		<part-salvage name="large vehicle frame" number="1" />
+		<part-salvage name="rover chassis panel" number="10" />
+		<part-salvage name="rover windshield" number="1" />
+		<part-salvage name="rover window" number="5" />
+		<part-salvage name="winch" number="1" />
+		<part-salvage name="rover generator" number="1" />
+		<part-salvage name="large motor" number="5" />
+		<part-salvage name="rover battery" number="3" />
+		<part-salvage name="rover control panel" number="1" />
+		<part-salvage name="fuel tank" number="1" />
+		<part-salvage name="gas tank" number="1" />
+		<part-salvage name="water tank" number="1" />
+		<part-salvage name="fuel pump" number="1" />
+		<part-salvage name="oxygen pump" number="1" />
+		<part-salvage name="satellite dish" number="1" />
+		<part-salvage name="radio antenna" number="1" />
+		<part-salvage name="electrical wire" number="20" />
+		<part-salvage name="wire connector" number="20" />
+		<part-salvage name="plastic tubing" number="5" />
+		<part-salvage name="plastic pipe" number="2" />
+		<part-salvage name="steel pipe" number="2" />
+		<part-salvage name="epoxy resin bottle" number="5" />
+		<part-salvage name="lubricant bottle" number="2" />
+		<part-salvage name="rover wheel" number="14" />
+		<part-salvage name="steel scrap" number="4" />		
+		<part-salvage name="aluminum scrap" number="8" />
+		<part-salvage name="optical cable" number="10" />				
+	</salvage>
+
+	<!-- Salvage process for a light utility vehicle (LUV) -->
+	<salvage item-name="light utility vehicle" type="vehicle" tech="3" skill="3" work-time="700">
+		<part-salvage name="small vehicle frame" number="1" />
+		<part-salvage name="large motor" number="2" />
+		<part-salvage name="rover battery" number="1" />
+		<part-salvage name="utility vehicle control panel" number="1" />
+		<part-salvage name="electrical wire" number="10" />
+		<part-salvage name="wire connector" number="10" />
+		<part-salvage name="epoxy resin bottle" number="1" />
+		<part-salvage name="lubricant bottle" number="1" />
+		<part-salvage name="small wheel" number="8" />
+		<part-salvage name="radio antenna" number="1" />
+		<part-salvage name="steel scrap" number="1" />		
+		<part-salvage name="aluminum scrap" number="2" />	
+		<part-salvage name="optical cable" number="3" />		
+	</salvage>
+
+	<!-- Salvage process for a barrel. -->
+	<salvage item-name="barrel" type="equipment" tech="2" skill="2" work-time="100">
+		<part-salvage name="steel sheet" number="1" />
+	</salvage>
+
+	<!-- Salvage process for a gas canister. -->
+	<salvage item-name="gas canister" type="equipment" tech="2" skill="3" work-time="100">
+		<part-salvage name="steel canister" number="1" />
+		<part-salvage name="valve" number="2" />
+		<part-salvage name="gasket" number="4" />
+	</salvage>
+
+	<!-- Salvage process for a large bag. -->
+	<salvage item-name="large bag" type="equipment" tech="2" skill="2" work-time="100">
+		<part-salvage name="fiberglass cloth" number="2" />
+		<part-salvage name="plastic sheet" number="2" />
+	</salvage>
+
+
+</manufacturing-processes>

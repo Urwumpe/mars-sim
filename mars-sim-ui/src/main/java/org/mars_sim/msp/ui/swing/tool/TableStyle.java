@@ -1,19 +1,18 @@
 /**
  * Mars Simulation Project
  * TableStyle.java
- * @version 3.1.0 2016-10-27
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.ui.swing.tool;
 
 import java.awt.Color;
+import java.awt.Font;
 
 import javax.swing.JTable;
 import javax.swing.SwingUtilities;
-
-import org.mars_sim.msp.ui.javafx.MainScene;
-
+@SuppressWarnings("serial")
 public class TableStyle extends ZebraJTable{
 
 	//private static JTableHeader theHeader;
@@ -56,7 +55,14 @@ public class TableStyle extends ZebraJTable{
     public static void setTableStyle(JTable table) {
 	   	//logger.info("setTableStyle() is on " + Thread.currentThread().getName() );
 
-    	int theme = MainScene.getTheme();
+//        if (MainWindow.OS.contains("linux"))
+//        	table.setRowHeight(24);
+//        else 
+        table.setRowHeight(24);
+        
+        table.setFont(new Font("Arial", Font.PLAIN, 12));
+        
+    	int theme = 0;//MainScene.getTheme();
 
 		// 255 228 225	MistyRose1
 
@@ -65,7 +71,7 @@ public class TableStyle extends ZebraJTable{
 	    //theRenderer = new TableHeaderRenderer(theHeader.getDefaultRenderer());
 	    //theHeader.setDefaultRenderer(theRenderer);
     	
-	    // 2017-01-19 disable this will allow a gradient color on the header
+	    // Disable this will allow a gradient color on the header
 	    //theHeader.setOpaque(false);
 		//theHeader.setFont( new Font( "Dialog", Font.BOLD, 12 ) );
 		//theHeader.setBorder(BorderFactory.createLineBorder(border, 1));

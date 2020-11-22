@@ -52,7 +52,7 @@ import org.mars_sim.msp.ui.swing.notification.icons.SimplicioIconProvider;
  * Holds the telegraph configuration.
  * 
  * @author Paulo Roberto Massa Cereda
- * @version 2.1
+ * @version 3.1.2 2020-09-02
  * @since 2.0
  */
 public class TelegraphConfig {
@@ -215,7 +215,7 @@ public class TelegraphConfig {
 			screenWidth = rect.getWidth();
 			screenHeight = rect.getHeight();
 		}
-		audioEnabled = true;
+		audioEnabled = false;
 		try {
 			audioInputStream = AudioSystem
 					.getAudioInputStream(new BufferedInputStream(ImageLoader.class

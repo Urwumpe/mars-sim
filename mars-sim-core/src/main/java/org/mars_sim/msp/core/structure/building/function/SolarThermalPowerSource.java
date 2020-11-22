@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SolarThermalPowerSource.java
- * @version 3.1.0 2017-09-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -9,11 +9,8 @@ package org.mars_sim.msp.core.structure.building.function;
 import java.io.Serializable;
 
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingManager;
 
 /**
  * A solar thermal power source.
@@ -31,8 +28,8 @@ implements Serializable {
 	
 	public static double ARRAY_AREA = 100D;		// in square feet
 	
-	private Coordinates location ;
-	private SurfaceFeatures surface ;
+	private Coordinates location;
+	
 	/**
 	 * Constructor.
 	 * @param maxPower the maximum generated power.
@@ -48,11 +45,10 @@ implements Serializable {
 
 	@Override
 	public double getCurrentPower(Building building) {
-		BuildingManager manager = building.getBuildingManager();
+//		BuildingManager manager = building.getBuildingManager();
 		if (location == null)
-			location = manager.getSettlement().getCoordinates();
-		if (surface == null)
-			surface = Simulation.instance().getMars().getSurfaceFeatures();
+			location = building.getBuildingManager().getSettlement().getCoordinates();
+
 		double sunlight = surface.getSolarIrradiance(location) * efficiency_solar_thermal / 1000D * ARRAY_AREA;
 		double max = getMaxPower(); 
 		if (sunlight <= max)
@@ -64,7 +60,7 @@ implements Serializable {
 
 	@Override
 	public double getAveragePower(Settlement settlement) {
-		return getMaxPower() / 2.5D;
+		return getMaxPower() * 0.707;
 	}
 
 	@Override
@@ -87,7 +83,6 @@ implements Serializable {
 	@Override
 	public void destroy() {
 		super.destroy();
-		surface = null;
 		location = null;
 
 	}

@@ -1,13 +1,14 @@
 /**
  * Mars Simulation Project
  * TabPanelWeather.java
- * @version 3.1.0 2017-02-14
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.ui.swing.unit_window.structure;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
@@ -15,6 +16,7 @@ import java.awt.Image;
 import java.awt.Toolkit;
 import java.net.URL;
 import java.text.DecimalFormat;
+import java.util.logging.Logger;
 
 import javax.swing.ImageIcon;
 import javax.swing.SpringLayout;
@@ -28,10 +30,10 @@ import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.mars.OrbitInfo;
 import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.mars.Weather;
+import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
 //import org.mars_sim.msp.ui.swing.tool.MarsViewer;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
@@ -43,13 +45,17 @@ import com.alee.laf.text.WebTextField;
 /**
  * The TabPanelWeather is a tab panel for location information.
  */
+@SuppressWarnings("serial")
 public class TabPanelWeather
 extends TabPanel {
+	
+	/** default logger. */
+	private static Logger logger = Logger.getLogger(TabPanelWeather.class.getName());
 
 	private static final String DUSTY_SKY = Msg.getString("img.dust128"); //$NON-NLS-1$
 	private static final String SUNNY = Msg.getString("img.sunny128"); //$NON-NLS-1$
 	private static final String BALMY = Msg.getString("img.hot128"); //$NON-NLS-1$
-	private static final String LIGHTNING = Msg.getString("img.lightning128"); //$NON-NLS-1$
+//	private static final String LIGHTNING = Msg.getString("img.lightning128"); //$NON-NLS-1$
 
 	private static final String SNOW_BLOWING = Msg.getString("img.snow_blowing"); //$NON-NLS-1$
 	private static final String SUN_STORM = Msg.getString("img.sun_storm"); //$NON-NLS-1$
@@ -64,6 +70,12 @@ extends TabPanel {
 	 /** default logger.   */
 	//private static Logger logger = Logger.getLogger(LocationTabPanel.class.getName());
 
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
+	/** The Settlement instance. */
+	private Settlement settlement;
+	
 	private WebTextField airDensityTF;
 	private WebTextField pressureTF;
 	private WebTextField solarIrradianceTF;
@@ -97,13 +109,12 @@ extends TabPanel {
 
 	private Coordinates locationCache;
 
-	private StormTrackingWindow stormWin;
+//	private StormTrackingWindow stormWin;
 
 	private static Weather weather;
 	private static SurfaceFeatures surfaceFeatures;
 	private static MasterClock masterClock;
 	private static OrbitInfo orbitInfo;
-
 
 	private static DecimalFormat fmt = new DecimalFormat("##0");
 	//private static DecimalFormat fmt1 = new DecimalFormat("#0.0");
@@ -121,6 +132,17 @@ extends TabPanel {
     			Msg.getString("TabPanelWeather.tooltip"), //$NON-NLS-1$
     			unit, desktop);
 
+		settlement = (Settlement) unit;
+
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
 		if (masterClock == null)
 			masterClock = Simulation.instance().getMasterClock();
 
@@ -143,31 +165,31 @@ extends TabPanel {
         topContentPanel.add(titlePanel);//, BorderLayout.NORTH);
 
         locationCoordsPanel = new WebPanel();
-        locationCoordsPanel.setBorder(new EmptyBorder(1, 1, 1, 1) );
+//        locationCoordsPanel.setBorder(new EmptyBorder(1, 1, 1, 1) );
         locationCoordsPanel.setLayout(new BorderLayout(0, 0));
 
         // Prepare latitude label
         latitudeLabel = new WebLabel(getLatitudeString());
         latitudeLabel.setOpaque(false);
-        latitudeLabel.setFont(new Font("Serif", Font.PLAIN, 15));
+        latitudeLabel.setFont(new Font("San Serif", Font.ITALIC, 15));
         latitudeLabel.setHorizontalAlignment(SwingConstants.LEFT);
         locationCoordsPanel.add(latitudeLabel, BorderLayout.NORTH);
 
         // Prepare longitude label
         longitudeLabel = new WebLabel(getLongitudeString());
         longitudeLabel.setOpaque(false);
-        longitudeLabel.setFont(new Font("Serif", Font.PLAIN, 15));
+        longitudeLabel.setFont(new Font("San Serif", Font.ITALIC, 15));
         longitudeLabel.setHorizontalAlignment(SwingConstants.LEFT);
         locationCoordsPanel.add(longitudeLabel, BorderLayout.CENTER);
 
         locationLabelPanel = new WebPanel();
-        locationLabelPanel.setBorder(new EmptyBorder(1, 1, 1, 1) );
+//        locationLabelPanel.setBorder(new EmptyBorder(1, 1, 1, 1) );
         locationLabelPanel.setLayout(new BorderLayout(0, 0));
-        WebLabel latLabel = new WebLabel("Latitude : ");//, JLabel.RIGHT);
-        latLabel.setFont(new Font("Serif", Font.PLAIN, 15));
+        WebLabel latLabel = new WebLabel("Lat : ");//, JLabel.RIGHT);
+        latLabel.setFont(new Font("San Serif", Font.ITALIC, 15));
         latLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-        WebLabel longLabel = new WebLabel("Longitude : ");//, JLabel.RIGHT);
-        longLabel.setFont(new Font("Serif", Font.PLAIN, 15));
+        WebLabel longLabel = new WebLabel("Lon : ");//, JLabel.RIGHT);
+        longLabel.setFont(new Font("San Serif", Font.ITALIC, 15));
         longLabel.setHorizontalAlignment(SwingConstants.RIGHT);
         locationLabelPanel.add(latLabel, BorderLayout.NORTH);
         locationLabelPanel.add(longLabel, BorderLayout.CENTER);
@@ -180,10 +202,13 @@ extends TabPanel {
         locationPanel.add(locationCoordsPanel);
 
         WebPanel leftPanel = new WebPanel(new BorderLayout(0, 0));
+        leftPanel.setMaximumSize(new Dimension(180, 350));
+        leftPanel.setPreferredSize(new Dimension(180, 350));
 		//mainPanel.setBorder(new MarsPanelBorder());
         leftPanel.add(locationPanel, BorderLayout.NORTH);
         
-        centerContentPanel.setBorder(new MarsPanelBorder());
+        
+//        centerContentPanel.setBorder(new MarsPanelBorder());
         centerContentPanel.add(leftPanel, BorderLayout.WEST);
 
       	// Create weatherPanel and imgPanel.
@@ -209,12 +234,13 @@ extends TabPanel {
 
     	WebPanel imgPanel = new WebPanel(new FlowLayout());
         weatherLabel = new WebLabel();
+        weatherLabel.setPreferredSize(96, 96);
     	imgPanel.add(weatherLabel, WebLabel.CENTER);
     	weatherPanel.add(imgPanel, BorderLayout.NORTH);
     	// TODO: calculate the average, high and low temperature during the day to determine
     	// if it is hot, sunny, dusty, stormy...
     	// Sets up if else clause to choose the proper weather image
-    	setImage(SUNNY);
+//    	ImageLoader.getNewIcon(SUNNY);
     	
     	// Prepare temperature panel
         WebPanel temperaturePanel = new WebPanel(new FlowLayout());
@@ -353,8 +379,8 @@ extends TabPanel {
 		//Lay out the spring panel.
 		SpringUtilities.makeCompactGrid(springPanel,
 		                                8, 2, //rows, cols
-		                                10, 10,        //initX, initY
-		                                10, 10);       //xPad, yPad
+		                                0, 30,        //initX, initY
+		                                5, 5);       //xPad, yPad
 
         // TODO: have a meteorologist or Areologist visit the weather station daily to fine tune the equipment
 //        String personName = "ABC";
@@ -367,9 +393,9 @@ extends TabPanel {
     }
 
 
-    public void setViewer(StormTrackingWindow w) {
-    	this.stormWin = w;
-    }
+//    public void setViewer(StormTrackingWindow w) {
+//    	this.stormWin = w;
+//    }
 
 //	/**
 //	 * Open storm tracking window
@@ -391,16 +417,20 @@ extends TabPanel {
 //		}
 //	}
 
-	/**
-	 * Sets weather image.
-	 */
-	public void setImage(String image) {
-        URL resource = ImageLoader.class.getResource(image);
-        Toolkit kit = Toolkit.getDefaultToolkit();
-        Image img = kit.createImage(resource);
-        ImageIcon weatherImageIcon = new ImageIcon(img);
-    	weatherLabel.setIcon(weatherImageIcon);
-	}
+//	/**
+//	 * Sets weather image.
+//	 */
+//	public void setImage(String image) {
+//        URL resource = ImageLoader.class.getResource(image);
+//		if (resource == null) {
+//			logger.severe("'" + image + "' cannot be found");
+//		}
+//		
+//        Toolkit kit = Toolkit.getDefaultToolkit();
+//        Image img = kit.createImage(resource);
+//        ImageIcon weatherImageIcon = new ImageIcon(img);
+//    	weatherLabel.setIcon(weatherImageIcon);
+//	}
 
     public String getTemperatureString(double value) {
     	// Use Msg.getString for the degree sign
@@ -488,7 +518,9 @@ extends TabPanel {
      * Updates the info on this panel.
      */
     public void update() {
-
+		if (!uiDone)
+			initializeUI();
+		
     	Coordinates location = unit.getCoordinates();
 		//System.out.println("solar declination angle : " + 57.2975 * orbitInfo.getSolarDeclinationAngle());
 		//System.out.println("Duration of Mars daylight in millisols : " + orbitInfo.getDaylightinMillisols(location));
@@ -539,6 +571,8 @@ extends TabPanel {
 	        	opticalDepthTF.setText(" " + getOpticalDepthString(opticalDepthCache));
 	        }
 
+	        //////////////////////////////////////////////
+	        
 	       	String icon = null;
 
 	    	if (temperatureCache <= 0) {
@@ -554,8 +588,8 @@ extends TabPanel {
 	    	else if (temperatureCache >= 26)
 	    		icon = BALMY;
 	    	else { //if (temperatureCache >= 0) {
-	    		if (windSpeedCache > 10D) {
-	    			icon = SUN_STORM;
+	    		if (windSpeedCache > 20D) {
+	    			icon = WIND_FLAG ;//SUN_STORM;
 	    		}
 	    		else if (opticalDepthCache > 1D) {
 			    	if (opticalDepthCache > 3D)
@@ -567,9 +601,12 @@ extends TabPanel {
 	    			icon = SUNNY;
 	    	}
 
+	    	//////////////////////////////////////////////
+	    	
 	    	if (!icon.equals(iconCache)) {
 	    		iconCache = icon;
-	    		setImage(icon);
+//	    		setImage(icon);
+	    		weatherLabel.setIcon(ImageLoader.getNewIcon(icon));
 	    	}
 
 	        double za = getZenithAngle();
@@ -620,7 +657,7 @@ extends TabPanel {
     	masterClock = null;
     	orbitInfo = null;
 
-    	stormWin = null;
+//    	stormWin = null;
 
     	fmt = null;
     	//fmt1 = null;

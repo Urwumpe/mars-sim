@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * InviteStudyCollaboratorMeta.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -9,18 +9,20 @@ package org.mars_sim.msp.core.person.ai.task.meta;
 import java.io.Serializable;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.task.InviteStudyCollaborator;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.core.science.ScientificStudyUtil;
 import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.tool.RandomUtil;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * Meta task for the InviteStudyCollaborator task.
@@ -48,25 +50,48 @@ public class InviteStudyCollaboratorMeta implements MetaTask, Serializable {
     public double getProbability(Person person) {
 
         double result = 0D;
-
+        
         if (person.isInside()) {
 
-	        ScientificStudyManager manager = Simulation.instance().getScientificStudyManager();
-	        ScientificStudy study = manager.getOngoingPrimaryStudy(person);
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double fatigue = condition.getFatigue();
+            double stress = condition.getStress();
+            double hunger = condition.getHunger();
+            
+            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            	return 0;
 
             // Check if study is in invitation phase.
-            if (study != null && study.getPhase().equals(ScientificStudy.INVITATION_PHASE)) {
+            ScientificStudy study = scientificStudyManager.getOngoingPrimaryStudy(person);
+            if (study == null)
+            	return 0;
+            		
+            else if (study.getPhase().equals(ScientificStudy.INVITATION_PHASE)) {
 
                 // Check that there isn't a full set of open invitations already sent out.
                 int collabNum = study.getCollaborativeResearchers().size();
                 int openInvites = study.getNumOpenResearchInvitations();
-                if ((openInvites + collabNum) < ScientificStudy.MAX_NUM_COLLABORATORS) {
+                if ((openInvites + collabNum) < study.getMaxCollaborators()) {
 
                     // Check that there's scientists available for invitation.
                     if (ScientificStudyUtil.getAvailableCollaboratorsForInvite(study).size() > 0) {
 
-                        result = 25D;
+                        result += 25D;
 
+                        if (person.isInVehicle()) {	
+                	        // Check if person is in a moving rover.
+                	        if (Vehicle.inMovingRover(person)) {
+                		        // the bonus for proposing scientific study inside a vehicle, 
+                	        	// rather than having nothing to do if a person is not driving
+                	        	result += 20;
+                	        } 	       
+                	        else
+                		        // the bonus for proposing scientific study inside a vehicle, 
+                	        	// rather than having nothing to do if a person is not driving
+                	        	result += 5;
+                        }
+                        
                         // Crowding modifier
                         Building adminBuilding = InviteStudyCollaborator.getAvailableAdministrationBuilding(person);
                         if (adminBuilding != null) {
@@ -90,7 +115,7 @@ public class InviteStudyCollaboratorMeta implements MetaTask, Serializable {
 
                         // Modify if research is the person's favorite activity.
                         if (person.getFavorite().getFavoriteActivity() == FavoriteType.RESEARCH) {
-                            result *= 2D;
+                            result += RandomUtil.getRandomInt(1, 20);
                         }
 
                         // Add Preference modifier

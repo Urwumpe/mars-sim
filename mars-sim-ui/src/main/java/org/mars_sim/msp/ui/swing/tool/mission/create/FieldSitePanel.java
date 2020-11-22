@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * FieldSitePanel.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission.create;
@@ -112,7 +112,7 @@ public class FieldSitePanel extends WizardPanel {
     @Override
     void updatePanel() {
         try {
-            double range = (getWizard().getMissionData().getRover().getRange() * RANGE_MODIFIER) / 2D;
+            double range = (getWizard().getMissionData().getRover().getRange(wizard.getMissionBean().getMissionType()) * RANGE_MODIFIER) / 2D;
             pixelRange = convertRadiusToMapPixels(range);
             ellipseLayer.setEllipseDetails(new IntPoint(150, 150), new IntPoint(150, 150), (pixelRange * 2));
             IntPoint initialNavpointPos = new IntPoint(150, 150 - (pixelRange / 2));

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * StartingSettlementPanel.java
- * @version 3.1.0 2017-03-03
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -19,20 +19,19 @@ import java.util.Iterator;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-
+import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.equipment.Bag;
 import org.mars_sim.msp.core.equipment.EVASuit;
-import org.mars_sim.msp.core.equipment.SpecimenContainer;
+import org.mars_sim.msp.core.equipment.SpecimenBox;
 import org.mars_sim.msp.core.person.ai.mission.CollectIce;
 import org.mars_sim.msp.core.person.ai.mission.Exploration;
+import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -45,7 +44,6 @@ import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
 
 /**
  * A wizard panel for selecting the mission's starting settlement.
@@ -57,10 +55,8 @@ class StartingSettlementPanel extends WizardPanel {
 
 	// Data members.
 	private SettlementTableModel settlementTableModel;
-	private WebTable settlementTable;
+	private JTable settlementTable;
 	private WebLabel errorMessageLabel;
-
-//	public static AmountResource [] availableDesserts = PreparingDessert.getArrayOfDessertsAR();
 
 	/**
 	 * Constructor.
@@ -99,7 +95,7 @@ class StartingSettlementPanel extends WizardPanel {
 		settlementTable = new ZebraJTable(settlementTableModel);
 		TableStyle.setTableStyle(settlementTable);
 		// Added sorting
-		settlementTable.setAutoCreateRowSorter(true);
+//		settlementTable.setAutoCreateRowSorter(true);
 		settlementTable.setDefaultRenderer(Object.class, new UnitTableCellRenderer(settlementTableModel));
 		settlementTable.setRowSelectionAllowed(true);
 		settlementTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -110,7 +106,7 @@ class StartingSettlementPanel extends WizardPanel {
 							int index = settlementTable.getSelectedRow();
 							if (index > -1) {
 								if (settlementTableModel.isFailureRow(index)) {
-									errorMessageLabel.setText("Settlement cannot start the mission (see red cells).");
+									errorMessageLabel.setText("Settlement cannot start the mission. See red cell(s).");
 									getWizard().setButtons(false);
 								}
 								else {
@@ -121,7 +117,7 @@ class StartingSettlementPanel extends WizardPanel {
 						}
 					}
 				}
-				);
+			);
 		// call it a click to next button when user double clicks the table
 		settlementTable.addMouseListener(
 				new MouseListener() {
@@ -202,8 +198,8 @@ class StartingSettlementPanel extends WizardPanel {
 			super();
 
 			// Add all settlements to table sorted by name.
-			UnitManager manager = Simulation.instance().getUnitManager();
-			Collection<Settlement> settlements = CollectionUtils.sortByName(manager.getSettlements());
+//			UnitManager manager = Simulation.instance().getUnitManager();
+			Collection<Settlement> settlements = CollectionUtils.sortByName(unitManager.getSettlements());
 			Iterator<Settlement> i = settlements.iterator();
 			while (i.hasNext()) units.add(i.next());
 
@@ -239,13 +235,13 @@ class StartingSettlementPanel extends WizardPanel {
 					else if (column == 2)
 						result = inv.findNumUnitsOfClass(Rover.class);
 					if (column == 3) {
-						result = (int) inv.getARStored(ResourceUtil.oxygenID, false);
+						result = (int) inv.getAmountResourceStored(ResourceUtil.oxygenID, false);
 					}
 					else if (column == 4) {
-						result = (int) inv.getARStored(ResourceUtil.waterID, false);
+						result = (int) inv.getAmountResourceStored(ResourceUtil.waterID, false);
 					}
 					else if (column == 5) {
-						result = (int) inv.getARStored(ResourceUtil.foodID, false);
+						result = (int) inv.getAmountResourceStored(ResourceUtil.foodID, false);
 					}
 //					else if (column == 6) {
 //						result = (int) determineHighestDessertResources(inv);
@@ -256,28 +252,27 @@ class StartingSettlementPanel extends WizardPanel {
 					else if (column == 7)
 						result = inv.findNumUnitsOfClass(EVASuit.class);
 
-					String type = getWizard().getMissionData().getType();
-
-					if (type.equals(MissionDataBean.EXPLORATION_MISSION)) {
+					MissionType type = getWizard().getMissionData().getMissionType();
+					if (MissionType.EXPLORATION == type) {
 						if (column == 8)
-							result = inv.findNumEmptyUnitsOfClass(SpecimenContainer.class, true);
+							result = inv.findNumSpecimenBoxes(true, true);//.findNumEmptyUnitsOfClass(SpecimenBox.class, true);
 					}
-					else if (type.equals(MissionDataBean.ICE_MISSION) ||
-							type.equals(MissionDataBean.REGOLITH_MISSION)) {
+					else if (MissionType.COLLECT_ICE == type ||
+							MissionType.COLLECT_REGOLITH == type) {
 						if (column == 8)
-							result = inv.findNumEmptyUnitsOfClass(Bag.class, true);
+							result = inv.findNumBags(true, true);//findNumEmptyUnitsOfClass(Bag.class, true);
 					}
-					else if (type.equals(MissionDataBean.MINING_MISSION)) {
-						if (column == 8)
-							result = inv.findNumEmptyUnitsOfClass(Bag.class, true);
-						else if (column == 9)
+					else if (MissionType.MINING == type) {
+						if (column == 8) {
+							result = inv.findNumBags(true, true);
+						}
+						else if (column == 9) {
 							result = inv.findNumUnitsOfClass(LightUtilityVehicle.class);
+						}
 						else if (column == 10) {
-							//Part pneumaticDrill = (Part) Part.findItemResource(Mining.PNEUMATIC_DRILL);
 							result = inv.getItemResourceNum(ItemResourceUtil.pneumaticDrillAR);
 						}
 						else if (column == 11) {
-							//Part backhoe = (Part) Part.findItemResource(Mining.BACKHOE);
 							result = inv.getItemResourceNum(ItemResourceUtil.backhoeAR);
 						}
 					}
@@ -344,11 +339,13 @@ class StartingSettlementPanel extends WizardPanel {
 			if (columns.size() > 8) {
 				for (int x = 0; x < (columns.size() - 8); x++) columns.remove(8);
 			}
-			String type = getWizard().getMissionData().getType();
-			if (type.equals(MissionDataBean.EXPLORATION_MISSION)) columns.add("Specimen Containers");
-			else if (type.equals(MissionDataBean.ICE_MISSION) ||
-					type.equals(MissionDataBean.REGOLITH_MISSION)) columns.add("Bags");
-			else if (type.equals(MissionDataBean.MINING_MISSION)) {
+			
+			MissionType type = getWizard().getMissionData().getMissionType();
+			if (MissionType.EXPLORATION == type)
+				columns.add("Specimen Containers");
+			else if (MissionType.COLLECT_ICE == type || MissionType.COLLECT_REGOLITH == type)
+				columns.add("Bags");
+			else if (MissionType.MINING == type) {
 				columns.add("Bags");
 				columns.add("Light Utility Vehicles");
 				columns.add("Pneumatic Drills");
@@ -391,27 +388,27 @@ class StartingSettlementPanel extends WizardPanel {
 					if (inv.getAmountResourceStored(ResourceUtil.methaneID, false) < 100D) result = true;
 				}
 				else if (column == 7) {
-					if (inv.findNumUnitsOfClass(EVASuit.class) == 0) result = true;
+					if (inv.findNumEVASuits(false, true) == 0) result = true;
 				}
 
-				String type = getWizard().getMissionData().getType();
-				if (type.equals(MissionDataBean.EXPLORATION_MISSION)) {
+				MissionType type = getWizard().getMissionData().getMissionType();
+				if (MissionType.EXPLORATION == type) {
 					if (column == 8) {
-						if (inv.findNumEmptyUnitsOfClass(SpecimenContainer.class, true) <
+						if (inv.findNumSpecimenBoxes(true, true) < //.findNumEmptyUnitsOfClass(SpecimenBox.class, true) <
 								Exploration.REQUIRED_SPECIMEN_CONTAINERS) result = true;
 					}
 				}
-				else if (type.equals(MissionDataBean.ICE_MISSION) ||
-						type.equals(MissionDataBean.REGOLITH_MISSION)) {
+				else if (MissionType.COLLECT_ICE == type ||
+						MissionType.COLLECT_REGOLITH == type) {
 					if (column == 8) {
-						if (inv.findNumEmptyUnitsOfClass(Bag.class, true) <
-								CollectIce.REQUIRED_BAGS) result = true;
+						if (inv.findNumBags(true, true) < //.findNumEmptyUnitsOfClass(Bag.class, true) <
+								CollectIce.REQUIRED_BARRELS) result = true;
 					}
 				}
-				else if (type.equals(MissionDataBean.MINING_MISSION)) {
+				else if (MissionType.MINING == type ) {
 					if (column == 8) {
-						if (inv.findNumEmptyUnitsOfClass(Bag.class, true) <
-								CollectIce.REQUIRED_BAGS) result = true;
+						if (inv.findNumBags(true, true) < //findNumEmptyUnitsOfClass(Bag.class, true) <
+								CollectIce.REQUIRED_BARRELS) result = true;
 					}
 					if (column == 9) {
 						if (inv.findNumUnitsOfClass(LightUtilityVehicle.class) == 0) result = true;

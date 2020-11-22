@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SelfTreatHealthProblem.java
- * @version 3.1.0 2017-03-09
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -16,13 +16,16 @@ import java.util.logging.Logger;
 import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.location.LocationStateType;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
 import org.mars_sim.msp.core.person.EventType;
-import org.mars_sim.msp.core.person.LocationSituation;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskEvent;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.person.health.Treatment;
@@ -84,7 +87,7 @@ public class SelfTreatHealthProblem extends Task implements Serializable {
             if (healthProblem != null) {
 
                 // Get the person's medical skill.
-                int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
+                int skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
 
                 // Determine medical treatment.
                 Treatment treatment = healthProblem.getIllness().getRecoveryTreatment();
@@ -111,7 +114,7 @@ public class SelfTreatHealthProblem extends Task implements Serializable {
                 MedicalCare medicalCare = (MedicalCare) medicalAid;
 
                 // Walk to medical care building.
-                walkToActivitySpotInBuilding(medicalCare.getBuilding(), false);
+                walkToTaskSpecificActivitySpotInBuilding(medicalCare.getBuilding(), false);
             }
             else if (medicalAid instanceof SickBay) {
                 // Walk to medical activity spot in rover.
@@ -141,10 +144,10 @@ public class SelfTreatHealthProblem extends Task implements Serializable {
 
         MedicalAid result = null;
 
-        if (person.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
+		if (person.getLocationStateType() == LocationStateType.INSIDE_SETTLEMENT) {
             result = determineMedicalAidAtSettlement();
         }
-        else if (person.getLocationSituation() == LocationSituation.IN_VEHICLE) {
+        else if (person.getLocationStateType() == LocationStateType.INSIDE_VEHICLE) {
             result = determineMedicalAidInVehicle();
         }
 
@@ -287,7 +290,7 @@ public class SelfTreatHealthProblem extends Task implements Serializable {
                 Treatment treatment = problem.getIllness().getRecoveryTreatment();
                 if (treatment != null) {
                     boolean selfTreatable = treatment.getSelfAdminister();
-                    int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
+                    int skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
                     int requiredSkill = treatment.getSkill();
                     if (selfTreatable && (skill >= requiredSkill)) {
                         result.add(problem);
@@ -334,9 +337,12 @@ public class SelfTreatHealthProblem extends Task implements Serializable {
         if (!medicalAid.getProblemsBeingTreated().contains(healthProblem)) {
             medicalAid.requestTreatment(healthProblem);
             medicalAid.startTreatment(healthProblem, duration);
+
         	LogConsolidated.log(logger, Level.INFO, 0, sourceName, 
         			"[" + person.getSettlement() + "] " +
-        			person.getName() + " is self-treating his/her " + healthProblem.getIllness().getType().toString().toLowerCase(), null);
+        			person.getName() + " is self-treating "
+        			+  person.getPronoun1() + " " 
+        			+ healthProblem.getIllness().getType().toString().toLowerCase(), null);
 
             // Create starting task event if needed.
             if (getCreateEvents()) {
@@ -367,13 +373,13 @@ public class SelfTreatHealthProblem extends Task implements Serializable {
     }
 
     @Override
-    protected FunctionType getLivingFunction() {
+    public FunctionType getLivingFunction() {
         return FunctionType.MEDICAL_CARE;
     }
 
     @Override
     public int getEffectiveSkillLevel() {
-        SkillManager manager = person.getMind().getSkillManager();
+        SkillManager manager = person.getSkillManager();
         return manager.getEffectiveSkillLevel(SkillType.MEDICINE);
     }
 
@@ -395,7 +401,7 @@ public class SelfTreatHealthProblem extends Task implements Serializable {
                 NaturalAttributeType.EXPERIENCE_APTITUDE);
         newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
         newPoints *= getTeachingExperienceModifier();
-        person.getMind().getSkillManager().addExperience(SkillType.MEDICINE, newPoints);
+        person.getSkillManager().addExperience(SkillType.MEDICINE, newPoints, time);
     }
 
     /**
@@ -429,7 +435,7 @@ public class SelfTreatHealthProblem extends Task implements Serializable {
         double chance = .005D;
 
         // Medical skill modification.
-        int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
+        int skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
         if (skill <= 3) {
             chance *= (4 - skill);
         }

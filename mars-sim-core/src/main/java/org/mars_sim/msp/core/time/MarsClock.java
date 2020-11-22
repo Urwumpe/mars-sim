@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MarsClock.java
- * @version 3.1.0 2017-01-19
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -82,9 +82,15 @@ public class MarsClock implements Serializable {
 	// public static final int THE_FIRST_SOL = 9353;
 
 	// Martian/Gregorian calendar conversion
+	// Note: 1 millisol = 88.775244 sec
+	
+	/** Number of seconds per millisol. */
 	public static final double SECONDS_PER_MILLISOL = 88.775244;
-	// 1 millisol = 88.775244 sec
-
+	/** Number of hours per millisol. */
+	public static final double HOURS_PER_MILLISOL  = SECONDS_PER_MILLISOL / 3600D;
+	/** Number of millisols per hour. */
+	public static final double MILLISOLS_PER_HOUR  = 3600D / SECONDS_PER_MILLISOL;
+	
 	// from https://www.teuse.net/games/mars/mars_dates.html
 	// Demios only takes 30hrs, and Phobos 7.6hrs to rotate around mars
 	// Spring lasts 193.30 sols
@@ -102,12 +108,13 @@ public class MarsClock implements Serializable {
 	// This gives them 4 periods to use like we do months.
 	// They are a bit long so maybe they divide them up more later.
 
+	public static final String START_CLOCK = "00-Adir-01:000.000";
 	private static final String DASH = "-";
 	private static final String COLON = ":";
 	private static final String ONE_ZERO = "0";
 	private static final String TWO_ZEROS = "00";
-	private static final String THREE_ZEROS = "000";
-	private static final String UMST = "(UMST) ";
+//	private static final String THREE_ZEROS = "000";
+//	private static final String UMST = "(UMST) ";
 	private static final String EARLY = "Early ";
 	private static final String MID = "Mid ";
 	private static final String LATE = "Late ";
@@ -145,14 +152,10 @@ public class MarsClock implements Serializable {
 	private double millisol;
 	/** The millisol of the day in 1 decimal place. */
 	private double msol1;
-
 	
 	private static OrbitInfo orbitInfo;
 
-//	private static EarthClock earthClock;
-
-	private Simulation sim;
-
+	private static Simulation sim;
 
 	/**
 	 * Constructor 1 : create an instance of MarsClock with date string parameter.
@@ -166,11 +169,10 @@ public class MarsClock implements Serializable {
 
 		sim = Simulation.instance();
 //		earthClock = sim.getMasterClock().getEarthClock();
+	
+		orbitInfo = sim.getMars().getOrbitInfo();
 
-		if (orbitInfo == null)
-			orbitInfo = sim.getMars().getOrbitInfo();
-
-		// Set initial date to dateString. ex: "0000-Adir-01 000.000"
+		// Set initial date to dateString. ex: "00-Adir-01 000.000"
 		String orbitStr = dateString.substring(0, dateString.indexOf(DASH));
 		orbit = Integer.parseInt(orbitStr);
 		if (orbit < 0)
@@ -557,28 +559,45 @@ public class MarsClock implements Serializable {
 	}
 
 	/**
-	 * Returns formatted time stamp string in the format of e.g. "0013-Adir-05:056.349"
+	 * Returns formatted time stamp string in the format of e.g. "03-Adir-05:056.349"
 	 *
 	 * @return formatted time stamp string
 	 */
 	public String getDateTimeStamp() {
-		// TODO: are the "two" whitespace intentional? or should we use colon as the
-		// separator ?
 		return new StringBuilder(getDateString()).append(COLON).append(getDecimalTimeString()).toString();
 	}
 
 	/**
-	 * Returns formatted time stamp string in the format of "0013-Adir-05:056"
+	 * Returns formatted time stamp string in the format of e.g. "03-Adir-05:056"
+	 *
+	 * @return formatted time stamp string
+	 */
+	public String getTrucatedDateTimeStamp() {
+		return new StringBuilder(getDateString()).append(COLON).append(getTrucatedTimeString()).toString();
+	}
+	
+	/**
+	 * Returns formatted time stamp string in the format of "03-Adir-05:056.434"
 	 * 
 	 * @param time {@link MarsClock} instance
 	 * @return formatted String
 	 */
 	public static String getDateTimeStamp(MarsClock time) {
+		return new StringBuilder(getDateString(time)).append(COLON).append(getDecimalTimeString(time)).toString();
+	}
+	
+	/**
+	 * Returns a truncated time stamp string in the format of "03-Adir-05:056"
+	 * 
+	 * @param time {@link MarsClock} instance
+	 * @return formatted String
+	 */
+	public static String getTruncatedDateTimeStamp(MarsClock time) {
 		return new StringBuilder(getDateString(time)).append(COLON).append(getTruncatedTimeString(time)).toString();
 	}
 	
 	/**
-	 * Gets the current date string in the format of e.g. "0013-Adir-05"
+	 * Gets the current date string in the format of e.g. "03-Adir-05"
 	 *
 	 * @return current date string
 	 */
@@ -586,13 +605,16 @@ public class MarsClock implements Serializable {
 		StringBuilder result = new StringBuilder();
 
 		// Append padding zeros to orbit
-		if (orbit < 10) // then 000x
-			result.append(THREE_ZEROS);
-		else if (orbit < 100) // then 00xx
-			result.append(TWO_ZEROS);
-		else if (orbit < 1000) // then 0xxx
-			result.append(ONE_ZERO);
+//		if (orbit < 10) // then 000x
+//			result.append(THREE_ZEROS);
+//		else if (orbit < 100) // then 00xx
+//			result.append(TWO_ZEROS);
+//		else if (orbit < 1000) // then 0xxx
+//			result.append(ONE_ZERO);
 
+		if (orbit < 10) // then 0x
+			result.append(ONE_ZERO);
+		
 		result.append(orbit).append(DASH).append(getMonthName()).append(DASH);
 
 		if (sol < 10)
@@ -604,7 +626,7 @@ public class MarsClock implements Serializable {
 	}
 
 	/**
-	 * Gets the current orbit string in the format of e.g. "0013"
+	 * Gets the current orbit string in the format of e.g. "03"
 	 *
 	 * @return current orbit string
 	 */
@@ -612,20 +634,23 @@ public class MarsClock implements Serializable {
 		StringBuilder s = new StringBuilder();
 
 		// Append padding zeros to orbit
-		if (orbit < 10) // then 000x
-			s.append(THREE_ZEROS);
-		else if (orbit < 100) // then 00xx
-			s.append(TWO_ZEROS);
-		else if (orbit < 1000) // then 0xxx
-			s.append(ONE_ZERO);
+//		if (orbit < 10) // then 000x
+//			s.append(THREE_ZEROS);
+//		else if (orbit < 100) // then 00xx
+//			s.append(TWO_ZEROS);
+//		else if (orbit < 1000) // then 0xxx
+//			s.append(ONE_ZERO);
 
+		if (orbit < 10) // then 0x
+			s.append(ONE_ZERO);
+		
 		s.append(orbit);
 
 		return s.toString();
 	}
 
 	/**
-	 * Gets the date string in the format of e.g. "0013-Adir-05"
+	 * Gets the date string in the format of e.g. "03-Adir-05"
 	 * 
 	 * @param time {@link MarsClock} instance
 	 * @return date string
@@ -637,13 +662,16 @@ public class MarsClock implements Serializable {
 		String month = time.getMonthName();
 
 		// Append padding zeros to orbit
-		if (orbit < 10) // then 000x
-			s.append(THREE_ZEROS);
-		else if (orbit < 100) // then 00xx
-			s.append(TWO_ZEROS);
-		else if (orbit < 1000) // then 0xxx
-			s.append(ONE_ZERO);
+//		if (orbit < 10) // then 000x
+//			s.append(THREE_ZEROS);
+//		else if (orbit < 100) // then 00xx
+//			s.append(TWO_ZEROS);
+//		else if (orbit < 1000) // then 0xxx
+//			s.append(ONE_ZERO);
 
+		if (orbit < 10) // then 0x
+			s.append(ONE_ZERO);
+		
 		// Append orbit
 		s.append(orbit).append(DASH).append(month).append(DASH);
 
@@ -660,7 +688,7 @@ public class MarsClock implements Serializable {
 	 * 
 	 * @return millisols without decimal
 	 */
-	public String getTrucatedTimeStringUMST() {
+	public String getTrucatedTimeString() {
 		StringBuilder s = new StringBuilder();
 		int tb = (int) millisol;
 		s.append(tb);
@@ -677,7 +705,7 @@ public class MarsClock implements Serializable {
 //		else if (millisol < 1000D)
 //			s.insert(0, ONE_ZERO);
 
-		return s.append(UMST).toString();
+		return s.toString(); // .append(UMST)
 	}
 
 	/**
@@ -698,10 +726,11 @@ public class MarsClock implements Serializable {
 			b.insert(0, ONE_ZERO);
 			// result = "0" + result;
 		}
-		if (millisol < 1) {
-			b.insert(0, ONE_ZERO);
-			// result = "0" + result;
-		}
+//		if (millisol < 1) {
+//			b.insert(0, ONE_ZERO);
+//			// result = "0" + result;
+//		}
+		
 		while (b.length() < 7) {
 			b.append(ONE_ZERO);
 			// result += "0";
@@ -710,6 +739,39 @@ public class MarsClock implements Serializable {
 		return b.toString();
 	}
 
+	/**
+	 * Returns the time string in the format of e.g. "056"
+	 * 
+	 * @param time {@link MarsClock} instance
+	 * @return String in millisols
+	 */
+	public static String getDecimalTimeString(MarsClock time) {
+		StringBuilder b = new StringBuilder();
+		double millisol = time.getMillisol();
+		double tb = Math.floor(millisol * 1000D) / 1000D;
+
+		// String result = "" + tb;
+		b.append(tb);
+		if (millisol < 100) {
+			b.insert(0, ONE_ZERO);
+			// result = "0" + result;
+		}
+		if (millisol < 10) {
+			b.insert(0, ONE_ZERO);
+			// result = "0" + result;
+		}
+//		if (millisol < 1) {
+//			b.insert(0, ONE_ZERO);
+//			// result = "0" + result;
+//		}
+		while (b.length() < 7) {
+			b.append(ONE_ZERO);
+			// result += "0";
+		}
+
+		return b.toString();
+	}
+	
 	/**
 	 * Returns the time string in the format of e.g. "056"
 	 * 
@@ -745,14 +807,14 @@ public class MarsClock implements Serializable {
 	/**
 	 * Returns the total number of millisols of a given time.
 	 *
-	 * @param time {@link MarsClock} instance
+	 * @param clock {@link MarsClock} instance
 	 * @return total millisols
 	 */
-	public static double getTotalMillisols(MarsClock time) {
+	public static double getTotalMillisols(MarsClock clock) {
 		double result = 0D;
 
 		// Add millisols up to current orbit
-		for (int x = 1; x < time.orbit; x++) {
+		for (int x = 0; x < clock.getOrbit(); x++) {
 			if (isLeapOrbit(x))
 				result += SOLS_PER_ORBIT_LEAPYEAR * 1000D;
 			else
@@ -760,14 +822,14 @@ public class MarsClock implements Serializable {
 		}
 
 		// Add millisols up to current month
-		for (int x = 1; x < time.month; x++)
-			result += getSolsInMonth(x, time.orbit) * 1000D;
+		for (int x = 1; x < clock.getMonth(); x++)
+			result += getSolsInMonth(x, clock.getOrbit()) * 1000D;
 
 		// Add millisols up to current sol
-		result += (time.sol - 1) * 1000D;
+		result += (clock.getSolOfMonth() - 1) * 1000D;
 
 		// Add millisols in current sol
-		result += time.millisol;
+		result += clock.getMillisol();
 
 		// System.out.println("MarsClock : result : " + result);
 
@@ -835,6 +897,16 @@ public class MarsClock implements Serializable {
 	 */
 	public double getMillisolOneDecimal() {
 		return msol1;
+	}
+	
+	/**
+	 * Checks if the mars clock becomes stable enough at the start of the sim
+	 * @return
+	 */
+	public boolean isStable() {
+		if (msolInt > 15)
+			return true;
+		return false;
 	}
 
 	/**
@@ -1031,7 +1103,18 @@ public class MarsClock implements Serializable {
 		return orbit * month * sol + ((int) (millisol * 1000D));
 	}
 
+	/**
+	 * Reloads instances after loading from a saved sim
+	 * 
+	 * @param mars
+	 */
+	public static void initializeInstances(Simulation s, OrbitInfo o) {
+		sim = s;
+		orbitInfo = o;
+	}
+	
 	public void destroy() {
+		orbitInfo.destroy();
 		orbitInfo = null;
 		sim = null;
 	}

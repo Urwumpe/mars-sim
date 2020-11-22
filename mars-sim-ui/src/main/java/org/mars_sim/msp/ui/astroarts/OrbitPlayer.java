@@ -1,6 +1,6 @@
 /* Mars Simulation Project
  * OrbitPlayer.java
- * @version 3.08 2016-04-19
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  * Original work by Osamu Ajiki and Ron Baalke (NASA/JPL)
  * http://www.astroarts.com/products/orbitviewer/
@@ -8,6 +8,8 @@
  */
 
 package org.mars_sim.msp.ui.astroarts;
+
+import org.mars_sim.msp.core.astroarts.ATime;
 
 public class OrbitPlayer implements Runnable {
 		OrbitViewer	orbitViewer;

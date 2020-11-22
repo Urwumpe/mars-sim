@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Makerbot.java
- * @version 3.07 2015-03-05
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.robot.ai.job;
@@ -54,7 +54,7 @@ implements Serializable {
 
 		double result = 0D;
 
-		int materialsScienceSkill = robot.getBotMind().getSkillManager().getSkillLevel(SkillType.MATERIALS_SCIENCE);
+		int materialsScienceSkill = robot.getSkillManager().getSkillLevel(SkillType.MATERIALS_SCIENCE);
 		result = materialsScienceSkill;
 
 		RoboticAttributeManager attributes = robot.getRoboticAttributeManager();
@@ -79,7 +79,7 @@ implements Serializable {
 		while (i.hasNext()) {
 			Building building = i.next();
 			Manufacture workshop = (Manufacture) building.getFunction(FunctionType.MANUFACTURE);
-			result += workshop.getTechLevel() * workshop.getSupportingProcesses() / 2D;
+			result += workshop.getTechLevel() * workshop.getMaxProcesses() / 2D;
 		}
 
 		return result;

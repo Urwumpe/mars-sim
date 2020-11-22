@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * VerticalLabelUI.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 // see http://tech.chitgoks.com/2009/11/13/rotate-jlabel-vertically/
 
 package org.mars_sim.msp.ui.swing.tool;

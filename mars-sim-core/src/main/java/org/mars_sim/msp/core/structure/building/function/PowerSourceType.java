@@ -1,9 +1,12 @@
+/**
+ * Mars Simulation Project
+ * ThermalGeneration.java
+ * @version 3.1.2 2020-09-02
+ * @author stpa
+ */
+
 package org.mars_sim.msp.core.structure.building.function;
 
-/**
- * @author stpa
- * 2014-03-04
- */
 public enum PowerSourceType {
 
 	SOLAR_POWER ("Solar Power Source"),
@@ -18,16 +21,6 @@ public enum PowerSourceType {
 	/** hidden constructor. */
 	private PowerSourceType(String string) {
 		this.string = string;
-	}
-
-	/**
-	 * use internationalized strings or no strings at all.
-	 * @return {@link String}
-	 * @deprecated
-	 */	
-	// use getType().getString() 
-	public String getString() {
-		return this.string;
 	}
 	
 	public final String getName() {

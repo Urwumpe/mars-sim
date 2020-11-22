@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * DustStorm.java
- * @version 3.1.0 2017-08-31
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -71,26 +71,24 @@ public class DustStorm implements Serializable {
 	// private int tall;
 	// In case of dust devil, for simplicity, height = size
 	// Martian dust devil roughly 12 miles (20 kilometers) high was captured winding
-	// its way along
-	// the Amazonis Planitia region of Northern Mars on March 14, 2012 by the High
-	// Resolution Imaging Science Experiment (HiRISE)
+	// its way along the Amazonis Planitia region of Northern Mars on March 14, 2012
+	// by the High Resolution Imaging Science Experiment (HiRISE)
 	// camera on NASA's Mars Reconnaissance Orbiter.
 
 	private DustStormType type;
 
-	private Weather weather;
-	private MarsClock marsClock;
-	private SurfaceFeatures surface;
-
 	private List<Settlement> settlements;
 
+	private static Weather weather;
+//	private static MarsClock marsClock;
+//	private static SurfaceFeatures surface;
+	
 	public DustStorm(String name, DustStormType type, int id, MarsClock marsClock, Weather weather,
 			List<Settlement> settlements) {
-		this.marsClock = marsClock;
+//		this.marsClock = marsClock;
 		this.name = name;
 		this.type = type;
 		this.id = id;
-		this.marsClock = marsClock;
 		this.settlements = settlements;
 
 		if (weather == null)
@@ -264,8 +262,8 @@ public class DustStorm implements Serializable {
 		this.type = type;
 	}
 
-	public void setWeather(Weather weather) {
-		this.weather = weather;
+	public static void initializeInstances(Weather w) {
+		weather = w;
 	}
 
 	public void setCoordinates(Coordinates location) {

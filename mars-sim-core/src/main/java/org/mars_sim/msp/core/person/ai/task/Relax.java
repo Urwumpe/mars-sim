@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Relax.java
- * @version 3.1.0 2017-09-13
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -14,15 +14,14 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
-import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
 
@@ -50,13 +49,7 @@ implements Serializable {
 
 	// Static members
 	/** The stress modified per millisol. */
-	private static final double STRESS_MODIFIER = -.4D;
-
-    private double timeFactor;
-
-    private static Simulation sim = Simulation.instance();
-	private static MasterClock masterClock = sim.getMasterClock();
-	private static MarsClock marsClock;// = masterClock.getMarsClock();
+	private static final double STRESS_MODIFIER = -1D;
 
 	/**
 	 * Constructor.
@@ -64,15 +57,6 @@ implements Serializable {
 	 */
 	public Relax(Person person) {
 		super(NAME, person, false, false, STRESS_MODIFIER, true, 10D);
-		
-        marsClock = masterClock.getMarsClock();
-        
-        timeFactor = 1D; // TODO: should vary this factor by person
-
-		compute();
-	}
-	
-	public void compute() {
 		
 		// If during person's work shift, only relax for short period.
 		int msols = marsClock.getMillisolInt();
@@ -85,11 +69,18 @@ implements Serializable {
 		boolean walkSite = false;
 		if (person.isInSettlement()) {
 			try {
-				Building recBuilding = getAvailableRecreationBuilding(person);
-				if (recBuilding != null) {
+				Building rec = getAvailableRecreationBuilding(person);
+				if (rec != null) {
 					// Walk to recreation building.
-				    walkToActivitySpotInBuilding(recBuilding, true);
+				    walkToTaskSpecificActivitySpotInBuilding(rec, true);
 				    walkSite = true;
+				}
+				else {
+					// Go back to his quarters
+					Building quarters = person.getQuarters();
+					if (quarters != null) {
+						walkToBed(quarters, person, true);
+					}
 				}
 			}
 			catch (Exception e) {
@@ -157,11 +148,11 @@ implements Serializable {
 	}
 
     @Override
-    protected FunctionType getLivingFunction() {
+    public FunctionType getLivingFunction() {
         return FunctionType.RECREATION;
     }
 
-    protected FunctionType getRoboticFunction() {
+    public FunctionType getRoboticFunction() {
         return FunctionType.ROBOTIC_STATION;
     }
 
@@ -246,4 +237,5 @@ implements Serializable {
 		List<SkillType> results = new ArrayList<SkillType>(0);
 		return results;
 	}
+	
 }

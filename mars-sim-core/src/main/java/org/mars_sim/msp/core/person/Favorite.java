@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Favorite.java
- * @version 3.1.0 2017-03-03
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -10,7 +10,6 @@ package org.mars_sim.msp.core.person;
 import java.io.Serializable;
 import java.util.List;
 
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.structure.building.function.cooking.HotMeal;
 import org.mars_sim.msp.core.structure.building.function.cooking.MealConfig;
 import org.mars_sim.msp.core.structure.building.function.cooking.PreparingDessert;
@@ -24,27 +23,15 @@ public class Favorite implements Serializable {
 	private String favoriteMainDish;
 	private String favoriteSideDish;
 	private String favoriteDessert;
-	private FavoriteType favoriteActivity;
+	private FavoriteType favoriteType;
 
 	private static List<HotMeal> mealConfigMealList;
 	
 	private static String[] availableDesserts;
 
-	private static String[] availableActivities = {
-							"Tending Plants",
-							"Workout",
-							"Research",
-							"Field Work",
-							"Tinkering",
-							"Lab Experimentation",
-							"Cooking",
-							"Construction",
-							"Operations"};
-
-	
 	public Favorite(Person person) {
-    	MealConfig mealConfig = SimulationConfig.instance().getMealConfiguration();
-        mealConfigMealList = mealConfig.getMealList();
+//    	MealConfig mealConfig = SimulationConfig.instance().getMealConfiguration();
+        mealConfigMealList = MealConfig.getMealList();
         availableDesserts = PreparingDessert.getArrayOfDesserts();
 	}
 
@@ -84,10 +71,9 @@ public class Favorite implements Serializable {
 		return result;
 	}
 
-	public FavoriteType getRandomActivity() {
+	public FavoriteType getARandomFavoriteType() {
     	int num = RandomUtil.getRandomInt(FavoriteType.availableFavoriteTypes.length - 1);
 		return FavoriteType.availableFavoriteTypes[num];
-
 	}
 
 	public String getFavoriteMainDish() {
@@ -103,7 +89,7 @@ public class Favorite implements Serializable {
 	}
 
 	public FavoriteType getFavoriteActivity() {
-		return favoriteActivity;
+		return favoriteType;
 	}
 
 	public void setFavoriteMainDish(String name) {
@@ -119,10 +105,6 @@ public class Favorite implements Serializable {
 	}
 
 	public void setFavoriteActivity(FavoriteType name) {
-		favoriteActivity = name;
+		favoriteType = name;
 	}
-
-
 }
-
-

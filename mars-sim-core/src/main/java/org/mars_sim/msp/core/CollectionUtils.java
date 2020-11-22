@@ -1,13 +1,12 @@
 /**
  * Mars Simulation Project
  * CollectionUtils.java
- * @version 3.1.0 2017-08-30
+ * @version 3.1.2 2020-09-02
  * @author Sebastien Venot
  */
 package org.mars_sim.msp.core;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -20,7 +19,6 @@ import org.mars_sim.msp.core.equipment.Equipment;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.terminal.ChatUtils;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
@@ -28,6 +26,8 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
  * This class provides general collection manipulation convenience methods.
  */
 public class CollectionUtils {
+
+	private static UnitManager unitManager = Simulation.instance().getUnitManager();
 
 	public static Collection<Equipment> getEquipment(
 		Collection<Unit> units
@@ -230,6 +230,85 @@ public class CollectionUtils {
 
 	}
 
+	
+	/**
+	 * Finds the settlement's unique id based on its name
+	 * 
+	 * @param name
+	 * @return
+	 */
+	public static int findSettlementID(String name) {
+		if (unitManager == null)
+			unitManager = Simulation.instance().getUnitManager();
+				
+		Collection<Settlement> ss = unitManager.getSettlements();
+		for (Settlement s : ss) {
+			if (s.getName().equals(name))
+				return s.getIdentifier();
+		}
+
+		return -1;
+	}
+	
+	/**
+	 * Finds the settlement instance based on its name
+	 * 
+	 * @param name
+	 * @return
+	 */
+	public static Settlement findSettlement(String name) {
+		if (unitManager == null)
+			unitManager = Simulation.instance().getUnitManager();
+				
+		Collection<Settlement> ss = unitManager.getSettlements();
+		for (Settlement s : ss) {
+			if (s.getName().equals(name))
+				return s;
+		}
+
+		return null;
+	}
+	
+	
+	/**
+	 * Finds a nearby settlement based on its coordinate
+	 * 
+	 * @param c {@link Coordinates}
+	 * @return
+	 */
+	public static Settlement findSettlement(Coordinates c) {
+		if (unitManager == null)
+			unitManager = Simulation.instance().getUnitManager();
+				
+		Collection<Settlement> ss = unitManager.getSettlements();
+		for (Settlement s : ss) {
+			if (s.getCoordinates().equals(c) || s.getCoordinates() == c)
+				return s;
+		}
+
+		return null; 
+		// WARNING : using associated settlement needs to exercise more caution
+	}
+	
+	/**
+	 * Find a nearby vehicle based on its coordinate
+	 * 
+	 * @param c {@link Coordinates}
+	 * @return
+	 */
+	public static Vehicle findVehicle(Coordinates c) {
+		if (unitManager == null)
+			unitManager = Simulation.instance().getUnitManager();
+				
+		Collection<Vehicle> vv = unitManager.getVehicles();
+		for (Vehicle v : vv) {
+			if (v.getCoordinates().equals(c) || v.getCoordinates() == c)
+				return v;
+		}
+
+		return null; 
+	}
+	
 	public static <T extends Unit> Collection<T> sortByName(
 		Collection<T> collection
 	) {
@@ -263,211 +342,85 @@ public class CollectionUtils {
 		sorted.addAll(collection);
 		return sorted;
 	}
-	
-	
+
+	/**
+	 * Gets a list of settlements that match the input text
+	 * 
+	 * @param text
+	 * @return {@link List<Settlement>}
+	 */
+	public static List<Settlement> matchSettlementList(String text, boolean exactMatch) {
+		List<Settlement> sList = new ArrayList<>();
+		Iterator<Settlement> j = unitManager.getSettlements().iterator();
+		while (j.hasNext()) {
+			Settlement settlement = j.next();
+			String s_name = settlement.getName();
+			int snum = s_name.length();
+			int tnum = text.length();
+
+			if (s_name.equalsIgnoreCase(text.toLowerCase())
+					|| (s_name.toLowerCase().contains(text.toLowerCase()) 
+							&& 2.5 * tnum > snum
+							&& tnum > 2)) {
+				sList.add(settlement);
+			} 
+			
+			else if (!exactMatch 
+						&& (s_name.toLowerCase().contains(text.toLowerCase()) 
+						&& 2 * tnum > snum
+						&& tnum > 2)) {
+				sList.add(settlement);
+			}
+		}
+		
+		return sList;
+	}
 	
 	/**
-	 * Compiles a list of shortcuts
+	 * Finds a person in a settlement
 	 * 
-	 * @return a list of string
+	 * @param name
+	 * @param settlement
+	 * @return
 	 */
-	public static List<String> createShortcutHelp() {
-		List<String> list = new ArrayList<>();
-		list.addAll(Arrays.asList(ChatUtils.SPECIAL_KEYS));
-		
-		return list;
+	public static Person findPerson(String name, Settlement settlement) {
+		// Person person = null;
+		Collection<Person> people = settlement.getIndoorPeople();
+		// List<Person> peopleList = new ArrayList<Person>(people);
+		return (Person) people.stream().filter(p -> p.getName() == name);
 	}
 	
 	
 	/**
-	 * Compiles the names of settlements, people, robots and vehicles into one single list
+	 * Gets a list of people to display on a settlement map.
+	 * Note: a person can be either inside the settlement or within its vicinity
 	 * 
-	 * @return a list of string
+	 * @param settlement the settlement
+	 * @return list of people to display.
 	 */
-	public static List<String> createAutoCompleteData() {
+	public static List<Person> getPeopleToDisplay(Settlement settlement) {
 
-		// Creates an array with the names of all of settlements
-		Collection<Settlement> settlements = Simulation.instance().getUnitManager().getSettlements();
-		List<Settlement> settlementList = new ArrayList<Settlement>(settlements);
-//		System.out.println("# settlements : " + settlementList.size());
-//		Collection<Settlement> settlements = getSettlement(Simulation.instance().getUnitManager().getUnits());
+		List<Person> result = new ArrayList<Person>();
 
-		// autoCompleteArray = settlementList.toArray(new
-		// String[settlementList.size()]);
-		// or with java 8 stream
-		// autoCompleteArray = settlementList.stream().toArray(String[]::new);
+		if (settlement != null) {
+			Iterator<Person> i = unitManager.getPeople().iterator();
+			while (i.hasNext()) {
+				Person person = i.next();
 
-		// Creates an array with the names of all of people and robots
-		List<String> nameList = new ArrayList<>();
-		
-		// Questions for mars net chat system
-		nameList.addAll(Arrays.asList(ChatUtils.SYSTEM_KEYS));
-		// Questions common to all parties	
-		nameList.addAll(Arrays.asList(ChatUtils.ALL_PARTIES_KEYS));
-		// Questions unique to a settlement 
-		nameList.addAll(Arrays.asList(ChatUtils.SETTLEMENT_KEYS));
-		// Questions unique to a person/robot
-		nameList.addAll(Arrays.asList(ChatUtils.PERSON_KEYS));			
-				
-		
-		nameList.addAll(createShortcutHelp());
-		
-		Iterator<Settlement> i = settlementList.iterator();
-		while (i.hasNext()) {
-			Settlement s = i.next();
-			nameList.add(s.getName());
+				// Only select living people.
+				if (!person.getPhysicalCondition().isDead()) {
 
-			// Get two lists of settlers name  
-			// One having the order of [first name] + [last name]
-			// The other having the order of [last name] + "," + [first name]
-			Iterator<Person> j = s.getAllAssociatedPeople().iterator();
-			while (j.hasNext()) {
-				Person p = j.next();
-
-				String first = "";
-				String last = "";
-				// Added names in both orders, namely, "first last" or "last, first"
-				String firstLast = p.getName();
-				String lastFirst = "";
-				int len1 = firstLast.length();
-				// Used for loop to find the last is the best approach instead of int index =
-				// firstLast.indexOf(" ");
-				int index = 0;
-
-				for (int k = len1 - 1; k > 0; k--) {
-					// Note: finding the whitespace from the end to 0 (from right to left) works
-					// better than from left to right
-					// e.g. Mary L. Smith (last name should be "Smith", not "L. Smith"
-					if (firstLast.charAt(k) == ' ') {
-						index = k;
-						first = firstLast.substring(0, k);
-						last = firstLast.substring(k + 1, len1);
-						break;
-					} else
-						first = firstLast;
+					// Select a person that is at the settlement location.
+					Coordinates settlementLoc = settlement.getCoordinates();
+					Coordinates personLoc = person.getCoordinates();
+					if (personLoc.equals(settlementLoc)) {
+						result.add(person);
+					}
 				}
-
-				if (index == -1) {
-					// the person has no last name
-					first = firstLast;
-					nameList.add(first);
-				} else {
-					first = firstLast.substring(0, index);
-					last = firstLast.substring(index + 1, firstLast.length());
-					lastFirst = last + ", " + first;
-					nameList.add(firstLast);
-					nameList.add(lastFirst);
-				}
-
-			}
-
-			// get all robot names
-			Iterator<Robot> k = s.getAllAssociatedRobots().iterator();
-			while (k.hasNext()) {
-				Robot r = k.next();
-				nameList.add(r.getName());
 			}
 		}
 
-		// Get all vehicles name
-		Iterator<Vehicle> k = getVehicle(Simulation.instance().getUnitManager().getUnits()).iterator();
-		while (k.hasNext()) {
-			Vehicle v = k.next();
-			nameList.add(v.getName());
-		}
-		
-		return nameList.stream()
-				.sorted((s1, s2)-> s1.compareTo(s2))
-				.collect(Collectors.toList());
+		return result;
 	}
 
-	/**
-	 * Compiles the names of all people into one single list
-	 * 
-	 * @return a list of names
-	 */
-	public static List<String> createSettlerNames() {
-
-		// Creates an array with the names of all of settlements
-		Collection<Settlement> settlements = Simulation.instance().getUnitManager().getSettlements();
-		List<Settlement> settlementList = new ArrayList<Settlement>(settlements);
-
-		// autoCompleteArray = settlementList.toArray(new
-		// String[settlementList.size()]);
-		// or with java 8 stream
-		// autoCompleteArray = settlementList.stream().toArray(String[]::new);
-
-		// Creates an array with the names of all of people and robots
-		List<String> nameList = new ArrayList<>();
-
-		nameList.addAll(createShortcutHelp());
-		
-		Iterator<Settlement> i = settlementList.iterator();
-		while (i.hasNext()) {
-			Settlement s = i.next();
-			nameList.add(s.getName());
-
-			// Get two lists of settlers name  
-			// One having the order of [first name] + [last name]
-			// The other having the order of [last name] + "," + [first name]
-			Iterator<Person> j = s.getAllAssociatedPeople().iterator();
-			while (j.hasNext()) {
-				Person p = j.next();
-
-				String first = "";
-				String last = "";
-				// Added names in both orders, namely, "first last" or "last, first"
-				String firstLast = p.getName();
-				String lastFirst = "";
-				int len1 = firstLast.length();
-				// Used for loop to find the last is the best approach instead of int index =
-				// firstLast.indexOf(" ");
-				int index = 0;
-
-				for (int k = len1 - 1; k > 0; k--) {
-					// Note: finding the whitespace from the end to 0 (from right to left) works
-					// better than from left to right
-					// e.g. Mary L. Smith (last name should be "Smith", not "L. Smith"
-					if (firstLast.charAt(k) == ' ') {
-						index = k;
-						first = firstLast.substring(0, k);
-						last = firstLast.substring(k + 1, len1);
-						break;
-					} else
-						first = firstLast;
-				}
-
-				if (index == -1) {
-					// the person has no last name
-					first = firstLast;
-					nameList.add(first);
-				} else {
-					first = firstLast.substring(0, index);
-					last = firstLast.substring(index + 1, firstLast.length());
-					lastFirst = last + ", " + first;
-					nameList.add(firstLast);
-					nameList.add(lastFirst);
-				}
-
-			}
-
-			// get all robot names
-//			Iterator<Robot> k = s.getAllAssociatedRobots().iterator();
-//			while (k.hasNext()) {
-//				Robot r = k.next();
-//				nameList.add(r.getName());
-//			}
-		}
-
-		// Get all vehicles name
-//		Iterator<Vehicle> k = getVehicle(Simulation.instance().getUnitManager().getUnits()).iterator();
-//		while (k.hasNext()) {
-//			Vehicle v = k.next();
-//			nameList.add(v.getName());
-//		}
-		
-		return nameList;
-	}
-	
-	
 }

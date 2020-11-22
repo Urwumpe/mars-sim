@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MiningMeta.java
- * @version 3.1.0 2017-05-02
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission.meta;
@@ -10,7 +10,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.equipment.Bag;
 import org.mars_sim.msp.core.mars.ExploredLocation;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.job.Job;
@@ -18,7 +17,6 @@ import org.mars_sim.msp.core.person.ai.mission.Mining;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.RoverMission;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
-import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.Rover;
@@ -29,15 +27,19 @@ import org.mars_sim.msp.core.vehicle.Rover;
 public class MiningMeta implements MetaMission {
 
     /** Mission name */
-    private static final String NAME = Msg.getString(
+    private static final String DEFAULT_DESCRIPTION = Msg.getString(
             "Mission.description.mining"); //$NON-NLS-1$
 
     /** default logger. */
     private static Logger logger = Logger.getLogger(MiningMeta.class.getName());
 
+	private static final double FACTOR = 100D;
+	
+    private static final double LIMIT = 10D;
+    
     @Override
     public String getName() {
-        return NAME;
+        return DEFAULT_DESCRIPTION;
     }
 
     @Override
@@ -48,67 +50,46 @@ public class MiningMeta implements MetaMission {
     @Override
     public double getProbability(Person person) {
 
-        double result = 0D;
+        double missionProbability = 0D;
 
         if (person.isInSettlement()) {
         	
         	Settlement settlement = person.getSettlement();
 
-            // Check if a mission-capable rover is available.
-            //boolean reservableRover =
-            if (!RoverMission.areVehiclesAvailable(settlement, false))
-                return 0;
-
-            // Check if available backup rover.
-            //boolean backupRover =
-            else if (!RoverMission.hasBackupRover(settlement))
-        		return 0;
-
-    	    // Check if minimum number of people are available at the settlement.
-            else if (!RoverMission.minAvailablePeopleAtSettlement(settlement, RoverMission.MIN_STAYING_MEMBERS)) {
-    	        return 0;
-    	    }
-
-    	    // Check if min number of EVA suits at settlement.
-            else if (Mission.getNumberAvailableEVASuitsAtSettlement(settlement) < RoverMission.MIN_GOING_MEMBERS) {
-    	        return 0;
-    	    }
-            // Check if there are enough bags at the settlement for collecting minerals.
-            //boolean enoughBags = false;
-
-            else if (settlement.getInventory().findNumEmptyUnitsOfClass(Bag.class, false) < Mining.NUMBER_OF_BAGS)
-            //int numBags = settlement.getInventory().findNumEmptyUnitsOfClass(Bag.class, false);
-            //enoughBags = (numBags >= Mining.NUMBER_OF_BAGS);
-        		return 0;
-
-            // Check for embarking missions.
-            //boolean embarkingMissions =
-            else if (!VehicleMission.hasEmbarkingMissions(settlement))
+            missionProbability = settlement.getMissionBaseProbability(DEFAULT_DESCRIPTION);
+       		if (missionProbability <= 0)
     			return 0;
-
-            // Check if settlement has enough basic resources for a rover mission.
-            //boolean hasBasicResources =
-            else if (!RoverMission.hasEnoughBasicResources(settlement, true))
+       		
+            // Check if there are enough bags at the settlement for collecting minerals.
+            if (settlement.getInventory().findNumBags(true, true) < Mining.NUMBER_OF_LARGE_BAGS)
             	return 0;
 
             // Check if available light utility vehicles.
             //boolean reservableLUV =
-            else if (!Mining.isLUVAvailable(settlement))
+            if (!Mining.isLUVAvailable(settlement))
             	return 0;
 
             // Check if LUV attachment parts available.
             //boolean availableAttachmentParts =
-            else if (!Mining.areAvailableAttachmentParts(settlement))
-            	return 0;
-            // Check if starting settlement has minimum amount of methane fuel.
-
-            else if (settlement.getInventory().getAmountResourceStored(ResourceUtil.methaneAR, false) <
-                    RoverMission.MIN_STARTING_SETTLEMENT_METHANE)
+            if (!Mining.areAvailableAttachmentParts(settlement))
             	return 0;
 
+			int numEmbarked = VehicleMission.numEmbarkingMissions(settlement);
+			int numThisMission = missionManager.numParticularMissions(DEFAULT_DESCRIPTION, settlement);
+	
+	   		// Check for # of embarking missions.
+    		if (Math.max(1, settlement.getNumCitizens() / 8.0) < numEmbarked + numThisMission) {
+    			return 0;
+    		}	
+    		
+    		if (numThisMission > 1)
+    			return 0;
+    		
+    		missionProbability = 0;
+    		
             try {
                 // Get available rover.
-                Rover rover = (Rover) RoverMission.getVehicleWithGreatestRange(
+                Rover rover = (Rover) RoverMission.getVehicleWithGreatestRange(Mining.missionType,
                         settlement, false);
 
                 if (rover != null) {
@@ -116,11 +97,12 @@ public class MiningMeta implements MetaMission {
                     ExploredLocation miningSite = Mining.determineBestMiningSite(
                             rover, settlement);
                     if (miningSite != null) {
-                        result = Mining.getMiningSiteValue(miningSite, settlement);
-                        if (result > 1D) {
-                            result = 1D;
-                        }
+                        missionProbability = Mining.getMiningSiteValue(miningSite, settlement) / FACTOR;;
+    					if (missionProbability < 0)
+    						missionProbability = 0;
                     }
+                    else // no mining site can be identified
+                    	return 0;
                 }
             } catch (Exception e) {
                 logger.log(Level.SEVERE, "Error getting mining site.", e);
@@ -130,18 +112,41 @@ public class MiningMeta implements MetaMission {
             int crowding = settlement.getIndoorPeopleCount()
                     - settlement.getPopulationCapacity();
             if (crowding > 0) {
-                result *= (crowding + 1);
+                missionProbability *= (crowding + 1);
             }
 
+			int f1 = 2*numEmbarked + 1;
+			int f2 = 2*numThisMission + 1;
+			
+			missionProbability *= settlement.getNumCitizens() / f1 / f2 / 2D * ( 1 + settlement.getMissionDirectiveModifier(6));
+			
             // Job modifier.
             Job job = person.getMind().getJob();
             if (job != null) {
-                result *= job.getStartMissionProbabilityModifier(Mining.class);
+				// It this town has a tourist objective, add bonus
+                missionProbability *= job.getStartMissionProbabilityModifier(Mining.class)
+                		* (settlement.getGoodsManager().getTourismFactor()
+                  		 + settlement.getGoodsManager().getResearchFactor())/1.5;
             }
 
+			if (missionProbability > LIMIT)
+				missionProbability = LIMIT;
+			
+			// if introvert, score  0 to  50 --> -2 to 0
+			// if extrovert, score 50 to 100 -->  0 to 2
+			// Reduce probability if introvert
+			int extrovert = person.getExtrovertmodifier();
+			missionProbability += extrovert;
+			
+			if (missionProbability < 0)
+				missionProbability = 0;
         }
 
-        return result;
+//        if (missionProbability > 0)
+//        	logger.info("MiningMeta's probability : " +
+//				 Math.round(missionProbability*100D)/100D);
+		 
+        return missionProbability;
     }
 
 	@Override

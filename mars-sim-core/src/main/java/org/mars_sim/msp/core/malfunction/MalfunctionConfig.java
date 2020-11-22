@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MalfunctionConfig.java
- * @version 3.1.0 2017-09-04
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.malfunction;
@@ -14,17 +14,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import org.jdom.Document;
-import org.jdom.Element;
+import org.jdom2.Document;
+import org.jdom2.Element;
 import org.mars_sim.msp.core.person.health.ComplaintType;
 import org.mars_sim.msp.core.resource.AmountResource;
+import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.ItemType;
 import org.mars_sim.msp.core.resource.Part;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.HeatSourceType;
 import org.mars_sim.msp.core.structure.building.function.PowerSourceType;
 import org.mars_sim.msp.core.structure.building.function.SystemType;
 import org.mars_sim.msp.core.tool.Conversion;
+import org.mars_sim.msp.core.vehicle.VehicleType;
 
 /**
  * Provides configuration information about malfunctions. Uses a DOM document to
@@ -57,11 +60,11 @@ public class MalfunctionConfig implements Serializable {
 	private static final String NUMBER = "number";
 	private static final String VALUE = "value";
 
-	private Document malfunctionDoc;
+	private static Document malfunctionDoc;
 
-	private List<Malfunction> malfunctionList;
+	private static List<Malfunction> malfunctionList;
 
-	private Map<String, List<RepairPart>> repairParts;
+	private static Map<String, List<RepairPart>> repairParts;
 
 	/**
 	 * Constructor
@@ -69,9 +72,8 @@ public class MalfunctionConfig implements Serializable {
 	 * @param malfunctionDoc DOM document containing malfunction configuration.
 	 */
 	public MalfunctionConfig(Document malfunctionDoc) {
-		this.malfunctionDoc = malfunctionDoc;
+		MalfunctionConfig.malfunctionDoc = malfunctionDoc;
 		repairParts = new HashMap<String, List<RepairPart>>();
-
 	}
 
 	/**
@@ -80,8 +82,7 @@ public class MalfunctionConfig implements Serializable {
 	 * @return list of malfunctions
 	 * @throws Exception when malfunctions can not be resolved.
 	 */
-	// @SuppressWarnings("unchecked")
-	public List<Malfunction> getMalfunctionList() {
+	public static List<Malfunction> getMalfunctionList() {
 
 		if (malfunctionList == null) {
 			malfunctionList = new ArrayList<Malfunction>();
@@ -138,31 +139,39 @@ public class MalfunctionConfig implements Serializable {
 						boolean exist = false;
 						String sys_name = Conversion.capitalize(systemElement.getAttributeValue(NAME));
 						for (FunctionType f : FunctionType.values()) {
-							if (sys_name.equals(f.getName())) {
-								systems.add(sys_name);
+							if (sys_name.equalsIgnoreCase(f.getName())) {
+								systems.add(sys_name.toLowerCase());
 								exist = true;
 							}
 						}
 						if (!exist) {
 							for (SystemType s : SystemType.values()) {
-								if (sys_name.equals(s.getName())) {
-									systems.add(sys_name);
+								if (sys_name.equalsIgnoreCase(s.getName())) {
+									systems.add(sys_name.toLowerCase());
 									exist = true;
 								}
 							}
 						}
 						if (!exist) {
 							for (HeatSourceType h : HeatSourceType.values()) {
-								if (sys_name.equals(h.getName())) {
-									systems.add(sys_name);
+								if (sys_name.equalsIgnoreCase(h.getName())) {
+									systems.add(sys_name.toLowerCase());
 									exist = true;
 								}
 							}
 						}
 						if (!exist) {
 							for (PowerSourceType p : PowerSourceType.values()) {
-								if (sys_name.equals(p.getName())) {
-									systems.add(sys_name);
+								if (sys_name.equalsIgnoreCase(p.getName())) {
+									systems.add(sys_name.toLowerCase());
+									exist = true;
+								}
+							}
+						}
+						if (!exist) {
+							for (VehicleType t : VehicleType.values()) {
+								if (sys_name.equalsIgnoreCase(t.getName())) {
+									systems.add(sys_name.toLowerCase());
 									exist = true;
 								}
 							}
@@ -185,7 +194,7 @@ public class MalfunctionConfig implements Serializable {
 						for (Element effectElement : effectNodes) {
 							String type = effectElement.getAttributeValue(TYPE);
 							String resourceName = effectElement.getAttributeValue(NAME);
-							Double changeRate = new Double(effectElement.getAttributeValue(CHANGE_RATE));
+							double changeRate = Double.parseDouble(effectElement.getAttributeValue(CHANGE_RATE));
 
 							if (type.equals("life-support")) {
 
@@ -198,7 +207,7 @@ public class MalfunctionConfig implements Serializable {
 
 								lifeSupportEffects.put(resourceName, changeRate);
 							} else if (type.equals(ItemType.AMOUNT_RESOURCE.getName())) {
-								AmountResource resource = AmountResource.findAmountResource(resourceName);
+								AmountResource resource = ResourceUtil.findAmountResource(resourceName);
 								if (resource == null)
 									logger.warning(resourceName
 											+ " shows up in malfunctions.xml but doesn't exist in resources.xml.");
@@ -222,7 +231,7 @@ public class MalfunctionConfig implements Serializable {
 
 						for (Element medicalComplaintElement : medicalComplaintNodes) {
 							String complaintName = medicalComplaintElement.getAttributeValue(NAME);
-							Double complaintProbability = new Double(
+							double complaintProbability = Double.parseDouble(
 									medicalComplaintElement.getAttributeValue(PROBABILITY));
 							medicalComplaints.put(ComplaintType.fromString(complaintName), complaintProbability);
 
@@ -249,7 +258,7 @@ public class MalfunctionConfig implements Serializable {
 
 						for (Element partElement : partNodes) {
 							String partName = partElement.getAttributeValue(NAME);
-							Part part = (Part) Part.findItemResource(partName);
+							Part part = (Part) (ItemResourceUtil.findItemResource(partName));
 							if (part == null)
 								logger.severe(
 										partName + " shows up in malfunctions.xml but doesn't exist in parts.xml.");
@@ -275,6 +284,19 @@ public class MalfunctionConfig implements Serializable {
 		return malfunctionList;
 	}
 
+//	public void setRepairPartProbability(String malfunctionName, String partName, double probability) {
+//	List<RepairPart> partList = repairParts.get(malfunctionName);
+//	if (partList != null) {
+//		Iterator<RepairPart> i = partList.iterator();
+//		while (i.hasNext()) {
+//			RepairPart part = i.next();
+//			if (part.name.equalsIgnoreCase(partName)) {
+//				part.setProbability(probability);
+//			}
+//		}
+//	}
+//}
+	
 	/**
 	 * Adds a repair part for a malfunction.
 	 * 
@@ -283,7 +305,7 @@ public class MalfunctionConfig implements Serializable {
 	 * @param number          the maximum number of parts required (min 1).
 	 * @param probability     the probability the part will be needed (0 - 100).
 	 */
-	private void addMalfunctionRepairPart(String malfunctionName, String partName, int number, int probability) {
+	private static void addMalfunctionRepairPart(String malfunctionName, String partName, int number, int probability) {
 		List<RepairPart> partList = repairParts.get(malfunctionName);
 		if (partList == null) {
 			partList = new ArrayList<RepairPart>();
@@ -358,20 +380,7 @@ public class MalfunctionConfig implements Serializable {
 		return result;
 	}
 
-	public void setRepairPartProbability(String malfunctionName, String partName, double probability) {
-		List<RepairPart> partList = repairParts.get(malfunctionName);
-		if (partList != null) {
-			Iterator<RepairPart> i = partList.iterator();
-			while (i.hasNext()) {
-				RepairPart part = i.next();
-				if (part.name.equalsIgnoreCase(partName)) {
-					part.setProbability(probability);
-				}
-			}
-		}
-	}
-
-	public Map<String, List<RepairPart>> getRepairParts() {
+	public static Map<String, List<RepairPart>> getRepairParts() {
 		return repairParts;
 	}
 
@@ -420,8 +429,8 @@ public class MalfunctionConfig implements Serializable {
 			this.probability = probability;
 		}
 
-		public void setProbability(double probability) {
-			this.probability = probability;
-		}
+//		public void setProbability(double probability) {
+//			this.probability = probability;
+//		}
 	}
 }

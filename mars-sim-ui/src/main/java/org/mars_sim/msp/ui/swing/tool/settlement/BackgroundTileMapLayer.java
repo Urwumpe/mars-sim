@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * BackgroundTileMapLayer.java
- * @version 3.1.0 2017-09-01
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.settlement;
@@ -18,7 +18,6 @@ import java.util.Map;
 
 import javax.swing.ImageIcon;
 
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.ui.swing.ImageLoader;
@@ -34,6 +33,10 @@ implements SettlementMapLayer {
 	private static final int MAX_BACKGROUND_IMAGE_NUM = 20;
 	private static final int MAX_BACKGROUND_DIMENSION = 1600;
 
+	private static final String MAP_TILE = "settlement_map_tile";
+	private static final String DIR = ImageLoader.IMAGE_DIR;
+	private static final String JPG = "jpg";
+	
 	// Data members.
 	private Map<Settlement, String> settlementBackgroundMap;
 	private Image backgroundTileImage;
@@ -50,7 +53,6 @@ implements SettlementMapLayer {
 	}
 
 	@Override
-	// 2014-11-04 Added building parameter
 	public void displayLayer(Graphics2D g2d, Settlement settlement, Building building, double xPos, 
 			double yPos, int mapWidth, int mapHeight, double rotation, double scale) {
 
@@ -221,16 +223,16 @@ implements SettlementMapLayer {
 
 		if (settlementBackgroundMap.containsKey(settlement)) {
 			String backgroundImageName = settlementBackgroundMap.get(settlement);
-			result = ImageLoader.getIcon(backgroundImageName, "jpg");
+			result = ImageLoader.getIcon(backgroundImageName, JPG, DIR);
 		}
 		else if (settlement != null) {
 			int count = 1;
-			Iterator<Settlement> i = Simulation.instance().getUnitManager().getSettlements().iterator();
+			Iterator<Settlement> i = unitManager.getSettlements().iterator();
 			while (i.hasNext()) {
 				if (i.next().equals(settlement)) {
-					String backgroundImageName = "settlement_map_tile" + count;
+					String backgroundImageName = MAP_TILE + count;
 					settlementBackgroundMap.put(settlement, backgroundImageName);
-					result = ImageLoader.getIcon(backgroundImageName, "jpg");
+					result = ImageLoader.getIcon(backgroundImageName, JPG, DIR);
 				}
 				count++;
 				if (count > MAX_BACKGROUND_IMAGE_NUM) {
@@ -239,7 +241,7 @@ implements SettlementMapLayer {
 			}
 		}
 		else {
-            result = ImageLoader.getIcon("settlement_map_tile1", "jpg");
+            result = ImageLoader.getIcon(MAP_TILE + "1", JPG, DIR);
 		}
 
 		return result;
@@ -247,6 +249,10 @@ implements SettlementMapLayer {
 
 	@Override
 	public void destroy() {
-		// Do nothing.
+		settlementBackgroundMap.clear();
+		settlementBackgroundMap = null;
+		backgroundTileImage = null;
+		currentSettlement = null;
+		mapPanel = null;
 	}
 }

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * UnitTableModel.java
- * @version 3.1.0 2017-09-13
+ * @version 3.1.2 2020-09-02
  * @author Barry Evans
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -14,30 +14,37 @@ import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitListener;
+import org.mars_sim.msp.core.UnitManager;
 
 /**
  * The UnitTableModel that maintains a table model of Units objects. It is only
  * a partial implementation of the TableModel interface.
  */
+@SuppressWarnings("serial")
 abstract public class UnitTableModel extends AbstractTableModel implements MonitorModel, UnitListener {
 
 	// Data members
-	/** Collection of units. */
-	private Collection<Unit> units;
+	/** Should it be refreshed to get the number of units. */
+	private boolean refreshSize = true;
+	/** The number of the units */
+	private int size = -1;
+
 	/** Model name. */
 	private String name;
-	/**
-	 * key for calling the internationalized text that counts the number of units.
-	 */
+	/** Key for calling the internationalized text that counts the number of units. */
 	private String countingMsgKey;
 	/** Names of the displayed columns. */
 	private String columnNames[];
+	
 	/** Types of the individual columns. */
 	private Class<?> columnTypes[];
-	private int size = -1;
-	private boolean refreshSize = true;
+	/** Collection of units. */
+	private Collection<Unit> units;
+
+	protected static UnitManager unitManager = Simulation.instance().getUnitManager();
 
 	/**
 	 * Constructor.

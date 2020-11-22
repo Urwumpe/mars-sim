@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SettlementTableModel.java
- * @version 3.1.0 2017-04-10
+ * @version 3.1.2 2020-09-02
  * @author Barry Evans
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -11,6 +11,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.swing.SwingUtilities;
 
@@ -35,7 +37,10 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
  * The SettlementTableModel that maintains a list of Settlement objects. It maps
  * key attributes of the Settlement into Columns.
  */
+@SuppressWarnings("serial")
 public class SettlementTableModel extends UnitTableModel {
+
+	private final static Logger logger = Logger.getLogger(SettlementTableModel.class.getName());
 
 	// Column indexes
 	private final static int NAME = 0;
@@ -58,9 +63,9 @@ public class SettlementTableModel extends UnitTableModel {
 	/** The number of Columns. */
 	private final static int COLUMNCOUNT = 15;
 	/** Names of Columns. */
-	private static String columnNames[];
+	private final static String columnNames[];
 	/** Types of columns. */
-	private static Class<?> columnTypes[];
+	private final static Class<?> columnTypes[];
 
 	static {
 		columnNames = new String[COLUMNCOUNT];
@@ -72,29 +77,29 @@ public class SettlementTableModel extends UnitTableModel {
 		columnNames[PARKED] = "Parked Vehicles";
 		columnTypes[PARKED] = Integer.class;
 		columnNames[POWER] = "Power (kW)";
-		columnTypes[POWER] = String.class;
+		columnTypes[POWER] = Number.class;
 		columnNames[MALFUNCTION] = "Malfunction";
 		columnTypes[MALFUNCTION] = String.class;
 		columnNames[OXYGEN] = "Oxygen";
-		columnTypes[OXYGEN] = String.class;
+		columnTypes[OXYGEN] = Number.class;
 		columnNames[HYDROGEN] = "Hydrogen";
-		columnTypes[HYDROGEN] = String.class;
+		columnTypes[HYDROGEN] = Number.class;
 		columnNames[CO2] = "CO2";
-		columnTypes[CO2] = String.class;
+		columnTypes[CO2] = Number.class;
 		columnNames[WATER] = "Water";
-		columnTypes[WATER] = String.class;
+		columnTypes[WATER] = Number.class;
 		columnNames[METHANE] = "Methane";
-		columnTypes[METHANE] = String.class;
+		columnTypes[METHANE] = Number.class;
 		columnNames[GREY_WATER] = "Grey Water";
-		columnTypes[GREY_WATER] = String.class;
+		columnTypes[GREY_WATER] = Number.class;
 		columnNames[BLACK_WATER] = "Black Water";
-		columnTypes[BLACK_WATER] = String.class;
+		columnTypes[BLACK_WATER] = Number.class;
 		columnNames[ROCK_SAMPLES] = "Rock Samples";
-		columnTypes[ROCK_SAMPLES] = String.class;
+		columnTypes[ROCK_SAMPLES] = Number.class;
 		columnNames[REGOLITH] = "Regolith";
-		columnTypes[REGOLITH] = String.class;
+		columnTypes[REGOLITH] = Number.class;
 		columnNames[ICE] = "Ice";
-		columnTypes[ICE] = String.class;
+		columnTypes[ICE] = Number.class;
 	};
 
 	private static UnitManager unitManager = Simulation.instance().getUnitManager();
@@ -102,29 +107,62 @@ public class SettlementTableModel extends UnitTableModel {
 	// Data members
 	private UnitManagerListener unitManagerListener;
 
-	private Map<Unit, Map<AmountResource, Double>> resourceCache;
+	private Map<Unit, Map<Integer, Double>> resourceCache;
 
-	private DecimalFormat df = new DecimalFormat("#,###,##0.00");
+	private final static DecimalFormat df = new DecimalFormat("#,###,##0.00");
 
+	private final static int regolithID = ResourceUtil.regolithID;
+	private final static int oxygenID = ResourceUtil.oxygenID;
+	private final static int waterID = ResourceUtil.waterID;
+	private final static int methaneID = ResourceUtil.methaneID;
+	private final static int rockSamplesID = ResourceUtil.rockSamplesID;
+	private final static int iceID = ResourceUtil.iceID;
+	
+	private final static int greyWaterID = ResourceUtil.greyWaterID;
+	private final static int blackWaterID = ResourceUtil.blackWaterID;
+	private final static int co2ID = ResourceUtil.co2ID;
+	private final static int hydrogenID = ResourceUtil.hydrogenID;
+	
+	static {
+		df.setMinimumFractionDigits(2);
+		df.setMinimumIntegerDigits(1);
+	}
 	
 	/**
 	 * Constructs a SettlementTableModel model that displays all Settlements in the
 	 * simulation.
-	 *
-	 * @param unitManager Unit manager that holds settlements.
 	 */
 	public SettlementTableModel() {
 		super(Msg.getString("SettlementTableModel.tabName"), "SettlementTableModel.countingSettlements", //$NON-NLS-2$
 				columnNames, columnTypes);
 
-		setSource(unitManager.getSettlements());
+//		if (GameManager.mode == GameMode.COMMAND)
+//			addUnit(unitManager.getCommanderSettlement());
+//		else
+			setSource(unitManager.getSettlements());
+		
 		unitManagerListener = new LocalUnitManagerListener();
 		unitManager.addUnitManagerListener(unitManagerListener);
 		
-		df.setMinimumFractionDigits(2);
-		df.setMinimumIntegerDigits(1);
 	}
 
+	/**
+	 * Constructs a SettlementTableModel model that displays a specific settlement in the
+	 * simulation.
+	 *
+	 * @param settlement
+	 */
+	public SettlementTableModel(Settlement settlement) {
+		super(Msg.getString("SettlementTableModel.tabName"), "SettlementTableModel.countingSettlements", //$NON-NLS-2$
+				columnNames, columnTypes);
+
+		addUnit(settlement);
+
+		unitManagerListener = new LocalUnitManagerListener();
+		unitManager.addUnitManagerListener(unitManagerListener);
+
+	}
+	
 	/**
 	 * Return the value of a Cell
 	 * 
@@ -137,7 +175,7 @@ public class SettlementTableModel extends UnitTableModel {
 		if (rowIndex < getUnitNumber()) {
 			Settlement settle = (Settlement) getUnit(rowIndex);
 			// BuildingManager bMgr = settle.getBuildingManager();
-			Map<AmountResource, Double> resourceMap = resourceCache.get(settle);
+			Map<Integer, Double> resourceMap = resourceCache.get(settle);
 
 			try {
 				switch (columnIndex) {
@@ -147,37 +185,37 @@ public class SettlementTableModel extends UnitTableModel {
 					break;
 
 				case WATER: {
-					result = df.format(resourceMap.get(ResourceUtil.waterAR));
+					result = df.format(resourceMap.get(waterID));
 				}
 					break;
 
 				case OXYGEN: {
-					result = df.format(resourceMap.get(ResourceUtil.oxygenAR));
+					result = df.format(resourceMap.get(oxygenID));
 				}
 					break;
 
 				case METHANE: {
-					result = df.format(resourceMap.get(ResourceUtil.methaneAR));
+					result = df.format(resourceMap.get(methaneID));
 				}
 					break;
 
 				case HYDROGEN: {
-					result = df.format(resourceMap.get(ResourceUtil.hydrogenAR));
+					result = df.format(resourceMap.get(hydrogenID));
 				}
 					break;
 
 				case CO2: {
-					result = df.format(resourceMap.get(ResourceUtil.carbonDioxideAR));
+					result = df.format(resourceMap.get(co2ID));
 				}
 					break;
 
 				case ROCK_SAMPLES: {
-					result = df.format(resourceMap.get(ResourceUtil.rockSamplesAR));
+					result = df.format(resourceMap.get(rockSamplesID));
 				}
 					break;
 
 				case REGOLITH: {
-					result = df.format(resourceMap.get(ResourceUtil.regolithAR));
+					result = df.format(resourceMap.get(regolithID));
 				}
 					break;
 
@@ -187,22 +225,26 @@ public class SettlementTableModel extends UnitTableModel {
 					break;
 
 				case POWER: {
-					result = df.format(settle.getPowerGrid().getGeneratedPower());
+					double power = settle.getPowerGrid().getGeneratedPower();
+					if (power < 0D || Double.isNaN(power) || Double.isInfinite(power))
+						result = 0;
+					else
+						result = df.format(power);
 				}
 					break;
 
 				case GREY_WATER: {
-					result = df.format(resourceMap.get(ResourceUtil.greyWaterAR));
+					result = df.format(resourceMap.get(greyWaterID));
 				}
 					break;
 
 				case BLACK_WATER: {
-					result = df.format(resourceMap.get(ResourceUtil.blackWaterAR));
+					result = df.format(resourceMap.get(blackWaterID));
 				}
 					break;
 
 				case ICE: {
-					result = df.format(resourceMap.get(ResourceUtil.iceAR));
+					result = df.format(resourceMap.get(iceID));
 				}
 					break;
 
@@ -245,76 +287,89 @@ public class SettlementTableModel extends UnitTableModel {
 	public void unitUpdate(UnitEvent event) {
 		Unit unit = (Unit) event.getSource();
 		int unitIndex = getUnitIndex(unit);
-		Object target = event.getTarget();
+		Object source = event.getTarget();
 		UnitEventType eventType = event.getType();
 
 		int columnNum = -1;
 		if (eventType == UnitEventType.NAME_EVENT) columnNum = NAME;
 		else if (eventType == UnitEventType.INVENTORY_STORING_UNIT_EVENT ||
 				eventType == UnitEventType.INVENTORY_RETRIEVING_UNIT_EVENT) {
-			if (target instanceof Person) columnNum = POPULATION;
-			else if (target instanceof Vehicle) columnNum = PARKED;
+			if (source instanceof Person) columnNum = POPULATION;
+			else if (source instanceof Vehicle) columnNum = PARKED;
 		}
 		else if (eventType == UnitEventType.GENERATED_POWER_EVENT) columnNum = POWER;
 		else if (eventType == UnitEventType.MALFUNCTION_EVENT) columnNum = MALFUNCTION;
 		else if (eventType == UnitEventType.INVENTORY_RESOURCE_EVENT) {
+			int target = -1;	
+			if (source instanceof AmountResource) {
+				target = ((AmountResource)source).getID();
+			}
+				
+			else if (source instanceof Integer) {
+				target = (Integer)source;
+				if (target >= ResourceUtil.FIRST_ITEM_RESOURCE_ID)
+					// if it's an item resource, quit
+					return;
+			}
+				
 			try {
 				int tempColumnNum = -1;
 				double currentValue = 0.0;
-				Map<AmountResource, Double> resourceMap = resourceCache.get(unit);
+				Map<Integer, Double> resourceMap = resourceCache.get(unit);
 				
-				if (target.equals(ResourceUtil.oxygenAR)) {
+				if (target == oxygenID) {
 					tempColumnNum = OXYGEN;
-					currentValue = resourceMap.get(ResourceUtil.oxygenAR);
+					currentValue = resourceMap.get(oxygenID);
 				}
-				else if (target.equals(ResourceUtil.hydrogenAR)) {
+				else if (target == hydrogenID) {
 					tempColumnNum = HYDROGEN;
-					currentValue = resourceMap.get(ResourceUtil.hydrogenAR);
+					currentValue = resourceMap.get(hydrogenID);
 				}	
-				else if (target.equals(ResourceUtil.carbonDioxideAR)) {
+				else if (target == co2ID) {
 					tempColumnNum = CO2;
-					currentValue = resourceMap.get(ResourceUtil.carbonDioxideAR);
+					currentValue = resourceMap.get(co2ID);
 				}
-				else if (target.equals(ResourceUtil.methaneAR)) {
+				else if (target == methaneID) {
 					tempColumnNum = METHANE;		
-					currentValue = resourceMap.get(ResourceUtil.methaneAR);
+					currentValue = resourceMap.get(methaneID);
 				}
-				else if (target.equals(ResourceUtil.waterAR)) {
+				else if (target == waterID) {
 					tempColumnNum = WATER;
-					currentValue = resourceMap.get(ResourceUtil.waterAR);
+					currentValue = resourceMap.get(waterID);
 				}
-				else if (target.equals(ResourceUtil.greyWaterAR)) {
+				else if (target == greyWaterID) {
 					tempColumnNum = GREY_WATER;
-					currentValue = resourceMap.get(ResourceUtil.greyWaterAR);
+					currentValue = resourceMap.get(greyWaterID);
 				}
-				else if (target.equals(ResourceUtil.blackWaterAR)) {
+				else if (target == blackWaterID) {
 					tempColumnNum = BLACK_WATER;
-					currentValue = resourceMap.get(ResourceUtil.blackWaterAR);
+					currentValue = resourceMap.get(blackWaterID);
 				}
-				else if (target.equals(ResourceUtil.rockSamplesAR)) {
+				else if (target == rockSamplesID) {
 					tempColumnNum = ROCK_SAMPLES;
-					currentValue = resourceMap.get(ResourceUtil.rockSamplesAR);
+					currentValue = resourceMap.get(rockSamplesID);
 				}
-				else if (target.equals(ResourceUtil.regolithAR)) {
+				else if (target == regolithID) {
 					tempColumnNum = REGOLITH;
-					currentValue = resourceMap.get(ResourceUtil.regolithAR);
+					currentValue = resourceMap.get(regolithID);
 				}
-				else if (target.equals(ResourceUtil.iceAR)) {
+				else if (target == iceID) {
 					tempColumnNum = ICE;
-					currentValue = resourceMap.get(ResourceUtil.iceAR);
+					currentValue = resourceMap.get(iceID);
 				}
 				
 				if (tempColumnNum > -1) {
-//					double currentValue = Math.round((Double)getValueAt(unitIndex, tempColumnNum)*10.0)/10.0;
-					double newValue = Math.round(getResourceStored(unit, (AmountResource) target)*100.0)/100.0;
+					currentValue = Math.round (currentValue * 10.0 ) / 10.0;
+					double newValue = Math.round (getResourceStored(unit, target) * 10.0 ) / 10.0;
 					if (currentValue != newValue) {
 						columnNum = tempColumnNum;
-//						Map<AmountResource, Double> resourceMap = resourceCache.get(unit);
-						resourceMap.put((AmountResource) target, newValue);
+						resourceMap.put(target, newValue);
 					}
 				}
 			}
-			catch (Exception e) {}
+			catch (Exception e) {
+				logger.log(Level.SEVERE, "Issues with unitUpdate()", e);
+			}
 		}
 
 		if (columnNum > -1) {
@@ -334,30 +389,21 @@ public class SettlementTableModel extends UnitTableModel {
 	@Override
 	protected void addUnit(Unit newUnit) {
 		if (resourceCache == null)
-			resourceCache = new HashMap<Unit, Map<AmountResource, Double>>();
+			resourceCache = new HashMap<Unit, Map<Integer, Double>>();
 		if (!resourceCache.containsKey(newUnit)) {
 			try {
-				Map<AmountResource, Double> resourceMap = new HashMap<AmountResource, Double>(9);
+				Map<Integer, Double> resourceMap = new HashMap<>();
 
-				resourceMap.put(ResourceUtil.oxygenAR, getResourceStored(newUnit, ResourceUtil.oxygenAR));
-
-				resourceMap.put(ResourceUtil.waterAR, getResourceStored(newUnit, ResourceUtil.waterAR));
-
-				resourceMap.put(ResourceUtil.hydrogenAR, getResourceStored(newUnit, ResourceUtil.hydrogenAR));
-
-				resourceMap.put(ResourceUtil.methaneAR, getResourceStored(newUnit, ResourceUtil.methaneAR));
-
-				resourceMap.put(ResourceUtil.rockSamplesAR, getResourceStored(newUnit, ResourceUtil.rockSamplesAR));
-
-				resourceMap.put(ResourceUtil.regolithAR, getResourceStored(newUnit, ResourceUtil.regolithAR));
-
-				resourceMap.put(ResourceUtil.greyWaterAR, getResourceStored(newUnit, ResourceUtil.greyWaterAR));
-
-				resourceMap.put(ResourceUtil.blackWaterAR, getResourceStored(newUnit, ResourceUtil.blackWaterAR));
-
-				resourceMap.put(ResourceUtil.iceAR, getResourceStored(newUnit, ResourceUtil.iceAR));
-
-				resourceMap.put(ResourceUtil.carbonDioxideAR, getResourceStored(newUnit, ResourceUtil.carbonDioxideAR));
+				resourceMap.put(oxygenID, getResourceStored(newUnit, oxygenID));
+				resourceMap.put(waterID, getResourceStored(newUnit, waterID));
+				resourceMap.put(hydrogenID, getResourceStored(newUnit, hydrogenID));
+				resourceMap.put(methaneID, getResourceStored(newUnit, methaneID));
+				resourceMap.put(rockSamplesID, getResourceStored(newUnit, rockSamplesID));
+				resourceMap.put(regolithID, getResourceStored(newUnit, regolithID));
+				resourceMap.put(greyWaterID, getResourceStored(newUnit, greyWaterID));
+				resourceMap.put(blackWaterID, getResourceStored(newUnit, blackWaterID));
+				resourceMap.put(iceID, getResourceStored(newUnit, iceID));
+				resourceMap.put(co2ID, getResourceStored(newUnit, co2ID));
 
 				resourceCache.put(newUnit, resourceMap);
 			} catch (Exception e) {
@@ -369,9 +415,9 @@ public class SettlementTableModel extends UnitTableModel {
 	@Override
 	protected void removeUnit(Unit oldUnit) {
 		if (resourceCache == null)
-			resourceCache = new HashMap<Unit, Map<AmountResource, Double>>();
+			resourceCache = new HashMap<>();
 		if (resourceCache.containsKey(oldUnit)) {
-			Map<AmountResource, Double> resourceMap = resourceCache.get(oldUnit);
+			Map<Integer, Double> resourceMap = resourceCache.get(oldUnit);
 			resourceMap.clear();
 			resourceCache.remove(oldUnit);
 		}
@@ -385,10 +431,10 @@ public class SettlementTableModel extends UnitTableModel {
 	 * @param resource the resource to check.
 	 * @return integer amount of resource.
 	 */
-	private double getResourceStored(Unit unit, AmountResource resource) {
+	private double getResourceStored(Unit unit, int resource) {
 		// This is the quickest way but it may or may not work if the object reference
 		// of ARs have changed during (de)serialization.
-		return Math.round(unit.getInventory().getAmountResourceStored(resource, true) * 100.0) / 100.0;
+		return Math.round(unit.getInventory().getAmountResourceStored(resource, false) * 100.0) / 100.0;
 	}
 
 	/**

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SalvageProjectPanel.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -268,7 +268,7 @@ extends WizardPanel {
             if (project instanceof Building) {
                 Building salvageBuilding = (Building) project;
                 try {
-                    info = ConstructionUtil.getConstructionStageInfo(salvageBuilding.getName());
+                    info = ConstructionUtil.getConstructionStageInfo(salvageBuilding.getBuildingType());
                 }
                 catch (Exception e) {
                     e.printStackTrace(System.err);
@@ -306,12 +306,12 @@ extends WizardPanel {
                         MissionMember member = i.next();
             	        if (member instanceof Person) {
             	        	person = (Person) member;
-            	        	int constructionSkill = person.getMind().getSkillManager().getSkillLevel(SkillType.CONSTRUCTION);
+            	        	int constructionSkill = person.getSkillManager().getSkillLevel(SkillType.CONSTRUCTION);
                             totalSkill += constructionSkill;
             	        }
             	        else if (member instanceof Robot) {
             	        	robot = (Robot) member;
-            	        	int constructionSkill = robot.getBotMind().getSkillManager().getSkillLevel(SkillType.CONSTRUCTION);
+            	        	int constructionSkill = robot.getSkillManager().getSkillLevel(SkillType.CONSTRUCTION);
                             totalSkill += constructionSkill;
             	        }    
                     }

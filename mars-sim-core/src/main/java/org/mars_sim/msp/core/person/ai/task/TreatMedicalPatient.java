@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TreatMedicalPatient.java
- * @version 3.1.0 2017-10-21
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -10,17 +10,21 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
 import org.mars_sim.msp.core.person.EventType;
-import org.mars_sim.msp.core.person.LocationSituation;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskEvent;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.person.health.Treatment;
@@ -43,6 +47,9 @@ public class TreatMedicalPatient extends Task implements Serializable {
 
     /** default logger. */
     private static Logger logger = Logger.getLogger(TreatMedicalPatient.class.getName());
+
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			logger.getName().length());
 
     /** Task name */
     private static final String NAME = Msg.getString(
@@ -68,7 +75,7 @@ public class TreatMedicalPatient extends Task implements Serializable {
      * @param person the person to perform the task
      */
     public TreatMedicalPatient(Person person) {
-        super(NAME, person, true, true, STRESS_MODIFIER, false, 0D);
+        super(NAME, person, true, true, STRESS_MODIFIER, false, 50D);
 
         treatmentTime = 0D;
 
@@ -84,7 +91,7 @@ public class TreatMedicalPatient extends Task implements Serializable {
                 patient = healthProblem.getSufferer();
 
                 // Get the person's medical skill.
-                int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
+                int skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
 
                 // Determine medical treatment.
                 Treatment treatment = healthProblem.getIllness().getRecoveryTreatment();
@@ -108,7 +115,7 @@ public class TreatMedicalPatient extends Task implements Serializable {
                 MedicalCare medicalCare = (MedicalCare) medicalAid;
 
                 // Walk to medical care building.
-                walkToActivitySpotInBuilding(medicalCare.getBuilding(), false);
+                walkToTaskSpecificActivitySpotInBuilding(medicalCare.getBuilding(), false);
             }
             else if (medicalAid instanceof SickBay) {
                 // Walk to medical activity spot in rover.
@@ -138,10 +145,10 @@ public class TreatMedicalPatient extends Task implements Serializable {
 
         MedicalAid result = null;
 
-        if (person.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
+        if (person.isInSettlement()) {
             result = determineMedicalAidAtSettlement();
         }
-        else if (person.getLocationSituation() == LocationSituation.IN_VEHICLE) {
+        else if (person.isInVehicle()) {
             result = determineMedicalAidInVehicle();
         }
 
@@ -150,6 +157,7 @@ public class TreatMedicalPatient extends Task implements Serializable {
 
     /**
      * Determines a medical aid at a settlement to use.
+     * 
      * @return medical aid or null if none found.
      */
     private MedicalAid determineMedicalAidAtSettlement() {
@@ -170,7 +178,7 @@ public class TreatMedicalPatient extends Task implements Serializable {
             if (!malfunction) {
 
                 // Check if there are any treatable medical problems at building.
-                MedicalCare medicalCare = (MedicalCare) building.getFunction(FunctionType.MEDICAL_CARE);
+                MedicalCare medicalCare = building.getMedical();
                 if (hasTreatableHealthProblems(medicalCare)) {
                     goodMedicalAids.add(medicalCare);
                 }
@@ -217,7 +225,7 @@ public class TreatMedicalPatient extends Task implements Serializable {
         boolean result = false;
 
         // Get the person's medical skill.
-        int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
+        int skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
 
         // Check if there are any treatable health problems awaiting treatment.
         Iterator<HealthProblem> j = aid.getProblemsAwaitingTreatment().iterator();
@@ -245,7 +253,7 @@ public class TreatMedicalPatient extends Task implements Serializable {
         HealthProblem result = null;
 
         // Get the person's medical skill.
-        int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
+        int skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
 
         // Determine health problems that person can treat.
         List<HealthProblem> treatableHealthProblems = new ArrayList<HealthProblem>();
@@ -272,7 +280,7 @@ public class TreatMedicalPatient extends Task implements Serializable {
     }
 
     @Override
-    protected FunctionType getLivingFunction() {
+    public FunctionType getLivingFunction() {
         return FunctionType.MEDICAL_CARE;
     }
 
@@ -311,8 +319,10 @@ public class TreatMedicalPatient extends Task implements Serializable {
         if (healthProblem.getAwaitingTreatment()) {
 
             medicalAid.startTreatment(healthProblem, duration);
-            logger.info(person.getName() + " is treating " + patient + " for " + healthProblem.getIllness().getType().toString());
-
+//            logger.info(person.getName() + " is treating " + patient + " for " + healthProblem.getIllness().getType().toString());
+    		LogConsolidated.flog(Level.INFO, 0, sourceName, "[" + person.getLocationTag().getLocale() + "] "				
+					+ person.getName() + " is treating " + patient + " for " + healthProblem.getIllness().getType().toString());
+    		
             // Create starting task event if needed.
             if (getCreateEvents()) {
                 TaskEvent startingEvent = new TaskEvent(person, 
@@ -351,7 +361,7 @@ public class TreatMedicalPatient extends Task implements Serializable {
                 NaturalAttributeType.EXPERIENCE_APTITUDE);
         newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
         newPoints *= getTeachingExperienceModifier();
-        person.getMind().getSkillManager().addExperience(SkillType.MEDICINE, newPoints);
+        person.getSkillManager().addExperience(SkillType.MEDICINE, newPoints, time);
     }
 
     /**
@@ -385,7 +395,7 @@ public class TreatMedicalPatient extends Task implements Serializable {
         double chance = .005D;
 
         // Medical skill modification.
-        int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
+        int skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
         if (skill <= 3) {
             chance *= (4 - skill);
         }
@@ -409,19 +419,28 @@ public class TreatMedicalPatient extends Task implements Serializable {
         }
     }
 
+	/**
+	 * Gets the medical aid the person is using for this task.
+	 * 
+	 * @return medical aid or null.
+	 */
+	public MedicalAid getMedicalAid() {
+		return medicalAid;
+	}
+	
     @Override
     public void endTask() {
         super.endTask();
 
         // Stop treatment.
-        if (medicalAid.getProblemsBeingTreated().contains(healthProblem)) {
+        if (medicalAid != null && medicalAid.getProblemsBeingTreated().contains(healthProblem)) {
             medicalAid.stopTreatment(healthProblem);
         }
     }
 
     @Override
     public int getEffectiveSkillLevel() {
-        SkillManager manager = person.getMind().getSkillManager();
+        SkillManager manager = person.getSkillManager();
         return manager.getEffectiveSkillLevel(SkillType.MEDICINE);
     }
 

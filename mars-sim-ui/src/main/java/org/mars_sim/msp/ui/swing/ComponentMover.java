@@ -1,15 +1,25 @@
 /**
  * Mars Simulation Project
  * ComponentMover.java
- * @version 3.07 2014-11-27
- * http://tips4java.wordpress.com/2009/06/14/moving-windows/
- *  */
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
 
+// see  http://tips4java.wordpress.com/2009/06/14/moving-windows/
 package org.mars_sim.msp.ui.swing;
 
 
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.GraphicsEnvironment;
+import java.awt.Insets;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.Window;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 
@@ -50,7 +60,7 @@ public class ComponentMover extends MouseAdapter {
 
 	private Cursor originalCursor;
 
-	private Class destinationClass;
+	private Class<?> destinationClass;
 
 	/**
 	 *  Constructor for moving individual components. The components must be
@@ -67,7 +77,7 @@ public class ComponentMover extends MouseAdapter {
 	 *  @param component         the Components to be registered for forwarding
 	 *                           drag events to the ancestor Component.
 	 */
-	public ComponentMover(Class destinationClass, Component... components)
+	public ComponentMover(Class<?> destinationClass, Component... components)
 	{
 		this.destinationClass = destinationClass;
 		registerComponent( components );

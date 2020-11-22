@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MissionTabPanel.java
- * @version 3.08 2015-07-02
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JList;
+import javax.swing.border.EmptyBorder;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
@@ -34,7 +35,6 @@ import org.mars_sim.msp.core.person.ai.mission.MissionMember;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
 import org.mars_sim.msp.ui.swing.tool.monitor.PersonTableModel;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
@@ -48,6 +48,7 @@ import com.alee.laf.text.WebTextArea;
 /**
  * Tab panel displaying vehicle mission info.
  */
+@SuppressWarnings("serial")
 public class TabPanelMission
 extends TabPanel {
 
@@ -63,6 +64,12 @@ extends TabPanel {
 	private String missionPhaseCache = null;
 	private Collection<MissionMember> memberCache;
 
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
+	/** The Vehicle instance. */
+	private Vehicle vehicle;
+	
 	private static MissionManager missionManager;
 	
 	/**
@@ -79,13 +86,25 @@ extends TabPanel {
 			vehicle, desktop
 		);
 
+      this.vehicle = vehicle;
+
+	}
+
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+			
 		missionManager = Simulation.instance().getMissionManager(); 
 		
 		Mission mission = missionManager.getMissionForVehicle(vehicle);
 
 		// Prepare mission top panel
 		WebPanel missionTopPanel = new WebPanel(new GridLayout(2, 1, 0, 0));
-		missionTopPanel.setBorder(new MarsPanelBorder());
+//		missionTopPanel.setBorder(new MarsPanelBorder());
+		missionTopPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
 		topContentPanel.add(missionTopPanel);
 
 		// Prepare mission panel
@@ -94,7 +113,7 @@ extends TabPanel {
 
 		// Prepare mission title label.
 		WebLabel missionTitleLabel = new WebLabel(Msg.getString("TabPanelMission.mission"), WebLabel.CENTER); //$NON-NLS-1$
-		missionTitleLabel.setFont(new Font("Serif", Font.BOLD, 16));
+		missionTitleLabel.setFont(new Font("Serif", Font.BOLD, 14));
 		missionPanel.add(missionTitleLabel, BorderLayout.NORTH);
 
 		// Prepare mission text area
@@ -107,10 +126,12 @@ extends TabPanel {
 
 		// Prepare mission phase panel
 		WebPanel missionPhasePanel = new WebPanel(new BorderLayout(0, 0));
+		missionPhasePanel.setBorder(new EmptyBorder(15, 15, 15, 15));
 		missionTopPanel.add(missionPhasePanel);
 
 		// Prepare mission phase label
 		WebLabel missionPhaseLabel = new WebLabel(Msg.getString("TabPanelMission.missionPhase"), WebLabel.CENTER); //$NON-NLS-1$
+		missionPhaseLabel.setFont(new Font("Serif", Font.BOLD, 16));
 		missionPhasePanel.add(missionPhaseLabel, BorderLayout.NORTH);
 
 		// Prepare mission phase text area
@@ -123,21 +144,23 @@ extends TabPanel {
 
 		// Prepare mission bottom panel
 		WebPanel missionBottomPanel = new WebPanel(new BorderLayout(0, 0));
-		missionBottomPanel.setBorder(new MarsPanelBorder());
+//		missionBottomPanel.setBorder(new MarsPanelBorder());
+		missionBottomPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
 		topContentPanel.add(missionBottomPanel);
 
 		// Prepare member label
 		WebLabel memberLabel = new WebLabel(Msg.getString("TabPanelMission.members"), WebLabel.CENTER); //$NON-NLS-1$
+		memberLabel.setFont(new Font("Serif", Font.BOLD, 14));
 		missionBottomPanel.add(memberLabel, BorderLayout.NORTH);
 
 		// Prepare member list panel
 		WebPanel memberListPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
-		memberListPanel.setBorder(new MarsPanelBorder());
+//		memberListPanel.setBorder(new MarsPanelBorder());
 		missionBottomPanel.add(memberListPanel, BorderLayout.SOUTH);
 
 		// Create scroll panel for member list.
 		WebScrollPane memberScrollPanel = new WebScrollPane();
-		memberScrollPanel.setPreferredSize(new Dimension(175, 100));
+		memberScrollPanel.setPreferredSize(new Dimension(225, 100));
 		memberListPanel.add(memberScrollPanel);
 
 		// Create member list model
@@ -160,7 +183,7 @@ extends TabPanel {
 		memberScrollPanel.setViewportView(memberList);
 
 		WebPanel buttonPanel = new WebPanel(new GridLayout(2, 1, 0, 2));
-		buttonPanel.setBorder(new MarsPanelBorder());
+//		buttonPanel.setBorder(new MarsPanelBorder());
 		memberListPanel.add(buttonPanel);
 
 		// Create mission tool button
@@ -199,7 +222,9 @@ extends TabPanel {
 	 * Updates the info on this panel.
 	 */
 	public void update() {
-
+		if (!uiDone)
+			initializeUI();
+		
 		Vehicle vehicle = (Vehicle) unit;
 		Mission mission = missionManager.getMissionForVehicle(vehicle);
 

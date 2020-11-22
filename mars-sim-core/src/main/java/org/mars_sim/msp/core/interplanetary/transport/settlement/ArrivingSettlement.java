@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ArrivingSettlement.java
- * @version 3.1.0 2017-10-05
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.interplanetary.transport.settlement;
@@ -29,15 +29,15 @@ import org.mars_sim.msp.core.person.Favorite;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PersonConfig;
 import org.mars_sim.msp.core.person.GenderType;
-import org.mars_sim.msp.core.person.ai.job.JobManager;
+import org.mars_sim.msp.core.person.ai.job.JobUtil;
 import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.RobotType;
 import org.mars_sim.msp.core.robot.ai.job.RobotJob;
-import org.mars_sim.msp.core.structure.ChainOfCommand;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.SettlementConfig;
 import org.mars_sim.msp.core.structure.SettlementTemplate;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
@@ -57,16 +57,22 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	private static Logger logger = Logger.getLogger(ArrivingSettlement.class.getName());
 
 	// Data members.
+	private int populationNum;
+	private int numOfRobots;
+	private int scenarioID;
+	
 	private String name;
 	private String template;
+	
 	private TransitState transitState;
 	private MarsClock launchDate;
 	private MarsClock arrivalDate;
 	private Coordinates landingLocation;
-	private int populationNum;
-	private int numOfRobots;
-	private int scenarioID;
-
+	
+	private static UnitManager unitManager = Simulation.instance().getUnitManager();
+	private static RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
+	private static SettlementConfig settlementConfig = SimulationConfig.instance().getSettlementConfiguration();
+	
 	/**
 	 * Constructor.
 	 * 
@@ -264,7 +270,7 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	 */
 	private Settlement createNewSettlement() {
 		// Create new settlement with unit manager.
-		UnitManager unitManager = Simulation.instance().getUnitManager();
+//		UnitManager unitManager = Simulation.instance().getUnitManager();
 		// Compute sid
 		scenarioID = 9; // NOTE: scenarioID will be updated later and NOT important here
 		// TODO: add the option of choosing sponsor
@@ -272,8 +278,9 @@ public class ArrivingSettlement implements Transportable, Serializable {
 
 		Settlement newSettlement = Settlement.createNewSettlement(name, scenarioID, template, sponsor, landingLocation,
 				populationNum, numOfRobots);
+		newSettlement.initialize();
 		unitManager.addUnit(newSettlement);
-
+	
 		// Add new settlement to credit manager.
 		Simulation.instance().getCreditManager().addSettlement(newSettlement);
 
@@ -288,22 +295,28 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	private void createNewImmigrants(Settlement newSettlement) {
 
 		Collection<Person> immigrants = new ConcurrentLinkedQueue<Person>();
-		UnitManager unitManager = Simulation.instance().getUnitManager();
-		RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
+//		UnitManager unitManager = Simulation.instance().getUnitManager();
+//		RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
 		for (int x = 0; x < populationNum; x++) {
-			PersonConfig personConfig = SimulationConfig.instance().getPersonConfiguration();
+			PersonConfig personConfig = SimulationConfig.instance().getPersonConfig();
 			GenderType gender = GenderType.FEMALE;
 			if (RandomUtil.getRandomDouble(1.0D) <= personConfig.getGenderRatio())
 				gender = GenderType.MALE;
-			String birthplace = "Earth"; // TODO: randomize from list of countries/federations
+//			String birthplace = "Earth"; // TODO: randomize from list of countries/federations
 			String immigrantName = unitManager.getNewName(UnitType.PERSON, null, gender, null);
 			String sponsor = newSettlement.getSponsor();
 			String country = UnitManager.getCountry(sponsor);
 			// Person immigrant = new Person(immigrantName, gender, country, newSettlement,
 			// sponsor);
 			// Use Builder Pattern for creating an instance of Person
-			Person immigrant = Person.create(immigrantName, newSettlement).setGender(gender).setCountry(country)
-					.setSponsor(sponsor).build();
+			Person immigrant = Person.create(immigrantName, newSettlement)
+					.setGender(gender)
+					.setCountry(country)
+					.setSponsor(sponsor)
+					.setSkill(null)
+					.setPersonality(null, null)
+					.setAttribute(null)
+					.build();
 			immigrant.initialize();
 
 			// Initialize favorites and preferences.
@@ -311,11 +324,11 @@ public class ArrivingSettlement implements Transportable, Serializable {
 			favorites.setFavoriteMainDish(favorites.getRandomMainDish());
 			favorites.setFavoriteSideDish(favorites.getRandomSideDish());
 			favorites.setFavoriteDessert(favorites.getRandomDessert());
-			favorites.setFavoriteActivity(favorites.getRandomActivity());
+			favorites.setFavoriteActivity(favorites.getARandomFavoriteType());
 			immigrant.getPreference().initializePreference();
 
 			// Assign a job by calling getInitialJob
-			immigrant.getMind().getInitialJob(JobManager.MISSION_CONTROL);
+			immigrant.getMind().getInitialJob(JobUtil.MISSION_CONTROL);
 
 			unitManager.addUnit(immigrant);
 			relationshipManager.addNewImmigrant(immigrant, immigrants);
@@ -329,29 +342,14 @@ public class ArrivingSettlement implements Transportable, Serializable {
 
 			int popSize = newSettlement.getNumCitizens();
 
-			// Reset specialist positions at settlement.
-			ChainOfCommand cc = newSettlement.getChainOfCommand();
-			Iterator<Person> i = newSettlement.getAllAssociatedPeople().iterator();
-			while (i.hasNext()) {
-				Person person = i.next();
-				if (popSize >= UnitManager.POPULATION_WITH_MAYOR) {
-					cc.set7Divisions(true);
-					cc.assignSpecialiststo7Divisions(person);
-				} else {
-					cc.set3Divisions(true);
-					cc.assignSpecialiststo3Divisions(person);
-				}
-			}
-
-			// Call updateAllAssociatedPeople(), not getAllAssociatedPeople()()
-			newSettlement.updateAllAssociatedPeople();
-			newSettlement.updateAllAssociatedRobots();
-
 			// Reset work shift schedules at settlement.
 			unitManager.setupShift(newSettlement, popSize);
-
+		
 			// Reset command/government system at settlement.
-			unitManager.establishSettlementGovernance(newSettlement);
+			newSettlement.getChainOfCommand().establishSettlementGovernance(newSettlement);
+
+//			// Assign a role to each person
+//			unitManager.assignRoles(newSettlement);
 		}
 	}
 
@@ -362,7 +360,7 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	 */
 	private void createNewRobots(Settlement newSettlement) {
 
-		UnitManager unitManager = Simulation.instance().getUnitManager();
+//		UnitManager unitManager = Simulation.instance().getUnitManager();
 		for (int x = 0; x < numOfRobots; x++) {
 
 			// Get a robotType randomly
@@ -372,7 +370,10 @@ public class ArrivingSettlement implements Transportable, Serializable {
 			// Adopt Static Factory Method and Factory Builder Pattern
 			Robot robot = Robot
 					.create(unitManager.getNewName(UnitType.ROBOT, null, null, robotType), newSettlement, robotType)
-					.setCountry("Earth").build();
+					.setCountry("Earth")
+					.setSkill(null, robotType)
+					.setAttribute(null)
+					.build();
 			robot.initialize();
 
 			unitManager.addUnit(robot);
@@ -380,7 +381,7 @@ public class ArrivingSettlement implements Transportable, Serializable {
 			// Initialize robot job.
 			String jobName = RobotJob.getName(robotType);
 			if (jobName != null) {
-				RobotJob robotJob = JobManager.getRobotJob(robotType.getName());
+				RobotJob robotJob = JobUtil.getRobotJob(robotType.getName());
 				if (robotJob != null) {
 					robot.getBotMind().setRobotJob(robotJob, true);
 				}
@@ -395,9 +396,8 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	 */
 	private void createNewEquipment(Settlement newSettlement) {
 
-		SettlementTemplate template = SimulationConfig.instance().getSettlementConfiguration()
+		SettlementTemplate template = settlementConfig
 				.getSettlementTemplate(getTemplate());
-		UnitManager unitManager = Simulation.instance().getUnitManager();
 		Iterator<String> equipmentI = template.getEquipment().keySet().iterator();
 		while (equipmentI.hasNext()) {
 			String equipmentType = equipmentI.next();
@@ -406,8 +406,9 @@ public class ArrivingSettlement implements Transportable, Serializable {
 				Equipment equipment = EquipmentFactory.createEquipment(equipmentType, newSettlement.getCoordinates(),
 						false);
 				equipment.setName(unitManager.getNewName(UnitType.EQUIPMENT, equipmentType, null, null));
-				unitManager.addUnit(equipment);
+				// Place this equipment within a settlement
 				newSettlement.getInventory().storeUnit(equipment);
+				unitManager.addUnit(equipment);
 			}
 		}
 	}
@@ -419,13 +420,13 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	 */
 	private void createNewParts(Settlement newSettlement) {
 
-		SettlementTemplate template = SimulationConfig.instance().getSettlementConfiguration()
+		SettlementTemplate template = settlementConfig
 				.getSettlementTemplate(getTemplate());
 		Iterator<Part> partsI = template.getParts().keySet().iterator();
 		while (partsI.hasNext()) {
 			Part part = partsI.next();
 			int number = template.getParts().get(part);
-			newSettlement.getInventory().storeItemResources(part, number);
+			newSettlement.getInventory().storeItemResources(part.getID(), number);
 		}
 	}
 
@@ -436,7 +437,7 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	 */
 	private void createNewResources(Settlement newSettlement) {
 
-		SettlementTemplate template = SimulationConfig.instance().getSettlementConfiguration()
+		SettlementTemplate template = settlementConfig
 				.getSettlementTemplate(getTemplate());
 		Iterator<AmountResource> resourcesI = template.getResources().keySet().iterator();
 		while (resourcesI.hasNext()) {
@@ -457,9 +458,10 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	 */
 	private void createNewVehicles(Settlement newSettlement) {
 
-		SettlementTemplate template = SimulationConfig.instance().getSettlementConfiguration()
+		String sponsor = newSettlement.getSponsor();
+		SettlementTemplate template = settlementConfig
 				.getSettlementTemplate(getTemplate());
-		UnitManager unitManager = Simulation.instance().getUnitManager();
+//		UnitManager unitManager = Simulation.instance().getUnitManager();
 		Iterator<String> vehicleI = template.getVehicles().keySet().iterator();
 		while (vehicleI.hasNext()) {
 			String vehicleType = vehicleI.next();
@@ -467,10 +469,10 @@ public class ArrivingSettlement implements Transportable, Serializable {
 			for (int x = 0; x < number; x++) {
 				Vehicle vehicle = null;
 				if (LightUtilityVehicle.NAME.equalsIgnoreCase(vehicleType)) {
-					String name = unitManager.getNewName(UnitType.VEHICLE, "LUV", null, null);
+					String name = unitManager.getNewVehicleName(LightUtilityVehicle.NAME, sponsor);
 					vehicle = new LightUtilityVehicle(name, vehicleType.toLowerCase(), newSettlement);
 				} else {
-					String name = unitManager.getNewName(UnitType.VEHICLE, null, null, null);
+					String name = unitManager.getNewVehicleName(vehicleType, sponsor);
 					vehicle = new Rover(name, vehicleType.toLowerCase(), newSettlement);
 				}
 				unitManager.addUnit(vehicle);

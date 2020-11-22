@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RecordActivity.java
- * @version 3.1.0 2018-06-09
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -11,9 +11,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
@@ -46,27 +49,33 @@ public class RecordActivity extends Task implements Serializable {
 		super(NAME, person, true, false, STRESS_MODIFIER, true, RandomUtil.getRandomDouble(10D));
 
 		if (person.isInSettlement()) {
+			
 			walkToRandomLocation(false);
+			
+			// Initialize phase
+			addPhase(RECORDING);
+			setPhase(RECORDING);
 		}
 
 		else if (person.isInVehicle()) {
-
 			if (person.getVehicle() instanceof Rover) {
 				walkToPassengerActivitySpotInRover((Rover) person.getVehicle(), true);
 			}
+			
+			// Initialize phase
+			addPhase(RECORDING);
+			setPhase(RECORDING);
 		}
 
 		else {
+			// TODO: Move to where other settlers are working outside or near a building
 			endTask();
 		}
 
-		// Initialize phase
-		addPhase(RECORDING);
-		setPhase(RECORDING);
 	}
 
 	@Override
-	protected FunctionType getLivingFunction() {
+	public FunctionType getLivingFunction() {
 		return FunctionType.ADMINISTRATION;
 	}
 
@@ -89,7 +98,8 @@ public class RecordActivity extends Task implements Serializable {
 	 */
 	private double recordingPhase(double time) {
 		// TODO: need to define what to do with this activity
-
+		// Take snapshot of pics and tap video clips, etc.
+		
 		return 0D;
 	}
 
@@ -101,7 +111,7 @@ public class RecordActivity extends Task implements Serializable {
 		int art = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.ARTISTRY);
 		newPoints += newPoints * (exp + art - 100D) / 100D;
 		newPoints *= getTeachingExperienceModifier();
-		person.getMind().getSkillManager().addExperience(SkillType.REPORTING, newPoints);
+		person.getSkillManager().addExperience(SkillType.REPORTING, newPoints, time);
 
 	}
 

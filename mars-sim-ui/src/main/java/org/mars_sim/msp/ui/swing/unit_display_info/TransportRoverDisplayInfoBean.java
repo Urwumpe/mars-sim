@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TransportRoverDisplayInfoBean.java
- * @version 3.1.0 2017-10-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -17,14 +17,14 @@ import javax.swing.*;
 class TransportRoverDisplayInfoBean extends RoverDisplayInfoBean {
     
     // Data members
-    private Icon buttonIcon;
+    private Icon buttonIcon = ImageLoader.getIcon("TransportRoverIcon", ImageLoader.VEHICLE_ICON_DIR);
     
     /**
      * Constructor
      */
     TransportRoverDisplayInfoBean() {
         super();
-        buttonIcon = ImageLoader.getIcon("TransportRoverIcon");
+//        buttonIcon = ImageLoader.getIcon("TransportRoverIcon", ImageLoader.VEHICLE_ICON_DIR);
     }
     
     /** 

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TreatMedicalPatientMeta.java
- * @version 3.1.0 2017-10-21
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -10,12 +10,13 @@ import java.io.Serializable;
 import java.util.Iterator;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.LocationSituation;
+import org.mars_sim.msp.core.location.LocationStateType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.job.Job;
-import org.mars_sim.msp.core.person.ai.task.Task;
 import org.mars_sim.msp.core.person.ai.task.TreatMedicalPatient;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.person.health.Treatment;
@@ -36,6 +37,8 @@ public class TreatMedicalPatientMeta implements MetaTask, Serializable {
     /** default serial id. */
     private static final long serialVersionUID = 1L;
     
+	private static final int VALUE = 1000;
+	
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.treatMedicalPatient"); //$NON-NLS-1$
@@ -55,11 +58,29 @@ public class TreatMedicalPatientMeta implements MetaTask, Serializable {
 
         double result = 0D;
       
+        // Probability affected by the person's stress and fatigue.
+//        PhysicalCondition condition = person.getPhysicalCondition();
+//        double fatigue = condition.getFatigue();
+//        double stress = condition.getStress();
+//        double hunger = condition.getHunger();
+//        
+//        if (fatigue > 1000 || stress > 50 || hunger > 500)
+//        	return 0;
+          
         if (person.isInside()) {
 	        // Get the local medical aids to use.
 	        if (hasNeedyMedicalAids(person)) {
-	            result = 300D;
-	
+	            result = VALUE;	
+	            
+	            if (person.isInVehicle()) {	
+	    	        // Check if person is in a moving rover.
+	    	        if (Vehicle.inMovingRover(person)) {
+	    	        	result += -50;
+	    	        } 	       
+	    	        else
+	    	        	result += 50;
+	            }
+	            
 	        }
 	
 	        // Effort-driven task modifier.
@@ -71,8 +92,10 @@ public class TreatMedicalPatientMeta implements MetaTask, Serializable {
 	            result *= job.getStartTaskProbabilityModifier(TreatMedicalPatient.class);
 	        }
 	
-            // 2015-06-07 Added Preference modifier
-            result = result + result * person.getPreference().getPreferenceScore(this) / 5D;
+	        double pref = person.getPreference().getPreferenceScore(this);
+	        
+	        if (pref > 0)
+	        	result = result * 3D;
 
 	        if (result < 0) result = 0;
 	        
@@ -90,10 +113,10 @@ public class TreatMedicalPatientMeta implements MetaTask, Serializable {
 
         boolean result = false;
 
-        if (person.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
+		if (person.getLocationStateType() == LocationStateType.INSIDE_SETTLEMENT) {
             result = hasNeedyMedicalAidsAtSettlement(person, person.getSettlement());
         }
-        else if (person.getLocationSituation() == LocationSituation.IN_VEHICLE) {
+        else if (person.getLocationStateType() == LocationStateType.INSIDE_VEHICLE) {
             result = hasNeedyMedicalAidsInVehicle(person, person.getVehicle());
         }
 
@@ -166,7 +189,7 @@ public class TreatMedicalPatientMeta implements MetaTask, Serializable {
         boolean result = false;
 
         // Get the person's medical skill.
-        int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
+        int skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
 
         // Check if there are any treatable health problems awaiting treatment.
         Iterator<HealthProblem> j = aid.getProblemsAwaitingTreatment().iterator();

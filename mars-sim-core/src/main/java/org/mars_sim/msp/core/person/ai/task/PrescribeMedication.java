@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PrescribeMedication.java
- * @version 3.1.0 2017-03-09
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -18,11 +18,14 @@ import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
+import org.mars_sim.msp.core.mars.MarsSurface;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.person.health.AnxietyMedication;
 import org.mars_sim.msp.core.person.health.Medication;
 import org.mars_sim.msp.core.person.health.RadiationExposure;
@@ -63,7 +66,7 @@ implements Serializable {
             "Task.phase.medicating")); //$NON-NLS-1$
 
 	/** The stress modified per millisol. */
-	private static final double STRESS_MODIFIER = .2D;
+	private static final double STRESS_MODIFIER = .1D;
 
 	// Data members.
 	private Person patient = null;
@@ -89,8 +92,8 @@ implements Serializable {
             // If in settlement, move doctor to building patient is in.
             else if (person.isInSettlement() && patient.getBuildingLocation() != null) {
                 // Walk to patient's building.
-            	patient.getMind().getTaskManager().clearTask();
-            	patient.getMind().getTaskManager().addTask(new RequestMedicalTreatment(patient));
+//            	patient.getMind().getTaskManager().clearTask();
+            	patient.getMind().getTaskManager().addTask(new RequestMedicalTreatment(patient), false);
             	//walkToActivitySpotInBuilding(patient.getBuildingLocation(), FunctionType.MEDICAL_CARE, false);
                 //walkToRandomLocInBuilding(BuildingManager.getBuilding(patient), false);
             }
@@ -121,8 +124,8 @@ implements Serializable {
             // If in settlement, move doctor to building patient is in.
             if (robot.isInSettlement() && patient.getBuildingLocation() != null) {
                 // Walk to patient's building.
-            	patient.getMind().getTaskManager().clearTask();
-            	patient.getMind().getTaskManager().addTask(new RequestMedicalTreatment(patient));
+//            	patient.getMind().getTaskManager().clearTask();
+            	patient.getMind().getTaskManager().addTask(new RequestMedicalTreatment(patient), false);
             	//walkToActivitySpotInBuilding(BuildingManager.getBuilding(patient), FunctionType.MEDICAL_CARE, false);
                 //walkToRandomLocInBuilding(BuildingManager.getBuilding(patient), false);
             }
@@ -140,72 +143,72 @@ implements Serializable {
         setPhase(MEDICATING);
     }
 
-/*	
-	   public static int determineNumPatients(Unit doctor) {
-	        int result = 0;
-	        Person p = null;
-	        Robot r = null;
-	        if (doctor instanceof Person)
-	        	p = (Person) doctor;
-	        else
-	        	r = (Robot) doctor;
-	        
-	        // Get possible patient list.
-	        // Note: Doctor can also prescribe medication for himself.
-	        Collection<Person> patientList = null;
-	        
-	        if (p != null) {
-		        if (LocationSituation.IN_SETTLEMENT == p.getLocationSituation()) {
-		            patientList = p.getSettlement().getInhabitants();
-		        }
-		        else if (LocationSituation.IN_VEHICLE == p.getLocationSituation()) {
-		            Vehicle vehicle = p.getVehicle();
-		            if (vehicle instanceof Crewable) {
-		                Crewable crewVehicle = (Crewable) vehicle;
-		                patientList = crewVehicle.getCrew();
-		            }
-		        }
-	        }
-	        
-	        else if (r != null) {
-		        if (LocationSituation.IN_SETTLEMENT == r.getLocationSituation()) {
-		            patientList = r.getSettlement().getInhabitants();
-		        }
-		        else if (LocationSituation.IN_VEHICLE == r.getLocationSituation()) {
-		            Vehicle vehicle = r.getVehicle();
-		            if (vehicle instanceof Crewable) {
-		                Crewable crewVehicle = (Crewable) vehicle;
-		                patientList = crewVehicle.getCrew();
-		            }
-		        }
-	        }
 
-	        // Determine patient.
-	        if (patientList != null) {
-	            Iterator<Person> i = patientList.iterator();
-	            while (i.hasNext()) {
-	                Person person = i.next();
-	                PhysicalCondition condition = person.getPhysicalCondition();
-	                RadiationExposure exposure = condition.getRadiationExposure();
-	                if (!condition.isDead()) {
-	                	if (condition.isStressedOut()) {
-	                        // Only prescribing anti-stress medication at the moment.
-	                        if (!condition.hasMedication(AnxietyMedication.NAME)) {
-	                            result++;
-	                        }
-	                	}
-	                	else if (exposure.isSick()) {
-	                        if (!condition.hasMedication(RadioProtectiveAgent.NAME)) {
-	                            result++;
-	                        }
-	                	}
-	                }
-	            }
-	        }
+//	   public static int determineNumPatients(Unit doctor) {
+//	        int result = 0;
+//	        Person p = null;
+//	        Robot r = null;
+//	        if (doctor instanceof Person)
+//	        	p = (Person) doctor;
+//	        else
+//	        	r = (Robot) doctor;
+//	        
+//	        // Get possible patient list.
+//	        // Note: Doctor can also prescribe medication for himself.
+//	        Collection<Person> patientList = null;
+//	        
+//	        if (p != null) {
+//		        if (LocationSituation.IN_SETTLEMENT == p.getLocationSituation()) {
+//		            patientList = p.getSettlement().getInhabitants();
+//		        }
+//		        else if (LocationSituation.IN_VEHICLE == p.getLocationSituation()) {
+//		            Vehicle vehicle = p.getVehicle();
+//		            if (vehicle instanceof Crewable) {
+//		                Crewable crewVehicle = (Crewable) vehicle;
+//		                patientList = crewVehicle.getCrew();
+//		            }
+//		        }
+//	        }
+//	        
+//	        else if (r != null) {
+//		        if (LocationSituation.IN_SETTLEMENT == r.getLocationSituation()) {
+//		            patientList = r.getSettlement().getInhabitants();
+//		        }
+//		        else if (LocationSituation.IN_VEHICLE == r.getLocationSituation()) {
+//		            Vehicle vehicle = r.getVehicle();
+//		            if (vehicle instanceof Crewable) {
+//		                Crewable crewVehicle = (Crewable) vehicle;
+//		                patientList = crewVehicle.getCrew();
+//		            }
+//		        }
+//	        }
+//
+//	        // Determine patient.
+//	        if (patientList != null) {
+//	            Iterator<Person> i = patientList.iterator();
+//	            while (i.hasNext()) {
+//	                Person person = i.next();
+//	                PhysicalCondition condition = person.getPhysicalCondition();
+//	                RadiationExposure exposure = condition.getRadiationExposure();
+//	                if (!condition.isDead()) {
+//	                	if (condition.isStressedOut()) {
+//	                        // Only prescribing anti-stress medication at the moment.
+//	                        if (!condition.hasMedication(AnxietyMedication.NAME)) {
+//	                            result++;
+//	                        }
+//	                	}
+//	                	else if (exposure.isSick()) {
+//	                        if (!condition.hasMedication(RadioProtectiveAgent.NAME)) {
+//	                            result++;
+//	                        }
+//	                	}
+//	                }
+//	            }
+//	        }
+//
+//	        return result;
+//	    }
 
-	        return result;
-	    }
-*/
 	
     /**
      * Determines if there is a patient nearby needing medication.
@@ -264,15 +267,15 @@ implements Serializable {
         if (doctor.isInSettlement()) {
             patientList = doctor.getSettlement().getIndoorPeople();
         }
-/*        
-        else if (loc == LocationSituation.IN_VEHICLE) {
-            Vehicle vehicle = doctor.getVehicle();
-            if (vehicle instanceof Crewable) {
-                Crewable crewVehicle = (Crewable) vehicle;
-                patientList = crewVehicle.getCrew();
-            }
-        }
-*/
+       
+//        else if (loc == LocationSituation.IN_VEHICLE) {
+//            Vehicle vehicle = doctor.getVehicle();
+//            if (vehicle instanceof Crewable) {
+//                Crewable crewVehicle = (Crewable) vehicle;
+//                patientList = crewVehicle.getCrew();
+//            }
+//        }
+
         // Determine patient.
         if (patientList != null) {
             Iterator<Person> i = patientList.iterator();
@@ -300,16 +303,16 @@ implements Serializable {
     }
 
 
-    /**
-     * Determines a medication for the patient.
-     * @param patient the patient to medicate.
-     * @return medication.
-     
-    private Medication determineMedication(Person patient) {
-        // Only allow anti-stress medication for now.
-        return new AnxietyMedication(patient); 
-    }
-*/
+//    /**
+//     * Determines a medication for the patient.
+//     * @param patient the patient to medicate.
+//     * @return medication.
+//    */ 
+//    private Medication determineMedication(Person patient) {
+//        // Only allow anti-stress medication for now.
+//        return new AnxietyMedication(patient); 
+//    }
+
     
     /**
      * Performs the medicating phase.
@@ -404,39 +407,13 @@ implements Serializable {
 		else if (robot != null)
 			containerUnit = robot.getContainerUnit();
 
-        if (containerUnit != null) {
+		if (!(containerUnit instanceof MarsSurface)) {
             Inventory inv = containerUnit.getInventory();
-            Storage.storeAnResource(AVERAGE_MEDICAL_WASTE, ResourceUtil.toxicWasteAR, inv, 
+            Storage.storeAnResource(AVERAGE_MEDICAL_WASTE, ResourceUtil.toxicWasteID, inv, 
             		sourceName + "::produceMedicalWaste");
         }
 	}
 
-/*
-	// 2015-02-06 Added storeAnResource()
-	public boolean storeAnResource(double amount, String name, Inventory inv) {
-		boolean result = false;
-		try {
-			AmountResource ar = AmountResource.findAmountResource(name);
-			double remainingCapacity = inv.getAmountResourceRemainingCapacity(ar, false, false);
-
-			if (remainingCapacity < amount) {
-			    // if the remaining capacity is smaller than the amount, set remaining capacity to full
-				amount = remainingCapacity;
-				result = false;
-
-			}
-			else {
-				inv.storeAmountResource(ar, amount, true);
-				inv.addAmountSupplyAmount(ar, amount);
-				result = true;
-			}
-		} catch (Exception e) {
-    		logger.log(Level.SEVERE,e.getMessage());
-		}
-
-		return result;
-	}
-*/
 	
     @Override
     protected void addExperience(double time) {
@@ -455,9 +432,9 @@ implements Serializable {
         newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
         newPoints *= getTeachingExperienceModifier();
 		if (person != null)
-			person.getMind().getSkillManager().addExperience(SkillType.MEDICINE, newPoints);
+			person.getSkillManager().addExperience(SkillType.MEDICINE, newPoints, time);
 		else if (robot != null)
-			robot.getBotMind().getSkillManager().addExperience(SkillType.MEDICINE, newPoints);
+			robot.getSkillManager().addExperience(SkillType.MEDICINE, newPoints, time);
 
     }
 
@@ -472,9 +449,9 @@ implements Serializable {
     public int getEffectiveSkillLevel() {
     	SkillManager manager = null;
 		if (person != null)
-		    manager = person.getMind().getSkillManager();
+		    manager = person.getSkillManager();
 		else if (robot != null)
-			manager = robot.getBotMind().getSkillManager();
+			manager = robot.getSkillManager();
 
 		return manager.getEffectiveSkillLevel(SkillType.MEDICINE);
     }

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ZebraJTable.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 // see http://nadeausoftware.com/articles/2008/01/java_tip_how_add_zebra_background_stripes_jtable
@@ -13,6 +13,7 @@ import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.event.MouseEvent;
 
+import javax.swing.JTable;
 import javax.swing.JViewport;
 import javax.swing.ListSelectionModel;
 import javax.swing.table.TableCellEditor;
@@ -20,20 +21,19 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableModel;
 
-import com.alee.laf.table.WebTable;
-
 
 /**
  * A WebTable that draws a zebra striped background.
  */
-public class ZebraJTable extends WebTable {
+@SuppressWarnings("serial")
+public class ZebraJTable extends JTable {
 
     private Color rowColors[] = new Color[2];
     private boolean drawStripes = false;
 
     public ZebraJTable(){
     }
-    public ZebraJTable(WebTable table) {// javax.swing.table.TableModel dataModel ) {
+    public ZebraJTable(JTable table) {// javax.swing.table.TableModel dataModel ) {
         super(table.getModel());
     }
     public ZebraJTable( int numRows, int numColumns )

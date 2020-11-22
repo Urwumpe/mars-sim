@@ -1,8 +1,7 @@
 /**
  * Mars Simulation Project
  * SearchWindow.java
- * @version 3.08 2015-06-26
-
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.search;
@@ -21,26 +20,26 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import javax.swing.DefaultListModel;
-
 import javax.swing.JList;
-
 import javax.swing.border.EtchedBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.UnitManagerEvent;
 import org.mars_sim.msp.core.UnitManagerListener;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.JComboBoxMW;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
+import org.mars_sim.msp.ui.swing.tool.navigator.NavigatorWindow;
+import org.mars_sim.msp.ui.swing.tool.settlement.SettlementMapPanel;
+import org.mars_sim.msp.ui.swing.tool.settlement.SettlementWindow;
 import org.mars_sim.msp.ui.swing.toolWindow.ToolWindow;
 
 import com.alee.laf.button.WebButton;
@@ -54,20 +53,20 @@ import com.alee.laf.text.WebTextField;
  * The SearchWindow is a tool window that allows the user to search
  * for individual units by name and category.
  */
+@SuppressWarnings("serial")
 public class SearchWindow
 extends ToolWindow {
-
-	/** default serial id. */
-	private static final long serialVersionUID = 1L;
 
 	/** Tool name. */
 	public static final String NAME = Msg.getString("SearchWindow.title"); //$NON-NLS-1$
 
 	/** Unit categories enum. */
 	enum UnitCategory {
-		PEOPLE (Msg.getString("SearchWindow.category.people")), //$NON-NLS-1$
-		SETTLEMENTS (Msg.getString("SearchWindow.category.settlements")), //$NON-NLS-1$
-		VEHICLES (Msg.getString("SearchWindow.category.vehicles")); //$NON-NLS-1$
+		PEOPLE 			(Msg.getString("SearchWindow.category.people")), //$NON-NLS-1$	
+		SETTLEMENTS 	(Msg.getString("SearchWindow.category.settlements")), //$NON-NLS-1$
+		VEHICLES 		(Msg.getString("SearchWindow.category.vehicles")), //$NON-NLS-1$
+		BOTS 			(Msg.getString("SearchWindow.category.bots")); //$NON-NLS-1$
+		
 		private String name;
 		private UnitCategory(String name) {
 			this.name = name;
@@ -87,7 +86,16 @@ extends ToolWindow {
 		}
 	}
 
+	/** True if unitList selection events should be ignored. */
+	private boolean lockUnitList;
+	/** True if selectTextField events should be ignored. */
+	private boolean lockSearchText;
+	/** Array of category names. */
+	private String[] unitCategoryNames;
+	
 	// Data members
+	private SettlementMapPanel mapPanel;
+	
 	/** Category selector. */
 	private JComboBoxMW<?> searchForSelect;
 	/** List of selectable units. */
@@ -100,14 +108,12 @@ extends ToolWindow {
 	private WebLabel statusLabel;
 	/** Checkbox to indicate if unit window is to be opened. */
 	private WebCheckBox openWindowCheck;
-	/** Checkbox to indicate if map is to be centered on unit. */
-	private WebCheckBox centerMapCheck;
-	/** True if unitList selection events should be ignored. */
-	private boolean lockUnitList;
-	/** True if selectTextField events should be ignored. */
-	private boolean lockSearchText;
-	/** Array of category names. */
-	private String[] unitCategoryNames;
+	/** Checkbox to indicate if mars navigator map is to be centered on unit. */
+	private WebCheckBox marsNavCheck;
+	/** Checkbox to indicate if the settlement map is to be centered on unit. */
+	private WebCheckBox settlementCheck;
+	/** Button to execute the search of the selected unit. */
+	private WebButton searchButton;
 
 	/**
 	 * Constructor.
@@ -118,16 +124,19 @@ extends ToolWindow {
 		// Use ToolWindow constructor
 		super(NAME, desktop);
 
+//		mapPanel = desktop.getSettlementWindow().getMapPanel();
+		
 		// Initialize locks
 		lockUnitList = false;
 		lockSearchText = false;
 
 		// Initialize unitCategoryNames
-		unitCategoryNames = new String[3];
+		unitCategoryNames = new String[4];
 		unitCategoryNames[0] = UnitCategory.PEOPLE.getName();
 		unitCategoryNames[1] = UnitCategory.SETTLEMENTS.getName();
 		unitCategoryNames[2] = UnitCategory.VEHICLES.getName();
-
+		unitCategoryNames[3] = UnitCategory.BOTS.getName();
+		
 		// Get content pane
 		WebPanel mainPane = new WebPanel(new BorderLayout());
 		mainPane.setBorder(new MarsPanelBorder());
@@ -146,7 +155,8 @@ extends ToolWindow {
 		String[] categoryStrings = {
 			UnitCategory.PEOPLE.getName(),
 			UnitCategory.SETTLEMENTS.getName(),
-			UnitCategory.VEHICLES.getName()
+			UnitCategory.VEHICLES.getName(),
+			UnitCategory.BOTS.getName()
 		};
 		searchForSelect = new JComboBoxMW<Object>(categoryStrings);
 		searchForSelect.setSelectedIndex(0);
@@ -167,9 +177,11 @@ extends ToolWindow {
 			public void changedUpdate(DocumentEvent event) {}
 			public void insertUpdate(DocumentEvent event) {
 				searchTextChange();
+				searchButton.setEnabled(true);
 			}
 			public void removeUpdate(DocumentEvent event) {
 				searchTextChange();
+				searchButton.setEnabled(false);
 			}
 		});
 		selectUnitPane.add(selectTextField, BorderLayout.NORTH);
@@ -201,14 +213,18 @@ extends ToolWindow {
 		WebPanel selectOptionsPane = new WebPanel(new GridLayout(2, 1));
 		bottomPane.add(selectOptionsPane, BorderLayout.NORTH);
 
-		// Create open window option check box
-		openWindowCheck = new WebCheckBox(Msg.getString("SearchWindow.openDetailWindow")); //$NON-NLS-1$
+		// Create open the unit window
+		openWindowCheck = new WebCheckBox(Msg.getString("SearchWindow.openWindow")); //$NON-NLS-1$
 		openWindowCheck.setSelected(true);
 		selectOptionsPane.add(openWindowCheck);
 
-		// Create center map option
-		centerMapCheck = new WebCheckBox(Msg.getString("SearchWindow.recenterMap")); //$NON-NLS-1$
-		selectOptionsPane.add(centerMapCheck);
+		// Create open the mars navigator
+		marsNavCheck = new WebCheckBox(Msg.getString("SearchWindow.openNav")); //$NON-NLS-1$
+		selectOptionsPane.add(marsNavCheck);
+
+		// Create open the settlement map
+		settlementCheck = new WebCheckBox(Msg.getString("SearchWindow.openSettlement")); //$NON-NLS-1$
+		selectOptionsPane.add(settlementCheck);
 
 		// Create status label
 		statusLabel = new WebLabel(" ", WebLabel.CENTER); //$NON-NLS-1$
@@ -220,12 +236,14 @@ extends ToolWindow {
 		bottomPane.add(searchButtonPane, BorderLayout.SOUTH);
 
 		// Create search button
-		WebButton searchButton = new WebButton(Msg.getString("SearchWindow.button.search")); //$NON-NLS-1$
+		searchButton = new WebButton(Msg.getString("SearchWindow.button.search")); //$NON-NLS-1$
 		searchButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent event) {
 				search();
 			}
 		});
+		searchButton.setEnabled(false);
+		searchButton.setToolTipText(Msg.getString("SearchWindow.button.toolTip"));
 		searchButtonPane.add(searchButton);
 
 		// Pack window
@@ -239,7 +257,7 @@ extends ToolWindow {
 	private void search() {
 		Collection<? extends Unit> units = null;
 		String category = (String) searchForSelect.getSelectedItem();
-		UnitManager unitManager = Simulation.instance().getUnitManager();
+//		UnitManager unitManager = Simulation.instance().getUnitManager();
 		if (category.equals(UnitCategory.PEOPLE.getName())) {
 			Collection<Person> people = unitManager.getPeople();
 			units = CollectionUtils.sortByName(people);
@@ -252,7 +270,11 @@ extends ToolWindow {
 			Collection<Vehicle> vehicle = unitManager.getVehicles();
 			units = CollectionUtils.sortByName(vehicle);
 		}
-
+		else if (category.equals(UnitCategory.BOTS.getName())) {
+			Collection<Robot> bots = unitManager.getRobots();
+			units = CollectionUtils.sortByName(bots);
+		}
+		
 		Iterator<? extends Unit> unitI = units.iterator();
 
 		// If entered text equals the name of a unit in this category, take appropriate action.
@@ -262,8 +284,12 @@ extends ToolWindow {
 			if (selectTextField.getText().equalsIgnoreCase(unit.getName())) {
 				foundUnit = true;
 				if (openWindowCheck.isSelected()) desktop.openUnitWindow(unit, false);
-				if (centerMapCheck.isSelected())
+				
+				if (marsNavCheck.isSelected())
 					desktop.centerMapGlobe(unit.getCoordinates());
+				
+				if (settlementCheck.isSelected())
+					 openUnit(unit);
 			}
 		}
 
@@ -277,6 +303,92 @@ extends ToolWindow {
 			statusLabel.setText(Msg.getString("SearchWindow.defaultSearch",tempName)); //$NON-NLS-1$
 	}
 
+	public void openUnit(Unit u) {
+
+		mapPanel = desktop.getSettlementWindow().getMapPanel();
+		
+		if (u.isInSettlement()) {
+			
+			showPersonRobot(u);
+		}
+
+		else if (u.isInVehicle()) {
+
+			Vehicle vv = u.getVehicle();
+
+			if (vv.getSettlement() == null) {
+				// person is on a mission on the surface of Mars 
+				desktop.openToolWindow(NavigatorWindow.NAME);
+				desktop.centerMapGlobe(u.getCoordinates());
+			} 
+			
+			else {
+				// still parked inside a garage or within the premise of a settlement
+				showPersonRobot(u);
+			}
+		}
+
+		else if (u.isOutside()) {
+			Vehicle vv = u.getVehicle();
+
+			if (vv == null) {
+				// if it's not in a vehicle
+				showPersonRobot(u);			
+			}
+			
+			else {
+				// if it's in a vehicle			
+				if (vv.getSettlement() != null) {
+					// if the vehicle is in a settlement
+					showPersonRobot(u);
+				}
+				
+				else {
+					// person is on a mission on the surface of Mars 
+					desktop.openToolWindow(NavigatorWindow.NAME);
+					// he's stepped outside a vehicle
+					desktop.centerMapGlobe(u.getCoordinates());
+				}
+			}
+		}
+	}
+	
+	public void showPersonRobot(Unit u) {
+//		Settlement s = u.findSettlementVicinity();
+
+		// person just happens to step outside the settlement at its
+		// vicinity temporarily
+
+		desktop.openToolWindow(SettlementWindow.NAME);
+		
+		if (u instanceof Person) {
+			Person p = (Person) u;
+			
+			double xLoc = p.getXLocation();
+			double yLoc = p.getYLocation();
+			double scale = mapPanel.getScale();
+			mapPanel.reCenter();
+			mapPanel.moveCenter(xLoc * scale, yLoc * scale);
+			
+			if (mapPanel.getSelectedPerson() != null)
+				mapPanel.displayPerson(p);
+		} 
+		
+		else if (u instanceof Robot) {
+			Robot r = (Robot) u;
+			
+			double xLoc = r.getXLocation();
+			double yLoc = r.getYLocation();
+			double scale = mapPanel.getScale();
+			mapPanel.reCenter();
+			mapPanel.moveCenter(xLoc * scale, yLoc * scale);
+				
+			if (mapPanel.getSelectedRobot() != null)
+				mapPanel.selectRobot(r);
+		}
+}
+	
+	
 	/**
 	 * Change the category of the unit list.
 	 * @param category
@@ -326,8 +438,8 @@ extends ToolWindow {
 	public void destroy() {} {
 
 		if (unitListModel != null) {
-			UnitManager manager = Simulation.instance().getUnitManager();
-			manager.removeUnitManagerListener(unitListModel);
+//			UnitManager manager = Simulation.instance().getUnitManager();
+			unitManager.removeUnitManagerListener(unitListModel);
 			unitListModel.clear();
 			unitListModel = null;
 		}
@@ -362,7 +474,7 @@ extends ToolWindow {
 			updateList();
 
 			// Add model as unit manager listener.
-			Simulation.instance().getUnitManager().addUnitManagerListener(this);
+			unitManager.addUnitManagerListener(this);
 		}
 
 		/**
@@ -385,10 +497,10 @@ extends ToolWindow {
 			clear();
 
 			Collection<? extends Unit> units = null;
-			UnitManager unitManager = Simulation.instance().getUnitManager();
+//			UnitManager unitManager = unitManager;
 			if (category.equals(UnitCategory.PEOPLE)) {
 
-				if (unitManager.getPeople() == null) {
+				if (unitManager.getTotalNumPeople() == 0) {
 					Thread.yield();
 					try {
 						Thread.sleep(2L);
@@ -407,14 +519,20 @@ extends ToolWindow {
 				units = CollectionUtils.sortByName(settlement);
 			}
 			else if (category.equals(UnitCategory.VEHICLES)) {
-				Collection<Vehicle> vehicle= unitManager.getVehicles();
+				Collection<Vehicle> vehicle = unitManager.getVehicles();
 				units = CollectionUtils.sortByName(vehicle);
 			}
-
-			Iterator<? extends Unit> unitI = units.iterator();
-
-			while (unitI.hasNext()) {
-				addElement(unitI.next());
+			else if (category.equals(UnitCategory.BOTS)) {
+				Collection<Robot> bots = unitManager.getRobots();
+				units = CollectionUtils.sortByName(bots);
+			}
+			
+			if (units != null && !units.isEmpty()) {
+				Iterator<? extends Unit> unitI = units.iterator();
+	
+				while (unitI.hasNext()) {
+					addElement(unitI.next());
+				}
 			}
 		}
 

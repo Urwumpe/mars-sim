@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * BuildingPanelManufacture.java
- * @version 3.1.0 2017-09-15
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -40,6 +40,7 @@ import org.mars_sim.msp.core.manufacture.SalvageProcessInfo;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.function.Manufacture;
 import org.mars_sim.msp.ui.swing.JComboBoxMW;
@@ -56,17 +57,19 @@ import com.alee.laf.scroll.WebScrollPane;
 /**
  * A building panel displaying the manufacture building function.
  */
+@SuppressWarnings("serial")
 public class BuildingPanelManufacture extends BuildingFunctionPanel {
 
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(BuildingPanelManufacture.class.getName());
 
-	private static int processStringWidth = 60;
+	private static int processStringWidth = 90;
 
 	/** The manufacture building. */
 	private Manufacture workshop;
 	/** Panel for displaying process panels. */
 	private WebPanel processListPane;
+	/** The scroll panel for the process list. */
 	private WebScrollPane scrollPanel;
 	/** List of manufacture processes in building. */
 	private List<ManufactureProcess> processCache;
@@ -87,6 +90,7 @@ public class BuildingPanelManufacture extends BuildingFunctionPanel {
 	 * @param workshop the manufacturing building function.
 	 * @param desktop  the main desktop.
 	 */
+	@SuppressWarnings("unchecked")
 	public BuildingPanelManufacture(Manufacture workshop, MainDesktopPane desktop) {
 		// Use BuildingFunctionPanel constructor.
 		super(workshop.getBuilding(), desktop);
@@ -99,8 +103,7 @@ public class BuildingPanelManufacture extends BuildingFunctionPanel {
 
 		// Prepare label panel
 		WebPanel labelPane = new WebPanel();
-		labelPane.setLayout(new GridLayout(3, 1, 0, 0));
-
+		labelPane.setLayout(new GridLayout(4, 1, 0, 0));
 		add(labelPane, BorderLayout.NORTH);
 
 		// Prepare manufacturing label
@@ -113,10 +116,15 @@ public class BuildingPanelManufacture extends BuildingFunctionPanel {
 		labelPane.add(techLabel);
 
 		// Prepare processCapacity label
-		WebLabel processCapacityLabel = new WebLabel("Process Capacity: " + workshop.getSupportingProcesses(),
+		WebLabel processCapacityLabel = new WebLabel("Process Capacity: " + workshop.getMaxProcesses(),
 				WebLabel.CENTER);
 		labelPane.add(processCapacityLabel);
 
+		// Prepare processCapacity label
+		WebLabel numPrintersLabel = new WebLabel("# of Printers In Use: " + workshop.getNumPrintersInUse(),
+				WebLabel.CENTER);
+		labelPane.add(numPrintersLabel);
+			
 		// Create scroll pane for manufacturing processes
 		scrollPanel = new WebScrollPane();
 		scrollPanel.setPreferredSize(new Dimension(170, 90));
@@ -150,6 +158,7 @@ public class BuildingPanelManufacture extends BuildingFunctionPanel {
 		// Create interaction panel.
 		WebPanel interactionPanel = new WebPanel(new GridLayout(2, 1, 10, 10));
 		add(interactionPanel, BorderLayout.SOUTH);
+		
 		// Create new manufacture process selection.
 		processComboBoxCache = getAvailableProcesses();
 		processComboBox = new JComboBoxMW<>();
@@ -192,7 +201,7 @@ public class BuildingPanelManufacture extends BuildingFunctionPanel {
 							SalvageProcessInfo selectedSalvage = (SalvageProcessInfo) selectedItem;
 							if (ManufactureUtil.canSalvageProcessBeStarted(selectedSalvage, getWorkshop())) {
 								Unit salvagedUnit = ManufactureUtil.findUnitForSalvage(selectedSalvage,
-										getWorkshop().getBuilding().getBuildingManager().getSettlement());
+										getWorkshop().getBuilding().getSettlement());
 								getWorkshop().addSalvageProcess(
 										new SalvageProcess(selectedSalvage, getWorkshop(), salvagedUnit));
 								update();
@@ -209,6 +218,7 @@ public class BuildingPanelManufacture extends BuildingFunctionPanel {
 		
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public void update() {
 
@@ -237,7 +247,7 @@ public class BuildingPanelManufacture extends BuildingFunctionPanel {
 			// Remove process panels for old processes.
 			Iterator<ManufactureProcess> j = processCache.iterator();
 			while (j.hasNext()) {
-				ManufactureProcess process = j.next();
+				ManufactureProcess process = j.next(); // java.util.ConcurrentModificationException
 				// for (ManufactureProcess process : processCache) {//= j.next();
 				if (!processes.contains(process)) {
 					ManufacturePanel panel = getManufacturePanel(process);
@@ -378,21 +388,31 @@ public class BuildingPanelManufacture extends BuildingFunctionPanel {
 	private List<ManufactureProcessInfo> getAvailableProcesses() {
 		List<ManufactureProcessInfo> result = new ArrayList<ManufactureProcessInfo>();
 
-		if (workshop.getProcesses().size() < workshop.getSupportingProcesses()) {
+		if (workshop.getProcesses().size() < workshop.getNumPrintersInUse()) {
 
 			// Determine highest materials science skill level at settlement.
-			Settlement settlement = workshop.getBuilding().getBuildingManager().getSettlement();
+			Settlement settlement = workshop.getBuilding().getSettlement();
 			int highestSkillLevel = 0;
 			Iterator<Person> i = settlement.getAllAssociatedPeople().iterator();
 			while (i.hasNext()) {
 				Person tempPerson = i.next();
-				SkillManager skillManager = tempPerson.getMind().getSkillManager();
+				SkillManager skillManager = tempPerson.getSkillManager();
 				int skill = skillManager.getSkillLevel(SkillType.MATERIALS_SCIENCE);
 				if (skill > highestSkillLevel) {
 					highestSkillLevel = skill;
 				}
 			}
 
+			Iterator<Robot> k = settlement.getAllAssociatedRobots().iterator();
+			while (k.hasNext()) {
+				Robot r = k.next();
+				SkillManager skillManager = r.getSkillManager();
+				int skill = skillManager.getSkillLevel(SkillType.MATERIALS_SCIENCE);
+				if (skill > highestSkillLevel) {
+					highestSkillLevel = skill;
+				}
+			}
+			
 			try {
 				Iterator<ManufactureProcessInfo> j = Collections
 						.unmodifiableList(ManufactureUtil
@@ -419,7 +439,7 @@ public class BuildingPanelManufacture extends BuildingFunctionPanel {
 	private List<SalvageProcessInfo> getAvailableSalvageProcesses() {
 		List<SalvageProcessInfo> result = new Vector<SalvageProcessInfo>();
 
-		if (workshop.getProcesses().size() < workshop.getSupportingProcesses()) {
+		if (workshop.getProcesses().size() < workshop.getNumPrintersInUse()) {
 			try {
 				Iterator<SalvageProcessInfo> i = Collections
 						.unmodifiableList(ManufactureUtil.getSalvageProcessesForTechLevel(workshop.getTechLevel()))
@@ -449,6 +469,7 @@ public class BuildingPanelManufacture extends BuildingFunctionPanel {
 	/**
 	 * Inner class for the manufacture selection list cell renderer.
 	 */
+	@SuppressWarnings("serial")
 	private static class ManufactureSelectionListCellRenderer extends DefaultListCellRenderer {
 
 		@Override

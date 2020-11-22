@@ -1,10 +1,14 @@
 /**
  * Mars Simulation Project
  * FunctionType.java
- * @version 3.1.0 2017-08-16
+ * @version 3.1.2 2020-09-02
  * @author stpa				
  */
 package org.mars_sim.msp.core.structure.building.function;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import org.mars_sim.msp.core.Msg;
 
@@ -23,7 +27,7 @@ public enum FunctionType {
 	FOOD_PRODUCTION  			(Msg.getString("FunctionType.foodProduction")), //$NON-NLS-1$	
 	GROUND_VEHICLE_MAINTENANCE	(Msg.getString("FunctionType.groundVehicleMaintenance")), //$NON-NLS-1$
 	LIFE_SUPPORT				(Msg.getString("FunctionType.lifeSupport")), //$NON-NLS-1$
-	LIVING_ACCOMODATIONS		(Msg.getString("FunctionType.livingAccomodations")), //$NON-NLS-1$
+	LIVING_ACCOMMODATIONS		(Msg.getString("FunctionType.livingAccommodations")), //$NON-NLS-1$
 	MANAGEMENT					(Msg.getString("FunctionType.management")), //$NON-NLS-1$
 	MANUFACTURE					(Msg.getString("FunctionType.manufacture")), //$NON-NLS-1$
 	MEDICAL_CARE				(Msg.getString("FunctionType.medicalCare")), //$NON-NLS-1$
@@ -52,4 +56,23 @@ public enum FunctionType {
 	public String getName() {
 		return this.name;
 	}
+	
+	public static String[] getNames() {
+		List<String> list = new ArrayList<String>();
+		for (FunctionType value : FunctionType.values()) {
+			list.add(value.getName());
+		}
+		Collections.sort(list);
+		return list.toArray(new String[] {});
+	}
+	
+	public static List<FunctionType> getFunctionTypes() {
+		List<FunctionType> list = new ArrayList<>();
+		for (FunctionType value : FunctionType.values()) {
+			list.add(value);
+		}
+		Collections.sort(list);
+		return list;
+	}
+	
 }

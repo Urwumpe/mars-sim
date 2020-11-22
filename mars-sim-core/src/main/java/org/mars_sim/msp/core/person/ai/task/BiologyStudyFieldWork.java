@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * BiologyStudyFieldWork.java
- * @version 3.1.0 2017-05-02
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -10,18 +10,19 @@ import java.awt.geom.Point2D;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.LocalAreaUtil;
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.Mars;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.mission.MissionMember;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
@@ -39,13 +40,16 @@ implements Serializable {
 
     private static Logger logger = Logger.getLogger(BiologyStudyFieldWork.class.getName());
 
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			 logger.getName().length());
+
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.biologyFieldWork"); //$NON-NLS-1$
 
     /** Task phases. */
     private static final TaskPhase FIELD_WORK = new TaskPhase(Msg.getString(
-            "Task.phase.fieldWork")); //$NON-NLS-1$
+            "Task.phase.fieldWork.biology")); //$NON-NLS-1$
 
     // Data members
     private Person leadResearcher;
@@ -97,7 +101,7 @@ implements Serializable {
 
                 newLocation = LocalAreaUtil.getLocalRelativeLocation(boundedLocalPoint.getX(),
                         boundedLocalPoint.getY(), rover);
-                goodLocation = LocalAreaUtil.checkLocationCollision(newLocation.getX(), newLocation.getY(),
+                goodLocation = LocalAreaUtil.isLocationCollisionFree(newLocation.getX(), newLocation.getY(),
                         person.getCoordinates());
             }
         }
@@ -117,15 +121,16 @@ implements Serializable {
             Person person = (Person) member;
 
             // Check if person can exit the rover.
-            boolean exitable = ExitAirlock.canExitAirlock(person, rover.getAirlock());
-
-
-            Mars mars = Simulation.instance().getMars();
-            if (mars.getSurfaceFeatures().getSolarIrradiance(person.getCoordinates()) == 0D) {
-                logger.fine(person.getName() + " end biology study field work : night time");
-                if (!mars.getSurfaceFeatures().inDarkPolarRegion(person.getCoordinates()))
-                    return false;
-            }
+            if(!ExitAirlock.canExitAirlock(person, rover.getAirlock()))
+            	return false;
+            
+            if (isGettingDark(person)) {
+    			LogConsolidated.log(logger, Level.FINE, 5000, sourceName,
+    					"[" + person.getLocationTag().getLocale() + "] " + person.getName() + " ended "
+    					+ person.getTaskDescription() + " due to getting too dark "
+    					+ " at " + person.getCoordinates().getFormattedString());
+    			return false;
+    		}
 
             // Check if person's medical condition will not allow task.
             if (person.getPerformanceRating() < .5D)
@@ -167,7 +172,7 @@ implements Serializable {
         // Check for an accident during the EVA operation.
         checkForAccident(time);
 
-        // 2015-05-29 Check for radiation exposure during the EVA operation.
+        // Check for radiation exposure during the EVA operation.
         if (isRadiationDetected(time)){
             setPhase(WALK_BACK_INSIDE);
             return time;
@@ -175,16 +180,25 @@ implements Serializable {
 
         // Check if site duration has ended or there is reason to cut the field
         // work phase short and return to the rover.
-        if (shouldEndEVAOperation() || addTimeOnSite(time)) {
+        if (shouldEndEVAOperation()) {
             setPhase(WALK_BACK_INSIDE);
             return time;
         }
 
+        if (addTimeOnSite(time)) {
+    		LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+    				"[" + person.getLocationTag().getLocale() + "] " + person.getName() 
+    				+ " was done doing biology study field work and going back to the rover.");
+            setPhase(WALK_BACK_INSIDE);
+            return time;
+        }
+        
         // Add research work to the scientific study for lead researcher.
         addResearchWorkTime(time);
 
         // Add experience points
         addExperience(time);
+
 
         return 0D;
     }
@@ -230,7 +244,7 @@ implements Serializable {
         double experienceAptitudeModifier = (((double) experienceAptitude) - 50D) / 100D;
         evaExperience += evaExperience * experienceAptitudeModifier;
         evaExperience *= getTeachingExperienceModifier();
-        person.getMind().getSkillManager().addExperience(SkillType.EVA_OPERATIONS, evaExperience);
+        person.getSkillManager().addExperience(SkillType.EVA_OPERATIONS, evaExperience, time);
 
         // If phase is performing field work, add experience to biology skill.
         if (FIELD_WORK.equals(getPhase())) {
@@ -238,7 +252,7 @@ implements Serializable {
             // Experience points adjusted by person's "Experience Aptitude" attribute.
             double biologyExperience = time / 10D;
             biologyExperience += biologyExperience * experienceAptitudeModifier;
-            person.getMind().getSkillManager().addExperience(SkillType.BIOLOGY, biologyExperience);
+            person.getSkillManager().addExperience(SkillType.BIOLOGY, biologyExperience, time);
         }
     }
 
@@ -252,7 +266,7 @@ implements Serializable {
 
     @Override
     public int getEffectiveSkillLevel() {
-        SkillManager manager = person.getMind().getSkillManager();
+        SkillManager manager = person.getSkillManager();
         int EVAOperationsSkill = manager.getEffectiveSkillLevel(SkillType.EVA_OPERATIONS);
         int biologySkill = manager.getEffectiveSkillLevel(SkillType.BIOLOGY);
         return (int) Math.round((double)(EVAOperationsSkill + biologySkill) / 2D);

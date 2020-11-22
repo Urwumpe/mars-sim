@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ConstructionUtil.java
- * @version 3.1.0 2017-09-21
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -247,7 +247,7 @@ public class ConstructionUtil {
 	    while (i.hasNext()) {
 	        Person person = i.next();
 	        if (!person.getPhysicalCondition().isDead()) {
-	            int constructionSkill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.CONSTRUCTION);
+	            int constructionSkill = person.getSkillManager().getEffectiveSkillLevel(SkillType.CONSTRUCTION);
 	            if (constructionSkill > result) {
 	                result = constructionSkill;
 	            }

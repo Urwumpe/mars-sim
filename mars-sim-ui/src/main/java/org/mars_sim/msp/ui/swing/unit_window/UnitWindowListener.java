@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * UnitWindowListener.java
- * @version 3.1.0 2017-03-04
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -33,7 +33,8 @@ public class UnitWindowListener extends InternalFrameAdapter {
      * @param e internal frame event.
      */
     public void internalFrameClosing(InternalFrameEvent e) {
-        desktop.disposeUnitWindow((UnitWindow) e.getSource());
+    	desktop.makeUnitWindowInvisible((UnitWindow) e.getSource());
+//        desktop.disposeUnitWindow((UnitWindow) e.getSource());
     }
 }
 

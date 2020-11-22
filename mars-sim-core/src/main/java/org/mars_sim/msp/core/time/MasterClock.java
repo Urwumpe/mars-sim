@@ -1,21 +1,16 @@
 /**
  * Mars Simulation Project
  * MasterClock.java
- * @version 3.1.0 2017-01-12
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.time;
 
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.SimulationConfig;
-import org.mars_sim.msp.core.tool.AutosaveScheduler;
-
-//import javafx.animation.Timeline;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
@@ -27,6 +22,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
+import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.Simulation.SaveType;
+
 /**
  * The MasterClock represents the simulated time clock on virtual Mars and
  * delivers a clock pulse for each frame.
@@ -34,92 +34,130 @@ import java.util.logging.Logger;
 public class MasterClock implements Serializable {
 
 	/** default serial id. */
-	static final long serialVersionUID = -1688463735489226493L;
+	static final long serialVersionUID = 1L;
 
 	/** Initialized logger. */
 	private static Logger logger = Logger.getLogger(MasterClock.class.getName());
-
-	private static final double PERIOD_IN_MILLISOLS = 1500D / MarsClock.SECONDS_PER_MILLISOL;
-
-//	private static final int ONE_THOUSAND = 1000;
-
+	private static String loggerName = logger.getName();
+	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	
+	private static final int FACTOR = 4;
+	public static final int MAX_SPEED = 12;
+	
+//	private static final double SMALL_NUMBER = 0.0028;
+	
+	/** The number of milliseconds for each millisols.  */	
+	private static final double MILLISECONDS_PER_MILLISOL = MarsClock.SECONDS_PER_MILLISOL * 1000.0;
+	/** The number of econds for each millisols.  */	
+	private static final double SECONDS_PER_MILLISOL = MarsClock.SECONDS_PER_MILLISOL;
+	
+	/** (For Command Mode) the maximum number of millisols for pausing. */
+	private static final double MAX_SOLS = 7_000;
+	
+	
 	// Data members
 	/** Runnable flag. */
-	private transient volatile boolean keepRunning = true;
+	private transient volatile boolean keepRunning = false;
 	/** Pausing clock. */
 	private transient volatile boolean isPaused = false;
-	
+	/** Flag for ending the simulation program. */
+	private transient volatile boolean exitProgram;
+	/** Flag for getting ready for autosaving. */
+//	private transient volatile boolean autosave;
+	/** Mode for saving a simulation. */
+	private transient volatile SaveType saveType = SaveType.NONE;
+//	private AtomicInteger saveType;
 	
 	/** The Current time between updates (TBU). */
 	private volatile long currentTBU_ns = 0L;
 	/** Simulation time ratio. */
-	private volatile double currentTR = 0D;
+	private volatile int currentTR = 0;
 	/** Adjusted time ratio. */
-	private volatile double adjustedTR = 0D;
+	private volatile int baseTR = 0;
 	/** Adjusted time between updates in nanoseconds. */
-	private volatile double adjustedTBU_ns = 0D;
+	private volatile double baseTBU_ns = 0D;
 	/** Adjusted time between updates in milliseconds. */
-	private volatile double adjustedTBU_ms = 0;
+	private volatile double baseTBU_ms = 0;
 	/** Adjusted time between updates in seconds. */
-	private volatile double adjustedTBU_s = 0;
+	private volatile double baseTBU_s = 0;
 	/** Adjusted frame per sec */
-	private volatile double adjustedFPS = 0;
+	private volatile double baseFPS = 0;
+	/** The pulse per seconds */
+	private volatile double pps = 0;
 	
+	/** The time taken to execute one frame in the game loop */
+	private volatile long executionTime;	
+	/** The sleep time */
+	private long sleepTime;
+	/** The residual time */
+	private long residualTime;
+	/** The last uptime in terms of number of pulses. */
+	private transient long tLast;
 	/** The cache for accumulating millisols up to a limit before sending out a clock pulse. */
 	private transient double timeCache;
-	/** Mode for saving a simulation. */
-	private transient volatile int saveType;
-	/** Flag for ending the simulation program. */
-	private transient volatile boolean exitProgram;
-	/** Flag for getting ready for autosaving. */
-	private transient volatile boolean autosave;
-	/** The pulses since last elapsed. */
-	private transient long elapsedLast;
+
+	private static boolean justReloaded = false;
 	
+//	/** The time between two ui pulses. */	
+//	private float pulseTime = .5F;
+	/** The counts for ui pulses. */	
+	private transient int count;
+	/** The total number of counts between two ui pulses. */
+//	private transient int totalCount = 40;
+	/** The average of the last working millis and the current one. */
+//	private long millisCache;
+	
+	/** Is FXGL is in use. */
+	public boolean isFXGL = false;
+	/** Is pausing millisol in use. */
+	public boolean canPauseTime = false;
+
 	/** The maximum number of counts allowed in waiting for other threads to execute. */
 	private int noDelaysPerYield = 0;
 	/** The measure of tolerance of the maximum number of lost frames for saving a simulation. */
 	private int maxFrameSkips = 0;
-	/** Mode for saving a simulation. */
-	private double tpfCache = 0;
-	/** The UI refresh cycle. */
-	private double refresh;
+	
 	/** The total number of pulses cumulated. */
 	private long totalPulses = 1;
-
 	/** The cache for the last nano time of an ui pulse. */	
-	private long t01;
-	/** The time between two ui pulses. */	
-	private float pulseTime;
+	private long t01 = 0;
 	
-	/** Is FXGL is in use. */
-	public boolean isFXGL = false;
+	/** Mode for saving a simulation. */
+	private double tpfCache = 0;
+	/** The total amount of millisols for Commander Mode. */
+	private double millisols = 0;
+	/** For Command Mode, the sim will pause every x millisols. */
+	private double pausingMillisols = 1000;
 
+	/** The file to save or load the simulation. */
+	private transient volatile File file;
+	/** The thread for running the clock listeners. */
+	private transient ExecutorService clockExecutor;
+	
 	/** A list of clock listeners. */
 	private transient List<ClockListener> clockListeners;
 	/** A list of clock listener tasks. */
-	private transient List<ClockListenerTask> clockListenerTasks = new CopyOnWriteArrayList<>();
-
-	/** The martian Clock. */
-	private MarsClock marsTime;
+	private transient List<ClockListenerTask> clockListenerTasks;
+	/** A list of past UI refresh rate. */
+	private static List<Float> timeIntervals;
+	
+	
+	/** The Martian Clock. */
+	private MarsClock marsClock;
 	/** A copy of the initial martian clock at the start of the sim. */
-	private static MarsClock initialMarsTime;
+	private MarsClock initialMarsTime;
 	/** The Earth Clock. */
 	private EarthClock earthClock;
 	/** The Uptime Timer. */
 	private UpTimer uptimer;
-	/** The file to save or load the simulation. */
-	private transient volatile File file;
 	/** The thread for running the game loop. */
 	private ClockThreadTask clockThreadTask;
-	/** The thread for running the clock listeners. */
-	private transient ExecutorService clockListenerExecutor;
+
 	// Note: ExecutorService may not stop after the program exits.
 	// see https://netopyr.com/2017/03/13/surprising-behavior-of-cached-thread-pool/
 
-	private static Simulation sim;
-
-	private static SimulationConfig config;
+	private static Simulation sim = Simulation.instance();
+//	private static SimulationConfig simulationConfig;
 
 	/**
 	 * Constructor
@@ -130,92 +168,102 @@ public class MasterClock implements Serializable {
 	 */
 	public MasterClock(boolean isFXGL, int userTimeRatio) {
 		this.isFXGL = isFXGL;
-		// logger.config("MasterClock's constructor is on " +
-		// Thread.currentThread().getName() + " Thread");
-
-		sim = Simulation.instance();
-		// Initialize data members
-		config = SimulationConfig.instance();
+		// logger.config("MasterClock's constructor is on " + Thread.currentThread().getName() + " Thread");
+		
+		// Gets an instance of the SimulationConfig singleton 
+		SimulationConfig simulationConfig = SimulationConfig.instance();
 
 		// Create a martian clock
-		marsTime = new MarsClock(config.getMarsStartDateTime());
-
-		initialMarsTime = (MarsClock) marsTime.clone();
-
+		marsClock = new MarsClock(simulationConfig.getMarsStartDateTime());
+		// Save a copy of the initial mars time
+		initialMarsTime = (MarsClock) marsClock.clone();
+		
 //		testNewMarsLandingDayTime();
 
 		// Create an Earth clock
-		earthClock = new EarthClock(config.getEarthStartDateTime());
+		earthClock = new EarthClock(simulationConfig.getEarthStartDateTime());
 
 		// Create an Uptime Timer
 		uptimer = new UpTimer(this);
 
 		// Create listener list.
 		clockListeners = Collections.synchronizedList(new CopyOnWriteArrayList<ClockListener>());
-		elapsedLast = uptimer.getUptimeMillis();
+		timeIntervals = new CopyOnWriteArrayList<>();
+		
+		// Calculate elapsedLast
+		tLast = uptimer.getUptimeMillis();
 
+		// Check if FXGL is used
 		if (!isFXGL)
 			clockThreadTask = new ClockThreadTask();
 
-		logger.config("   -------------------------------------------");
+		logger.config("-----------------------------------------------------");
 		
 		// Setting the initial time ratio.
 		double tr = 0;
 		if (userTimeRatio == -1)
-			tr = config.getTimeRatio();
+			tr = simulationConfig.getTimeRatio();
 		else {
 			tr = userTimeRatio;
-		logger.config("   User-Defined Time Ratio (TR) : " + (int) tr + "x");
+//			logger.config("   User-Defined Time Ratio (TR) : " + (int) tr + "x");
 		}
-		double tbu = config.getTimeBetweenUpdates();
+		
+		// Gets the time between updates
+		double tbu = simulationConfig.getTimeBetweenUpdates();
 
+		// Gets the machine's # of threads
 		int threads = Simulation.NUM_THREADS;
 
 		// Tune the time between update
 		if (threads <= 32) {
-			adjustedTBU_ms = 12D / (Math.sqrt(threads) * 2) * tbu;
+			baseTBU_ms = 12D / (Math.sqrt(threads) * 2) * tbu;
 		} else {
-			adjustedTBU_ms = 1.5 * tbu;
+			baseTBU_ms = 1.5 * tbu;
 		}
 
 		// Tune the time ratio
 		if (threads == 1) {
-			adjustedTR = tr / 32D;
+			baseTR = (int) (tr / 32D);
 		} else if (threads == 2) {
-			adjustedTR = tr / 16D;
+			baseTR = (int) (tr / 16D);
 		} else if (threads <= 3) {
-			adjustedTR = tr / 8D;
+			baseTR = (int) (tr / 8D);
 		} else if (threads <= 4) {
-			adjustedTR = tr / 4D;
+			baseTR = (int) (tr / 6D);
 		} else if (threads <= 6) {
-			adjustedTR = tr / 2D;
+			baseTR = (int) (tr / 4D);
 		} else if (threads <= 8) {
-			adjustedTR = tr;
+			baseTR = (int) (tr / 2D);
 		} else if (threads <= 12) {
-			adjustedTR = tr * 2D;
+			baseTR = (int) tr;
 		} else if (threads <= 16) {
-			adjustedTR = tr * 4D;
+			baseTR = (int) (tr * 2D);
 		} else {
-			adjustedTR = tr * 8D;
+			baseTR = (int) (tr * 4D);
 		}
 
-		adjustedTBU_ns = adjustedTBU_ms * 1_000_000.0; // convert from millis to nano
-		adjustedTBU_s = adjustedTBU_ms / 1_000.0;
-		adjustedFPS = 1.0 / adjustedTBU_s;
-		currentTBU_ns = (long) adjustedTBU_ns;
+		baseTBU_ns = baseTBU_ms * 1_000_000.0; // convert from millis to nano
+		baseTBU_s = baseTBU_ms / 1_000.0;
+		baseFPS = 1.0 / baseTBU_s;
+		
+		// Set the current TBU
+		currentTBU_ns = (long) baseTBU_ns;
 
-		currentTR = adjustedTR;
+		// Set the current time ratio
+		currentTR = baseTR;
 
 		// Added loading the values below from SimulationConfig
-		setNoDelaysPerYield(config.getNoDelaysPerYield());
-		setMaxFrameSkips(config.getMaxFrameSkips());
+		setNoDelaysPerYield(simulationConfig.getNoDelaysPerYield());
+		setMaxFrameSkips(simulationConfig.getMaxFrameSkips());
 
-//		logger.config("Based on # CPU cores/threads, the following parameters have been re-adjusted as follows :");
-		logger.config("       Adjusted Time Ratio (TR) : " + (int) adjustedTR + "x");
-		logger.config("     Time between Updates (TBU) : " + Math.round(adjustedTBU_ms * 100D) / 100D + " ms");
-		logger.config("         Ticks Per Second (TPS) : " + Math.round(adjustedFPS * 100D) / 100D + " Hz");
-		logger.config("   -------------------------------------------");
-//		logger.config(" - - - Welcome to Mars - - -");
+		logger.config("         User Defined Time Ratio : " + (int) tr + "x");
+		logger.config("            Base Time Ratio (TR) : " + (int) baseTR + "x");
+		logger.config("     Base Ticks Per Second (TPS) : " + Math.round(baseFPS * 100D) / 100D + " Hz");
+		logger.config(" Base Time between Updates (TBU) : " + Math.round(baseTBU_ms * 100D) / 100D + " ms");
+		logger.config("-----------------------------------------------------");
+		logger.config("Note: parameters are tuned to # available CPU threads");
+
+		//		logger.config(" - - - Welcome to Mars - - -");
 	}
 
 	public void testNewMarsLandingDayTime() {
@@ -303,7 +351,7 @@ public class MasterClock implements Serializable {
 	 * @return Martian clock instance
 	 */
 	public MarsClock getMarsClock() {
-		return marsTime;
+		return marsClock;
 	}
 
 	/**
@@ -356,13 +404,15 @@ public class MasterClock implements Serializable {
 	 * @param oldListener the listener to remove.
 	 */
 	public final void removeClockListener(ClockListener oldListener) {
-		if (clockListeners == null)
-			clockListeners = Collections.synchronizedList(new CopyOnWriteArrayList<ClockListener>());
-		if (clockListeners.contains(oldListener))
+//		if (clockListeners == null)
+//			clockListeners = Collections.synchronizedList(new CopyOnWriteArrayList<ClockListener>());
+		if (clockListeners != null && clockListeners.contains(oldListener))
 			clockListeners.remove(oldListener);
+//		 logger.config("just called clockListeners.remove(oldListener)");
 		// Check if clockListenerTaskList contain the newListener's task, if it does,
 		// delete it
 		ClockListenerTask task = retrieveClockListenerTask(oldListener);
+//		 logger.config("just get task");
 		if (task != null)
 			clockListenerTasks.remove(task);
 	}
@@ -383,30 +433,27 @@ public class MasterClock implements Serializable {
 				hasIt = true;
 		}
 		if (!hasIt) {
-			clockListenerTasks.add(new ClockListenerTask(listener));
+			ClockListenerTask clt = new ClockListenerTask(listener);
+			clockListenerTasks.add(clt);
+//			logger.config(clt.getClockListener().getClass().getSimpleName() + "'s clock listener added.");
 		}
 	}
 
 	/**
-	 * Retrieve a clock listener task
+	 * Retrieve the clock listener task instance, given its clock listener
 	 * 
-	 * @param oldListener the clock listener task to remove.
+	 * @param listener the clock listener
 	 */
-	public ClockListenerTask retrieveClockListenerTask(ClockListener oldListener) {
-		
-//		 ClockListenerTask c = null; clockListenerTaskList.forEach(t -> {
-//		 ClockListenerTask l = c; 
-//		if (t.getClockListener().equals(oldListener)) l = t;
-//		 });
-		 
-		ClockListenerTask t = null;
-		Iterator<ClockListenerTask> i = clockListenerTasks.iterator();
-		while (i.hasNext()) {
-			ClockListenerTask c = i.next();
-			if (c.getClockListener().equals(oldListener))
-				t = c;
+	public ClockListenerTask retrieveClockListenerTask(ClockListener listener) {	
+		if (clockListenerTasks != null) {
+			Iterator<ClockListenerTask> i = clockListenerTasks.iterator();
+			while (i.hasNext()) {
+				ClockListenerTask c = i.next();
+				if (c.getClockListener().equals(listener))
+					return c;
+			}
 		}
-		return t;
+		return null;
 	}
 
 	/**
@@ -416,7 +463,6 @@ public class MasterClock implements Serializable {
 	 */
 	public void loadSimulation(File file) {
 		this.setPaused(false, false);
-		// loadSimulation = true;
 		this.file = file;
 	}
 
@@ -425,28 +471,29 @@ public class MasterClock implements Serializable {
 	 * 
 	 * @param file save to file or null if default file.
 	 */
-	public void setSaveSim(int type, File file) {
+	public void setSaveSim(SaveType type, File file) {
 		saveType = type;
 		this.file = file;
+//		logger.config("setSaveSim(" + type + ", " + file + ");  saveType is " + saveType);
 	}
 
-	/**
-	 * Sets the value of autosave
-	 * 
-	 * @param value
-	 */
-	public void setAutosave(boolean value) {
-		autosave = value;
-	}
+//	/**
+//	 * Sets the value of autosave
+//	 * 
+//	 * @param value
+//	 */
+//	public void setAutosave(boolean value) {
+//		autosave = value;
+//	}
 
-	/**
-	 * Gets the value of autosave
-	 * 
-	 * @return autosave
-	 */
-	public boolean getAutosave() {
-		return autosave;
-	}
+//	/**
+//	 * Gets the value of autosave
+//	 * 
+//	 * @return autosave
+//	 */
+//	public boolean getAutosave() {
+//		return autosave;
+//	}
 
 	/**
 	 * Checks if in the process of saving a simulation.
@@ -454,12 +501,16 @@ public class MasterClock implements Serializable {
 	 * @return true if saving simulation.
 	 */
 	public boolean isSavingSimulation() {
-		if (saveType != 0)
-			return true;
-		else
+		if (saveType == SaveType.NONE)
 			return false;
+		else
+			return true;
 	}
 
+	public void setSaveType() {
+		saveType = SaveType.NONE;
+	}
+	
 	/**
 	 * Sets the exit program flag.
 	 */
@@ -472,21 +523,24 @@ public class MasterClock implements Serializable {
 	 * Computes the time pulse in millisols in other words, the number of realworld
 	 * seconds that have elapsed since it was last called
 	 * 
+	 * @param elapsedMilliseconds time elapsed in milliseconds
 	 * @return time pulse length in millisols
 	 * @throws Exception if time pulse length could not be determined.
 	 */
 	public double computeTimePulseInMillisols(long elapsedMilliseconds) {
-		return computeTimePulseInSeconds(elapsedMilliseconds) / MarsClock.SECONDS_PER_MILLISOL;
+//		return computeTimePulseInSeconds(elapsedMilliseconds) / MarsClock.SECONDS_PER_MILLISOL;
+		return elapsedMilliseconds * currentTR / 1000D / MarsClock.SECONDS_PER_MILLISOL;
 	}
 
-	/**
-	 * Computes the time pulse in seconds. It varies, depending on the time ratio
-	 * 
-	 * @return time pulse length in seconds
-	 */
-	public double computeTimePulseInSeconds(long elapsedMilliseconds) {
-		return elapsedMilliseconds * currentTR / 1000D;
-	}
+//	/**
+//	 * Computes the time pulse in seconds. It varies, depending on the time ratio
+//	 * 
+//	 * @param elapsedMilliseconds time elapsed in milliseconds
+//	 * @return time pulse length in seconds
+//	 */
+//	public double computeTimePulseInSeconds(long elapsedMilliseconds) {
+//		return elapsedMilliseconds * currentTR / 1000D;
+//	}
 
 	/*
 	 * Gets the total number of pulses since the start of the sim
@@ -501,31 +555,59 @@ public class MasterClock implements Serializable {
 	 * @return totalPulses
 	 */
 	public void resetTotalPulses() {
-		totalPulses = (long) (1D / adjustedTBU_ms * uptimer.getLastUptime());
+//		long old = totalPulses;
+		totalPulses = 1;// (long) (1D / adjustedTBU_ms * uptimer.getLastUptime());
+		// At the start of the sim, totalPulses is zero
+//		if (totalPulses > 1)
+//			logger.config("Resetting the pulse count from " + old + " to " + totalPulses + ".");
 	}
 
+	/**
+	 * Resets the clock listener thread
+	 */
+	public void resetClockListeners() {
+		// If the clockListenerExecutor is not working, need to restart it
+//		LogConsolidated.log(Level.CONFIG, 0, sourceName, "The Clock Thread has died. Restarting...");
+		
+		// Re-instantiate clockListenerExecutor
+		clockExecutor = Executors.newSingleThreadExecutor();
+		// Re-instantiate clockListeners
+		clockListeners = Collections.synchronizedList(new CopyOnWriteArrayList<ClockListener>());
+
+		setupClockListenerTask();
+			
+		addClockListenerTask(sim);
+
+//		sim.restartClockExecutor();
+	}
+	
+//	public long getDefaultTotalPulses() {
+//		return (long)(1D / adjustedTBU_ms * uptimer.getLastUptime());
+//	}
+	
 	/**
 	 * Sets the simulation time ratio and adjust the value of time between update
 	 * (TBU)
 	 * 
 	 * @param ratio
 	 */
-	public void setTimeRatio(double ratio) {
-		if (ratio >= 1D && ratio <= 65536D) {
+	public void setTimeRatio(int ratio) {
+		if (ratio >= 0D && ratio <= Math.pow(2, MAX_SPEED) && currentTR != ratio) {
 
 			if (ratio > currentTR)
 				currentTBU_ns = (long) (currentTBU_ns * 1.0025); // increment by .5%
 			else
 				currentTBU_ns = (long) (currentTBU_ns * .9975); // decrement by .5%
 
-			logger.config("Time-ratio : " + (int)currentTR + "x ==> " + (int)ratio + "x");
-			
-			adjustedTBU_s = currentTBU_ns / 1_000_000_000D;
+			logger.config("Time-ratio : " + (int)currentTR + "x -> " + (int)ratio + "x");
+				
 			currentTR = ratio;
 			
-		} 
+		}
 		
-		else throw new IllegalArgumentException("Time ratio is out of bounds ");
+//		else {
+//			logger.config("Not possible to change the time-ratio from " + (int)currentTR + "x -> " + (int)ratio + "x");		
+//		}
 	}
 
 	/**
@@ -543,7 +625,7 @@ public class MasterClock implements Serializable {
 	 * @return ratio
 	 */
 	public double getCalculatedTimeRatio() {
-		return adjustedTR;
+		return baseTR;
 	}
 
 	/**
@@ -618,164 +700,293 @@ public class MasterClock implements Serializable {
 
 		@Override
 		public void run() {
-			elapsedLast = uptimer.getUptimeMillis();
+			tLast = uptimer.getUptimeMillis();
 			// Keep running until told not to by calling stop()
 			keepRunning = true;
 
-			if (!isFXGL) {
+			if (sim.isDoneInitializing() && !isFXGL) {
 
-				long t1, t2, sleepTime, overSleepTime = 0L, excess = 0L;
+				long t1 = 0;
+				long t2 = 0;
+				long t3 = 0;
+				long overSleepTime = 0L;
+				long excess = 0L;
 				int noDelays = 0;
-				t1 = System.nanoTime();
 
 				while (keepRunning) {
-					// Refactored codes for variable sleepTime
-					t2 = System.nanoTime();
-
+					// Gets the new t1
+					t1 = System.nanoTime();
+					
+					// Call addTime() to increment time in EarthClock and MarsClock
 					addTime();
+		
+					// Gets t2 after a time pulse has been sent to EarthClock and MarsClock
+					t2 = System.nanoTime();
+					
+					executionTime = t2 - t1;
+					
+					// Note: dt = t2 - t1. It's the time where all the logics are done
 
-					// Benchmark CPU speed
-//	 		        long diff = 0;
-//
-//	 		        if (count >= 1000)
-//	 		        	count = 0;
-//
-//	 		        if (count >= 0) {
-//	 			        diff = (long) ((t2 - t2Cache) / 1_000_000D);
-//	 		        	diffCache = (diff * count + diffCache)/(count + 1);
-//	 		        }
-
-					// if (count == 0) logger.config("Benchmarking this machine : " + diff + " per
-					// 1000 frames");
-
-					// dt = t2 - t1;
-					sleepTime = currentTBU_ns - t2 + t1 - overSleepTime;
-					// System.out.print ("sleep : " + sleepTime/1_000_000 + "ms\t");
+					// sleepTime varies, depending on the remaining time
+					sleepTime = currentTBU_ns - executionTime;
+//					logger.config("sleepTime : " + sleepTime/1_000_000 + " ms");
 
 					if (sleepTime > 0 && keepRunning) {
 						// Pause simulation to allow other threads to complete.
 						try {
-							// Thread.yield();
 							TimeUnit.NANOSECONDS.sleep(sleepTime);
 						} catch (InterruptedException e) {
 							Thread.currentThread().interrupt();
 						}
-
-						overSleepTime = (System.nanoTime() - t2) - sleepTime;
-
-						// timeBetweenUpdates = (long) (timeBetweenUpdates * .999905); // decrement by
-						// .0005%
+						residualTime = t1 - t3;
+						overSleepTime = currentTBU_ns - executionTime - sleepTime - residualTime;
+//						logger.config("overSleepTime : " + overSleepTime/1_000_000 + " ms");
 					}
 
-					else { // last frame went beyond the PERIOD
+					else {
+						// if sleepTime <= 0 ( if t2 is way bigger than t1
+						// last frame went beyond the PERIOD
+						int secs = 0;
+						int overSleepSeconds = (int) (overSleepTime/1_000_000_000);
+						int mins = 0;
+						
+						String s = "";
+						
+						if (overSleepSeconds > 60) {
+							mins = overSleepSeconds / 60;
+						}
+						secs = overSleepSeconds % 60;
+						
+						if (mins > 0) {
+							s = mins + " mins " + secs + " secs";
+						}
+						else {
+							s = secs + " secs";
+						}
+						
+						if (overSleepSeconds > 0 && keepRunning)
+							logger.config("This machine seems to be on power saving for " + s); 
+						
 						excess -= sleepTime;
 						overSleepTime = 0L;
-
+						sleepTime = 0;
+						
 						if (++noDelays >= noDelaysPerYield) {
-							Thread.yield();
 							noDelays = 0;
 						}
 
-						// timeBetweenUpdates = (long) (timeBetweenUpdates * 1.0025); // increment by
-						// 0.25%
-					}
-
-					int skips = 0;
-
-					while ((excess > currentTBU_ns) && (skips < maxFrameSkips)) {
-						excess -= currentTBU_ns;
-						// Make up lost frames
-						skips++;
-
-						if (skips >= maxFrameSkips) {
-							logger.config(
-									"# of skips has reached the maximum # of frame skips. Resetting total pulse and slowing down (TBU).");
+						if (excess/1_000_000 > 1000) {
+							// If the pause is more than .5 seconds, this is most likely due to the machine 
+							// just recovering from a power saving event
+							
+							// Reset the pulse count
 							resetTotalPulses();
-							if (currentTBU_ns > (long) (adjustedTBU_ns * 1.25))
-								currentTBU_ns = (long) (adjustedTBU_ns * 1.25);
-							else
-								currentTBU_ns = (long) (currentTBU_ns * .9925); // decrement by 2.5%
 						}
-
-						addTime();
+						
+						else {
+							for (int i = 1; i <= maxFrameSkips; i++) {
+								boolean value = !justReloaded && (Math.abs(excess) > currentTBU_ns);
+								justReloaded = false;	
+								
+								if (!value) {
+									excess = 0;
+									break;
+								}
+									
+								logger.warning("excess: " + excess/1_000_000 
+										 + " ms. currentTBU : " + currentTBU_ns/1_000_000
+										 + " ms. executionTime : " + executionTime/1_000_000
+										 + " ms. Recovering from a lost frame (Skips # " + i + ")."
+										); // e.g. excess : -118289082
+								
+								excess -= currentTBU_ns;
+		
+								// Reset the pulse count
+								resetTotalPulses();
+								
+								// Call addTime once to get back the time lost in a frame
+								addTime();
+								
+							}
+							
+//							if (skips >= maxFrameSkips) {
+////								logger.config("# of skips (" + skips + ") is at the max skips (" + maxFrameSkips + ")."); 
+//								// Reset the pulse count
+//								resetTotalPulses();
+//								// Adjust the time between update
+//								if (currentTBU_ns > (long) (baseTBU_ns * 1.25))
+//									currentTBU_ns = (long) (baseTBU_ns * 1.25);
+//								else
+//									currentTBU_ns = (long) (currentTBU_ns * .9925); // decrement by 2.5%
+//								
+//								logger.config("Reset total pulses and set TBU to " + Math.round(100.0 * currentTBU_ns/1_000_000.0)/100.0 + " ms");
+//								
+//								addTime();
+//							}
+						}
+						
+						// Gets t3
+						t3 = System.nanoTime();
 					}
-
+					
 					// Set excess to zero to prevent getting stuck in the above while loop after
 					// waking up from power saving
+//					logger.config("Setting excess to zero");
 					excess = 0;
-
-					t1 = System.nanoTime();
-
-					if (checkSave())
-						// Reset t1 time due to the long process of saving
-						t1 = System.nanoTime();
 
 					// Exit program if exitProgram flag is true.
 					if (exitProgram) {
-//						if (sim.getAutosaveTimer() != null)
-//							sim.getAutosaveTimer().shutdownNow();// .stop();
 						AutosaveScheduler.cancel();
 						System.exit(0);
 					}
-
-					// For performance benchmarking
-//	 		       t2Cache = t2;
-//	 		       count++;
-
+					
+					// Gets t3
+					t3 = System.nanoTime();
+					
+					if (canPauseTime && millisols >= pausingMillisols) {
+						
+						double m = marsClock.getMillisolOneDecimal();
+						
+						millisols = m % pausingMillisols;
+						
+						setPaused(true, false);
+					}
+					
+					// Check to see if the simulation should be saved at this point.
+					checkSave();
+					
 				} // end of while
 			} // if fxgl is not used
 		} // end of run
 	}
 
+	public void setCommandPause(boolean value0, double value1) {
+		// Check GameManager.mode == GameMode.COMMAND ?
+		canPauseTime = value0;
+		pausingMillisols = value1;
+	}
+	
 	/*
 	 * Add earth time and mars time
 	 */
 	private void addTime() {
 		if (!isPaused) {
 			// Update elapsed milliseconds.
-			long millis = updateElapsedMilliseconds();
-			// Get the sim millisecond for EarthClock
-			// double ms = millis * timeRatio;
+			long millis = calculateElapsedTime();
+			if (millis < baseTBU_ms * .20) {
+				// Note: this usually happens when recovering from power saving
+				// Or when it resumes from pause
+//				logger.config("millis : " + millis + "     baseTBU_ms : " + baseTBU_ms);
+				
+				// Since millis is too far off, use millisCache instead to compute the correct timePulse 
+				
+				// Reset currentTR
+				if (currentTR > baseTR)
+					currentTR = baseTR;
+//				else
+//					currentTR = baseTR;
+				
+				// Reset millis back to its original value
+				millis = (long) (baseTBU_ms);
+			}
+				
+//			logger.config("millis : " + millis + "     currentTR : " + currentTR);
+
+			// The time elapsed for the EarthClock
+			long earthMillis = millis * currentTR;
 			// Get the time pulse length in millisols.
-			// double timePulse = millis / 1000 * timeRatio / MarsClock.SECONDS_IN_MILLISOL;
-			// Get the time pulse length in millisols.
-			double timePulse = computeTimePulseInMillisols(millis);
+			double timePulse = earthMillis / MILLISECONDS_PER_MILLISOL; 
+//			logger.config("timePulse : " + Math.round(timePulse*1000.0)/1000.0);
+
 			// Incrementing total time pulse number.
 			totalPulses++;
 
-			if (timePulse > 0 && keepRunning
-			// || !clockListenerExecutor.isTerminating()
-					&& clockListenerExecutor != null && !clockListenerExecutor.isTerminated()
-					&& !clockListenerExecutor.isShutdown()) {
-
-				// Add time pulse length to Earth and Mars clocks.
-				earthClock.addTime(millis * currentTR);
-				marsTime.addTime(timePulse);
-				fireClockPulse(timePulse);
+			// Note: after recovering from a power save
+			// millis = 0 or 1
+			// timePulse = 0.0 or 0.002883686808002465
+			 
+			if (timePulse > 0 && keepRunning) {
+				if (clockExecutor != null
+					&& !clockExecutor.isTerminated()
+					&& !clockExecutor.isShutdown()) {	
+					
+					// Add time to the Earth clock.
+					earthClock.addTime(earthMillis);
+					
+					// Add time pulse to Mars clock.
+					marsClock.addTime(timePulse);
+					
+//					long t0 = System.nanoTime();
+					// Run the clock listener tasks that are in other package
+					fireClockPulse(timePulse);
+					
+//					long t1 = System.nanoTime();
+									
+					millisols += timePulse;
+					if (millisols > MAX_SOLS)
+						millisols = millisols - MAX_SOLS;
+//					logger.info("dt : " + (t1- t0)/1_000 + " us");
+				}
+				else {
+					// NOTE: when resuming from power saving, timePulse becomes zero
+					LogConsolidated.flog(Level.CONFIG, 0, sourceName, "The clockListenerExecutor has died. Restarting...");
+					resetClockListeners();
+				}
 			}
+			// NOTE: when resuming from power saving, timePulse becomes zero
+
 		}
 	}
 
+//	private void shutdownAndAwaitTermination(ExecutorService pool) {
+//		pool.shutdown(); // Disable new tasks from being submitted
+//		try {
+//		// Wait a while for existing tasks to terminate
+//		if (!pool.awaitTermination(2, TimeUnit.SECONDS)) {
+//			pool.shutdownNow(); // Cancel currently executing tasks
+//		// Wait a while for tasks to respond to being cancelled
+//			if (!pool.awaitTermination(2, TimeUnit.SECONDS))
+//				System.err.println("Pool did not terminate");
+//			}
+//		} catch (InterruptedException ie) {
+//			// (Re-)Cancel if current thread also interrupted
+//			pool.shutdownNow();
+//			// Preserve interrupt status
+//			Thread.currentThread().interrupt();
+//		}
+//	}
+		   
 	/**
 	 * Checks if it is on pause or a saving process has been requested. Keeps track
 	 * of the time pulse
+	 * 
+	 * @return true if it's saving
 	 */
 	private boolean checkSave() {
-		if (saveType != 0) {
+//		logger.config("checkSave() is on " + Thread.currentThread().getName()); // pool-4-thread-1
+//		logger.config("1. checkSave() : saveType is " + saveType); 
+		if (saveType != SaveType.NONE) {
+//			logger.config("checkSave() is on " + Thread.currentThread().getName());
+//			logger.config("2. checkSave() : saveType is " + saveType + "     file is " + file); 
 			try {
 				sim.saveSimulation(saveType, file);
+			} catch (NullPointerException e) {
+				logger.log(Level.SEVERE,
+						"NullPointerException. Could not save the simulation.", e);// as " + (file == null ? "null" : file.getPath()), e);
+				e.printStackTrace();	
 			} catch (IOException e) {
 				logger.log(Level.SEVERE,
-						"IOException. Could not save the simulation as " + (file == null ? "null" : file.getPath()), e);
+						"IOException. Could not save the simulation.", e);//  as " + (file == null ? "null" : file.getPath()), e);
 				e.printStackTrace();
 
-			} catch (Exception e1) {
+			} catch (Exception e) {
 				logger.log(Level.SEVERE,
-						"Exception. Could not save the simulation as " + (file == null ? "null" : file.getPath()), e1);
-				e1.printStackTrace();
+						"Exception. Could not save the simulation.", e);//  as " + (file == null ? "null" : file.getPath()), e1);
+				e.printStackTrace();
 			}
-
-			saveType = 0;
+			
+			// Reset saveType back to zero
+			saveType = SaveType.NONE;
 
 			return true;
 		}
@@ -790,20 +1001,36 @@ public class MasterClock implements Serializable {
 	 */
 	public void setupClockListenerTask() {
 		clockListeners.forEach(t -> {
-			// Check if it has a corresponding task or not, if it doesn't, create a task for
-			// t
+			// Check if it has a corresponding task or not, 
+			// if it doesn't, create a task for t
 			addClockListenerTask(t);
 		});
 	}
 
-	public double getRefresh() {
-		return refresh;
+	/**
+	 * Returns the refresh rate
+	 * 
+	 * @return the refresh rate
+	 */
+	public float getRefresh() {
+//		return 1/(DoubleStream.of(refreshRates).average().orElse(0d));
+		float sum = 0;
+		int size = timeIntervals.size();
+		for (float r : timeIntervals) {
+			sum += r;
+		}	
+		// Note: average refresh rate = 1/timeInterval
+		return size/sum;
 	}
 
-	/** Gets the time between two ui pulses. */
-	public float getPulseTime( ) {
-		return pulseTime;
-	}
+//	/** 
+//	 * Gets the time between two ui pulses.
+//	 * 
+//	 * @return the pulse time
+//	 */
+//	public float getPulseTime( ) {
+//		return pulseTime;
+//	}
 	
 	/**
 	 * Prepares clock listener tasks for setting up threads.
@@ -825,59 +1052,135 @@ public class MasterClock implements Serializable {
 			this.time = time;
 		}
 
+		public double getTime() {
+			return time;
+		}
+		
 		@Override
 		public void run() {
-			try {
-
-				// The most important job for CLockListener is to send a clock pulse to
-				// Simulation's clockPulse()
-				// so that UpTimer, Mars, UnitManager, ScientificStudyManager, TransportManager
-				// gets updated.
-				listener.clockPulse(time);
-				timeCache += time;
-
-				if (timeCache > refresh) {
-					// Set refresh to the new value
-					refresh = PERIOD_IN_MILLISOLS * time;
-					long t02 = System.nanoTime();
-					pulseTime = (t02-t01)/1_000_000_000F;
-//					System.out.println("time : " + time + "   refresh : " + refresh + "   Rate : " + pulseTime + " s");
-					t01 = t02;
-					// at the start of the sim, delta is ~.18 s
+			if (sim.isDoneInitializing()) {
+				try {
+					// The most important job for CLockListener is to send a clock pulse to
+					// 1. Simulation
+	
+					// so that 
+					// 1. UpTimer,
+					// 2. Mars, 
+					// 3. MissionManager,
+					// 4. UnitManager, 
+					// 5. ScientificStudyManager, 
+					// 6. TransportManager,
+				
+					// gets updated.
+					listener.clockPulse(time);
+					timeCache += time;
+					count++;
+	//				long t02 = System.currentTimeMillis();//.nanoTime();
+	//				// Discard the very first pulseTime since it's not invalid
+	//				// at the start of the sim
+	//				if (t01 != 0) {
+	//					timeIntervals.add((t02-t01)/1_000F);
+	//				}
+	//				t01 = t02;
+	//				if (timeIntervals.size() > 15)
+	//					timeIntervals.remove(0);
 					
-					// The secondary job of CLockListener is to send uiPulse() out to
-					// MainDesktopPane,
-					// which in terms sends a clock pulse out to update all unit windows and tool
-					// windows
-					//
-					// It also sends an ui pulse out to the following class and map related panels:
-					// 1. SettlementMapPanel
-					// 2. ArrivingSettlementDetailPanel
-					// 3. GlobeDisplay
-					// 4. MapPanel
-					// 5. ResupplyDetailPanel
-					// 6. Telegraph
-					// 7. TimeWindow
-					// 8. EventTableModel
-					// 9. NotificationWindow
-					listener.uiPulse(time);
-					timeCache = 0;
+					// period is in seconds
+	//				double period = timeCache / currentTR * MarsClock.SECONDS_PER_MILLISOL;
+	
+					if (count > FACTOR) {
+	//					int speed = getCurrentSpeed();
+	//					if (speed == 0)
+	//						speed = 1;
+	//					totalCount = speed * speed / FACTOR ;
+	//					System.out.println(totalCount);
+	//					if (totalCount < 4)
+	//						totalCount = 4;
+	//					totalCount = (int) (3D/computePulsesPerSecond());
+						count = 0;
+						
+	//					long t02 = System.nanoTime();
+						long t02 = System.currentTimeMillis();//.nanoTime();
+						// Discard the very first pulseTime since it's not invalid
+						// at the start of the sim
+						if (t01 != 0) {
+							timeIntervals.add((t02-t01)/1_000F);
+						}
+						t01 = t02;
+	
+						if (timeIntervals.size() > 30)
+							timeIntervals.remove(0);
+	
+	//					System.out.println(
+	//							"time : " + Math.round(time*100.0)/100.0 
+	//							+ "   timeCache : " + Math.round(timeCache*100.0)/100.0 
+	//							  "   r : " + Math.round(r*100.0)/100.0 
+	//							+ "   refresh : " + Math.round(getRefresh()*100.0)/100.0 
+	//							"   time between pulses : " + pulseTime
+	//							+ "   currentTR : " + currentTR
+	//							+ "   Period : " + Math.round(period*1000.0)/1000.0
+	//							);
+	
+						// The secondary job of CLockListener is to send uiPulse() out to
+						// 0. MainDesktopPane,
+						// which in terms sends a clock pulse out to update all unit windows and tool
+						// windows
+						//
+						// It also sends an ui pulse out to the following class and map related panels:
+	
+						// 1. MarsTerminal
+						// 2. AudioPlayer
+						// 3. MainDesktopPane
+						// 4. GlobeDisplay
+						// 5. MapPanel (2x)
+						// 6. TimeWindow
+						// 7. SettlementMapPanel
+						// 8. NotificationWindow
+						// 9. ResupplyDetailPanel
+						//10. ArrivingSettlementDetailPanel
+						
+						
+						// Note: on a typical PC, approximately one ui pulse is sent out each second
+						listener.uiPulse(timeCache);
+						timeCache = 0;
+	
+					}
+	
+				} catch (ConcurrentModificationException e) {
+					e.printStackTrace();
 				}
-
-			} catch (ConcurrentModificationException e) {
-				e.printStackTrace();
 			}
 		}
 	}
 
+	   /**
+     * Gets the simulation speed
+     * 
+     * @return
+     */
+    public int getCurrentSpeed() {
+    	int speed = 0;
+    	int tr = (int) currentTR;	
+        int base = 2;
+
+        while (tr != 1) {
+            tr = tr/base;
+            --speed;
+        }
+        
+    	return -speed;
+    }
+    
 	/**
 	 * Fires the clock pulse to each clock listener
+	 * 
+	 * @param time
 	 */
 	public void fireClockPulse(double time) {
 		for (ClockListenerTask task : clockListenerTasks) {
 			if (task != null) {
 				task.insertTime(time);
-				clockListenerExecutor.execute(task);
+				clockExecutor.execute(task);
 			}
 
 			else
@@ -888,48 +1191,49 @@ public class MasterClock implements Serializable {
 	/**
 	 * Stop the clock
 	 */
-	// called by stop() in Simulation.java
 	public void stop() {
 		keepRunning = false;
 	}
 
+	/**
+	 * Restarts the clock
+	 */
 	public void restart() {
 		keepRunning = true;
 	}
 
 	/**
+	 * Starts the clock
+	 */
+	public void start() {
+		keepRunning = true;
+	}
+
+	
+	/**
 	 * Set if the simulation is paused or not.
 	 *
-	 * @param isPaused true if simulation is paused.
+	 * @param value the state to be set.
+	 * @param showPane true if the pane should be shown.
 	 */
-	public void setPaused(boolean isPaused, boolean showPane) {
-		if (this.isPaused != isPaused) {
-			uptimer.setPaused(isPaused);
+	public void setPaused(boolean value, boolean showPane) {
+		if (this.isPaused != value) {
+			this.isPaused = value;
+			uptimer.setPaused(value);
 	
-			if (isPaused) {
-//				&& sim.getAutosaveTimer() != null 
-//					&& !sim.getAutosaveTimer().isShutdown()
-//					&& !sim.getAutosaveTimer().isTerminated()) {
-				
-				AutosaveScheduler.cancel();
-//				sim.getAutosaveTimer().shutdown(); 
-				// Note: using sim (instead of Simulation.instance()) 
-				// won't work when loading a saved sim.
-			} else {
-				AutosaveScheduler.start();
-//				sim.startAutosaveTimer();
-			}
-	
-			this.isPaused = isPaused;
-			// Fire pause change to all clock listeners.
-			firePauseChange(showPane);
-			
-			if (isPaused) {
-				logger.config("The simulation is paused.");
+			if (value) {
+//				stop();
+				AutosaveScheduler.cancel();		
+//				logger.config("The simulation is paused.");
 			}
 			else {
-				logger.config("The simulation is unpaused.");
+//				restart();
+				AutosaveScheduler.start();
+//				logger.config("The simulation is unpaused.");
 			}
+			
+			// Fire pause change to all clock listeners.
+			firePauseChange(value, showPane);
 		}
 	}
 
@@ -944,8 +1248,11 @@ public class MasterClock implements Serializable {
 
 	/**
 	 * Send a pulse change event to all clock listeners.
+	 * 
+	 * @param isPaused
+	 * @param showPane
 	 */
-	public void firePauseChange(boolean showPane) {
+	public void firePauseChange(boolean isPaused, boolean showPane) {
 
 		clockListeners.forEach(cl -> cl.pauseChange(isPaused, showPane));
 		
@@ -963,20 +1270,29 @@ public class MasterClock implements Serializable {
 		 
 	}
 
+	/**
+	 * Gets the pulse per second
+	 * 
+	 * @return
+	 */
 	public double getPulsesPerSecond() {
-		return 1000.0 / elapsedLast * totalPulses;
+		return 1000.0 / tLast * totalPulses;
 	}
-
+	
 	/**
 	 * Update the milliseconds elapsed since last time pulse.
 	 */
-	private long updateElapsedMilliseconds() {
-		if (uptimer == null) {
-			uptimer = new UpTimer(this);
-		}
-		long tnow = uptimer.getUptimeMillis();
-		long elapsedMilliseconds = tnow - elapsedLast;
-		elapsedLast = tnow;
+	private long calculateElapsedTime() {
+//		if (uptimer == null) {
+//			uptimer = new UpTimer(this);
+//		}		
+		// Find the new up time
+		long tnow = uptimer.getUptimeMillis();		
+		// Calculate the elapsed time in milli-seconds
+		long elapsedMilliseconds = tnow - tLast;		
+		// Update the last up time
+		tLast = tnow;
+		// return the elapsed time;
 		return elapsedMilliseconds;
 	}
 
@@ -984,28 +1300,34 @@ public class MasterClock implements Serializable {
 	 * Starts clock listener thread pool executor
 	 */
 	public void startClockListenerExecutor() {
-		// if ( clockListenerExecutor.isTerminated() ||
-		// clockListenerExecutor.isShutdown() )
-		if (clockListenerExecutor == null)
-			// clockListenerExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(1);
-			clockListenerExecutor = Executors.newSingleThreadExecutor();
-
+		if (clockExecutor == null)
+			clockExecutor = Executors.newSingleThreadExecutor(); //(ThreadPoolExecutor) Executors.newFixedThreadPool(1);
 	}
 
 	/**
 	 * Shuts down clock listener thread pool executor
 	 */
 	public void endClockListenerExecutor() {
-		if (clockListenerExecutor != null)
-			clockListenerExecutor.shutdownNow();
+		if (clockExecutor != null)
+			clockExecutor.shutdownNow();
 	}
 
-	// To be called by TransportWizard and ConstructionWizard
+
+	/**
+	 * Gets the clock listener executor. To be called by TransportWizard and ConstructionWizard
+	 * 
+	 * @return
+	 */
 	public ExecutorService getClockListenerExecutor() {
-		return clockListenerExecutor;
+		return clockExecutor;
 	}
 
 
+	/**
+	 * Gets the Frame per second
+	 * 
+	 * @return
+	 */
 	public double getFPS() {
 //		List<Double> list = new ArrayList<>(TPFList);
 //		double sum = 0;
@@ -1014,42 +1336,33 @@ public class MasterClock implements Serializable {
 //			sum += list.get(i);
 //		}
 //		return size/sum;
-		return Math.round(10.0 / adjustedTBU_s) / 10.0;// 1_000_000/tbu_ns;
+		return Math.round(10.0 / baseTBU_s) / 10.0;// 1_000_000/tbu_ns;
 	}
 
 	/**
 	 * Sends out a clock pulse if using FXGL
+	 * 
+	 * @param tpf
 	 */
 	public void onUpdate(double tpf) {
 		if (!isPaused) {
 			tpfCache += tpf;
-			if (tpfCache >= adjustedTBU_s) {
+			if (tpfCache >= baseTBU_s) {
 				
-//				 TPFList.add(tpfCache); // Remove the first 5 if (TPFList.size() > 20) {
-//				 List<Double> list = new ArrayList<>(TPFList); for (int i = 0; i < 5; i++) {
-//				 list.remove(i); } TPFList = list; }
-				 
-				// elapsedLast = uptimer.getUptimeMillis();
-				// if (isPaused) {
-				// resetTotalPulses();
-				// }
-				// else {
 				double t = tpfCache * currentTR;
 				// Get the time pulse length in millisols.
-				double timePulse = t / MarsClock.SECONDS_PER_MILLISOL;
+				double timePulse = t / SECONDS_PER_MILLISOL;
 				// tpfCache : 0.117 tpfCache * timeRatio : 14.933 elapsedLast : 9315.0(inc)
 				// timePulse : 0.168
 
-				// Incrementing total time pulse number.
-				// totalPulses++;
-				// if (totalPulses > 100_000) resetTotalPulses();
 				if (timePulse > 0 && keepRunning && !isPaused
-				// || !clockListenerExecutor.isTerminating()
-						&& clockListenerExecutor != null && !clockListenerExecutor.isTerminated()
-						&& !clockListenerExecutor.isShutdown()) {
+						&& clockExecutor != null 
+						&& !clockExecutor.isTerminated()
+//						&& !clockExecutor.isTerminating()
+						&& !clockExecutor.isShutdown()) {
 					// Add time pulse length to Earth and Mars clocks.
-					earthClock.addTime(1000D * t);
-					marsTime.addTime(timePulse);
+					earthClock.addTime((int)(1000 * t));
+					marsClock.addTime(timePulse);
 					fireClockPulse(timePulse);
 				}
 
@@ -1057,45 +1370,113 @@ public class MasterClock implements Serializable {
 				tpfCache = 0;
 			}
 
-			if (saveType != 0) {
-				try {
-					sim.saveSimulation(saveType, file);
-				} catch (IOException e) {
-					logger.log(Level.SEVERE,
-							"Could not save the simulation as " + (file == null ? "null" : file.getPath()), e);
-					e.printStackTrace();
-				}
-
-				saveType = 0;
-			}
+			checkSave();
+			
+//			if (saveType != 0) {
+//				try {
+//					sim.saveSimulation(saveType, file);
+//				} catch (IOException e) {
+//					logger.log(Level.SEVERE,
+//							"Could not save the simulation as " + (file == null ? "null" : file.getPath()), e);
+//					e.printStackTrace();
+//				}
+//
+//				saveType = 0;
+//			}
 
 			// Exit program if exitProgram flag is true.
 			if (exitProgram) {
-//				if (sim.getAutosaveTimer() != null)
-//					sim.getAutosaveTimer().shutdownNow();
 				AutosaveScheduler.cancel();
 				System.exit(0);
 			}
-
 		}
-
 	}
 
+	public double getTime() {
+		return clockListenerTasks.get(0).getTime();
+	}
+	
+	/**
+	 * Gets the sleep time in milliseconds
+	 * 
+	 * @return
+	 */
+	public long getSleepTime() {
+		return sleepTime/1_000_000;
+	}
+	
+	/**
+	 * Gets the residual time in milliseconds
+	 * 
+	 * @return
+	 */
+	public long getResidualTime() {
+		return residualTime/1_000_000;
+	}
+	
+	/** 
+	 * Gets the time [in microseconds] taken to execute one frame in the game loop 
+	 * 
+	 * @return
+	 */
+	public long getExecutionTime() {
+		return executionTime/1_000;	
+	}
+	
+	/** 
+	 * Gets the base time between update [in microseconds] in the game loop 
+	 * 
+	 * @return
+	 */
+	public double getBaseTBU() {
+		return baseTBU_ms;	
+	}
+	
+	public void increaseTimeRatio() {
+        int currentSpeed = getCurrentSpeed();
+        int newSpeed = currentSpeed + 1;
+		if (newSpeed >= 0 && newSpeed <= MAX_SPEED) {
+        	double ratio = Math.pow(2, newSpeed);
+        	setTimeRatio((int)ratio);  
+		}
+	}
+	
+	public void decreaseTimeRatio() {
+        int currentSpeed = getCurrentSpeed();
+        int newSpeed = currentSpeed - 1;
+		if (newSpeed >= 0 && newSpeed <= MAX_SPEED) {
+        	double ratio = Math.pow(2, newSpeed);
+        	setTimeRatio((int)ratio);  
+		}
+	}
+	
+	/**
+	 * Reloads instances after loading from a saved sim
+	 * 
+	 * @param clock
+	 */
+	public static void initializeInstances(Simulation s) {
+		sim = s;//Simulation.instance();
+		timeIntervals = new ArrayList<>();
+		justReloaded = true;
+	}
+	
 	/**
 	 * Prepare object for garbage collection.
 	 */
 	public void destroy() {
-		config = null;
 		sim = null;
-		marsTime = null;
+		marsClock.destroy();
+		marsClock = null;
 		initialMarsTime = null;
+		earthClock.destroy();
 		earthClock = null;
 		uptimer = null;
 		clockThreadTask = null;
-		clockListenerExecutor = null;
+		clockExecutor = null;
 		file = null;
 
 		clockListeners = null;
-		clockListenerExecutor = null;
+		clockExecutor = null;
 	}
 }

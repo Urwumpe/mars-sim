@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * BotMind.java
- * @version 3.1.0 2017-12-16
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.robot.ai;
@@ -13,11 +13,9 @@ import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.UnitEventType;
-import org.mars_sim.msp.core.person.ai.PersonalityType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionManager;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.ai.job.RobotJob;
 import org.mars_sim.msp.core.robot.ai.task.BotTaskManager;
@@ -40,25 +38,25 @@ public class BotMind implements Serializable {
 	/** Is the job locked so another can't be chosen? */
 	private boolean jobLock;
 	/** The cache for msol. */
-	private double msolCache = -1D;
+	private int msolCache = -1;
+	
 	/** The robot owning this mind. */
 	private Robot robot = null;
 	/** The robot's task manager. */
 	private BotTaskManager botTaskManager;
 	/** The robot's current mission (if any). */
-	private Mission mission;
+//	private Mission mission;
 	/** The robot's job. */
 	private RobotJob robotJob;
-	/** The robot's personality. */
-	private PersonalityType personality;
 	/** The robot's skill manager. */
-	private static SkillManager skillManager;
+	private SkillManager skillManager;
+//	/** The robot's core mind. */
+//	private CoreMind coreMind;
+	
 
-	private static MissionManager missionManager;
-
+//	private static MissionManager missionManager;
 	private static Simulation sim;
-
-	private MarsClock marsClock;
+	private static MarsClock marsClock;
 
 	/**
 	 * Constructor 1.
@@ -70,12 +68,12 @@ public class BotMind implements Serializable {
 
 		// Initialize data members
 		this.robot = robot;
-		mission = null;
+//		mission = null;
 		robotJob = null;
 		jobLock = false;
 
 		sim = Simulation.instance();
-		marsClock = Simulation.instance().getMasterClock().getMarsClock();
+		marsClock = sim.getMasterClock().getMarsClock();
 
 		// Define the boundary in Sense-Act-Plan (Robot control methodology
 		// 1. Sense - gather information using the sensors
@@ -86,13 +84,16 @@ public class BotMind implements Serializable {
 		// entire cycle, is repeated.
 		// https://en.wikipedia.org/wiki/Sense_Plan_Act
 
+//		// Create CoreMind
+//		coreMind = new CoreMind();
 		// Construct a skill manager.
-		skillManager = new SkillManager(robot);
-
+//		skillManager = new SkillManager(robot, coreMind);
+//		skillManager = new SkillManager(robot);
+		
 		// Construct a task manager
 		botTaskManager = new BotTaskManager(this);
 
-		missionManager = sim.getMissionManager();
+//		missionManager = sim.getMissionManager();
 
 	}
 
@@ -104,27 +105,24 @@ public class BotMind implements Serializable {
 	 */
 	public void timePassing(double time) {
 
-		if (botTaskManager != null)
-			botTaskManager.recordTask();
-
+		if (botTaskManager != null) {
+			// Take action as necessary.
+			takeAction(time);
+		}
+		
 //	    if (missionManager != null)
 //	    	missionManager.recordMission(robot);
 
-		double msol1 = marsClock.getMillisolOneDecimal();
+//		int msolInt = marsClock.getMillisolInt();
 
-		if (msolCache != msol1) {
-			msolCache = msol1;
-
+//		if (msolCache != msolInt) {
+//			msolCache = msolInt;
 			// I don't think robots should be changing jobs on their own. - Scott
 			// Check if this robot needs to get a new job or change jobs.
 //		        if (!jobLock) {
 //		        	setRobotJob(JobManager.getNewRobotJob(robot), false);
 //		        }
-
-			if (botTaskManager != null)
-				// Take action as necessary.
-				takeAction(time);
-		}
+//		}
 
 	}
 
@@ -135,20 +133,6 @@ public class BotMind implements Serializable {
 	 * @throws Exception if error during action.
 	 */
 	public void takeAction(double time) {
-
-		if ((mission != null) && mission.isDone()) {
-			mission = null;
-		}
-
-		boolean activeMission = (mission != null);
-
-		// Check if mission creation at settlement (if any) is overridden.
-		boolean overrideMission = false;
-
-		if (robot.isInSettlement()) {
-			overrideMission = robot.getSettlement().getMissionCreationOverride();
-		}
-
 		boolean hasActiveTask = botTaskManager.hasActiveTask();
 		// Perform a task if the robot has one, or determine a new task/mission.
 		if (hasActiveTask) {
@@ -156,24 +140,17 @@ public class BotMind implements Serializable {
 			if (remainingTime > 0D) {
 				takeAction(remainingTime);
 			}
-		} else {
-
-			if (activeMission) {
-				mission.performMission(robot);
-			}
-
+		} 
+		
+		else {
 			if (!botTaskManager.hasActiveTask()) {
 				try {
-					getNewAction(true, (!activeMission && !overrideMission));
+					getNewAction(true);
 				} catch (Exception e) {
 					logger.log(Level.WARNING, robot + " could not get new action", e);
 					e.printStackTrace(System.err);
 				}
 			}
-
-			// if (botTaskManager.hasActiveTask() || hasActiveMission()) {
-			// takeAction(time);
-			// }
 		}
 	}
 
@@ -197,7 +174,7 @@ public class BotMind implements Serializable {
 	 * @return current mission
 	 */
 	public Mission getMission() {
-		return mission;
+		return null;//mission;
 	}
 
 	/**
@@ -235,14 +212,14 @@ public class BotMind implements Serializable {
 		}
 	}
 
-	/**
-	 * Returns true if robot has an active mission.
-	 * 
-	 * @return true for active mission
-	 */
-	public boolean hasActiveMission() {
-		return (mission != null) && !mission.isDone();
-	}
+//	/**
+//	 * Returns true if robot has an active mission.
+//	 * 
+//	 * @return true for active mission
+//	 */
+//	public boolean hasActiveMission() {
+//		return (mission != null) && !mission.isDone();
+//	}
 
 	/**
 	 * Set this mind as inactive. Needs move work on this; has to abort the Task can
@@ -251,13 +228,11 @@ public class BotMind implements Serializable {
 	 */
 	public void setInactive() {
 		botTaskManager.clearTask();
-		if (hasActiveMission()) {
-
-			if (robot != null)
-				mission.removeMember(robot);
-
-			mission = null;
-		}
+//		if (hasActiveMission()) {
+//			if (robot != null)
+//				mission.removeMember(robot);
+//			mission = null;
+//		}
 	}
 
 	/**
@@ -266,23 +241,22 @@ public class BotMind implements Serializable {
 	 * @param newMission the new mission
 	 */
 	public void setMission(Mission newMission) {
-		if (newMission != mission) {
-
-			if (robot != null) {
-				if (mission != null) {
-					mission.removeMember(robot);
-				}
-
-				mission = newMission;
-
-				if (newMission != null) {
-					newMission.addMember(robot);
-				}
-
-				robot.fireUnitUpdate(UnitEventType.MISSION_EVENT, newMission);
-			}
-
-		}
+//		if (newMission != mission) {
+//
+//			if (robot != null) {
+//				if (mission != null) {
+//					mission.removeMember(robot);
+//				}
+//
+//				mission = newMission;
+//
+//				if (newMission != null) {
+//					newMission.addMember(robot);
+//				}
+//
+//				robot.fireUnitUpdate(UnitEventType.MISSION_EVENT, newMission);
+//			}
+//		}
 	}
 
 	/**
@@ -290,14 +264,8 @@ public class BotMind implements Serializable {
 	 * active missions.
 	 * 
 	 * @param tasks    can actions be tasks?
-	 * @param missions can actions be new missions?
 	 */
-	public void getNewAction(boolean tasks, boolean missions) {
-
-//    	if (robot.getPerformanceRating() < 0.5D) {
-//        	missions = false;
-//        }
-
+	public void getNewAction(boolean tasks) {
 		// Get probability weights from tasks, missions and active missions.
 		double taskWeights = 0D;
 		double missionWeights = 0D;
@@ -310,13 +278,6 @@ public class BotMind implements Serializable {
 			weightSum += taskWeights;
 		}
 
-//        if (missions) {
-//        	if (missionManager == null)
-//        		missionManager = sim.getMissionManager();
-//        	missionWeights = missionManager.getTotalMissionProbability(robot);
-//        	weightSum += missionWeights;
-//	   }
-
 		if ((weightSum <= 0D) || (Double.isNaN(weightSum)) || (Double.isInfinite(weightSum))) {
 			try {
 				TimeUnit.MILLISECONDS.sleep(1000L);
@@ -324,8 +285,7 @@ public class BotMind implements Serializable {
 				logger.severe("BotMind.getNewAction() " + robot.getName() + " has weight sum of " + weightSum);
 				e.printStackTrace();
 			}
-			// throw new IllegalStateException("BotMind.getNewAction() " + robot.getName() +
-			// " has weight sum of " + weightSum);
+
 		}
 
 		// Select randomly across the total weight sum.
@@ -347,50 +307,24 @@ public class BotMind implements Serializable {
 			}
 		}
 
-//        if (missions) {
-//            if (rand < missionWeights) {
-//            	Mission newMission = null;
-//
-//            	logger.fine(robot.getName() + " is starting a new mission.");
-//            	newMission = missionManager.getNewMission(robot);
-//
-//
-//                if (newMission != null) {
-//                    missionManager.addMission(newMission);
-//                    setMission(newMission);
-//                }
-//
-//                return;
-//            }
-//            else {
-//                rand -= missionWeights;
-//            }
-//        }
-
 		// If reached this point, no task or mission has been found.
 		logger.severe(robot.getName() + " couldn't determine new action - taskWeights: " + taskWeights
 				+ ", missionWeights: " + missionWeights);
-
 	}
 
 	/**
-	 * Gets the robot's personality type.
+	 * Reloads instances after loading from a saved sim
 	 * 
-	 * @return personality type.
+	 * @param clock
 	 */
-	public PersonalityType getPersonalityType() {
-		return personality;
+	public static void initializeInstances(MarsClock clock) {
+		marsClock = clock;
 	}
-
-	/**
-	 * Returns a reference to the robot's skill manager
-	 * 
-	 * @return the robot's skill manager
-	 */
-	public SkillManager getSkillManager() {
-		return skillManager;
+	
+	public void reinit() {
+		botTaskManager.reinit();
 	}
-
+	
 	/**
 	 * Prepare object for garbage collection.
 	 */
@@ -398,16 +332,11 @@ public class BotMind implements Serializable {
 		robot = null;
 		botTaskManager.destroy();
 		botTaskManager = null;
-		if (mission != null)
-			mission.destroy();
-		mission = null;
+//		if (mission != null)
+//			mission.destroy();
+//		mission = null;
 		robotJob = null;
-		if (personality != null)
-			personality.destroy();
-		personality = null;
 		// skillManager.destroy(); // not working for maven test
-		// skillManager = null;
-		// missionManager.destroy(); // not working for maven test
-		// missionManager = null;
+		 skillManager = null;
 	}
 }

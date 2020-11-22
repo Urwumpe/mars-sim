@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * LocationState.java
-* @version 3.1.0 2017-10-10
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.location;
@@ -14,34 +14,34 @@ public interface LocationState {
 	String getName();
 	
 	LocationStateType getType();
-/*	
-	// for a person or robot
-	public void leavingBuilding();
-	// for a person or robot
-	public void enterBuilding();
-	// for a person or robot
-	public void embarkVehicleInVicinity();
-	// for a person or robot
-	public void disembarkVehicleInVicinity();
-	// for a person or robot
-	public void embarkVehicleInGarage();
-	// for a person or robot
-	public void disembarkVehicleInGarage();
 
-	
-	// for a vehicle
-	public void departFromVicinity();
-	// for a vehicle
-	public void returnToVicinity();
+//	// for a person or robot
+//	public void leavingBuilding();
+//	// for a person or robot
+//	public void enterBuilding();
+//	// for a person or robot
+//	public void embarkVehicleInVicinity();
+//	// for a person or robot
+//	public void disembarkVehicleInVicinity();
+//	// for a person or robot
+//	public void embarkVehicleInGarage();
+//	// for a person or robot
+//	public void disembarkVehicleInGarage();
+//
+//	
+//	// for a vehicle
+//	public void departFromVicinity();
+//	// for a vehicle
+//	public void returnToVicinity();
+//
+//	
+//	// for a resource or item
+//	public void transferFromSettlementToPerson();
+//	// for a resource or item
+//	public void transferFromPersonToSettlement();
+//	// for a resource or item
+//	public void transferFromPersonToVehicle();
+//	// for a resource or item
+//	public void transferFromVehicleToPerson();
 
-	
-	// for a resource or item
-	public void transferFromSettlementToPerson();
-	// for a resource or item
-	public void transferFromPersonToSettlement();
-	// for a resource or item
-	public void transferFromPersonToVehicle();
-	// for a resource or item
-	public void transferFromVehicleToPerson();
-*/
 }

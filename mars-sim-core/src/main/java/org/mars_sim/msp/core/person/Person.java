@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Person.java
- * @version 3.1.0 2017-01-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -10,28 +10,39 @@ package org.mars_sim.msp.core.person;
 import java.awt.geom.Point2D;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.LifeSupportType;
-import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.CollectionUtils;
+import org.mars_sim.msp.core.LifeSupportInterface;
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitEventType;
+import org.mars_sim.msp.core.equipment.EVASuit;
 import org.mars_sim.msp.core.location.LocationStateType;
 import org.mars_sim.msp.core.person.ai.Mind;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
+import org.mars_sim.msp.core.person.ai.SkillManager;
+import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.job.JobAssignmentType;
 import org.mars_sim.msp.core.person.ai.job.JobHistory;
-import org.mars_sim.msp.core.person.ai.job.JobManager;
+import org.mars_sim.msp.core.person.ai.job.JobUtil;
+import org.mars_sim.msp.core.person.ai.job.Politician;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionMember;
-import org.mars_sim.msp.core.person.ai.task.Relax;
-import org.mars_sim.msp.core.person.ai.task.Sleep;
-import org.mars_sim.msp.core.person.ai.task.Walk;
+import org.mars_sim.msp.core.person.ai.role.Role;
+import org.mars_sim.msp.core.person.ai.role.RoleType;
+import org.mars_sim.msp.core.person.ai.task.meta.WorkoutMeta;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.reportingAuthority.CNSAMissionControl;
 import org.mars_sim.msp.core.reportingAuthority.CSAMissionControl;
@@ -43,18 +54,17 @@ import org.mars_sim.msp.core.reportingAuthority.NASAMissionControl;
 import org.mars_sim.msp.core.reportingAuthority.RKAMissionControl;
 import org.mars_sim.msp.core.reportingAuthority.ReportingAuthority;
 import org.mars_sim.msp.core.reportingAuthority.ReportingAuthorityType;
+import org.mars_sim.msp.core.reportingAuthority.SpaceXMissionControl;
+import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.LifeSupport;
-import org.mars_sim.msp.core.structure.building.function.LivingAccommodations;
 import org.mars_sim.msp.core.structure.building.function.cooking.Cooking;
 import org.mars_sim.msp.core.structure.building.function.cooking.PreparingDessert;
 import org.mars_sim.msp.core.time.EarthClock;
-import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Crewable;
 import org.mars_sim.msp.core.vehicle.Medical;
@@ -70,47 +80,78 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 	/* default logger. */
-	private static transient Logger logger = Logger.getLogger(Person.class.getName());
-	/** The base carrying capacity (kg) of a person. */
-	private final static double BASE_CAPACITY = 60D;
+	private static final Logger logger = Logger.getLogger(Person.class.getName());
+	private static final String loggerName = logger.getName();
+	private static final String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
 
+	public static final int MAX_NUM_SOLS = 3;
+	
+	private static final double SMALL_AMOUNT = 0.00001;
+	
+	private final static String POLITICIAN = Politician.class.getSimpleName();
 	private final static String EARTH = "Earth";
 	private final static String MARS = "Mars";
-
 	private final static String HEIGHT = "Height";
 	private final static String WEIGHT = "Weight";
-
-	private final static double AVERAGE_TALL_HEIGHT = 176.5;
-	private final static double AVERAGE_SHORT_HEIGHT = 162.5;
-	final static double AVERAGE_HEIGHT = 169.5;// (AVERAGE_TALL_HEIGHT + AVERAGE_SHORT_HEIGHT)/2D;
-
-	private final static double AVERAGE_HIGH_WEIGHT = 68.5;
-	private final static double AVERAGE_LOW_WEIGHT = 57.2;
-	final static double AVERAGE_WEIGHT = 62.85; // (AVERAGE_HIGH_WEIGHT + AVERAGE_LOW_WEIGHT)/2D ;
-
-	private static final String POLITICIAN = "Politician";
-
-	// static unit identifier
-	private static int unitCount = 0;
-
+	
+	private final static String EARTHLING = "Earthling";
+	private final static String ONE_SPACE = " ";
+	
+//	private final static String MARTIAN = "Martian";
+	
+	/** The unit count for this person. */
+	private static int uniqueCount = Unit.FIRST_PERSON_UNIT_ID;
+	/** The average height of a person. */
+	private static final double averageHeight;
+	/** The average weight of a person. */
+	private static final double averageWeight;
+	/** The average upper height of a person. */
+	private static final double tall;
+	/** The average low height of a person. */
+	private static final double shortH;
+	/** The average high weight of a person. */
+	private static final double highW;
+	/** The average low weight of a person. */
+	private static final double lowW;
+	
+	// Transient data members
+	/** The extrovert score of a person. */
+	private transient int extrovertScore = -1;
+	
 	// Data members
-	/** Unique person id. */
-	private int pid;
-	/** True if a person is rationing water */
-	private boolean waterRation;
-	/** True if a person is born on Mars. */
+	/** True if the person is a preconfigured crew member. */
+	private boolean preConfigured;
+	/** True if the person is born on Mars. */
 	private boolean bornOnMars;
-	/** True if person is buried. */
+	/** True if the person is buried. */
 	private boolean isBuried;
-	/** True if person is declared dead. */
+	/** True if the person is declared dead. */
 	private boolean declaredDead;
+
+	/** Unique identifier for this person. */
+	private int identifier;
+	/** The year of birth of a person */
+	private int year;
+	/** The month of birth of a person */
+	private int month;
+	/** The day of birth of a person */
+	private int day;
 	/** The age of a person */
-	private int age;
+	private int age = -1;
 	/** The cache for sol. */
 	private int solCache = 1;
+	
+	/** The settlement the person is currently associated with. */
+	private Integer associatedSettlementID = Integer.valueOf(-1);
+	/** The buried settlement if the person has been deceased. */
+	private Integer buriedSettlement = Integer.valueOf(-1);
+	/** The vehicle the person is on. */
+//	private Integer vehicleInt = Integer.valueOf(-1);
+
 	/** The cache for msol1 */
 	private double msolCache = -1D;
-	// private int[] emotional_states;
+	/** The eating speed of the person [kg/millisol]. */
+	private double eatingSpeed = 0.5 + .1 * RandomUtil.getRandomDouble(1) - .1 * RandomUtil.getRandomDouble(1);
 	/** The height of the person (in cm). */
 	private double height;
 	/** The height of the person (in kg). */
@@ -119,34 +160,36 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	private double xLoc;
 	/** Settlement Y location (meters) from settlement center. */
 	private double yLoc;
-
+	/** Settlement Z location (meters) from settlement center. */
+	private double zLoc;
+	/** The walking speed modifier. */
+	private double walkSpeedMod = 1.1;
+	
+	/** The birth timestamp of the person. */
+//	private String birthTimeStamp;
 	/** The birthplace of the person. */
 	private String birthplace;
 	/** The person's name. */
-	private String name;
+//	private String name;
 	/** The person's first name. */
 	private String firstName;
 	/** The person's last name. */
 	private String lastName;
 	/** The person's sponsor. */
 	private String sponsor;
-	/** The person's country. */
+	/** The person's country of origin. */
 	private String country;
 	/** The person's blood type. */
 	private String bloodType;
-	/** The person's last word before departing. */
-	private String lastWord;
-	/** The person's status. */
-	private String status;
-	
+
 	/** The gender of the person (male or female). */
-	private GenderType gender;
-	/** The birth time of the person. */
-	private EarthClock birthTimeStamp;
-	/** The settlement the person is currently associated with. */
-	private Settlement associatedSettlement;
-	/** The buried settlement if the person has been deceased. */
-	private Settlement buriedSettlement;
+	private GenderType gender = GenderType.MALE;
+	
+	/** The person model instance. */
+//	private PersonModel personModel;
+ 
+	/** The person's skill manager. */
+	private SkillManager skillManager;
 	/** Manager for Person's natural attributes. */
 	private NaturalAttributeManager attributes;
 	/** Person's mind. */
@@ -155,43 +198,32 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	private PhysicalCondition condition;
 	/** Person's circadian clock. */
 	private CircadianClock circadian;
-
+	/** Person's Favorite instance. */
 	private Favorite favorite;
-
+	/** Person's TaskSchedule instance. */
 	private TaskSchedule taskSchedule;
-
+	/** Person's JobHistory instance. */
 	private JobHistory jobHistory;
-
+	/** Person's Role instance. */
 	private Role role;
-
+	/** Person's Preference instance. */
 	private Preference preference;
-
-	private LifeSupportType support;
-
+	/** Person's LifeSupportInterface instance. */
+	private LifeSupportInterface support;
+	/** Person's Cooking instance. */
 	private Cooking kitchenWithMeal;
-
+	/** Person's PreparingDessert instance. */
 	private PreparingDessert kitchenWithDessert;
-
+	/** Person's ReportingAuthority instance. */
 	private ReportingAuthority ra;
-
+	/** The bed location of the person */
 	private Point2D bed;
-
-	private Building quarters;
-
-	private Building diningBuilding;
-
-	private Building currentBuilding;
-
-	private Vehicle vehicle;
-
-//	private Vehicle associatedVehicle;
-
-	private Relax relax;
-
-	private Sleep sleep;
-
-	private Walk walk;
-
+	/** The quarters that the person belongs. */
+	private int quartersInt = -1;
+	/** The current building location of the person. */
+	private int currentBuildingInt;
+	/** The EVA suit that the person has donned on. */
+	private EVASuit suit;
 	/** The person's achievement in scientific fields. */
 	private Map<ScienceType, Double> scientificAchievement;
 	/** The person's paternal chromosome. */
@@ -200,15 +232,26 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	private Map<Integer, Gene> maternal_chromosome;
 	/** The person's mission experiences */
 	private Map<Integer, List<Double>> missionExperiences;
-	// private Simulation sim = Simulation.instance();
-	private MarsClock marsClock;
-
-	private EarthClock earthClock;
-
-	private MasterClock masterClock;
-
+	/** The person's EVA times */
+	private Map<Integer, Map<String, Double>> eVATaskTime;
+	/** The person's water/oxygen consumption */
+	private Map<Integer, Map<Integer, Double>> consumption;
+	/** The person's prior training */
+	private List<TrainingType> trainings;
 	
-	// private PersonConfig config;
+	static {
+		// personConfig is needed by maven unit test
+		PersonConfig personConfig = simulationConfig.getPersonConfig();
+		
+		// Compute the average height for all
+		tall = personConfig.getTallAverageHeight();
+		shortH = personConfig.getShortAverageHeight();
+		averageHeight = (tall + shortH) / 2D;
+		// Compute the average weight for all
+		highW = personConfig.getHighAverageWeight();
+		lowW = personConfig.getLowAverageWeight();
+		averageWeight = (highW + lowW) / 2D;
+	}
 
 	/**
 	 * Must be synchronised to prevent duplicate ids being assigned via different
@@ -216,10 +259,49 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 * 
 	 * @return
 	 */
-	private static synchronized int getNextCount() {
-		return unitCount++;
+	private static synchronized int getNextIdentifier() {
+		return uniqueCount++;
 	}
+	
+	/**
+	 * Get the unique identifier for this person
+	 * 
+	 * @return Identifier
+	 */
+	public int getIdentifier() {
+		return identifier;
+	}
+	
+	public void incrementID() {
+		// Gets the identifier
+		this.identifier = getNextIdentifier();
+	}
+	
+	/**
+	 * Constructor 0 : used by LoadVehicleTest and other maven test suites
+	 * 
+	 * @param settlement
+	 */
+	public Person(Settlement settlement) {
+		super("Mock Person", settlement.getCoordinates());
+		this.xLoc = 0D;
+		this.yLoc = 0D;
+		this.associatedSettlementID = settlement.getIdentifier();
+		super.setDescription(EARTHLING);
+		
+		// Add the person to the lookup map
+		unitManager.addPersonID(this);
+		// Put person in settlement
+		settlement.getInventory().storeUnit(this);
+		// Add this person as a citizen
+		settlement.addACitizen(this);
 
+		// reloading from a saved sim
+		BuildingManager.addToRandomBuilding(this, associatedSettlementID);
+		// Construct the NaturalAttributeManager instance
+		attributes = new NaturalAttributeManager(this);
+	}
+	
 	/**
 	 * Constructor 1 : used by PersonBuilderImpl Creates a Person object at a given
 	 * settlement.
@@ -228,84 +310,102 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 * @param settlement {@link Settlement} the settlement the person is at
 	 * @throws Exception if no inhabitable building available at settlement.
 	 */
-	protected Person(String name, Settlement settlement) {
+	public Person(String name, Settlement settlement) {
 		super(name, settlement.getCoordinates());
-		super.setDescription(settlement.getName());
+		super.setDescription(EARTHLING);
 
-		this.pid = getNextCount();
-
+		// Add the person to the lookup map
+		unitManager.addPersonID(this);
+		// Store this person in the settlement
+		settlement.getInventory().storeUnit(this);
+		// Add this person as a citizen
+		settlement.addACitizen(this);
+		
 		// Initialize data members
-		this.name = name;
-		firstName = name.substring(0, name.indexOf(" "));
-		lastName = name.substring(name.indexOf(" ")+1, name.length());
+//		this.name = name;
+		super.setName(name);
+		firstName = name.substring(0, name.indexOf(ONE_SPACE));
+		lastName = name.substring(name.indexOf(ONE_SPACE) + 1, name.length());
 		this.xLoc = 0D;
 		this.yLoc = 0D;
-		this.associatedSettlement = settlement;		
-//		System.out.println("first name : " + firstName);
-//		System.out.println("last name : " + lastName);
+		this.associatedSettlementID = settlement.getIdentifier();
+		
+		// create a prior training profile
+		generatePriorTraining();
+		// Construct the NaturalAttributeManager instance
+		attributes = new NaturalAttributeManager(this);
+		// Construct the SkillManager instance
+		skillManager = new SkillManager(this);
+		// Construct the Mind instance
+		mind = new Mind(this);
+		// Set the person's status of death
+		isBuried = false;
 	}
 
 	/*
 	 * Uses static factory method to create an instance of PersonBuilder
+	 *
+	 * @param name
+	 * @param settlement
+	 * @return
 	 */
 	public static PersonBuilder<?> create(String name, Settlement settlement) {
 		return new PersonBuilderImpl(name, settlement);
 	}
 
 	/**
-	 * Initialize field data, class and maps
+	 * Initialize field data and class 
 	 */
 	public void initialize() {
-
-		// sim = Simulation.instance();
-		masterClock = Simulation.instance().getMasterClock();
-		if (masterClock != null) { // avoid NullPointerException during maven test
-			marsClock = masterClock.getMarsClock();
-			earthClock = masterClock.getEarthClock();
-			// TODO : avoid declaring a birth clock for each person
-			// Find a way to use existing EarthClock inside MasterClock, plus the difference
-			// in date
-			birthTimeStamp = new EarthClock(createBirthTimeString());
-		}
-
-		isBuried = false;
-
-		// config = SimulationConfig.instance().getPersonConfiguration();
-
-		attributes = new NaturalAttributeManager(this);
-
-		jobHistory = new JobHistory(this);
-
-		mind = new Mind(this);
-
-		setupChromosomeMap();
-
-		circadian = new CircadianClock(this);
-
-		condition = new PhysicalCondition(this);
-
-		scientificAchievement = new HashMap<ScienceType, Double>(0);
-
-		favorite = new Favorite(this);
-
-		role = new Role(this);
-
-		taskSchedule = new TaskSchedule(this);
-
-		preference = new Preference(this);
-
-		assignReportingAuthority();
-
-		// Put person in proper building.
-		associatedSettlement.getInventory().storeUnit(this);
-		// Note: setAssociatedSettlement(settlement) will cause suffocation when
+		// WARNING: setAssociatedSettlement(settlement) will cause suffocation when
 		// reloading from a saved sim
-		BuildingManager.addToRandomBuilding(this, associatedSettlement); // why failed ?
-		// testWalkingStepsRoverToExterior(org.mars_sim.msp.core.person.ai.task.WalkingStepsTest)
+		BuildingManager.addToRandomBuilding(this, associatedSettlementID);	
+		// Set up the time stamp for the person
+		createBirthTimeStamp();
+		// Create favorites
+		favorite = new Favorite(this);
+		// Create preferences
+		preference = new Preference(this);
+		// Set up genetic make-up. Notes it requires attributes.
+		setupChromosomeMap();
+		// Create ciracdian clock
+		circadian = new CircadianClock(this);
+		// Create physical condition
+		condition = new PhysicalCondition(this);
+		// Create job history 		
+		jobHistory = new JobHistory(this);
+		// Create the scientific achievement map
+		scientificAchievement = new HashMap<ScienceType, Double>(0);
+		// Create the role
+		role = new Role(this);
+		// Create task schedule
+		taskSchedule = new TaskSchedule(this);
+		// Initialize task manager
+		mind.getTaskManager().initialize();
+		// Set up life support type
 		support = getLifeSupportType();
-			
 		// Create the mission experiences map
-		missionExperiences = new HashMap<>();
+		missionExperiences = new ConcurrentHashMap<>();
+		// Create the EVA hours map
+		eVATaskTime = new ConcurrentHashMap<>();
+		// Create the consumption map
+		consumption = new ConcurrentHashMap<>();
+		// Asssume the person is not a preconfigured crew member
+		preConfigured = false;
+	}
+
+	/**
+	 * Initialize field data, class and maps
+	 */
+	public void initializeMock() {
+		if (unitManager == null) {
+			System.out.println("Person's initializeMock() : unitManager is null");
+		}
+		unitManager.getSettlementByID(associatedSettlementID).getInventory().storeUnit(this);
+		BuildingManager.addToRandomBuilding(this, associatedSettlementID);
+		isBuried = false;
+		// Create natural attribute mananger
+		attributes = new NaturalAttributeManager(this);
 	}
 
 	/**
@@ -323,12 +423,13 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 			// Biochemistry: id 0 - 19
 			setupBloodType();
 			// Physical Characteristics: id 20 - 39
+			// Set up Height
 			setupHeight();
+			// Set up Weight
 			setupWeight();
-			// Personality traits: id 40 - 59
+			// Set up personality traits: id 40 - 59
 			setupAttributeTrait();
 		}
-
 	}
 
 	/**
@@ -340,13 +441,28 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		int ID = 40;
 		boolean dominant = false;
 
-		// Set inventory total mass capacity based on the person's strength.
 		int strength = attributes.getAttribute(NaturalAttributeType.STRENGTH);
-		getInventory().addGeneralCapacity(BASE_CAPACITY + strength);
+		int endurance = attributes.getAttribute(NaturalAttributeType.ENDURANCE);
+		double gym = 2 * getPreference().getPreferenceScore(new WorkoutMeta());
+		if (getFavorite().getFavoriteActivity() == FavoriteType.FIELD_WORK)
+			gym += RandomUtil.getRandomRegressionInteger(20);
+		else if (getFavorite().getFavoriteActivity() == FavoriteType.SPORT)
+			gym += RandomUtil.getRandomRegressionInteger(10);
 
-		int rand = RandomUtil.getRandomInt(100);
+		int carryCap = (int)(gym + personConfig.getBaseCapacity() + weight/6.0 + strength/4.0 + endurance/4.5 
+				+ RandomUtil.getRandomRegressionInteger(10));
+//		logger.info(name + " (" + weight + " kg) with strength " + strength 
+//				+ " & endurance " + endurance  
+//				+ " can carry " + carryCap + " kg");
+		
+		// Calculate the walking speed modifier
+		caculateWalkSpeedMod();
+		// Set inventory total mass capacity based on the person's weight and strength.
+		getInventory().addGeneralCapacity(carryCap); 
 
-		Gene trait1_G = new Gene(this, ID, "Trait 1", true, dominant, "Introvert", rand);
+		int score = mind.getMBTI().getIntrovertExtrovertScore();
+
+		Gene trait1_G = new Gene(this, ID, "Trait 1", true, dominant, "Introvert", score);
 		paternal_chromosome.put(ID, trait1_G);
 
 	}
@@ -412,6 +528,10 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 
 	}
 
+	public String getBloodType() {
+		return bloodType;
+	}
+	
 	/**
 	 * Compute a person's height and its chromosome
 	 */
@@ -426,9 +546,11 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		// TODO: factor in country of origin.
 		// TODO: look for a gender-correlated curve
 
+		// Note: p = mean + RandomUtil.getGaussianDouble() * standardDeviation
 		// Attempt to compute height with gaussian curve
-		double dad_height = AVERAGE_TALL_HEIGHT + RandomUtil.getGaussianDouble() * RandomUtil.getRandomInt(22);
-		double mom_height = AVERAGE_SHORT_HEIGHT + RandomUtil.getGaussianDouble() * RandomUtil.getRandomInt(15);
+
+		double dad_height = tall + RandomUtil.getGaussianDouble() * tall / 7D;// RandomUtil.getRandomInt(22);
+		double mom_height = shortH + RandomUtil.getGaussianDouble() * shortH / 10D;// RandomUtil.getRandomInt(15);
 
 		Gene dad_height_G = new Gene(this, ID, HEIGHT, true, dominant, null, dad_height);
 		paternal_chromosome.put(ID, dad_height_G);
@@ -437,7 +559,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		maternal_chromosome.put(ID, mom_height_G);
 
 		double genetic_factor = .65;
-		double sex_factor = (AVERAGE_TALL_HEIGHT - AVERAGE_HEIGHT) / AVERAGE_HEIGHT;
+		double sex_factor = (tall - averageHeight) / averageHeight;
 		// Add arbitrary (US-based) sex and genetic factor
 		if (gender == GenderType.MALE)
 			height = Math.round(
@@ -462,9 +584,10 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		// TODO: factor in country of origin.
 		// TODO: look for a gender-correlated curve
 
+		// Note: p = mean + RandomUtil.getGaussianDouble() * standardDeviation
 		// Attempt to compute height with gaussian curve
-		double dad_weight = AVERAGE_HIGH_WEIGHT + RandomUtil.getGaussianDouble() * RandomUtil.getRandomInt(10);
-		double mom_weight = AVERAGE_LOW_WEIGHT + RandomUtil.getGaussianDouble() * RandomUtil.getRandomInt(15);
+		double dad_weight = highW + RandomUtil.getGaussianDouble() * highW / 13.5;// RandomUtil.getRandomInt(10);
+		double mom_weight = lowW + RandomUtil.getGaussianDouble() * lowW / 10.5;// RandomUtil.getRandomInt(15);
 
 		Gene dad_weight_G = new Gene(this, ID, WEIGHT, true, dominant, null, dad_weight);
 		paternal_chromosome.put(ID, dad_weight_G);
@@ -473,8 +596,9 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		maternal_chromosome.put(ID, mom_weight_G);
 
 		double genetic_factor = .65;
-		double sex_factor = (AVERAGE_HIGH_WEIGHT - AVERAGE_WEIGHT) / AVERAGE_WEIGHT; // for male
-		double height_factor = height / AVERAGE_HEIGHT;
+		double sex_factor = (highW - averageWeight) / averageWeight; // for male
+		double height_factor = height / averageHeight;
+
 		// Add arbitrary (US-based) sex and genetic factor
 		if (gender == GenderType.MALE)
 			weight = Math.round(height_factor
@@ -494,41 +618,37 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 */
 	public void setSponsor(String sponsor) {
 		this.sponsor = sponsor;
-	}
 
-	/*
-	 * Assigns sponsoring agency and set up specific mission control for the person
-	 */
-	public void assignReportingAuthority() {
-		if (ra == null) {
-			if (sponsor.contains(ReportingAuthorityType.CNSA.getName())) {
-				ra = CNSAMissionControl.createMissionControl(); // ProspectingMineral
+		if (sponsor.contains(ReportingAuthorityType.CNSA.getName())) {
+			ra = CNSAMissionControl.createMissionControl(); // ProspectingMineral
 
-			} else if (sponsor.contains(ReportingAuthorityType.CSA.getName())) {
-				ra = CSAMissionControl.createMissionControl(); // AdvancingSpaceKnowledge
+		} else if (sponsor.contains(ReportingAuthorityType.CSA.getName())) {
+			ra = CSAMissionControl.createMissionControl(); // AdvancingSpaceKnowledge
 
-			} else if (sponsor.contains(ReportingAuthorityType.ESA.getName())) {
-				ra = ESAMissionControl.createMissionControl(); // DevelopingSpaceActivity;
+		} else if (sponsor.contains(ReportingAuthorityType.ESA.getName())) {
+			ra = ESAMissionControl.createMissionControl(); // DevelopingSpaceActivity;
 
-			} else if (sponsor.contains(ReportingAuthorityType.ISRO.getName())) {
-				ra = ISROMissionControl.createMissionControl(); // DevelopingAdvancedTechnology
+		} else if (sponsor.contains(ReportingAuthorityType.ISRO.getName())) {
+			ra = ISROMissionControl.createMissionControl(); // DevelopingAdvancedTechnology
 
-			} else if (sponsor.contains(ReportingAuthorityType.JAXA.getName())) {
-				ra = JAXAMissionControl.createMissionControl(); // ResearchingSpaceApplication
+		} else if (sponsor.contains(ReportingAuthorityType.JAXA.getName())) {
+			ra = JAXAMissionControl.createMissionControl(); // ResearchingSpaceApplication
 
-			} else if (sponsor.contains(ReportingAuthorityType.NASA.getName())) {
-				ra = NASAMissionControl.createMissionControl(); // FindingLife
+		} else if (sponsor.contains(ReportingAuthorityType.NASA.getName())) {
+			ra = NASAMissionControl.createMissionControl(); // FindingLife
 
-			} else if (sponsor.contains(ReportingAuthorityType.MARS_SOCIETY.getName())) {
-				ra = MarsSocietyMissionControl.createMissionControl(); // SettlingMars
+		} else if (sponsor.contains(ReportingAuthorityType.RKA.getName())) {
+			ra = RKAMissionControl.createMissionControl(); // ResearchingHealthHazard
 
-			} else if (sponsor.contains(ReportingAuthorityType.RKA.getName())) {
-				ra = RKAMissionControl.createMissionControl(); // ResearchingHealthHazard
+		} else if (sponsor.contains(ReportingAuthorityType.MS.getName())) {
+			ra = MarsSocietyMissionControl.createMissionControl(); // SettlingMars
 
-			} else {
-				logger.warning(name + " has no reporting authority!");
-				// ra = null;
-			}
+		} else if (sponsor.contains(ReportingAuthorityType.SPACEX.getName())) {
+			ra = SpaceXMissionControl.createMissionControl(); // BuildingSelfSustainingColonies
+
+		} else {
+			logger.warning(getName() + " has no reporting authority!");
+
 		}
 	}
 
@@ -548,17 +668,33 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 
 	/**
 	 * Sets the role for a person.
+	 * 
+	 * @param type {@link RoleType}
 	 */
 	public void setRole(RoleType type) {
+		getRole().changeRoleType(type);
 
+		// In case of the role of the Mayor, his job must be set to Politician instead.
 		if (type == RoleType.MAYOR) {
-			getRole().setNewRoleType(type);
-			Job job = JobManager.getJob(POLITICIAN);
+			// Set the job as Politician
+			Job job = JobUtil.getJob(POLITICIAN);
 			if (job != null) {
-				mind.setJob(job, true, JobManager.SETTLEMENT, JobAssignmentType.APPROVED, JobManager.SETTLEMENT);
+				mind.setJob(job, true, JobUtil.SETTLEMENT, JobAssignmentType.APPROVED, JobUtil.SETTLEMENT);
 			}
-		} else
-			getRole().setNewRoleType(type);
+		}
+	}
+
+	/**
+	 * Sets the job of a person
+	 * 
+	 * @param jobStr
+	 * @param authority
+	 */
+	public void setJob(String jobStr, String authority) {
+		Job job = JobUtil.getJob(jobStr);
+		if (job != null) {
+			mind.setJob(job, true, JobUtil.SETTLEMENT, JobAssignmentType.APPROVED, authority);
+		}
 	}
 
 	/**
@@ -589,25 +725,33 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		return taskSchedule;
 	}
 
+//	public void assignAWorkShiftType() {	
+//	}
+	
 	/**
 	 * Create a string representing the birth time of the person.
 	 *
 	 * @return birth time string.
 	 */
-	private String createBirthTimeString() {
+	private String createBirthTimeStamp() {
 		StringBuilder s = new StringBuilder();
 		// Set a birth time for the person
-		int year = EarthClock.getCurrentYear(earthClock) - RandomUtil.getRandomInt(22, 62);
+		if (age != -1) {
+			year = EarthClock.getCurrentYear(earthClock) - age - 1;
+		}
+		else {
+			year = EarthClock.getCurrentYear(earthClock) - RandomUtil.getRandomInt(21, 65);
+		}
+		
 		// 2003 + RandomUtil.getRandomInt(10) + RandomUtil.getRandomInt(10);
 		s.append(year);
 
-		int month = RandomUtil.getRandomInt(11) + 1;
+		month = RandomUtil.getRandomInt(11) + 1;
 		s.append("-");
 		if (month < 10)
 			s.append(0);
 		s.append(month).append("-");
 
-		int day;
 		if (month == 2) {
 			if (((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0)) {
 				day = RandomUtil.getRandomInt(28) + 1;
@@ -624,9 +768,12 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 
 		// TODO: find out why sometimes day = 0 as seen on
 		if (day == 0) {
-			logger.warning(name + "'s date of birth is on the day 0th. Incrementing to the 1st.");
+			logger.warning(getName() + "'s date of birth is on the day 0th. Incrementing to the 1st.");
 			day = 1;
 		}
+
+		// Set the age
+		age = updateAge();
 
 		if (day < 10)
 			s.append(0);
@@ -651,158 +798,53 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	}
 
 	/**
-	 * Is the person outside on the surface of Mars
-	 * 
-	 * @return true if the person is outside
-	 */
-	public boolean isOutside() {
-		if (getContainerUnit() == null)
-			return true;
-		else if (isBuried)
-			return true;
-		return false;
-	}
-
-	/**
 	 * Is the person outside of a settlement but within its vicinity
 	 * 
 	 * @return true if the person is just right outside of a settlement
 	 */
 	public boolean isRightOutsideSettlement() {
-		if (getLocationStateType() == LocationStateType.OUTSIDE_SETTLEMENT_VICINITY)
+		if (LocationStateType.WITHIN_SETTLEMENT_VICINITY == currentStateType || isBuried)
 			return true;
 		return false;
 	}
 
-	/**
-	 * Is the person inside a vehicle
-	 * 
-	 * @return true if the person is inside a vehicle
-	 */
-	public boolean isInVehicle() {
-		if (isBuried)
-			return false;
-		else if (getContainerUnit() instanceof Vehicle)
-				return true;
-		return false;
-	}
-
-	/**
-	 * Is the person in a vehicle inside a garage
-	 * 
-	 * @return true if the person is in a vehicle inside a garage
-	 */
-	public boolean isInVehicleInGarage() {
-//		if (isBuried)
-//			return false;
-//		else {
-//			Unit c = getContainerUnit();
-//			if (c instanceof Vehicle && ((Vehicle) c).getStatus() == StatusType.GARAGED)//.getGarage() != null)
-//				return true;
-			if (getContainerUnit() instanceof Vehicle) {
-				Building b = BuildingManager.getBuilding((Vehicle) getContainerUnit());
-				if (b != null)
-					// still inside the garage
-					return true;
-			}
-//		}
-		return false;
-	}
-	
 //	/**
-//	 * Is the person inside a settlement but not in a vehicle inside a garage
+//	 * Is the person in a vehicle inside a garage
 //	 * 
-//	 * @return true or false
+//	 * @return true if the person is in a vehicle inside a garage
 //	 */
-//	public boolean isInSettlementNotVehicleGarage() {
-////		if (isBuried)
-////			return false;
-////		else {
-//			Unit c = getContainerUnit();
-////			if (c instanceof Vehicle && ((Vehicle) c).getStatus() == StatusType.GARAGED)//.getGarage() != null)
-////				return false;
-//		if (c instanceof Settlement)
-//			return true;
-////		}
-//		return false;
-//	}
-
-	/**
-	 * Is the person inside a settlement
-	 * 
-	 * @return true if the person is inside a settlement
-	 */
-	public boolean isInSettlement() {
-		if (getContainerUnit() instanceof Settlement) {
-			return true;
-		}
-
-//		else if (getContainerUnit() instanceof Vehicle) {
+//	public boolean isInVehicleInGarage() {
+//		if (getContainerUnit() instanceof Vehicle) {
 //			Building b = BuildingManager.getBuilding((Vehicle) getContainerUnit());
 //			if (b != null)
 //				// still inside the garage
 //				return true;
 //		}
-		
+//		return false;
+//	}
+
+//	/**
+//	 * Get a person's location situation
+//	 * 
+//	 * @return {@link LocationSituation} the person's location
+//	 */
+//	public LocationSituation getLocationSituation() {
 //		if (isBuried)
-//			return false;
+//			return LocationSituation.BURIED;
 //		else {
-//			Unit c = getContainerUnit();
-//			if (c instanceof Settlement)
-//				return true;
-//			else if (c instanceof Vehicle && ((Vehicle) c).getStatus() == StatusType.GARAGED)//.getGarage() != null)
-//				return true;
+//			Unit container = getContainerUnit();
+//			if (container instanceof Settlement)
+//				return LocationSituation.IN_SETTLEMENT;
+//			else if (container instanceof Vehicle)
+//				return LocationSituation.IN_VEHICLE;
+//			else if (container instanceof EVASuit)
+//				return container.getLocationSituation();
+//			else if (container instanceof MarsSurface)
+//				return LocationSituation.OUTSIDE;
 //			else
-//				return false;
+//				return LocationSituation.UNKNOWN;
 //		}
-		
-		return false;
-	}
-
-
-	/**
-	 * Is the person inside a settlement or a vehicle
-	 * 
-	 * @return true if the person is inside a settlement or a vehicle
-	 */
-	public boolean isInside() {
-		if (isBuried)
-			return false;
-		else {
-			Unit c = getContainerUnit();
-			if (c == null)
-				return false;
-			else if (c instanceof Settlement)
-				return true;
-			else if (c instanceof Vehicle)
-				return true;
-		}
-		return false;
-
-	}
-
-	/**
-	 * Get a person's location situation
-	 * 
-	 * @deprecated use other more efficient methods
-	 * @return {@link LocationSituation} the person's location
-	 */
-	public LocationSituation getLocationSituation() {
-		if (isBuried)
-			return LocationSituation.BURIED;
-		else {
-			Unit container = getContainerUnit();
-			if (container instanceof Settlement)
-				return LocationSituation.IN_SETTLEMENT;
-			else if (container instanceof Vehicle)
-				return LocationSituation.IN_VEHICLE;
-			else if (container == null)
-				return LocationSituation.OUTSIDE;
-			else
-				return LocationSituation.UNKNOWN;
-		}
-
-	}
+//	}
 
 	/**
 	 * Gets the person's X location at a settlement.
@@ -841,11 +883,49 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	}
 
 	/**
-	 * Get settlement person is at, null if person is not at a settlement
+	 * Gets the person's Z location at a settlement.
+	 *
+	 * @return Z distance (meters) from the settlement's center.
+	 */
+	public double getZLocation() {
+		return zLoc;
+	}
+
+	/**
+	 * Sets the person's Z location at a settlement.
+	 *
+	 * @param zLocation the Z distance (meters) from the settlement's center.
+	 */
+	public void setZLocation(double zLocation) {
+		this.zLoc = zLocation;
+	}
+	
+	/**
+	 * Get the settlement in vicinity. This is used assume the person is not at a settlement
+	 *
+	 * @return the person's settlement
+	 */
+	public Settlement getNearbySettlement() {	
+		return CollectionUtils.findSettlement(getCoordinates());
+	}
+	
+	/**
+	 * Get the settlement the person is at.
+	 * Returns null if person is not at a settlement.
 	 *
 	 * @return the person's settlement
 	 */
 	public Settlement getSettlement() {
+//		System.out.println("Person: getContainerID() is " + getContainerID());
+		
+		if (getContainerID() == Unit.MARS_SURFACE_UNIT_ID)
+			return null;
+//		
+//		else if (vehicle == 0)
+//			return null;
+//
+//		else
+//			return unitManager.getSettlementByID(getContainerID());
 
 		Unit c = getContainerUnit();
 
@@ -853,36 +933,31 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 			return (Settlement) c;
 		}
 
+		else if (c instanceof EVASuit || c instanceof Person || c instanceof Robot) {
+			return c.getSettlement();
+		}
+		
 		else if (c instanceof Vehicle) {
-			Building b = BuildingManager.getBuilding((Vehicle) getContainerUnit());
+			Building b = BuildingManager.getBuilding((Vehicle) c);
 			if (b != null)
 				// still inside the garage
 				return b.getSettlement();
-//			else
-				// either at the vicinity of a settlement or already outside on a mission
-				// TODO: need to differentiate which case in future better granularity
-//				return null;
 		}
-
-//		else if (c == null) {
-//			return null;
-//		}
-
-//		logger.warning("Error in determining " + getName() + "'s getSettlement() ");
 		return null;
 	}
 
-	/**
-	 * Sets the unit's container unit. Overridden from Unit class.
-	 *
-	 * @param containerUnit the unit to contain this unit.
-	 */
-	public void setContainerUnit(Unit containerUnit) {
-		if (containerUnit instanceof Vehicle) {
-			vehicle = (Vehicle) containerUnit;
-		}
-		super.setContainerUnit(containerUnit);
-	}
+//	/**
+//	 * Sets the unit's container unit. Overridden from Unit class.
+//	 *
+//	 * @param containerUnit the unit to contain this unit.
+//	 */
+//	public void setContainerUnit(Unit containerUnit) {
+//		super.setContainerUnit(containerUnit);
+//		if (containerUnit instanceof Vehicle) {
+//			vehicle = containerUnit.getIdentifier();
+//		} else
+//			vehicle = -1;
+//	}
 
 	/**
 	 * Bury the Person at the current location. This happens only if the person can
@@ -890,44 +965,41 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 * fixed at the last location of the containing unit.
 	 */
 	public void buryBody() {
-		Unit containerUnit = getContainerUnit();
-		if (containerUnit != null) {
-			// Note: if a person is dead inside a vehicle that's outside on Mars,
-			// should NOT be retrieved until the body arrives at a settlement
-			containerUnit.getInventory().retrieveUnit(this);
-		}
-
+		// Remove the person from the settlement
+//		getContainerUnit().getInventory().retrieveUnit(this);
 		// Bury the body
 		isBuried = true;
-		// Remove the person from the settlement
+		// Back up the last container unit
+//		condition.getDeathDetails().backupContainerUnit(containerUnit);
+		condition.getDeathDetails().backupContainerID(getContainerID());
+		// set container unit to null if not done so
 		setContainerUnit(null);
+		// Set his/her currentStateType
+		currentStateType = LocationStateType.WITHIN_SETTLEMENT_VICINITY;  
 		// Set his/her buried settlement
-		setBuriedSettlement(associatedSettlement);
+		setBuriedSettlement(associatedSettlementID);
 		// Remove the person from being a member of the associated settlement
-		setAssociatedSettlement(null);
-		// Set work shift to OFF
-		setShiftType(ShiftType.OFF);
-		// Set unit description to "Dead"
-		super.setDescription("Dead");
-		// Relinquish his role
-		role.relinquishOldRoleType(role.getType());
-		// Re-elect his role
-		buriedSettlement.getChainOfCommand().reelect(role.getType());
+		setAssociatedSettlement(-1);
 		// Throw unit event.
 		fireUnitUpdate(UnitEventType.BURIAL_EVENT);
 	}
 
+	protected void setDescription(String s) {
+		super.setDescription(s);
+	}
+
 	/**
-	 * Declares the person dead and removes the designated quarter 
+	 * Declares the person dead and removes the designated quarter
 	 */
 	void setDeclaredDead() {
 
 		declaredDead = true;
 		// Set quarters to null
-		if (quarters != null) {
-			LivingAccommodations accommodations = quarters.getLivingAccommodations();
-			accommodations.getBedMap().remove(this);
-			quarters = null;
+		if (quartersInt != -1) {
+			Map<Person, Point2D>  map = unitManager.getBuildingByID(quartersInt).getLivingAccommodations().getAssignedBeds();
+			if (map.containsKey(this)) 
+				map.remove(this);
+			quartersInt = -1;
 		}
 		// Empty the bed
 		if (bed != null)
@@ -942,18 +1014,25 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 */
 	public void timePassing(double time) {
 
-		if (marsClock == null) {
-			masterClock = Simulation.instance().getMasterClock();
-			marsClock = masterClock.getMarsClock();
-		}
+		if (!condition.isDead()) {
 
+			try {
+				// Mental changes with time passing.
+				mind.timePassing(time);
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				LogConsolidated.log(logger, Level.SEVERE, 20_000, sourceName, "[" + getLocale() + "] "
+						+ getName() + "'s Mind was having trouble processing task selection.", ex);
+			}
+		}
+		
 		double msol1 = marsClock.getMillisolOneDecimal();
 
 		if (msolCache != msol1) {
 			msolCache = msol1;
-
+			
 			// If Person is dead, then skip
-			if (!condition.isDead()) {// health.getDeathDetails() == null) {
+			if (!condition.isDead() && getLifeSupportType() != null) {// health.getDeathDetails() == null) {
 
 				support = getLifeSupportType();
 
@@ -963,38 +1042,83 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 
 				if (!condition.isDead()) {
 
-					// Call preference
-					// preference.timePassing(time);
-
-					try {
-						// Mental changes with time passing.
-						mind.timePassing(time);
-					} catch (Exception ex) {
-						ex.printStackTrace();
-					}
-
+//					// Check on the EVA suit donned by the person
+//					if (suit != null) {
+//						suit.getMalfunctionManager().activeTimePassing(time);	
+//						suit.getMalfunctionManager().timePassing(time);
+//					}
+					
 					// check for the passing of each day
 					int solElapsed = marsClock.getMissionSol();
-
+	
 					if (solCache != solElapsed) {
-						// Check if a person's age should be updated
-						age = updateAge();
+						// Update the solCache
 						solCache = solElapsed;
-
-						if (solElapsed % 3 == 0) {
-							// Adjust the shiftChoice once every 3 sols based on sleep hour
-							int bestSleepTime[] = getPreferredSleepHours();
-							taskSchedule.adjustShiftChoice(bestSleepTime);
+						
+						if (solElapsed == 1) {
+							// On the first mission sol,
+							// adjust the sleep habit according to the current work shift
+							for (int i=0; i< 15; i++) {
+								int shiftEnd = getTaskSchedule().getShiftEnd();
+								int m = shiftEnd - 20 * (i+1);
+								if (m < 0)
+									m = m + 1000;
+								// suppress sleep during the work shift
+								circadian.updateSleepCycle(m, false);
+								
+								m = shiftEnd + 10 * (i+1);
+								if (m > 1000)
+									m = m - 1000;
+								// encourage sleep after the work shift
+								circadian.updateSleepCycle(m, true);
+							}
+							
+							if (getShiftType() == ShiftType.B) {
+								condition.setFatigue(getFatigue() + RandomUtil.getRandomInt(500));
+							}
+							else if (getShiftType() == ShiftType.Y) {
+								condition.setFatigue(getFatigue() + RandomUtil.getRandomInt(333));
+							}
+							else if (getShiftType() == ShiftType.Z) {
+								condition.setFatigue(getFatigue() + RandomUtil.getRandomInt(667));
+							}
+								
 						}
-
-						if (solElapsed % 4 == 0) {
-							// Increment the shiftChoice once every 4 sols
-							taskSchedule.incrementShiftChoice();
-						}
-
-						if (solElapsed % 7 == 0) {
-							// Normalize the shiftChoice once every week
-							taskSchedule.normalizeShiftChoice();
+						else {
+							// Adjust the sleep habit according to the current work shift
+							for (int i=0; i< 5; i++) {
+								int m = getTaskSchedule().getShiftEnd() + 10 * (i+1);
+								if (m > 1000)
+									m = m - 1000;
+								circadian.updateSleepCycle(m, true);
+							}
+							
+							// Check if a person's age should be updated
+							age = updateAge();					
+							
+							// Checks if a person has a role
+							if (role.getType() == null)
+								role.obtainNewRole();
+	
+							// Limit the size of the dailyWaterUsage to x key value pairs
+							if (consumption.size() > MAX_NUM_SOLS)
+								consumption.remove(solElapsed - MAX_NUM_SOLS);
+	
+							if (solElapsed % 3 == 0) {
+								// Adjust the shiftChoice once every 3 sols based on sleep hour
+								int bestSleepTime[] = getPreferredSleepHours();
+								taskSchedule.adjustShiftChoice(bestSleepTime);
+							}
+	
+							if (solElapsed % 4 == 0) {
+								// Increment the shiftChoice once every 4 sols
+								taskSchedule.incrementShiftChoice();
+							}
+	
+							if (solElapsed % 7 == 0) {
+								// Normalize the shiftChoice once every week
+								taskSchedule.normalizeShiftChoice();
+							}
 						}
 					}
 				}
@@ -1007,8 +1131,6 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 					setDeclaredDead();
 					mind.setInactive();
 				}
-
-				buryBody();
 			}
 		}
 
@@ -1057,7 +1179,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 			if (infirmaries.size() > 0) {
 				int rand = RandomUtil.getRandomInt(infirmaries.size() - 1);
 				Building foundBuilding = infirmaries.get(rand);
-				found = (MedicalAid) foundBuilding.getMedical();// .getFunction(FunctionType.MEDICAL_CARE);
+				found = (MedicalAid) foundBuilding.getMedical();
 			}
 		}
 
@@ -1079,48 +1201,62 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	}
 
 	/**
+	 * Returns the person's job name
+	 *
+	 * @return the person's job name
+	 */
+	public String getJobName() {
+		if (mind.getJob() != null)
+			return mind.getJob().getName(gender);
+		else
+			return "";
+	}
+
+	/**
 	 * Updates and returns the person's age
 	 *
 	 * @return the person's age
 	 */
 	public int updateAge() {
-		age = earthClock.getYear() - birthTimeStamp.getYear() - 1;
-		if (earthClock.getMonth() >= birthTimeStamp.getMonth())
-			if (earthClock.getDayOfMonth() >= birthTimeStamp.getDayOfMonth())
+		age = earthClock.getYear() - year - 1;
+		if (earthClock.getMonth() >= month)
+			if (earthClock.getDayOfMonth() >= day)
 				age++;
 
 		return age;
 	}
 
 	/**
-	 * Updates the person's age
+	 * Set a person's age and update one's year of birth
 	 *
 	 * @param newAge
 	 */
 	public void changeAge(int newAge) {
-		int year = 0;
-		// Figure out the year
-		year = earthClock.getYear() - newAge - 1;
-		birthTimeStamp.setYear(year);
-		age = newAge; 
+		// Back calculate a person's year
+		int y = earthClock.getYear() - newAge - 1;
+		// Set year to newYear
+		year = y;
+		age = newAge;
 	}
 	
 	/**
-	 * Returns the person's height in cm
-	 *
-	 * @return the person's height
-	 */
-	public double getHeight() {
-		return height;
-	}
-
-	/**
-	 * Returns the person's birth date
+	 * Returns the person's birth date in the format of "2055-05-06"
 	 *
 	 * @return the person's birth date
 	 */
 	public String getBirthDate() {
-		return birthTimeStamp.getDateStringF0();
+		StringBuilder s = new StringBuilder();
+		s.append(year).append("-");
+		if (month < 10)
+			s.append("0").append(month).append("-");
+		else
+			s.append(month).append("-");
+		if (day < 10)
+			s.append("0").append(day);
+		else
+			s.append(day);
+
+		return s.toString();
 	}
 
 	/**
@@ -1129,36 +1265,42 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 *
 	 * @return Life support system.
 	 */
-	private LifeSupportType getLifeSupportType() {
+	private LifeSupportInterface getLifeSupportType() {
 
-		LifeSupportType result = null;
-		List<LifeSupportType> lifeSupportUnits = new ArrayList<LifeSupportType>();
+		LifeSupportInterface result = null;
+		List<LifeSupportInterface> lifeSupportUnits = new ArrayList<LifeSupportInterface>();
 
 		Settlement settlement = getSettlement();
 		if (settlement != null) {
 			lifeSupportUnits.add(settlement);
-		} else {
-			Vehicle vehicle = getVehicle();
-			if ((vehicle != null) && (vehicle instanceof LifeSupportType)) {
+		}
 
-				if (BuildingManager.getBuilding(vehicle) != null) {
+		else {
+			
+			Vehicle vehicle = getVehicle();
+			if ((vehicle != null) && (vehicle instanceof LifeSupportInterface)) {
+
+				if (vehicle.isInVehicleInGarage()) { //BuildingManager.getBuilding(vehicle) != null) {
 					// if the vehicle is inside a garage
 					lifeSupportUnits.add(vehicle.getSettlement());
-				} else {
-					lifeSupportUnits.add((LifeSupportType) vehicle);
+				}
+
+				else {
+					lifeSupportUnits.add((LifeSupportInterface) vehicle);
 				}
 			}
 		}
 
 		// Get all contained units.
-		Collection<Unit> units = getInventory().getContainedUnits();
-		for (Unit u : units) {
-			if (u instanceof LifeSupportType)
-				lifeSupportUnits.add((LifeSupportType) u);
+		Collection<Integer> IDs = getInventory().getContainedUnitIDs();
+		for (Integer id : IDs) {
+			Unit u = unitManager.getUnitByID(id);
+			if (u instanceof LifeSupportInterface)
+				lifeSupportUnits.add((LifeSupportInterface) u);
 		}
 
 		// Get first life support unit that checks out.
-		for (LifeSupportType goodUnit : lifeSupportUnits) {
+		for (LifeSupportInterface goodUnit : lifeSupportUnits) {
 			if (result == null && goodUnit.lifeSupportCheck()) {
 				result = goodUnit;
 			}
@@ -1169,6 +1311,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 			result = lifeSupportUnits.get(0);
 		}
 
+//		System.out.println(name + " in " + getLocationTag().getImmediateLocation() + " is on " + result.toString() + " life support.");
 		return result;
 	}
 
@@ -1182,12 +1325,23 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	}
 
 	/**
+	 * Checks if he is a male
+	 * 
+	 * @return
+	 */
+	public boolean isMale() {
+		if (GenderType.MALE == gender)
+			return true;
+		return false;
+	}
+	
+	/**
 	 * Sets the gender of the person.
 	 *
-	 * @param g the GenderType
+	 * @param gender the GenderType
 	 */
-	public void setGender(GenderType g) {
-		gender = g;
+	public void setGender(GenderType gender) {
+		this.gender = gender;
 	}
 
 	/**
@@ -1202,8 +1356,8 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 			gender = GenderType.valueOfIgnoreCase("female");
 		else
 			gender = GenderType.valueOfIgnoreCase("unknown");
-	}	
-	
+	}
+
 	/**
 	 * Gets the birthplace of the person
 	 *
@@ -1266,20 +1420,25 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 * @param name new name
 	 */
 	public void setName(String newName) {
-		if (!name.equals(newName))
-			logger.info("Replace the previous commander '" + name + "' with '" + newName + "' in " + associatedSettlement + ".");
-		this.name = newName;
-		super.setName(newName);
-		super.setDescription(associatedSettlement.getName());
+		if (!getName().equals(newName)) {
+			LogConsolidated.log(logger, Level.CONFIG, 20_000, sourceName, "[" + getLocale() 
+					+ "] The Mission Control replaced the member '" + getName() + "' with '" + newName + "'.");
+//					+ unitManager.getSettlementByID(associatedSettlementID) + ".");
+			firstName = newName.substring(0, newName.indexOf(" "));
+			lastName = newName.substring(newName.indexOf(" ") + 1, newName.length());	
+//			this.name = newName;
+			super.setName(newName);
+			super.setDescription(EARTHLING);
+		}
 	}
-	
+
 	/**
 	 * Gets the settlement the person is currently associated with.
 	 *
 	 * @return associated settlement or null if none.
 	 */
 	public Settlement getAssociatedSettlement() {
-		return associatedSettlement;
+		return unitManager.getSettlementByID(associatedSettlementID);
 	}
 
 	/**
@@ -1287,26 +1446,19 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 *
 	 * @param newSettlement the new associated settlement or null if none.
 	 */
-	public void setAssociatedSettlement(Settlement newSettlement) {
-		
-		if (associatedSettlement != newSettlement) {
-			
-			Settlement oldSettlement = associatedSettlement;
-			associatedSettlement = newSettlement;
-			fireUnitUpdate(UnitEventType.ASSOCIATED_SETTLEMENT_EVENT, associatedSettlement);
-			
-			if (oldSettlement != null) {
-				oldSettlement.removePerson(this);				
-				oldSettlement.fireUnitUpdate(UnitEventType.REMOVE_ASSOCIATED_PERSON_EVENT, this);
-				// Call to update people list in the old settlement
-				oldSettlement.updateAllAssociatedPeople();
+	public void setAssociatedSettlement(int newSettlement) {
+
+		if (associatedSettlementID != newSettlement) {
+
+			int oldSettlement = associatedSettlementID;
+			associatedSettlementID = newSettlement;
+
+			if (oldSettlement != -1) {
+				unitManager.getSettlementByID(oldSettlement).removeACitizen(this);
 			}
-			
-			if (newSettlement != null) {
-				newSettlement.addPerson(this);
-				newSettlement.fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_PERSON_EVENT, this);
-				// Call to update people list in the new settlement
-				newSettlement.updateAllAssociatedPeople();
+
+			if (newSettlement != -1) {
+				unitManager.getSettlementByID(newSettlement).addACitizen(this);
 			}
 		}
 	}
@@ -1316,12 +1468,12 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 *
 	 * @param settlement
 	 */
-	public void setBuriedSettlement(Settlement settlement) {
+	public void setBuriedSettlement(int settlement) {
 		buriedSettlement = settlement;
 	}
 
 	public Settlement getBuriedSettlement() {
-		return buriedSettlement;
+		return unitManager.getSettlementByID(buriedSettlement);
 	}
 
 	/**
@@ -1364,14 +1516,6 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		scientificAchievement.put(science, achievementCredit);
 	}
 
-	public void setDiningBuilding(Building diningBuilding) {
-		this.diningBuilding = diningBuilding;
-	}
-
-	public Building getDiningBuilding() {
-		return diningBuilding;
-	}
-
 	public void setKitchenWithMeal(Cooking kitchen) {
 		this.kitchenWithMeal = kitchen;
 	}
@@ -1412,7 +1556,9 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 //			currentBuilding = getSettlement().getBuildingManager().getBuildingAtPosition(getXLocation(),
 //					getYLocation());
 //		}
-		return currentBuilding;
+		if (currentBuildingInt == -1)
+			return null;
+		return unitManager.getBuildingByID(currentBuildingInt);
 	}
 
 	/**
@@ -1422,14 +1568,79 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 * @return building
 	 */
 	public void setCurrentBuilding(Building building) {
-		currentBuilding = building;
+		if (building == null) {
+			currentBuildingInt = -1;
+//			logger.info("currentBuildingInt ID : " + currentBuildingInt);
+		}
+		
+		else {
+//			logger.info(building.getName() + "'s ID : " + building.getIdentifier());
+//			logger.info("currentBuildingInt ID : " + currentBuildingInt);
+			currentBuildingInt = building.getIdentifier();
+		}		
 	}
 
+	/**
+	 * Computes the building the person is currently located at Returns null if
+	 * outside of a settlement
+	 *
+	 * @return building
+	 */
+	public void setCurrentMockBuilding(Building building) {
+		if (building == null) {
+			currentBuildingInt = -1;
+//			logger.info("currentBuildingInt ID : " + currentBuildingInt);
+		}
+		else {
+//			logger.info(building.getName() + "'s ID : " + building.getIdentifier());
+//			logger.info("currentBuildingInt ID : " + currentBuildingInt);
+			currentBuildingInt = building.getIdentifier();
+		}
+	}
+	
+	/**
+	 * Obtains the immediate location (either building, vehicle, a settlement's
+	 * vicinity or outside on Mars)
+	 * 
+	 * @return the name string of the location the unit is at
+	 */
+	public String getImmediateLocation() {
+		return getLocationTag().getImmediateLocation();
+	}
+
+	/**
+	 * Obtains the modified immediate location 
+	 * 
+	 * @return the name string of the location the unit is at
+	 */
+	public String getModifiedLoc() {
+		return getLocationTag().getModifiedLoc();
+	}
+	
+	public String getLocale() {
+		return getLocationTag().getLocale();
+	}
+	
+	public String getExtendedLocations() {
+		return getLocationTag().getExtendedLocations();
+	}
+	
+	public Settlement findSettlementVicinity() {
+		return getLocationTag().findSettlementVicinity();
+	}
+	
 	@Override
 	public String getTaskDescription() {
 		return getMind().getTaskManager().getTaskDescription(false);
 	}
 
+	public String getTaskPhase() {
+		if (getMind().getTaskManager().getPhase() != null)
+		return getMind().getTaskManager().getPhase().getName();
+		
+		return "";
+	}
+	
 	@Override
 	public void setMission(Mission newMission) {
 		getMind().setMission(newMission);
@@ -1440,10 +1651,22 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		taskSchedule.setShiftType(shiftType);
 	}
 
+	public ShiftType getShiftType() {
+		return taskSchedule.getShiftType();
+	}
+
 	public double getFatigue() {
 		return condition.getFatigue();
 	}
 
+	public double getEnergy() {
+		return condition.getEnergy();
+	}
+	
+	public double getHunger() {
+		return condition.getHunger();
+	}
+		
 	public double getStress() {
 		return condition.getStress();
 	}
@@ -1457,11 +1680,11 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	}
 
 	public Building getQuarters() {
-		return quarters;
+		return unitManager.getBuildingByID(quartersInt);
 	}
 
-	public void setQuarters(Building quarters) {
-		this.quarters = quarters;
+	public void setQuarters(Building b) {
+		this.quartersInt = b.getIdentifier();
 	}
 
 	public Point2D getBed() {
@@ -1492,100 +1715,50 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		return isBuried;
 	}
 
-	public void setLastWord(String s) {
-		lastWord = s;
-	}
-
-	public String getLastWord() {
-		return lastWord;
-	}
-
-	// @Override
+	@Override
 	public void setVehicle(Vehicle vehicle) {
-		this.vehicle = vehicle;
+//		this.vehicleInt = vehicle.getIdentifier();
 	}
-
+	
 	/**
 	 * Get vehicle person is in, null if person is not in vehicle
 	 * 
 	 * @return the person's vehicle
 	 */
 	public Vehicle getVehicle() {
-		return vehicle;
-	}
+		if (getLocationStateType() == LocationStateType.INSIDE_VEHICLE) {
+			Vehicle v = (Vehicle) getContainerUnit();
+//			setVehicle(v);
+			return v;
+		}
 
-//	public Vehicle getAssociatedVehicle() {
-//		return associatedVehicle;
-//	}
-//
-//	public void setAssociatedVehicle(Vehicle v) {
-//		associatedVehicle = v;
-//	}
+		return null;
+	}
 
 	public CircadianClock getCircadianClock() {
 		return circadian;
 	}
-
-	public void setWaterRation(boolean value) {
-		waterRation = value;
-	}
-
-	public boolean getWaterRation() {
-		return waterRation;
-	}
-
-	public Relax getRelax() {
-		return relax;
-	}
-
-	public void setRelax(Relax relax) {
-		this.relax = relax;
-	}
-
-	public Sleep getSleep() {
-		return sleep;
-	}
-
-	public void setSleep(Sleep sleep) {
-		this.sleep = sleep;
-	}
-
-	public Walk getWalk() {
-		return walk;
-	}
-
-	public void setWalk(Walk walk) {
-		this.walk = walk;
-	}
-
-	/**
-	 * Get the unique person id for this unit
-	 * 
-	 * @return pid
-	 */
-	public int getPid() {
-		return pid;
-	}
-
+	
 	/**
 	 * Gets the first name of the person
+	 * 
 	 * @return the first name
 	 */
 	public String getFirstName() {
 		return firstName;
 	}
-	
+
 	/**
 	 * Gets the last name of the person
+	 * 
 	 * @return the last name
 	 */
 	public String getLastName() {
 		return lastName;
 	}
 
-	
-	/** 
-	 * Gets the status of the person 
+	/**
+	 * Gets the status of the person
 	 * 
 	 * @param status
 	 */
@@ -1597,21 +1770,15 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		double t = condition.getThirst();
 		double s = condition.getStress();
 		double f = condition.getFatigue();
-		
+
 		String pStr = PhysicalCondition.getPerformanceStatus(p);
 		String hStr = PhysicalCondition.getHungerStatus(h, e);
 		String tStr = PhysicalCondition.getThirstyStatus(t);
 		String sStr = PhysicalCondition.getStressStatus(s);
 		String fStr = PhysicalCondition.getFatigueStatus(f);
-		
-		return 
-				pStr + " in performance, " 
-				+ sStr + ", " 
-				+ fStr + ", "
-				+ hStr + ", and " 
-				+ tStr + "." 
-				;
-		
+
+		return pStr + " in performance, " + sStr + ", " + fStr + ", " + hStr + ", and " + tStr + ".";
+
 //		if (p > .9) {
 //			if (h < 150 && t < 100 && s == 0 && f < 100) {
 //				status = "terrific";
@@ -1640,11 +1807,9 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 //		else {
 //			status = "not feeling well";
 //		}
-		
-		
-		//return status;
+		// return status;
 	}
-	
+
 	/**
 	 * Return the mission description if a person is on a mission
 	 * 
@@ -1655,13 +1820,11 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		if (mind.getMission() != null) {
 			m = mind.getMission();
 			return m.getDescription();
-		}
-		else {
+		} else {
 			return "None";
 		}
 	}
-	
-	
+
 	/**
 	 * Adds the mission experience score
 	 * 
@@ -1673,17 +1836,16 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 			List<Double> scores = missionExperiences.get(id);
 			scores.add(score);
 //			missionExperiences.get(id).add(score);
-			// Limit the size of each list to 20
-			if (scores.size() > 20)
-				scores.remove(0);
-		}
-		else {
+//			// Limit the size of each list to 20
+//			if (scores.size() > 20)
+//				scores.remove(0);
+		} else {
 			List<Double> scores = new ArrayList<>();
 			scores.add(score);
 			missionExperiences.put(id, scores);
 		}
 	}
-	
+
 //	/**
 //	 * Adds the mission experience score
 //	 * 
@@ -1702,7 +1864,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 //			missionExperiences.put(id, scores);
 //		}
 //	}
-	
+
 	/**
 	 * Gets the mission experiences map
 	 * 
@@ -1711,21 +1873,422 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	public Map<Integer, List<Double>> getMissionExperiences() {
 		return missionExperiences;
 	}
+
+	/**
+	 * Adds the EVA time
+	 * 
+	 * @param taskName
+	 * @param time
+	 */
+	public void addEVATime(String taskName, double time) {
+		Map<String, Double> map = null;
+
+		if (eVATaskTime.containsKey(solCache)) {
+			map = eVATaskTime.get(solCache);
+			if (map.containsKey(taskName)) {
+				double oldTime = map.get(taskName);
+				map.put(taskName, time + oldTime);
+			} else {
+				map.put(taskName, time);
+			}
+		} else {
+			map = new ConcurrentHashMap<>();
+			map.put(taskName, time);
+		}
+
+		eVATaskTime.put(solCache, map);
+	}
+
+	/**
+	 * Gets the map of EVA task time.
+	 * 
+	 * @return
+	 */
+	public Map<Integer, Double> getTotalEVATaskTimeBySol() {
+		Map<Integer, Double> map = new ConcurrentHashMap<>();
+
+		for (Integer sol : eVATaskTime.keySet()) {
+			double sum = 0;
+
+			for (String t : eVATaskTime.get(sol).keySet()) {
+				sum += eVATaskTime.get(sol).get(t);
+			}
+
+			map.put(sol, sum);
+		}
+
+		return map;
+	}
+
+	/**
+	 * Adds the amount consumed.
+	 * 
+	 * @param type
+	 * @param amount
+	 */
+	public void addConsumptionTime(int type, double amount) {
+		Map<Integer, Double> map = null;
+
+		if (consumption.containsKey(solCache)) {
+			map = consumption.get(solCache);
+			if (map.containsKey(type)) {
+				double oldAmt = map.get(type);
+				map.put(type, amount + oldAmt);
+			} else {
+				map.put(type, amount);
+			}
+		} else {
+			map = new ConcurrentHashMap<>();
+			map.put(type, amount);
+		}
+
+		consumption.put(solCache, map);
+	}
+
+	/**
+	 * Gets the total amount consumed
+	 * 
+	 * @param type
+	 * @return
+	 */
+	public Map<Integer, Double> getTotalConsumptionBySol(int type) {
+		Map<Integer, Double> map = new ConcurrentHashMap<>();
+
+		for (Integer sol : consumption.keySet()) {
+			for (Integer t : consumption.get(sol).keySet()) {
+				if (t == type) {
+					map.put(sol, consumption.get(sol).get(t));
+				}
+			}
+		}
+
+		return map;
+	}
+
+	/**
+	 * Gets the daily average water usage of the last x sols Not: most weight on
+	 * yesterday's usage. Least weight on usage from x sols ago
+	 * 
+	 * @return
+	 */
+	public double getDailyUsage(int type) {
+		Map<Integer, Double> map = getTotalConsumptionBySol(type);
+
+		boolean quit = false;
+		int today = solCache;
+		int sol = solCache;
+		double sum = 0;
+		double numSols = 0;
+		double cumulativeWeight = 0.75;
+		double weight = 1;
+
+		while (!quit) {
+			if (map.size() == 0) {
+				quit = true;
+				return 0;
+			}
+
+			else if (map.containsKey(sol)) {
+				if (today == sol) {
+					// If it's getting the today's average, one may
+					// project the full-day usage based on the usage up to this moment
+					weight = .25;
+					sum = sum + map.get(sol) * 1_000D / marsClock.getMillisol() * weight;
+				}
+
+				else {
+					sum = sum + map.get(sol) * weight;
+				}
+			}
+
+			else if (map.containsKey(sol - 1)) {
+				sum = sum + map.get(sol - 1) * weight;
+				sol--;
+			}
+
+			cumulativeWeight = cumulativeWeight + weight;
+			weight = (numSols + 1) / (cumulativeWeight + 1);
+			numSols++;
+			sol--;
+			// Get the last x sols only
+			if (numSols > MAX_NUM_SOLS)
+				quit = true;
+		}
+
+		return sum / cumulativeWeight;
+	}
+
+	public double getEatingSpeed() {
+		return eatingSpeed;
+	}
+
+	/**
+	 * Returns the person's height in cm
+	 *
+	 * @return the person's height
+	 */
+	public double getHeight() {
+		return height;
+	}
+
+	/**
+	 * Gets the average height of a person.
+	 */
+	public static double getAverageHeight() {
+		return averageHeight;
+	}
+
+	/**
+	 * Gets the average weight of a person.
+	 */
+	public static double getAverageWeight() {
+		return averageWeight;
+	}
+
+	/**
+	 * Gets the age of this person.
+	 * 
+	 * @return
+	 */
+	public int getAge() {
+		return age;
+	}
+
+	/**
+	 * Sets the age of this person.
+	 * 
+	 * @param value
+	 */
+	public void setAge(int value) {
+		age = value;
+	}
+
+	
+	/**
+	 * Checks if the person is a preconfigured crew member.
+	 */
+	public boolean isPreConfigured() {
+		return preConfigured;
+	}
+
+	/**
+	 * Set the person as a preconfigured crew member.
+	 */
+	public void setPreConfigured(boolean value) {
+		preConfigured = value;
+	}
+
+	/**
+	 * Returns a reference to the Person's skill manager
+	 * 
+	 * @return the person's skill manager
+	 */
+	public SkillManager getSkillManager() {
+		return skillManager;
+	}
+
+	/**
+	 * Returns the effective integer skill level from a named skill based on
+	 * additional modifiers such as fatigue.
+	 * 
+	 * @param skillType the skill's type
+	 * @return the skill's effective level
+	 */
+	public int getEffectiveSkillLevel(SkillType skillType) {
+		// Modify for fatigue, minus 1 skill level for every 1000 points of fatigue.
+		return (int) Math.round(getPerformanceRating() * skillManager.getSkillLevel(skillType));
+	}
+
+//	public void updateBuildingPreference(FunctionType type) {
+//		if (buildingPreference.isEmpty()) {
+//			for (FunctionType ft : FunctionType.getFunctionTypes()) {
+//				buildingPreference.put(ft.ordinal(), 1);
+//			}
+//		}
+//		else {
+//			int pref = buildingPreference.get(type.ordinal());
+//			if (pref <= 99)
+//				buildingPreference.put(type.ordinal(), 1 + pref);
+//		}
+//	}
+
+	/**
+	 * Randomly generate a list of training the person may have attended
+	 */
+	public void generatePriorTraining() {
+		if (trainings == null) {
+			trainings = new ArrayList<>();
+			List<TrainingType> lists = new ArrayList<>(Arrays.asList(TrainingType.values()));
+			int size = lists.size();
+			int num = RandomUtil.getRandomRegressionInteger(4);
+			// Guarantee at least one training
+			if (num == 0) num = 1;
+			for (int i= 0 ; i < num; i++) {
+				size = lists.size();
+				int rand = RandomUtil.getRandomInt(size-1);
+				TrainingType t = lists.get(rand);
+				trainings.add(t);
+				lists.remove(t);
+			}
+		}
+	}
+	
+	/**
+	 * Gets a list of prior training
+	 * 
+	 * @return {@link List<TrainingType>}
+	 */
+	public List<TrainingType> getTrainings() {
+		return trainings;
+	}
+	
+	public double getPilotingMod() {
+		double mod = 0;
+		if (trainings.contains(TrainingType.AVIATION_CERTIFICATION))
+			mod += .2;
+		if (trainings.contains(TrainingType.FLIGHT_SAFETY))
+			mod += .25;
+		if (trainings.contains(TrainingType.NASA_DESERT_RATS))
+			mod += .15;
+		
+		return mod;
+	}
+	
+	/**
+	 * Registers a particular EVA suit to the person
+	 * 
+	 * @param suit
+	 */
+	public void registerSuit(EVASuit suit) {
+		this.suit = suit;
+	}
+
+	/**
+	 * Gets the EVA suit the person has donned on
+	 * @return
+	 */
+	public EVASuit getSuit() {
+		return suit;
+	}
+	
+	public int getExtrovertScore() {
+		if (extrovertScore == -1) {
+			int score = mind.getTraitManager().getIntrovertExtrovertScore();
+			extrovertScore = score;
+			
+			// if introvert, score  0 to  50 --> -2 to 0
+			// if extrovert, score 50 to 100 -->  0 to 2
+			return score;
+		}
+		
+		return extrovertScore;
+	}
+	
+	public int getExtrovertmodifier() {
+		return (int)((getExtrovertScore() - 50) / 25D);
+	}
+	
+	/**
+	 * Calculate the modifier for walking speed based on how much this unit is carrying
+	 * 
+	 * @return modifier
+	 */
+	public void caculateWalkSpeedMod() {
+		double mass = getInventory().getTotalInventoryMass(false);
+		double cap = getInventory().getGeneralCapacity();
+		// At full capacity, may still move at 10% 
+		walkSpeedMod = 1.1 - mass/Math.max(cap, SMALL_AMOUNT);
+	}
+	
+	public double getWalkSpeedMod() {
+		return walkSpeedMod;
+	}
+	
+	
+	/**
+	 * Returns the pronoun string of this person
+	 * @return
+	 */
+	public String getPronoun0() {
+       if (gender == GenderType.MALE)
+    	   return "he";
+       
+       return "she";
+	}
+	
+	/**
+	 * Returns the pronoun string of this person
+	 * @return
+	 */
+	public String getPronoun1() {
+       if (gender == GenderType.MALE)
+    	   return "his";
+       
+       return "her";
+	}
+
+	/**
+	 * Returns the pronoun string of this person
+	 * @return
+	 */
+	public String getPronoun2() {
+       if (gender == GenderType.MALE)
+    	   return "his";
+       
+       return "hers";
+	}
+	
+	/**
+	 * Reinitialize references after loading from a saved sim
+	 */
+	public void reinit() {
+		mind.reinit();
+		condition.reinit();
+	}
+
+	/**
+	 * Reset uniqueCount to the current number of people
+	 */
+	public static void reinitializeIdentifierCount() {
+		uniqueCount = unitManager.getTotalNumPeople() + Unit.FIRST_PERSON_UNIT_ID;
+	}
+	
+	public boolean equals(Object obj) {
+		if (this == obj) return true;
+		if (obj == null) return false;
+		if (this.getClass() != obj.getClass()) return false;
+		Person p = (Person) obj;
+		return this.identifier == p.getIdentifier()
+//				&& this.firstName.equals(p.getFirstName())
+//				&& this.lastName.equals(p.getLastName())
+				&& this.height == p.getHeight()
+//				&& this.gender.equals(p.getGender())
+				&& this.age == p.getAge()
+				&& this.getBirthDate() == p.getBirthDate();
+	}
+
+	/**
+	 * Gets the hash code for this object.
+	 * 
+	 * @return hash code.
+	 */
+	public int hashCode() {
+		int hashCode = (int)(1 + height); // firstName.hashCode() * lastName.hashCode();
+		hashCode *= (1 + age) * (1 + identifier);
+		hashCode *= ( 1+ getBirthDate().hashCode());
+		return hashCode;
+	}
+	
+	
+//	@Override
+//	public String toString() {
+//		return getName();
+//	}
 	
 	@Override
 	public void destroy() {
 		super.destroy();
-		relax = null;
-		sleep = null;
-		walk = null;
 		circadian = null;
-		vehicle = null;
-//		associatedVehicle = null;
-		associatedSettlement = null;
-		buriedSettlement = null;
-		quarters = null;
-		diningBuilding = null;
-		currentBuilding = null;
 		condition = null;
 		favorite = null;
 		taskSchedule = null;
@@ -1737,7 +2300,6 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		kitchenWithDessert = null;
 		ra = null;
 		bed = null;
-
 		attributes.destroy();
 		attributes = null;
 		mind.destroy();
@@ -1745,7 +2307,9 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		// condition.destroy();
 		condition = null;
 		gender = null;
-		birthTimeStamp = null;
+
+		skillManager.destroy();
+		skillManager = null;
 
 		scientificAchievement.clear();
 		scientificAchievement = null;

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * NewTransportItemDialog.java
- * @version 3.1.0 2017-02-03
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.resupply;
@@ -28,6 +28,7 @@ import com.alee.laf.panel.WebPanel;
  * A dialog for creating a new transport item.
  * TODO externalize strings
  */
+@SuppressWarnings("serial")
 public class NewTransportItemDialog extends ModalInternalFrame {
 
 	// Transport item types.
@@ -51,6 +52,7 @@ public class NewTransportItemDialog extends ModalInternalFrame {
 	 * @param MainDesktopPane desktop
 	 * @param transportItem the transport item to modify.
 	 */
+	@SuppressWarnings("unchecked")
 	public NewTransportItemDialog(MainDesktopPane desktop, ResupplyWindow resupplyWindow) {
 
 		// Use ModalInternalFrame constructor
@@ -71,7 +73,7 @@ public class NewTransportItemDialog extends ModalInternalFrame {
 		getContentPane().add(transportTypePanel, BorderLayout.NORTH);
 
 		// Create combo box for determining transport item type.
-		JComboBox<String> typeBox = new JComboBoxMW<String>();
+		JComboBoxMW<String> typeBox = new JComboBoxMW<>();
 		typeBox.addItem(DEFAULT_MESSAGE);
 		typeBox.addItem(RESUPPLY_MISSION);
 		typeBox.addItem(ARRIVING_SETTLEMENT);
@@ -130,10 +132,10 @@ public class NewTransportItemDialog extends ModalInternalFrame {
 		buttonPane.add(cancelButton);
 
         // Add to its own tab pane
-        if (desktop.getMainScene() != null)
-        	desktop.add(this);
-        	//desktop.getMainScene().getDesktops().get(2).add(this);
-        else
+//        if (desktop.getMainScene() != null)
+//        	desktop.add(this);
+//        	//desktop.getMainScene().getDesktops().get(2).add(this);
+//        else
         	desktop.add(this);
 
 		Dimension desktopSize = desktop.getParent().getSize();

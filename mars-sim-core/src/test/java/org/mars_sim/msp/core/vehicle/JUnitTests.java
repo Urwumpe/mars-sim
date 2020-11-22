@@ -1,14 +1,11 @@
 package org.mars_sim.msp.core.vehicle;
 
-import junit.textui.TestRunner;
-
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.SimulationConfig;
-import org.mars_sim.msp.core.structure.MockSettlement;
+import org.mars_sim.msp.core.person.ai.task.WalkOutsideTest;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import junit.textui.TestRunner;
 
 // include any ONE of the following...
 //import junit.textui.TestRunner;
@@ -54,7 +51,11 @@ public class JUnitTests extends TestCase {
      * Collection of external test suites to be included in current testing.
      */
     public static Test suite() {
-        return new TestSuite(thisClass);
+    	TestSuite suite =  new TestSuite(thisClass);
+        
+	    suite.addTestSuite(TestLightUtilityVehicle.class);
+	    
+	    return suite;
     }
 
     /**
@@ -62,17 +63,5 @@ public class JUnitTests extends TestCase {
      * Any others beginning with "test..." will be automatically included as well.
      */
     public void testNothing() {
-    }
-
-    public void testLightUtilityVehicle() {
-        SimulationConfig.loadConfig();
-        Simulation.createNewSimulation(-1);
-        
-        LightUtilityVehicle vehicle = new LightUtilityVehicle("Subaru", "Light Utility Vehicle", new MockSettlement());
-        int crewCapacity = vehicle.getCrewCapacity();
-        int slots = vehicle.getAtachmentSlotNumber();
-
-        assertEquals("Wrong crew capacity", 1, crewCapacity);
-        assertEquals("Wrong slot number", 2, slots);
     }
 }

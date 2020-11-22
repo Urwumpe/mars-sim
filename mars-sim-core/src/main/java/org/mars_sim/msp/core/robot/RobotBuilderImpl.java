@@ -1,12 +1,17 @@
 /**
  * Mars Simulation Project
  * RobotBuilderImpl.java
- * @version 3.1.0 2017-04-16
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.core.robot;
 
+import java.util.Iterator;
+import java.util.Map;
+
+import org.mars_sim.msp.core.person.ai.Skill;
+import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.structure.Settlement;
 
 public class RobotBuilderImpl implements RobotBuilder<Robot>{
@@ -36,7 +41,7 @@ public class RobotBuilderImpl implements RobotBuilder<Robot>{
 		return this;
 	}
 
-	public RobotBuilder<Robot> setAssociatedSettlement(Settlement s) {
+	public RobotBuilder<Robot> setAssociatedSettlement(int s) {
 		robot.setAssociatedSettlement(s);
 		return this;
 	}
@@ -46,6 +51,44 @@ public class RobotBuilderImpl implements RobotBuilder<Robot>{
 		return this;
 	}
 
+	public RobotBuilder<Robot> setSkill(Map<String, Integer> skillMap, RobotType t) {
+		if (skillMap == null || skillMap.isEmpty()) {
+			robot.getSkillManager().setRandomBotSkills(t);
+		}
+		else {
+			Iterator<String> i = skillMap.keySet().iterator();
+			while (i.hasNext()) {
+				String skillName = i.next();
+				int level = skillMap.get(skillName);
+				robot.getSkillManager()
+						.addNewSkill(new Skill(SkillType.valueOfIgnoreCase(skillName), level));
+			}
+		}
+		return this;
+	}
+	
+	/**
+	 * Sets the attributes of a robot
+	 * 
+	 * @param attribute map
+	 * @return {@link RobotBuilder<>}
+	 */
+	public RobotBuilder<Robot> setAttribute(Map<String, Integer> attributeMap) {	
+		if (attributeMap == null || attributeMap.isEmpty()) {
+			robot.getRoboticAttributeManager().setRandomAttributes();	
+		}
+		else {
+			Iterator<String> i = attributeMap.keySet().iterator();
+			while (i.hasNext()) {
+				String attributeName = i.next();
+				int value = (Integer) attributeMap.get(attributeName);
+				robot.getRoboticAttributeManager()
+						.setAttribute(RoboticAttributeType.valueOfIgnoreCase(attributeName), value);
+			}
+		}
+		return this;
+	}
+	
 	public Robot build() {
 		return robot;
 	}

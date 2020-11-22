@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MarsSocietyMissionControl.java
- * @version 3.1.0 2017-01-14
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -9,7 +9,7 @@ package org.mars_sim.msp.core.reportingAuthority;
 
 import java.io.Serializable;
 
-import org.mars_sim.msp.core.reportingAuthority.objectives.DeterminingHabitability;
+import org.mars_sim.msp.core.reportingAuthority.objectives.SettlingMars;
 
 /*
  * This class represents the Mission Control of the Mars Society
@@ -22,7 +22,7 @@ implements Serializable {
 
 	//private final String name = "MS";
 
-	private final ReportingAuthorityType org = ReportingAuthorityType.MARS_SOCIETY;
+	private final ReportingAuthorityType org = ReportingAuthorityType.MS;
 
 	private final String toolTipStr = "Mars Society";
 
@@ -35,7 +35,7 @@ implements Serializable {
 	}
 
 	private MarsSocietyMissionControl() {
-		missionAgenda = new DeterminingHabitability();
+		missionAgenda = new SettlingMars();
 	}
 
 	public static MarsSocietyMissionControl createMissionControl() {

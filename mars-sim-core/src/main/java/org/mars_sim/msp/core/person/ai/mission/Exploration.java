@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Exploration.java
- * @version 3.1.0 2017-08-08
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission;
@@ -20,21 +20,19 @@ import org.mars_sim.msp.core.Direction;
 import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.SimulationConfig;
-
+import org.mars_sim.msp.core.equipment.EVASuit;
+import org.mars_sim.msp.core.equipment.EquipmentFactory;
 import org.mars_sim.msp.core.equipment.EquipmentType;
-import org.mars_sim.msp.core.equipment.SpecimenContainer;
+import org.mars_sim.msp.core.equipment.SpecimenBox;
 import org.mars_sim.msp.core.mars.ExploredLocation;
-import org.mars_sim.msp.core.mars.Mars;
 import org.mars_sim.msp.core.mars.MineralMap;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PersonConfig;
 import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.EVAOperation;
 import org.mars_sim.msp.core.person.ai.task.ExploreSite;
-import org.mars_sim.msp.core.person.ai.task.Task;
-
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -53,14 +51,22 @@ public class Exploration extends RoverMission implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(Exploration.class.getName());
-
+	private static final Logger logger = Logger.getLogger(Exploration.class.getName());
+	private static final String loggerName = logger.getName();
+	private static final String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	
 	/** Default description. */
 	public static final String DEFAULT_DESCRIPTION = Msg.getString("Mission.description.exploration"); //$NON-NLS-1$
 
+	/** Mission Type enum. */
+	public static final MissionType missionType = MissionType.EXPLORATION;
+	
 	/** Mission phase. */
-	final public static MissionPhase EXPLORE_SITE = new MissionPhase(Msg.getString("Mission.phase.exploreSite")); //$NON-NLS-1$
+	public static final MissionPhase EXPLORE_SITE = new MissionPhase(Msg.getString("Mission.phase.exploreSite")); //$NON-NLS-1$
 
+	/** Exploration Site */
+	public static final String EXPLORATION_SITE = "Exploration Site ";
+	
 	/** Number of specimen containers required for the mission. */
 	public static final int REQUIRED_SPECIMEN_CONTAINERS = 20;
 
@@ -68,10 +74,10 @@ public class Exploration extends RoverMission implements Serializable {
 	private static final int NUM_SITES = 5;
 
 	/** Amount of time to explore a site. */
-	public final static double EXPLORING_SITE_TIME = 1000D;
+	public static final double EXPLORING_SITE_TIME = 1000D;
 
 	/** Maximum mineral concentration estimation diff from actual. */
-	private final static double MINERAL_ESTIMATION_CEILING = 20D;
+	private static final double MINERAL_ESTIMATION_CEILING = 20D;
 
 	// Data members
 	/** Map of exploration sites and their completion. */
@@ -86,12 +92,10 @@ public class Exploration extends RoverMission implements Serializable {
 	private boolean endExploringSite;
 
 	// Static members
-	private static int oxygenID = ResourceUtil.oxygenID;
-	private static int waterID = ResourceUtil.waterID;
-	private static int foodID = ResourceUtil.foodID;
-
-	private static PersonConfig personConfig;
-
+	private static final int oxygenID = ResourceUtil.oxygenID;
+	private static final int waterID = ResourceUtil.waterID;
+	private static final int foodID = ResourceUtil.foodID;
+	
 	/**
 	 * Constructor.
 	 * 
@@ -101,54 +105,66 @@ public class Exploration extends RoverMission implements Serializable {
 	public Exploration(Person startingPerson) {
 
 		// Use RoverMission constructor.
-		super(DEFAULT_DESCRIPTION, startingPerson, RoverMission.MIN_GOING_MEMBERS);
-
+		super(DEFAULT_DESCRIPTION, missionType, startingPerson, RoverMission.MIN_GOING_MEMBERS);
+		
 		Settlement s = startingPerson.getSettlement();
 
 		if (s != null & !isDone()) {
-
-			// Set mission capacity.
-			if (hasVehicle())
-				setMissionCapacity(getRover().getCrewCapacity());
-			int availableSuitNum = Mission.getNumberAvailableEVASuitsAtSettlement(s);
-			if (availableSuitNum < getMissionCapacity())
-				setMissionCapacity(availableSuitNum);
 
 			// Initialize data members.
 			setStartingSettlement(s);
 			exploredSites = new ArrayList<ExploredLocation>(NUM_SITES);
 			explorationSiteCompletion = new HashMap<String, Double>(NUM_SITES);
+			
+			// Check if vehicle can carry enough supplies for the mission.
+			if (hasVehicle() && !isVehicleLoadable()) {
+				addMissionStatus(MissionStatus.VEHICLE_NOT_LOADABLE);
+				endMission();
+			}
+			
+			// Set mission capacity.
+			if (hasVehicle())
+				setMissionCapacity(getRover().getCrewCapacity());
+			
+			int availableSuitNum = Mission.getNumberAvailableEVASuitsAtSettlement(s);
+			if (availableSuitNum < getMissionCapacity())
+				setMissionCapacity(availableSuitNum);
 
+			// Create a list of sites to be explored during the stage of mission planning
+			createNewExploredSite();
+			
 			// Recruit additional members to mission.
-			recruitMembersForMission(startingPerson);
+			if (!recruitMembersForMission(startingPerson))
+				return;
 
 			// Determine exploration sites
 			try {
 				if (hasVehicle()) {
-					int skill = startingPerson.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.AREOLOGY);
-					determineExplorationSites(getVehicle().getRange(),
+					int skill = startingPerson.getSkillManager().getEffectiveSkillLevel(SkillType.AREOLOGY);
+					determineExplorationSites(getVehicle().getRange(missionType),
 							getTotalTripTimeLimit(getRover(), getPeopleNumber(), true), NUM_SITES, skill);
+					if (explorationSiteCompletion.size() == 0) {
+						addMissionStatus(MissionStatus.NO_EXPLORATION_SITES);
+						endMission();
+					}
 				}
 			} catch (Exception e) {
-				endMission(NO_EXPLORATION_SITES);
+				addMissionStatus(MissionStatus.NO_EXPLORATION_SITES);
+				endMission();
 			}
 
 			// Add home settlement
 			addNavpoint(new NavPoint(getStartingSettlement().getCoordinates(), s, s.getName()));
 
-			// Check if vehicle can carry enough supplies for the mission.
-			if (hasVehicle() && !isVehicleLoadable())
-				endMission(VEHICLE_NOT_LOADABLE);
-		}
-
-		if (s != null) {
 			// Add exploring site phase.
 			addPhase(EXPLORE_SITE);
 
 			// Set initial mission phase.
-			setPhase(VehicleMission.APPROVAL);//.EMBARKING);
-			setPhaseDescription(Msg.getString("Mission.phase.approval.description", s.getName())); // $NON-NLS-1$
+			setPhase(VehicleMission.REVIEWING);
+			setPhaseDescription(Msg.getString("Mission.phase.reviewing.description"));//, s.getName())); // $NON-NLS-1$
 		}
+		
+		logger.finer(getStartingMember() + " had just finished creating an Exploration mission.");
 	}
 
 	/**
@@ -165,8 +181,14 @@ public class Exploration extends RoverMission implements Serializable {
 			List<Coordinates> explorationSites, Rover rover, String description) {
 
 		// Use RoverMission constructor.
-		super(description, (MissionMember) members.toArray()[0], RoverMission.MIN_GOING_MEMBERS, rover);
+		super(description, missionType, (MissionMember) members.toArray()[0], RoverMission.MIN_GOING_MEMBERS, rover);
 
+		// Check if vehicle can carry enough supplies for the mission.
+		if (hasVehicle() && !isVehicleLoadable()) {
+			addMissionStatus(MissionStatus.VEHICLE_NOT_LOADABLE);
+			endMission();
+		}
+		
 		setStartingSettlement(startingSettlement);
 
 		// Set mission capacity.
@@ -179,9 +201,12 @@ public class Exploration extends RoverMission implements Serializable {
 		exploredSites = new ArrayList<ExploredLocation>(NUM_SITES);
 		explorationSiteCompletion = new HashMap<String, Double>(NUM_SITES);
 
+//		// Configure the sites to be explored with mineral concentration during the stage of mission planning
+		configuredExploredSite(explorationSites);
+				
 		// Set exploration navpoints.
 		for (int x = 0; x < explorationSites.size(); x++) {
-			String siteName = "exploration site " + (x + 1);
+			String siteName = EXPLORATION_SITE + (x + 1);
 			addNavpoint(new NavPoint(explorationSites.get(x), siteName));
 			explorationSiteCompletion.put(siteName, 0D);
 		}
@@ -191,7 +216,7 @@ public class Exploration extends RoverMission implements Serializable {
 				new NavPoint(startingSettlement.getCoordinates(), startingSettlement, startingSettlement.getName()));
 
 		Person person = null;
-		Robot robot = null;
+//		Robot robot = null;
 
 		// Add mission members.
 		// TODO Refactor this.
@@ -203,8 +228,8 @@ public class Exploration extends RoverMission implements Serializable {
 				person = (Person) member;
 				person.getMind().setMission(this);
 			} else if (member instanceof Robot) {
-				robot = (Robot) member;
-				robot.getBotMind().setMission(this);
+//				robot = (Robot) member;
+//				robot.getBotMind().setMission(this);
 			}
 		}
 
@@ -212,16 +237,13 @@ public class Exploration extends RoverMission implements Serializable {
 		addPhase(EXPLORE_SITE);
 
 		// Set initial mission phase.
-		setPhase(VehicleMission.APPROVAL);//.EMBARKING);
-		setPhaseDescription(Msg.getString("Mission.phase.approval.description", startingSettlement.getName())); // $NON-NLS-1$
+		setPhase(VehicleMission.EMBARKING);
+		setPhaseDescription(Msg.getString("Mission.phase.embarking.description", startingSettlement.getName())); // $NON-NLS-1$
 
-		// Check if vehicle can carry enough supplies for the mission.
-		if (hasVehicle() && !isVehicleLoadable())
-			endMission(VEHICLE_NOT_LOADABLE);
 	}
 
 	/**
-	 * Checks of there are any mineral locations within rover/mission range.
+	 * Checks if there are any mineral locations within rover/mission range.
 	 * 
 	 * @param rover          the rover to use.
 	 * @param homeSettlement the starting settlement.
@@ -230,20 +252,48 @@ public class Exploration extends RoverMission implements Serializable {
 	 */
 	public static boolean hasNearbyMineralLocations(Rover rover, Settlement homeSettlement) {
 
-		double roverRange = rover.getRange();
+		double roverRange = rover.getRange(missionType);
 		double tripTimeLimit = getTotalTripTimeLimit(rover, rover.getCrewCapacity(), true);
-		double tripRange = getTripTimeRange(tripTimeLimit, rover.getBaseSpeed() / 2D);
+		double tripRange = getTripTimeRange(tripTimeLimit, rover.getBaseSpeed() / 1.25D);
 		double range = roverRange;
 		if (tripRange < range)
 			range = tripRange;
 
-		MineralMap map = Simulation.instance().getMars().getSurfaceFeatures().getMineralMap();
+		MineralMap map = surfaceFeatures.getMineralMap();
 		Coordinates mineralLocation = map.findRandomMineralLocation(homeSettlement.getCoordinates(), range / 2D);
+		
 		boolean result = (mineralLocation != null);
 
 		return result;
 	}
 
+	/**
+	 * Checks if there are any mineral locations within rover/mission range.
+	 * 
+	 * @param rover          the rover to use.
+	 * @param homeSettlement the starting settlement.
+	 * @return true if mineral locations.
+	 * @throws Exception if error determining mineral locations.
+	 */
+	public static Map<String, Double> getNearbyMineral(Rover rover, Settlement homeSettlement) {
+		Map<String, Double> minerals = new HashMap<>();
+		
+		double roverRange = rover.getRange(missionType);
+		double tripTimeLimit = getTotalTripTimeLimit(rover, rover.getCrewCapacity(), true);
+		double tripRange = getTripTimeRange(tripTimeLimit, rover.getBaseSpeed() / 1.25D);
+		double range = roverRange;
+		if (tripRange < range)
+			range = tripRange;
+
+		MineralMap map = surfaceFeatures.getMineralMap();
+		Coordinates mineralLocation = map.findRandomMineralLocation(homeSettlement.getCoordinates(), range / 2D);
+		
+		if (mineralLocation != null)
+			minerals = map.getAllMineralConcentrations(mineralLocation);
+		
+		return minerals;
+	}
+	
 	/**
 	 * Gets the range of a trip based on its time limit and exploration sites.
 	 * 
@@ -260,7 +310,7 @@ public class Exploration extends RoverMission implements Serializable {
 
 	@Override
 	protected void determineNewPhase() {
-		if (APPROVAL.equals(getPhase())) {
+		if (REVIEWING.equals(getPhase())) {
 			setPhase(VehicleMission.EMBARKING);
 			setPhaseDescription(
 					Msg.getString("Mission.phase.embarking.description", getCurrentNavpoint().getDescription()));//startingMember.getSettlement().toString())); // $NON-NLS-1$
@@ -292,8 +342,19 @@ public class Exploration extends RoverMission implements Serializable {
 					Msg.getString("Mission.phase.travelling.description", getNextNavpoint().getDescription())); // $NON-NLS-1$
 		} 
 		
-		else if (DISEMBARKING.equals(getPhase()))
-			endMission(ALL_DISEMBARKED);
+//		else if (DISEMBARKING.equals(getPhase()))
+//			endMission(ALL_DISEMBARKED);
+		
+		else if (DISEMBARKING.equals(getPhase())) {
+			setPhase(VehicleMission.COMPLETED);
+			setPhaseDescription(
+					Msg.getString("Mission.phase.completed.description")); // $NON-NLS-1$
+		}
+		
+		else if (COMPLETED.equals(getPhase())) {
+			addMissionStatus(MissionStatus.MISSION_ACCOMPLISHED);
+			endMission();
+		}
 	}
 
 	@Override
@@ -326,6 +387,20 @@ public class Exploration extends RoverMission implements Serializable {
 	}
 
 	/**
+	 * Retrieves the current exploration site instance
+	 * 
+	 * @return
+	 */
+	private ExploredLocation retrieveCurrentSite() {
+		for (ExploredLocation e: exploredSites) {
+			if (e.getLocation().equals(getCurrentMissionLocation()))
+				return e;
+		}
+
+		return createAExploredSite();
+	}
+	
+	/**
 	 * Performs the explore site phase of the mission.
 	 * 
 	 * @param member the mission member currently performing the mission
@@ -333,15 +408,16 @@ public class Exploration extends RoverMission implements Serializable {
 	 */
 	private void exploringPhase(MissionMember member) {
 
+		MarsClock currentTime = (MarsClock) Simulation.instance().getMasterClock().getMarsClock().clone();
+		
 		// Add new explored site if just starting exploring.
-		if (currentSite == null) {
-			createNewExploredSite();
-			explorationSiteStartTime = (MarsClock) Simulation.instance().getMasterClock().getMarsClock().clone();
+		if (currentSite == null) {// currentSite vs. explorationSiteStartTime
+			explorationSiteStartTime = currentTime;
+			currentSite = retrieveCurrentSite();
 		}
 
 		// Check if crew has been at site for more than one sol.
 		boolean timeExpired = false;
-		MarsClock currentTime = (MarsClock) Simulation.instance().getMasterClock().getMarsClock().clone();
 		double timeDiff = MarsClock.getTimeDiff(currentTime, explorationSiteStartTime);
 		if (timeDiff >= EXPLORING_SITE_TIME) {
 			timeExpired = true;
@@ -380,10 +456,9 @@ public class Exploration extends RoverMission implements Serializable {
 
 			// If no one can explore the site and this is not due to it just being
 			// night time, end the exploring phase.
-			Mars mars = Simulation.instance().getMars();
-			boolean inDarkPolarRegion = mars.getSurfaceFeatures().inDarkPolarRegion(getCurrentMissionLocation());
-			double sunlight = mars.getSurfaceFeatures().getSolarIrradiance(getCurrentMissionLocation());
-			if (nobodyExplore && ((sunlight > 0D) || inDarkPolarRegion))
+			boolean inDarkPolarRegion = surfaceFeatures.inDarkPolarRegion(getCurrentMissionLocation());
+			double sunlight = surfaceFeatures.getSolarIrradiance(getCurrentMissionLocation());
+			if (nobodyExplore && ((sunlight < 20) || inDarkPolarRegion))
 				setPhaseEnded(true);
 
 			// Anyone in the crew or a single person at the home settlement has a dangerous
@@ -391,7 +466,7 @@ public class Exploration extends RoverMission implements Serializable {
 			if (hasEmergency())
 				setPhaseEnded(true);
 
-			// Check if enough resources for remaining trip.
+			// Check if enough resources for remaining trip. false = not using margin.
 			if (!hasEnoughResourcesForRemainingMission(false)) {
 				// If not, determine an emergency destination.
 				determineEmergencyDestination(member);
@@ -423,6 +498,7 @@ public class Exploration extends RoverMission implements Serializable {
 					Person person = (Person) member;
 					// If person can explore the site, start that task.
 					if (ExploreSite.canExploreSite(person, getRover())) {
+//						if (currentSite == null) System.out.println(person + "'s currentSite is null");
 						assignTask(person, new ExploreSite(person, currentSite, (Rover) getVehicle()));
 					}
 				}
@@ -432,34 +508,111 @@ public class Exploration extends RoverMission implements Serializable {
 			currentSite = null;
 		}
 	}
-
+	
 	/**
-	 * Creates a new explored site at the current location, creates initial
+	 * Gets a list of navpoint site coordinates
+	 * 
+	 * @return
+	 */
+	public List<Coordinates> getSiteCoordinates() {
+		return ((TravelMission)this).getNavCoordinates();
+	}
+	
+	/**
+	 * Creates a new site at the current location, creates initial
 	 * estimates for mineral concentrations, and adds it to the explored site list.
 	 * 
 	 * @throws MissionException if error creating explored site.
 	 */
 	private void createNewExploredSite() {
-		SurfaceFeatures surfaceFeatures = Simulation.instance().getMars().getSurfaceFeatures();
 		MineralMap mineralMap = surfaceFeatures.getMineralMap();
 		String[] mineralTypes = mineralMap.getMineralTypeNames();
-		Map<String, Double> initialMineralEstimations = new HashMap<String, Double>(mineralTypes.length);
-		for (String mineralType : mineralTypes) {
-			double estimation = RandomUtil.getRandomDouble(MINERAL_ESTIMATION_CEILING * 2D)
-					- MINERAL_ESTIMATION_CEILING;
-			double actualConcentration = mineralMap.getMineralConcentration(mineralType, getCurrentMissionLocation());
-			estimation += actualConcentration;
-			if (estimation < 0D)
-				estimation = 0D - estimation;
-			else if (estimation > 100D)
-				estimation = 100D - estimation;
-			initialMineralEstimations.put(mineralType, estimation);
+		
+		List<Coordinates> coords = getSiteCoordinates();
+		for (Coordinates c: coords) {
+			Map<String, Double> initialMineralEstimations = new HashMap<String, Double>(mineralTypes.length);
+			for (String mineralType : mineralTypes) {
+				double estimation = RandomUtil.getRandomDouble(MINERAL_ESTIMATION_CEILING * 2D)
+						- MINERAL_ESTIMATION_CEILING;
+				double actualConcentration = mineralMap.getMineralConcentration(mineralType, c);//getCurrentMissionLocation());
+				estimation += actualConcentration;
+				if (estimation < 0D)
+					estimation = 0D - estimation;
+				else if (estimation > 100D)
+					estimation = 100D - estimation;
+				initialMineralEstimations.put(mineralType, estimation);
+			}
+			
+			ExploredLocation el = surfaceFeatures.addExploredLocation(c, //getCurrentMissionLocation()),
+					initialMineralEstimations, getAssociatedSettlement());
+			exploredSites.add(el);
 		}
-		currentSite = surfaceFeatures.addExploredLocation(new Coordinates(getCurrentMissionLocation()),
-				initialMineralEstimations, getAssociatedSettlement());
-		exploredSites.add(currentSite);
 	}
 
+	/**
+	 * Creates a brand new site at the current location and 
+	 * estimate its mineral concentrations
+	 * 
+	 * @throws MissionException if error creating explored site.
+	 * @return ExploredLocation
+	 */
+	private ExploredLocation createAExploredSite() {
+		MineralMap mineralMap = surfaceFeatures.getMineralMap();
+		String[] mineralTypes = mineralMap.getMineralTypeNames();
+		Coordinates c = getCurrentMissionLocation();
+//		List<Coordinates> coords = getSiteCoordinates();
+//		for (Coordinates c: coords) {
+			Map<String, Double> initialMineralEstimations = new HashMap<String, Double>(mineralTypes.length);
+			for (String mineralType : mineralTypes) {
+				double estimation = RandomUtil.getRandomDouble(MINERAL_ESTIMATION_CEILING * 2D)
+						- MINERAL_ESTIMATION_CEILING;
+				double actualConcentration = mineralMap.getMineralConcentration(mineralType, c);//getCurrentMissionLocation());
+				estimation += actualConcentration;
+				if (estimation < 0D)
+					estimation = 0D - estimation;
+				else if (estimation > 100D)
+					estimation = 100D - estimation;
+				initialMineralEstimations.put(mineralType, estimation);
+			}
+			
+			ExploredLocation el = surfaceFeatures.addExploredLocation(c, //getCurrentMissionLocation()),
+					initialMineralEstimations, getAssociatedSettlement());
+//			exploredSites.add(el);
+//		}
+		return el;
+	}
+	
+	/**
+	 * Configure a new site at the current location, creates initial
+	 * estimates for mineral concentrations, and adds it to the explored site list.
+	 * 
+	 * @param coords
+	 * @throws MissionException if error creating explored site.
+	 */
+	private void configuredExploredSite(List<Coordinates> coords) {
+		MineralMap mineralMap = surfaceFeatures.getMineralMap();
+		String[] mineralTypes = mineralMap.getMineralTypeNames();
+		
+		for (Coordinates c: coords) {
+			Map<String, Double> initialMineralEstimations = new HashMap<String, Double>(mineralTypes.length);
+			for (String mineralType : mineralTypes) {
+				double estimation = RandomUtil.getRandomDouble(MINERAL_ESTIMATION_CEILING * 2D)
+						- MINERAL_ESTIMATION_CEILING;
+				double actualConcentration = mineralMap.getMineralConcentration(mineralType, c);//getCurrentMissionLocation());
+				estimation += actualConcentration;
+				if (estimation < 0D)
+					estimation = 0D - estimation;
+				else if (estimation > 100D)
+					estimation = 100D - estimation;
+				initialMineralEstimations.put(mineralType, estimation);
+			}
+			
+			ExploredLocation el = surfaceFeatures.addExploredLocation(c, //getCurrentMissionLocation()),
+					initialMineralEstimations, getAssociatedSettlement());
+			exploredSites.add(el);
+		}
+	}
+	
 	@Override
 	protected boolean isCapableOfMission(MissionMember member) {
 		boolean result = super.isCapableOfMission(member);
@@ -495,8 +648,8 @@ public class Exploration extends RoverMission implements Serializable {
 
 		// Add estimated remaining exploration time at current site if still there.
 		if (EXPLORE_SITE.equals(getPhase())) {
-			MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
-			double timeSpentAtExplorationSite = MarsClock.getTimeDiff(currentTime, explorationSiteStartTime);
+//			MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
+			double timeSpentAtExplorationSite = MarsClock.getTimeDiff(Simulation.instance().getMasterClock().getMarsClock(), explorationSiteStartTime);
 			double remainingTime = EXPLORING_SITE_TIME - timeSpentAtExplorationSite;
 			if (remainingTime > 0D)
 				result += remainingTime;
@@ -519,37 +672,23 @@ public class Exploration extends RoverMission implements Serializable {
 		int crewNum = getPeopleNumber();
 
 		// Determine life support supplies needed for trip.
-		// AmountResource oxygen =
-		// AmountResource.findAmountResource(LifeSupportType.OXYGEN);
 		double oxygenAmount = PhysicalCondition.getOxygenConsumptionRate()// * Mission.OXYGEN_MARGIN
 				* timeSols * crewNum;
 		if (result.containsKey(oxygenID))
 			oxygenAmount += (Double) result.get(oxygenID);
 		result.put(oxygenID, oxygenAmount);
 
-		// AmountResource water =
-		// AmountResource.findAmountResource(LifeSupportType.WATER);
 		double waterAmount = PhysicalCondition.getWaterConsumptionRate()// * Mission.WATER_MARGIN
 				* timeSols * crewNum;
 		if (result.containsKey(waterID))
 			waterAmount += (Double) result.get(waterID);
 		result.put(waterID, waterAmount);
 
-		// AmountResource food =
-		// AmountResource.findAmountResource(LifeSupportType.FOOD);
 		double foodAmount = PhysicalCondition.getFoodConsumptionRate()// * Mission.FOOD_MARGIN
 				* timeSols * crewNum;
 		if (result.containsKey(foodID))
 			foodAmount += (Double) result.get(foodID);
 		result.put(foodID, foodAmount);
-
-		// Added Soymilk
-//        AmountResource dessert1 = AmountResource.findAmountResource("Soymilk");
-//        double dessert1Amount = PhysicalCondition.getFoodConsumptionRate() / 6D
-//                * timeSols * crewNum;
-//        if (result.containsKey(dessert1))
-//            dessert1Amount += (Double) result.get(dessert1);
-//        result.put(dessert1, dessert1Amount);
 
 		return result;
 	}
@@ -615,7 +754,7 @@ public class Exploration extends RoverMission implements Serializable {
 			Map<Integer, Integer> result = new HashMap<>();
 
 			// Include required number of specimen containers.
-			result.put(EquipmentType.str2int(SpecimenContainer.TYPE), REQUIRED_SPECIMEN_CONTAINERS);
+			result.put(EquipmentType.convertName2ID(SpecimenBox.TYPE), REQUIRED_SPECIMEN_CONTAINERS);
 
 			equipmentNeededCache = result;
 			return result;
@@ -635,33 +774,23 @@ public class Exploration extends RoverMission implements Serializable {
 
 		double timeLimit = Double.MAX_VALUE;
 
-		if (personConfig == null)
-			personConfig = SimulationConfig.instance().getPersonConfiguration();
-
 		// Check food capacity as time limit.
 		double foodConsumptionRate = personConfig.getFoodConsumptionRate();
-		double foodCapacity = vInv.getARCapacity(foodID, false);
+		double foodCapacity = vInv.getAmountResourceCapacity(foodID, false);
 		double foodTimeLimit = foodCapacity / (foodConsumptionRate * memberNum);
 		if (foodTimeLimit < timeLimit)
 			timeLimit = foodTimeLimit;
-		/*
-		 * // Added Soymilk // Check dessert1 capacity as time limit. AmountResource
-		 * dessert1 = AmountResource.findAmountResource("Soymilk"); double
-		 * dessert1ConsumptionRate = config.getFoodConsumptionRate() / 6D; double
-		 * dessert1Capacity = vInv.getAmountResourceCapacity(dessert1, false); double
-		 * dessert1TimeLimit = dessert1Capacity / (dessert1ConsumptionRate * memberNum);
-		 * if (dessert1TimeLimit < timeLimit) timeLimit = dessert1TimeLimit;
-		 */
+
 		// Check water capacity as time limit.
 		double waterConsumptionRate = personConfig.getWaterConsumptionRate();
-		double waterCapacity = vInv.getARCapacity(waterID, false);
+		double waterCapacity = vInv.getAmountResourceCapacity(waterID, false);
 		double waterTimeLimit = waterCapacity / (waterConsumptionRate * memberNum);
 		if (waterTimeLimit < timeLimit)
 			timeLimit = waterTimeLimit;
 
 		// Check oxygen capacity as time limit.
 		double oxygenConsumptionRate = personConfig.getNominalO2ConsumptionRate();
-		double oxygenCapacity = vInv.getARCapacity(oxygenID, false);
+		double oxygenCapacity = vInv.getAmountResourceCapacity(oxygenID, false);
 		double oxygenTimeLimit = oxygenCapacity / (oxygenConsumptionRate * memberNum);
 		if (oxygenTimeLimit < timeLimit)
 			timeLimit = oxygenTimeLimit;
@@ -693,7 +822,7 @@ public class Exploration extends RoverMission implements Serializable {
 		if (timeRange < range) {
 			range = timeRange;
 		}
-
+		
 		// Get the current location.
 		Coordinates startingLocation = getCurrentMissionLocation();
 
@@ -704,7 +833,7 @@ public class Exploration extends RoverMission implements Serializable {
 		} else
 			throw new IllegalStateException(getPhase() + " : Could not determine first exploration site.");
 
-		double siteDistance = startingLocation.getDistance(newLocation);
+		double siteDistance = Coordinates.computeDistance(startingLocation, newLocation);
 		Coordinates currentLocation = newLocation;
 
 		// Determine remaining exploration sites.
@@ -731,11 +860,11 @@ public class Exploration extends RoverMission implements Serializable {
 			currentLocation = startingLocation;
 			while (unorderedSites2.size() > 0) {
 				Coordinates shortest = unorderedSites2.get(0);
-				double shortestDistance = currentLocation.getDistance(shortest);
+				double shortestDistance = Coordinates.computeDistance(currentLocation, shortest);
 				Iterator<Coordinates> i = unorderedSites2.iterator();
 				while (i.hasNext()) {
 					Coordinates site = i.next();
-					double distance = currentLocation.getDistance(site);
+					double distance = Coordinates.computeDistance(currentLocation, site);
 					if (distance < shortestDistance) {
 						shortest = site;
 						shortestDistance = distance;
@@ -801,7 +930,7 @@ public class Exploration extends RoverMission implements Serializable {
 		Coordinates result = null;
 
 		Coordinates startingLocation = getCurrentMissionLocation();
-		MineralMap map = Simulation.instance().getMars().getSurfaceFeatures().getMineralMap();
+		MineralMap map = surfaceFeatures.getMineralMap();
 		Coordinates randomLocation = map.findRandomMineralLocation(startingLocation, range);
 		if (randomLocation != null) {
 			Direction direction = new Direction(RandomUtil.getRandomDouble(2D * Math.PI));
@@ -810,7 +939,7 @@ public class Exploration extends RoverMission implements Serializable {
 			}
 			double distance = RandomUtil.getRandomDouble(500D / areologySkill);
 			result = randomLocation.getNewLocation(direction, distance);
-			double distanceFromStart = startingLocation.getDistance(result);
+			double distanceFromStart = Coordinates.computeDistance(startingLocation, result);
 			if (distanceFromStart > range) {
 				Direction direction2 = startingLocation.getDirectionToPoint(result);
 				result = startingLocation.getNewLocation(direction2, range);
@@ -836,7 +965,7 @@ public class Exploration extends RoverMission implements Serializable {
 		double timeAtSites = getEstimatedTimeAtExplorationSites();
 		double tripTimeTravellingLimit = tripTimeLimit - timeAtSites;
 		double averageSpeed = getAverageVehicleSpeedForOperators();
-		double millisolsInHour = MarsClock.convertSecondsToMillisols(60D * 60D);
+		double millisolsInHour = MarsClock.MILLISOLS_PER_HOUR;
 		double averageSpeedMillisol = averageSpeed / millisolsInHour;
 		return tripTimeTravellingLimit * averageSpeedMillisol;
 	}
@@ -857,6 +986,65 @@ public class Exploration extends RoverMission implements Serializable {
 	 */
 	public Map<String, Double> getExplorationSiteCompletion() {
 		return new HashMap<String, Double>(explorationSiteCompletion);
+	}
+
+	/**
+	 * Gets the estimated total mineral value of a mining site.
+	 * 
+	 * @param site       the mining site.
+	 * @param settlement the settlement valuing the minerals.
+	 * @return estimated value of the minerals at the site (VP).
+	 * @throws MissionException if error determining the value.
+	 */
+	public static double getTotalMineralValue(Settlement settlement, Map<String, Double> minerals) {
+
+		double result = 0D;		
+
+		for (String mineralType : minerals.keySet()) {
+			int mineralResource = ResourceUtil.findIDbyAmountResourceName(mineralType);
+			double mineralValue = settlement.getGoodsManager().getGoodValuePerItem(mineralResource);
+			double concentration = minerals.get(mineralType);
+			double mineralAmount = (concentration / 100D) * Mining.MINERAL_BASE_AMOUNT;
+			result += mineralValue * mineralAmount;
+		}
+
+		return result;
+	}
+	
+	@Override
+	protected Map<Integer, Number> getPartsNeededForTrip(double distance) {
+		// Load the standard parts from VehicleMission.
+		Map<Integer, Number> result = super.getPartsNeededForTrip(distance); // new HashMap<>();
+
+		// Determine repair parts for EVA Suits.
+		double evaTime = getEstimatedRemainingExplorationSiteTime();
+		double numberAccidents = evaTime * getPeopleNumber() * EVAOperation.BASE_ACCIDENT_CHANCE;
+
+		// Assume the average number malfunctions per accident is 1.5.
+		double numberMalfunctions = numberAccidents * VehicleMission.AVERAGE_EVA_MALFUNCTION;
+
+		// Get temporary EVA suit.
+		EVASuit suit = (EVASuit) EquipmentFactory.createEquipment(EVASuit.class, new Coordinates(0, 0), true);
+
+		// Determine needed repair parts for EVA suits.
+		Map<Integer, Double> parts = suit.getMalfunctionManager().getRepairPartProbabilities();
+		Iterator<Integer> i = parts.keySet().iterator();
+		while (i.hasNext()) {
+			Integer part = i.next();
+			String name = ItemResourceUtil.findItemResourceName(part);
+			for (String n : EVASuit.getParts()) {
+				if (n.equalsIgnoreCase(name)) {
+					int number = (int) Math.round(parts.get(part) * numberMalfunctions);
+					if (number > 0) {
+						if (result.containsKey(part))
+							number += result.get(part).intValue();
+						result.put(part, number);
+					}
+				}
+			}
+		}
+
+		return result;
 	}
 
 	@Override

@@ -1,13 +1,11 @@
 /**
  * Mars Simulation Project
  * HelpGenerator.java
- * @version 3.1.0 2017-02-03
+ * @version 3.1.2 2020-09-02
  * @author stpa
  */
 
 package org.mars_sim.msp.ui.helpGenerator;
-
-// TODO make the generated help files internationalizable.
 
 import java.io.File;
 import java.io.PrintWriter;
@@ -18,7 +16,7 @@ import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.mars_sim.msp.core.LifeSupportType;
+import org.mars_sim.msp.core.LifeSupportInterface;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.foodProduction.FoodProductionProcessInfo;
 import org.mars_sim.msp.core.foodProduction.FoodProductionProcessItem;
@@ -36,48 +34,74 @@ import org.mars_sim.msp.core.vehicle.VehicleConfig.VehicleDescription;
 import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.resupply.SupplyTableModel;
 
+/*
+ * Help for finding the absolute path of the html help files 
+ */
+
+// First, use the command line argument -html for generating new html help files (Or run the eclipse launcher
+// "MarsProject -html.launch" in Eclipse IDE to do the same).
+//	 
+// In Windows OS, the html help files are kept inside the src folder hierarchy as follows : 
+//
+// At \mars-sim\mars-sim-ui\src\main\resources\docs\help\$[DIR]
+// e.g. D:\Data\git\mars-sim\mars-sim-ui\src\main\resources\docs\help\$[DIR]
+//
+// However, after running "MarsProjectFX -html.launch" in Eclipse, the newly generated htmls will be 
+// saved at the target folder hierarchy instead of the 'src' folder as follows :
+//
+// At \mars-sim-ui\target\classes\docs\help\$[DIR]
+// e.g. D:\Data\git\mars-sim\mars-sim-ui\target\classes\docs\help\$[DIR]
+//
+// Note : the newly generated html files are located within the mars-sim-ui's 'target' folder
+// and NOT the mars-sim-ui's 'src' folder.
+//
+// You will need to "manually" copy the newly generated htmls from the \target\$[DIR] to the \src\$[DIR] 
+// and then commit the changes.
+//   
+// A total of 652 newly generated htmls using this HelpGenerator class can be broken into the followings :
+// 1. food_production*.html
+// 2. process*.html       
+// 3. part*.html
+// 4. resource*.html
+// 5. $[vehicle type].html
+//
+// They are stored inside their respective directory $[DIR] as follows : 
+// 1. food
+// 2. processes
+// 3. parts
+// 4. resources
+// 5. vehicles
+//
+// The base directory \help contains other important html pages such as the tutorial pages. They do not
+// need to be overwritten in this case.
+//
+// In order to include a clean set of htmls, it is recommended that one should delete the old set of 
+// htmls (1-5 above) in the \src\$[DIR] right before copying the new set of htmls from the \target\$[DIR]. 
+// 
+// There may be a time delay and refresh issue with Eclipse, if you use the Windows Explorer outside of 
+// Eclipse IDE to manually delete the old html pages and then copy over the new html files.
+//
+// Afterward, make sure you "refresh" the Project Explorer in Eclipse so that it will intelligently compare which 
+// particular html files have been changed/updated and which ones stay the same. Eclipse will compare the new
+// ones against the local copies. In this manner, during "Git Staging", Eclipse will properly tag and post only 
+// the html files that need to be updated in the mars-sim codebase. 
+//
+// For if you delete all 652 old html files in $[DIR] and copy over the new 652 html files, Eclipse would 
+// intelligently detect the 20 html files that need to be updated in the codebase during "Git Staging".
+//
+
+
+
 /**
  * Generates html files for the in-game help. 
- * Note : start it by running "MarsProjectFX -html.launch" in Eclipse 
+ * Note : run "MarsProject -html.launch" in Eclipse 
  */
 public class HelpGenerator {
 
 	/** initialized logger for this class. */
 	private static Logger logger = Logger.getLogger(HelpGenerator.class.getName());
 
-	/*
-	 * absolute path for creating help files with command
-	 * line argument -generateHelp only when needed.
-	 *
-	private static final String ABSOLUTE_DIR = "X:/path/to/your/workspace/code/mars-sim/mars-sim-ui/src/main/resources/docs/help";
-
-	// In Windows OS, the htmls that are visible together with the codebase under the Eclipse's IDE are kept 
-	// inside the src folder hierarchy as follows : 
-	//
-	// at \mars-sim\mars-sim-ui\src\main\resources\docs\help
-	// e.g. D:\Data\git\mars-sim\mars-sim-ui\src\main\resources\docs\help
-	//
-	// After running "MarsProjectFX -html.launch" in Eclipse, 
-	// the newly generated htmls will be at the target folder hierarchy as follows :
-	//
-	// at \mars-sim-ui\target\classes\docs\help
-	// e.g. D:\Data\git\mars-sim\mars-sim-ui\target\classes\docs\help
-    //
-    // Note that the generated html files are located within the mars-sim-ui's target folder
-    // and NOT the mars-sim-ui's src folder.
-    //
-    // One will need to "manually" copy the newly generated htmls from the target folder to the src folder
-    //   
-    // A total of 620 newly generated htmls using this HelpGenerator class can be broken into the followings :
-    // 1. food_production*.html
-    // 2. process*.html       
-    // 3. part*.html
-    // 4. resource*.html
-    // 
-    // In order to include a clean set of htmls, it is recommended that one should delete the old set of htmls 
-    // (1-4 above) in the src folder right before copying the new set of htmls from the target folder. 
-    // 
-*/
+//	private static final String ABSOLUTE_DIR = "X:/path/to/your/workspace/code/mars-sim/mars-sim-ui/src/main/resources/docs/help";
 
 //	private static final String DIR = "\\docs\\help\\";
 	private static final String VEHICLE_DIR = "\\docs\\help\\vehicles\\";
@@ -427,9 +451,9 @@ public class HelpGenerator {
 		String[] cargoArray = new String[] {
 			"hydrogen",
 			"methane",
-			LifeSupportType.OXYGEN,
-			LifeSupportType.WATER,
-			LifeSupportType.FOOD,
+			LifeSupportInterface.OXYGEN,
+			LifeSupportInterface.WATER,
+			LifeSupportInterface.FOOD,
 			"dessert",
 			"rock samples",
 			"ice"
@@ -1104,6 +1128,13 @@ public class HelpGenerator {
 			.toString()
 		);
 
+		logger.log(
+				Level.INFO,
+				new StringBuffer()
+					.append("The generated files are located at /Git/mars-sim/mars-sim-ui/target/classes/")
+				.toString()
+			);
+				
 		System.exit(0);
 	}
 }

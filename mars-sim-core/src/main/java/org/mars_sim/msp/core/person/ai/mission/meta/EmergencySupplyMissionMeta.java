@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * EmergencySupplyMissionMeta.java
- * @version 3.1.0 2017-09-15
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission.meta;
@@ -9,7 +9,7 @@ package org.mars_sim.msp.core.person.ai.mission.meta;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.job.Job;
-import org.mars_sim.msp.core.person.ai.mission.EmergencySupplyMission;
+import org.mars_sim.msp.core.person.ai.mission.EmergencySupply;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.RoverMission;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
@@ -22,21 +22,23 @@ import org.mars_sim.msp.core.vehicle.Rover;
  */
 public class EmergencySupplyMissionMeta implements MetaMission {
 
-    /** Mission name */
-    private static final String NAME = Msg.getString(
-            "Mission.description.emergencySupplyMission"); //$NON-NLS-1$
-
     /** default logger. */
     //private static Logger logger = Logger.getLogger(EmergencySupplyMissionMeta.class.getName());
 
+    private static final double LIMIT = 50D;
+    
+    /** Mission name */
+    private static final String DEFAULT_DESCRIPTION = Msg.getString(
+            "Mission.description.emergencySupply"); //$NON-NLS-1$
+
     @Override
     public String getName() {
-        return NAME;
+        return DEFAULT_DESCRIPTION;
     }
 
     @Override
     public Mission constructInstance(Person person) {
-        return new EmergencySupplyMission(person);
+        return new EmergencySupply(person);
     }
 
     @Override
@@ -46,28 +48,31 @@ public class EmergencySupplyMissionMeta implements MetaMission {
 
         if (person.isInSettlement()) {
         		
+            Settlement settlement = person.getSettlement();
+        	
+            missionProbability = settlement.getMissionBaseProbability(DEFAULT_DESCRIPTION);
+    		if (missionProbability == 0)
+    			return 0;
+    		
 	        // Determine job modifier.
 	        Job job = person.getMind().getJob();
 	        double jobModifier = 0D;
 	        if (job != null) {
-	            jobModifier = job.getStartMissionProbabilityModifier(EmergencySupplyMission.class);
+	            jobModifier = job.getStartMissionProbabilityModifier(EmergencySupply.class);
 	        }
 	
 	        // Check if person is in a settlement.
 	        if (jobModifier > 0D) {
 
-	            Settlement settlement = person.getSettlement();
-	
-	            // Check if available rover.
-	            if (!RoverMission.areVehiclesAvailable(settlement, false)) {
-	                return 0;
+	            Rover rover = (Rover) RoverMission.getVehicleWithGreatestRange(EmergencySupply.missionType, settlement, false);
+	            if (rover != null) {
+	                Settlement targetSettlement = EmergencySupply.findSettlementNeedingEmergencySupplies(
+	                        settlement, rover);
+	                if (targetSettlement == null) {
+	                    return 0;
+	                }
 	            }
-	
-	            // Check if available backup rover.
-	            if (!RoverMission.hasBackupRover(settlement)) {
-	                return 0;
-	            }
-	
+	            
 	            int min_num = 0;
 	            int all = settlement.getNumCitizens();
 	            if (all == 2)
@@ -75,11 +80,7 @@ public class EmergencySupplyMissionMeta implements MetaMission {
 	            else 
 	            	min_num = RoverMission.MIN_STAYING_MEMBERS;
 	    	    
-	    	    // Check if minimum number of people are available at the settlement.
-	            if (!RoverMission.minAvailablePeopleAtSettlement(settlement, min_num)) {
-	    	        return 0;
-	    	    }
-	
+
 	            if (all == 2)
 	            	min_num = 1;
 	            else
@@ -90,27 +91,27 @@ public class EmergencySupplyMissionMeta implements MetaMission {
 	    	        return 0;
 	    	    }
 	
-	            // Check for embarking missions.
-	            if (VehicleMission.hasEmbarkingMissions(settlement)) {
-	                return 0;
-	            }
+	            missionProbability = EmergencySupply.BASE_STARTING_PROBABILITY;
 	
-	            // Check if settlement has enough basic resources for a rover mission.
-	            if (!RoverMission.hasEnoughBasicResources(settlement, false)) {
-	                return 0;
-	            }
-	
-	            Rover rover = (Rover) RoverMission.getVehicleWithGreatestRange(settlement, false);
-	            if (rover != null) {
-	                Settlement targetSettlement = EmergencySupplyMission.findSettlementNeedingEmergencySupplies(
-	                        settlement, rover);
-	                if (targetSettlement == null) {
-	                    return 0;
-	                }
-	            }
-	
-	            missionProbability = EmergencySupplyMission.BASE_STARTING_PROBABILITY;
-	
+	    		int numEmbarked = VehicleMission.numEmbarkingMissions(settlement);	
+	    		int numThisMission = missionManager.numParticularMissions(DEFAULT_DESCRIPTION, settlement);
+	    		
+		   		// Check for # of embarking missions.
+	    		if (Math.max(1, settlement.getNumCitizens() / 8.0) < numEmbarked + numThisMission) {
+	    			return 0;
+	    		}	
+	    		
+	    		if (numThisMission > 1)
+	    			return 0;	
+
+	    		if (missionProbability <= 0)
+	    			return 0;
+	    		
+	    		int f1 = 2*numEmbarked + 1;
+	    		int f2 = 2*numThisMission + 1;
+	    		
+	    		missionProbability *= settlement.getNumCitizens() / f1 / f2 / 2D;
+	    		
 	            // Crowding modifier.
 	            int crowding = settlement.getIndoorPeopleCount() - settlement.getPopulationCapacity();
 	            if (crowding > 0) missionProbability *= (crowding + 1);
@@ -118,6 +119,10 @@ public class EmergencySupplyMissionMeta implements MetaMission {
 	            // Job modifier.
 	            missionProbability *= jobModifier;
 	
+				if (missionProbability > LIMIT)
+					missionProbability = LIMIT;
+				else if (missionProbability < 0)
+					missionProbability = 0;
 	        }
 	        
         }

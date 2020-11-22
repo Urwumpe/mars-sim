@@ -1,11 +1,17 @@
+/**
+ * Mars Simulation Project
+ * StandardCompressXz.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 package org.mars_sim.msp.core.tool;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.InputStream;
 
-import org.tukaani.xz.*;
+import org.tukaani.xz.LZMA2Options;
+import org.tukaani.xz.XZOutputStream;
 
 public class StandardCompressXz {
 
@@ -37,6 +43,9 @@ public class StandardCompressXz {
 		while ((size = inFile.read(buf)) != -1)
 		   out.write(buf, 0, size);
 
+		
 		out.finish();
+		
+        out.close();
 	}
 }

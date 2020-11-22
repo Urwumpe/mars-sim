@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TabPanelMissions.java
- * @version 3.1.0 2017-10-18
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -36,7 +36,6 @@ import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
 import org.mars_sim.msp.ui.swing.tool.monitor.PersonTableModel;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
@@ -48,11 +47,17 @@ import org.mars_sim.msp.ui.swing.unit_window.vehicle.TabPanelMission;
  * {@link TabPanelMission}, which displays a vehicle's
  * single mission's details.
  */
+@SuppressWarnings("serial")
 public class TabPanelMissions
 extends TabPanel {
 
 	// Data members
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
+	/** The Settlement instance. */
 	private Settlement settlement;
+	
 	private List<Mission> missionsCache;
 	private DefaultListModel<Mission> missionListModel;
 	private JList<Mission> missionList;
@@ -78,7 +83,15 @@ extends TabPanel {
 
 		// Initialize data members.
 		this.settlement = settlement;
-
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
 		missionManager = Simulation.instance().getMissionManager();
 		
 		// Create label panel.
@@ -93,7 +106,7 @@ extends TabPanel {
 
 		// Create center panel.
 		JPanel centerPanel = new JPanel(new BorderLayout());
-		centerPanel.setBorder(new MarsPanelBorder());
+//		centerPanel.setBorder(new MarsPanelBorder());
 		centerContentPanel.add(centerPanel, BorderLayout.CENTER);
 
 		// Create mission list panel.
@@ -159,7 +172,7 @@ extends TabPanel {
 
 		// Create bottom panel.
 		JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		bottomPanel.setBorder(new MarsPanelBorder());
+//		bottomPanel.setBorder(new MarsPanelBorder());
 		topContentPanel.add(bottomPanel, BorderLayout.SOUTH);
 
 		// Create override check box.
@@ -176,7 +189,9 @@ extends TabPanel {
 
 	@Override
 	public void update() {
-
+		if (!uiDone)
+			initializeUI();
+		
 		// Get all missions for the settlement.
 		//MissionManager manager = Simulation.instance().getMissionManager();
 		List<Mission> missions = missionManager.getMissionsForSettlement(settlement);

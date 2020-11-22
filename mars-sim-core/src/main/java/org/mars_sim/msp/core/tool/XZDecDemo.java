@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * XZDecDemo.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 package org.mars_sim.msp.core.tool;
 
 /*
@@ -29,6 +36,8 @@ class XZDecDemo {
                 int size;
                 while ((size = in.read(buf)) != -1)
                     System.out.write(buf, 0, size);
+                
+                in.close();
 
             } else {
                 // Read from files given on the command line.

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * EventFilter.java
- * @version 3.1.0 2017-02-03
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -24,6 +24,7 @@ import com.alee.laf.panel.WebPanel;
  * The EventFilter class is a internal dialog window for filtering 
  * historical events by category in the EventTab.
  */
+@SuppressWarnings("serial")
 public class EventFilter
 extends WebInternalFrame
 implements ActionListener {
@@ -99,12 +100,7 @@ implements ActionListener {
 
 		pack();
 		
-        // 2016-10-22 Add to its own tab pane
-        //if (desktop.getMainScene() != null)
-        	desktop.add(this);
-        	//desktop.getMainScene().getDesktops().get(0).add(this);
-       // else 
-       // 	desktop.add(this);
+        desktop.add(this);
 	    
 	}
 

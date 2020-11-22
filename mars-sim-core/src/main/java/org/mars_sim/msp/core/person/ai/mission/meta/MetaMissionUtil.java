@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MetaMissionUtil.java
- * @version 3.1.0 2017-09-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission.meta;
@@ -14,6 +14,8 @@ import java.util.List;
  */
 public class MetaMissionUtil {
 
+	private static int numMetaMissions;
+	
 	// Static values.
 	private static List<MetaMission> metaMissions = null;
 	private static List<MetaMission> robotMetaMissions = null;
@@ -29,21 +31,24 @@ public class MetaMissionUtil {
 	 */
 	private static void initializeMetaMissions() {
 
-		metaMissions = new ArrayList<MetaMission>(12);
+		metaMissions = new ArrayList<MetaMission>(13);
 
 		// Populate metaMissions list with all meta missions.
-		metaMissions.add(new AreologyStudyFieldMissionMeta());
-		metaMissions.add(new BiologyStudyFieldMissionMeta());
+		metaMissions.add(new AreologyFieldStudyMeta());
+		metaMissions.add(new BiologyFieldStudyMeta());
 		metaMissions.add(new BuildingConstructionMissionMeta());
 		metaMissions.add(new BuildingSalvageMissionMeta());
 		metaMissions.add(new CollectIceMeta());
 		metaMissions.add(new CollectRegolithMeta());
 		metaMissions.add(new EmergencySupplyMissionMeta());
 		metaMissions.add(new ExplorationMeta());
+		metaMissions.add(new MeteorologyFieldStudyMeta());
 		metaMissions.add(new MiningMeta());
 		metaMissions.add(new RescueSalvageVehicleMeta());
 		metaMissions.add(new TradeMeta());
 		metaMissions.add(new TravelToSettlementMeta());
+		
+		computeNumMetaMissions();
 	}
 
 	private static void initializeRobotMetaMissions() {
@@ -55,6 +60,14 @@ public class MetaMissionUtil {
 		// robotMetaMissions.add(new TravelToSettlementMeta());
 		// robotMetaMissions.add(new BuildingConstructionMissionMeta());
 		// robotMetaMissions.add(new BuildingSalvageMissionMeta());
+	}
+
+	public static int getNumMetaMissions() {
+		return numMetaMissions;
+	}
+
+	public static void computeNumMetaMissions() {
+		numMetaMissions = getMetaMissions().size();
 	}
 
 	/**

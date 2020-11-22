@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Botanist.java
- * @version 3.07 2014-12-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.job;
@@ -10,15 +10,15 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.mission.AreologyFieldStudy;
+import org.mars_sim.msp.core.person.ai.mission.BiologyFieldStudy;
 import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
 import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
-import org.mars_sim.msp.core.person.ai.mission.EmergencySupplyMission;
-import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
-import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
+import org.mars_sim.msp.core.person.ai.mission.Exploration;
 import org.mars_sim.msp.core.person.ai.task.AssistScientificStudyResearcher;
 import org.mars_sim.msp.core.person.ai.task.CompileScientificStudyResults;
 import org.mars_sim.msp.core.person.ai.task.InviteStudyCollaborator;
@@ -50,6 +50,10 @@ implements Serializable {
 
 	//private static Logger logger = Logger.getLogger(Botanist.class.getName());
 
+	private final int JOB_ID = 4;
+
+	private double[] roleProspects = new double[] {25.0, 5.0, 5.0, 5.0, 20.0, 5.0, 35.0};
+	
 	/**
 	 * Constructor.
 	 */
@@ -78,14 +82,17 @@ implements Serializable {
 		// None
 
 		// Add botanist-related missions.
-		jobMissionStarts.add(TravelToSettlement.class);
-		jobMissionJoins.add(TravelToSettlement.class);
-		jobMissionStarts.add(RescueSalvageVehicle.class);
-		jobMissionJoins.add(RescueSalvageVehicle.class);
+		jobMissionJoins.add(AreologyFieldStudy.class);
+		
+		jobMissionStarts.add(BiologyFieldStudy.class);
+		jobMissionJoins.add(BiologyFieldStudy.class);
+		
+		jobMissionJoins.add(Exploration.class);
+
 		jobMissionJoins.add(BuildingConstructionMission.class);
+		
 		jobMissionJoins.add(BuildingSalvageMission.class);
-		jobMissionStarts.add(EmergencySupplyMission.class);
-		jobMissionJoins.add(EmergencySupplyMission.class);
+
 	}
 
 	/**
@@ -95,20 +102,25 @@ implements Serializable {
 	 */
 	public double getCapability(Person person) {
 
-		double result = 0D;
+		double result = 0;
 
-		int botanySkill = person.getMind().getSkillManager().getSkillLevel(SkillType.BOTANY);
+		int botanySkill = person.getSkillManager().getSkillLevel(SkillType.BOTANY);
 		result = botanySkill;
 
 		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
 		int academicAptitude = attributes.getAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
 		int experienceAptitude = attributes.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
 		double averageAptitude = (academicAptitude + experienceAptitude) / 2D;
-		result+= result * ((averageAptitude - 50D) / 100D);
+		result += result * ((averageAptitude - 100D) / 100D);
+		
+//		double averageAptitude = (academicAptitude + experienceAptitude) / 2D;
+//		result+= result * ((averageAptitude - 50D) / 100D);
 
 		if (person.getPhysicalCondition().hasSeriousMedicalProblems()) 
 			result = result/2D;
 
+//		System.out.println(person + " botanist : " + Math.round(result*100.0)/100.0);
+		
 		return result;
 	}
 
@@ -119,8 +131,10 @@ implements Serializable {
 	 * @return the base need >= 0
 	 */
 	public double getSettlementNeed(Settlement settlement) {
-		double result = 0D;
+		double result = .1;
 
+		int population = settlement.getNumCitizens();
+		
 		// Add (labspace * tech level) / 2 for all labs with botany specialties.
 		List<Building> laboratoryBuildings = settlement.getBuildingManager().getBuildings(FunctionType.RESEARCH);
 		Iterator<Building> i = laboratoryBuildings.iterator();
@@ -128,7 +142,7 @@ implements Serializable {
 			Building building = i.next();
 			Research lab = building.getResearch();
 			if (lab.hasSpecialty(ScienceType.BOTANY)) {
-				result += (double) (lab.getResearcherNum() * lab.getTechnologyLevel()) / 2D;
+				result += (double) (lab.getResearcherNum() * lab.getTechnologyLevel()) / 12D;
 			}
 		}
 
@@ -138,17 +152,31 @@ implements Serializable {
 		while (j.hasNext()) {
 			Building building = j.next();
 			Farming farm = building.getFarming();
-			result += (farm.getGrowingArea() / 25D);
+			result += (farm.getGrowingArea() / 100D);
 		}
 
 		// Multiply by food value at settlement.
 		//Good foodGood = GoodsUtil.getResourceGood(AmountResource.findAmountResource(LifeSupport.FOOD));
 		//double foodValue = settlement.getGoodsManager().getGoodValuePerItem(foodGood);
 		//result *= foodValue;
-		//System.out.println("getSettlementNeed() : result is " + result);
+		
+		result = (result + population / 6D) / 2.0;
+		
+//		System.out.println(settlement + " Botany Need: " + result);
 
 		return result;
 	}
 
 
+	public double[] getRoleProspects() {
+		return roleProspects;
+	}
+	
+	public void setRoleProspects(int index, int weight) {
+		roleProspects[index] = weight;
+	}
+	
+	public int getJobID() {
+		return JOB_ID;
+	}
 }

@@ -1,15 +1,13 @@
 /**
  * Mars Simulation Project
  * GroundVehicleMaintenance.java
- * @version 3.1.0 2017-10-16
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 
 import java.awt.geom.Point2D;
 import java.io.Serializable;
@@ -28,8 +26,6 @@ implements Serializable {
 
 	private static final FunctionType FUNCTION = FunctionType.GROUND_VEHICLE_MAINTENANCE;
 
-	private static BuildingConfig config;
-	
 	/**
 	 * Constructor.
 	 * @param building the building the function is for.
@@ -38,18 +34,16 @@ implements Serializable {
 		// Call VehicleMaintenance constructor.
 		super(FUNCTION, building);
 
-		config = SimulationConfig.instance().getBuildingConfiguration();
+		vehicleCapacity = buildingConfig.getVehicleCapacity(building.getBuildingType());
 
-		vehicleCapacity = config.getVehicleCapacity(building.getBuildingType());
-
-		int parkingLocationNum = config.getParkingLocationNumber(building.getBuildingType());
+		int parkingLocationNum = buildingConfig.getParkingLocationNumber(building.getBuildingType());
 		for (int x = 0; x < parkingLocationNum; x++) {
-			Point2D.Double parkingLocationPoint = config.getParkingLocation(building.getBuildingType(), x);
+			Point2D.Double parkingLocationPoint = buildingConfig.getParkingLocation(building.getBuildingType(), x);
 			addParkingLocation(parkingLocationPoint.getX(), parkingLocationPoint.getY());
 		}
 		
 		// Load activity spots
-        loadActivitySpots(config.getGroundVehicleMaintenanceActivitySpots(building.getBuildingType()));
+        loadActivitySpots(buildingConfig.getGroundVehicleMaintenanceActivitySpots(building.getBuildingType()));
 	}
 
 	/**
@@ -64,7 +58,7 @@ implements Serializable {
 		super(FUNCTION, building);
 
 		this.vehicleCapacity = vehicleCapacity;
-
+		
 		for (int x = 0; x < parkingLocations.length; x++) {
 			addParkingLocation(parkingLocations[x].getX(), parkingLocations[x].getY());
 		}
@@ -82,7 +76,7 @@ implements Serializable {
 			Settlement settlement) {
 
 		// Demand is one ground vehicle capacity for every ground vehicles.
-		double demand = settlement.getAllAssociatedVehicles().size();
+		double demand = settlement.getVehicleNum();
 
 		double supply = 0D;
 		boolean removedBuilding = false;
@@ -101,9 +95,7 @@ implements Serializable {
 
 		double vehicleCapacityValue = demand / (supply + 1D);
 
-		if (config == null)
-			config = SimulationConfig.instance().getBuildingConfiguration();
-		double vehicleCapacity = config.getVehicleCapacity(buildingName);
+		double vehicleCapacity = buildingConfig.getVehicleCapacity(buildingName);
 
 		return vehicleCapacity * vehicleCapacityValue;
 	}
@@ -119,4 +111,5 @@ implements Serializable {
 		// TODO Auto-generated method stub
 		return 0;
 	}
+	
 }

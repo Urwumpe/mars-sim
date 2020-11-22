@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * AmountResourceStorage.java
- * @version 3.1.0 2017-04-10
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -37,6 +37,8 @@ public class AmountResourceStorage implements Serializable {
 	private transient boolean allStoredResourcesCacheDirty = true;
 	private transient double totalResourcesStored = 0D;
 	private transient boolean totalResourcesStoredDirty = true;
+	
+//	private static ResourceUtil resourceUtil = ResourceUtil.getInstance();
 
 	/**
 	 * Adds capacity for a resource type.
@@ -45,13 +47,7 @@ public class AmountResourceStorage implements Serializable {
 	 * @param capacity the extra capacity amount (kg).
 	 */
 	public void addAmountResourceTypeCapacity(AmountResource resource, double capacity) {
-
-		if (typeStorage == null) {
-			typeStorage = new AmountResourceTypeStorage();
-		}
-
-		typeStorage.addTypeCapacity(resource.getID(), capacity);
-		// typeStorage.addAmountResourceTypeCapacity(resource, capacity);
+		addAmountResourceTypeCapacity(resource.getID(), capacity);
 	}
 
 	/**
@@ -60,13 +56,13 @@ public class AmountResourceStorage implements Serializable {
 	 * @param resource the resource.
 	 * @param capacity the extra capacity amount (kg).
 	 */
-	public void addARTypeCapacity(int resource, double capacity) {
+	public void addAmountResourceTypeCapacity(int resource, double capacity) {
 
 		if (typeStorage == null) {
 			typeStorage = new AmountResourceTypeStorage();
 		}
 
-		typeStorage.addTypeCapacity(resource, capacity);
+		typeStorage.addAmountResourceTypeCapacity(resource, capacity);
 	}
 
 	/**
@@ -76,13 +72,7 @@ public class AmountResourceStorage implements Serializable {
 	 * @param capacity capacity the capacity amount (kg).
 	 */
 	public void removeAmountResourceTypeCapacity(AmountResource resource, double capacity) {
-
-		if (typeStorage == null) {
-			typeStorage = new AmountResourceTypeStorage();
-		}
-
-		typeStorage.removeTypeCapacity(resource.getID(), capacity);
-		// typeStorage.removeAmountResourceTypeCapacity(resource, capacity);
+		removeAmountResourceTypeCapacity(resource.getID(), capacity);
 	}
 
 	/**
@@ -105,14 +95,14 @@ public class AmountResourceStorage implements Serializable {
 	 * 
 	 * @return map of all amount resources that have type capacity.
 	 */
-	public Map<AmountResource, Double> getAmountResourceTypeCapacities() {
+	public Map<Integer, Double> getAmountResourceTypeCapacities() {
 
-		Map<AmountResource, Double> typeCapacities = new HashMap<AmountResource, Double>();
+		Map<Integer, Double> typeCapacities = new HashMap<Integer, Double>();
 
 		if (typeStorage != null) {
-			Iterator<AmountResource> i = ResourceUtil.getInstance().getAmountResources().iterator();
+			Iterator<Integer> i = ResourceUtil.getIDs().iterator();
 			while (i.hasNext()) {
-				AmountResource resource = i.next();
+				Integer resource = i.next();
 				double capacity = typeStorage.getAmountResourceTypeCapacity(resource);
 				if (capacity > 0D) {
 					typeCapacities.put(resource, capacity);
@@ -228,13 +218,18 @@ public class AmountResourceStorage implements Serializable {
 	 * @param resource the resource.
 	 * @return capacity amount (kg).
 	 */
-	public double getARCapacity(int resource) {
+	public double getAmountResourceCapacity(int resource) {
 		AmountResource ar = ResourceUtil.findAmountResource(resource);
+//		if (ar == null)
+//			System.out.println("resource : " + resource);
+//		if (resource == 281)
+//			System.out.println("resource : " + ar.getName());
+//		System.out.println("resource " + resource + " " + ar.getName());
 		PhaseType pt = ar.getPhase();
 		double result = 0D;
 
 		if ((typeStorage != null) && typeStorage.hasARTypeCapacity(resource)) {
-			result = typeStorage.getARTypeCapacity(resource);
+			result = typeStorage.getAmountResourceTypeCapacity(resource);
 		}
 		if ((phaseStorage != null) && phaseStorage.hasAmountResourcePhaseCapacity(pt)) {
 			if ((phaseStorage.getAmountResourcePhaseType(pt) == null)
@@ -273,14 +268,14 @@ public class AmountResourceStorage implements Serializable {
 	 * @param resource the resource.
 	 * @return stored amount (kg).
 	 */
-	public double getARStored(int resource) {
+	public double getAmountResourceStored(int resource) {
 		AmountResource ar = ResourceUtil.findAmountResource(resource);
 		PhaseType pt = ar.getPhase();
 
 		double result = 0D;
 
 		if (typeStorage != null) {
-			result = typeStorage.getARTypeStored(resource);
+			result = typeStorage.getAmountResourceTypeStored(resource);
 		}
 
 		if (phaseStorage != null && ar.equals(phaseStorage.getAmountResourcePhaseType(pt))) {
@@ -340,17 +335,20 @@ public class AmountResourceStorage implements Serializable {
 	 * Update the all stored resources values.
 	 */
 	private void updateAllAmountResourcesStored() {
-		/*
-		 * Set<AmountResource> tempResources = new HashSet<AmountResource>();
-		 * 
-		 * // Add type storage resources. if (typeStorage != null) {
-		 * tempResources.addAll(typeStorage.getAllAmountResourcesStored()); }
-		 * 
-		 * // Add phase storage resources. if (phaseStorage != null) { for (PhaseType
-		 * phase : PhaseType.values()) { if
-		 * (phaseStorage.getAmountResourcePhaseStored(phase) > 0D) {
-		 * tempResources.add(phaseStorage.getAmountResourcePhaseType(phase)); } } }
-		 */
+//		 Set<AmountResource> tempResources = new HashSet<AmountResource>();
+//		 // Add type storage resources. 
+//		 if (typeStorage != null) {
+//			 tempResources.addAll(typeStorage.getAllAmountResourcesStored()); 
+//		 }
+//		 // Add phase storage resources. 
+//		 if (phaseStorage != null) { 
+//			 for (PhaseType phase : PhaseType.values()) { 
+//				 if (phaseStorage.getAmountResourcePhaseStored(phase) > 0D) {
+//					 tempResources.add(phaseStorage.getAmountResourcePhaseType(phase)); 
+//				} 
+//			} 
+//		}
+	 
 		Set<Integer> tempResources = new HashSet<Integer>();
 
 		// Add type storage resources.
@@ -435,7 +433,7 @@ public class AmountResourceStorage implements Serializable {
 		double result = 0D;
 
 		if (hasARCapacity(resource)) {
-			result = getARCapacity(resource) - getARStored(resource);
+			result = getAmountResourceCapacity(resource) - getAmountResourceStored(resource);
 		}
 
 		return result;
@@ -652,7 +650,7 @@ public class AmountResourceStorage implements Serializable {
 	 * @param amount   the amount (kg).
 	 * @throws ResourceException if error retrieving resource.
 	 */
-	public void retrieveAR(int resource, double amount) {
+	public void retrieveAmountResource(int resource, double amount) {
 		AmountResource ar = ResourceUtil.findAmountResource(resource);
 		PhaseType pt = ar.getPhase();
 
@@ -661,7 +659,7 @@ public class AmountResourceStorage implements Serializable {
 		}
 
 		boolean retrievable = false;
-		double amountStored = getARStored(resource);
+		double amountStored = getAmountResourceStored(resource);
 
 		if (amountStored >= amount) {
 
@@ -687,9 +685,9 @@ public class AmountResourceStorage implements Serializable {
 
 			// Retrieve resource from type storage.
 			if ((typeStorage != null) && (remainingAmount > 0D)) {
-				double remainingTypeStored = typeStorage.getARTypeStored(resource);
+				double remainingTypeStored = typeStorage.getAmountResourceTypeStored(resource);
 				if (remainingTypeStored >= remainingAmount) {
-					typeStorage.retrieveARType(resource, remainingAmount);
+					typeStorage.retrieveAmountResourceType(resource, remainingAmount);
 					remainingAmount = 0D;
 				}
 			}

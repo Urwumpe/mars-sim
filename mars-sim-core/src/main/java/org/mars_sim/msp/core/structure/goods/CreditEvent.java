@@ -1,17 +1,18 @@
 /**
  * Mars Simulation Project
  * CreditEvent.java
- * @version 3.1.0 2014-12-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.structure.goods;
 
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.structure.Settlement;
-
 import java.io.Serializable;
 import java.util.EventObject;
+
+import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.structure.Settlement;
 
 /**
  * A credit change event.
@@ -21,9 +22,13 @@ public class CreditEvent extends EventObject implements Serializable {
     private static final long serialVersionUID = 2L;
     
 	// Data members
-	private Settlement settlement1;
-	private Settlement settlement2;
+	private int settlement1;
+	private int settlement2;
 	private double credit;
+	
+	private static Simulation sim = Simulation.instance();
+	private static UnitManager unitManager = sim.getUnitManager();
+	private static CreditManager creditManager = sim.getCreditManager();
 	
 	/**
 	 * Constructor
@@ -33,10 +38,10 @@ public class CreditEvent extends EventObject implements Serializable {
 	 */
 	public CreditEvent(Settlement settlement1, Settlement settlement2, double credit) {
 		// Use EventObject constructor
-		super(Simulation.instance().getCreditManager());
+		super(creditManager);
 		
-		this.settlement1 = settlement1;
-		this.settlement2 = settlement2;
+		this.settlement1 = settlement1.getIdentifier();
+		this.settlement2 = settlement2.getIdentifier();
 		this.credit = credit;
 	}
 
@@ -46,7 +51,7 @@ public class CreditEvent extends EventObject implements Serializable {
 	 * @return settlement.
 	 */
 	public Settlement getSettlement1() {
-		return settlement1;
+		return unitManager.getSettlementByID(settlement1);
 	}
 	
 	/**
@@ -54,7 +59,7 @@ public class CreditEvent extends EventObject implements Serializable {
 	 * @return settlement.
 	 */
 	public Settlement getSettlement2() {
-		return settlement2;
+		return unitManager.getSettlementByID(settlement2);
 	}
 	
 	/**
@@ -64,4 +69,16 @@ public class CreditEvent extends EventObject implements Serializable {
 	public double getCredit() {
 		return credit;
 	}
+	
+//	/**
+//	 * Reloads instances after loading from a saved sim
+//	 * 
+//	 * @param u {@link UnitManager}
+//	 * @param c {@link CreditManager}
+//	 */
+//	public static void setInstances(UnitManager u, CreditManager c) {
+//		unitManager = u;
+//		creditManager = c;
+//	}
+
 }

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * FoodProductionTab.java
- * @version 3.1.0 2017-03-12
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -20,6 +20,7 @@ import org.mars_sim.msp.ui.swing.NumberCellRenderer;
  * This class represents an inventory of food at settlements displayed within
  * the Monitor Window.
  */
+@SuppressWarnings("serial")
 public class FoodInventoryTab extends TableTab implements UnitManagerListener {
 	/**
 	 * constructor.

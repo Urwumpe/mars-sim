@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SettlementTemplate.java
- * @version 3.1.0 2017-11-04
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure;
@@ -18,40 +18,44 @@ import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.Part;
 
 /**
- * A settlement template information.
+ * This class defines a template for modeling the initial conditions and building configurations of a settlement. 
+ * Called by ConstructionConfig and ResupplyConfig
  */
-// TODO: delete count if not useful
-//Called by ConstructionConfig.java and ResupplyConfig.java 
 public class SettlementTemplate implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	// * default logger.
-	// private static Logger logger =
-	// Logger.getLogger(SettlementTemplate.class.getName());
+	// private static Logger logger = Logger.getLogger(SettlementTemplate.class.getName());
 
 	// Data members.
-	private String name;
 	private int defaultPopulation;
 	private int defaultNumOfRobots;
+	private int id;
+	
+	private String name;
+	
 	private List<BuildingTemplate> buildings;
+	private List<ResupplyMissionTemplate> resupplies;
+	
 	private Map<String, Integer> vehicles;
 	private Map<String, Integer> equipment;
 	private Map<AmountResource, Double> resources;
 	private Map<Part, Integer> parts;
-	private List<ResupplyMissionTemplate> resupplies;
-
-	private int scenarioID;
 
 	/**
-	 * Constructor 1.
+	 * Constructor 1. TODO: pending for deletion (use constructor 2 instead)
+	 * 
+	 * @param name
+	 * @param defaultPopulation
+	 * @param defaultNumOfRobots
 	 */
-	// TODO: pending for deletion (use constructor 2 instead)
 	public SettlementTemplate(String name, int defaultPopulation, int defaultNumOfRobots) {
 		this.name = name;
 		this.defaultPopulation = defaultPopulation;
 		this.defaultNumOfRobots = defaultNumOfRobots;
+		
 		buildings = new ArrayList<BuildingTemplate>();
 		vehicles = new HashMap<String, Integer>();
 		equipment = new HashMap<String, Integer>();
@@ -61,12 +65,16 @@ public class SettlementTemplate implements Serializable {
 	}
 
 	/**
-	 * Constructor 2.
+	 * Constructor 2. Called by SettlementConfig.java
+	 * 
+	 * @param name
+	 * @param id
+	 * @param defaultPopulation
+	 * @param defaultNumOfRobots
 	 */
-	// Called by SettlementConfig.java
-	public SettlementTemplate(String name, int scenarioID, int defaultPopulation, int defaultNumOfRobots) {
+	public SettlementTemplate(String name, int id, int defaultPopulation, int defaultNumOfRobots) {
 		this.name = name;
-		this.scenarioID = scenarioID;
+		this.id = id;
 		this.defaultPopulation = defaultPopulation;
 		this.defaultNumOfRobots = defaultNumOfRobots;
 
@@ -88,17 +96,21 @@ public class SettlementTemplate implements Serializable {
 	}
 
 	/**
+	 * Gets the name of the template.
+	 * 
+	 * @return name.
+	 */
+	public String toString() {
+		return name;
+	}
+	
+	/**
 	 * Gets the template's unique ID.
 	 * 
 	 * @return ID number.
 	 */
 	public int getID() {
-//		if (scenarioID == count) return scenarioID;
-//		else {
-//			logger.info("SettlementTemplate.java : getID() : warning: scenarioID is not assigned correctly");
-//			scenarioID = count;
-		return scenarioID;
-//		}
+		return id;
 	}
 
 	/**

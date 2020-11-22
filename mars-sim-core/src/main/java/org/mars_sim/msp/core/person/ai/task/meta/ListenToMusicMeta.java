@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ListenToMusicMeta.java
- * @version 3.08 2015-11-02
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -11,15 +11,17 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
+import org.mars_sim.msp.core.person.ShiftType;
 import org.mars_sim.msp.core.person.ai.task.ListenToMusic;
 import org.mars_sim.msp.core.person.ai.task.Sleep;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.tool.RandomUtil;
+import org.mars_sim.msp.core.structure.building.BuildingManager;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * Meta task for the ListenToMusic task.
@@ -38,9 +40,7 @@ public class ListenToMusicMeta implements MetaTask, Serializable {
 
     /** default logger. */
     private static Logger logger = Logger.getLogger(ListenToMusicMeta.class.getName());
-
-    private static MarsClock marsClock;
-    
+ 
     @Override
     public String getName() {
         return NAME;
@@ -55,68 +55,60 @@ public class ListenToMusicMeta implements MetaTask, Serializable {
     public double getProbability(Person person) {
         double result = 0D;
         
-        /*
-        // TODO: listening to music is driven by boredom, not so much fatigue
-        // Fatigue modifier.
-        double fatigue = person.getPhysicalCondition().getFatigue();
-    	result = fatigue;
-
-        if (fatigue > 800D) {
-            result += (fatigue - 800D) / 4D;
-        }
-*/
-
-        // Crowding modifier
         if (person.isInSettlement()) {
-        	
-           if (person.isInVehicle()) {
-        	   result *= RandomUtil.getRandomDouble(2); // more likely to listen to music than not if on a vehicle
-            }
-            
-        	// Stress modifier
-            double stress = person.getPhysicalCondition().getStress();
-            result += stress * 3D; // 0 to 100%
             
             try {
-            	// 2016-01-10 Added checking if a person has a designated bed
-                Building quarters = person.getQuarters();    
-                if (quarters == null) {
-                	quarters = Sleep.getBestAvailableQuarters(person, true);
-
-	            	if (quarters == null) {
-		                Building recBuilding = ListenToMusic.getAvailableRecreationBuilding(person);
-			                if (recBuilding != null) {
-			                    result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(person, recBuilding);
-			                    result *= TaskProbabilityUtil.getRelationshipModifier(person, recBuilding);
-			                    result *= RandomUtil.getRandomDouble(3);
-			                }
-	            	}
-	            	else
-	            		result *= RandomUtil.getRandomDouble(2);
-	            }
-	
+            	// Check if a person has a designated bed
+                Building recBuilding = BuildingManager.getAvailableRecBuilding(person);
+                if (recBuilding != null) {
+                    result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(person, recBuilding);
+                    result *= TaskProbabilityUtil.getRelationshipModifier(person, recBuilding);
+                }
             } catch (Exception e) {
                 logger.log(Level.SEVERE, e.getMessage());
             }
             
-            if (marsClock == null)
-            	marsClock = Simulation.instance().getMasterClock().getMarsClock();
             // Modify probability if during person's work shift.
             int millisols = marsClock.getMillisolInt();
             boolean isShiftHour = person.getTaskSchedule().isShiftHour(millisols);
-            if (isShiftHour) {
+            if (isShiftHour && person.getShiftType() != ShiftType.ON_CALL) {
                 result*= WORK_SHIFT_MODIFIER;
-            }
-
-            // 2015-06-07 Added Preference modifier
-            if (result > 0D) {
-                result = result + result * person.getPreference().getPreferenceScore(this)/2D;
             }
             
             if (result < 0) result = 0;
             
         }
-
+            
+        else if (person.isInVehicle()) {	
+	        // Check if person is in a moving rover.
+	        if (Vehicle.inMovingRover(person)) {
+	        	result += 20D;
+	        }
+        }
+        
+        if (person.isInside() && result > 0) {
+	        double pref = person.getPreference().getPreferenceScore(this);
+	        
+	     	result = pref * 2.5D;
+	     	
+	        // Probability affected by the person's stress and fatigue.
+	        PhysicalCondition condition = person.getPhysicalCondition();
+	        double stress = condition.getStress();
+	        
+	        if (pref > 0) {
+	         	if (stress > 45D)
+	         		result*=1.5;
+	         	else if (stress > 65D)
+	         		result*=2D;
+	         	else if (stress > 85D)
+	         		result*=3D;
+	         	else
+	         		result*=4D;
+	        }
+        }
+        
+        if (result < 0) result = 0;
+        
         return result;
     }
 

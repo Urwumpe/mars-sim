@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Administration.java
- * @version 3.1.0 2017-10-12
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -10,13 +10,14 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
+import org.mars_sim.msp.core.structure.building.BuildingException;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
@@ -30,10 +31,15 @@ public class Administration extends Function implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	private static Logger logger = Logger.getLogger(Administration.class.getName());
+	private static String loggerName = logger.getName();
+	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
 
 	private static final FunctionType FUNCTION = FunctionType.ADMINISTRATION;
-	private static BuildingConfig buildingConfig;
 
+	private static final String CC = "Command and Control";
+	private static final String LANDER_HAB = "Lander Hab";
+	private static final String OUTPOST_HUB = "Outpost Hub";
+	
 	// Data members
 	private int populationSupport;
 	private int staff;
@@ -53,14 +59,13 @@ public class Administration extends Function implements Serializable {
 		this.building = building;
 
 		buildingType = building.getBuildingType();
+		
 		// Populate data members.
-		buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
-
-		if (buildingType.equalsIgnoreCase("Command and Control"))
+		if (buildingType.equalsIgnoreCase(CC))
 			populationSupport = 16;
-		else if (buildingType.equalsIgnoreCase("Lander Hab"))
+		else if (buildingType.equalsIgnoreCase(LANDER_HAB))
 			populationSupport = 8;
-		else if (buildingType.equalsIgnoreCase("Outpost Hub"))
+		else if (buildingType.equalsIgnoreCase(OUTPOST_HUB))
 			populationSupport = 6;
 
 		staffCapacity = buildingConfig.getAdministrationPopulationSupport(buildingType);
@@ -94,8 +99,6 @@ public class Administration extends Function implements Serializable {
 		}
 
 		if (!newBuilding) {
-			// BuildingConfig config =
-			// SimulationConfig.instance().getBuildingConfiguration();
 			supply -= buildingConfig.getAdministrationPopulationSupport(buildingName);
 			if (supply < 0D)
 				supply = 0D;
@@ -113,16 +116,29 @@ public class Administration extends Function implements Serializable {
 	public static Building getAvailableOffice(Person person) {
 		Building result = null;
 
+		boolean acceptCrowded = false;
+		boolean acceptBadRelation = false;
+		
 		// If person is in a settlement, try to find a building with )an office.
 		if (person.isInSettlement()) {
 			BuildingManager buildingManager = person.getSettlement().getBuildingManager();
 			List<Building> offices = buildingManager.getBuildings(FunctionType.ADMINISTRATION);
 			offices = BuildingManager.getNonMalfunctioningBuildings(offices);
-			offices = BuildingManager.getLeastCrowdedBuildings(offices);
-
-			if (offices.size() > 0) {
-				Map<Building, Double> selectedOffices = BuildingManager.getBestRelationshipBuildings(person, offices);
-				result = RandomUtil.getWeightedRandomObject(selectedOffices);
+			
+			while (!acceptCrowded) {
+				List<Building> comfortOffices = BuildingManager.getLeastCrowdedBuildings(offices);
+	
+				if (comfortOffices.size() > 0) {				
+					while (!acceptBadRelation) {
+						Map<Building, Double> selectedOffices = BuildingManager.getBestRelationshipBuildings(person, comfortOffices);
+						return RandomUtil.getWeightedRandomObject(selectedOffices);
+					}				
+				}
+				else {
+					// skip filtering the crowded offices
+					Map<Building, Double> selectedOffices = BuildingManager.getBestRelationshipBuildings(person, offices);
+					return RandomUtil.getWeightedRandomObject(selectedOffices);
+				}
 			}
 		}
 
@@ -158,7 +174,7 @@ public class Administration extends Function implements Serializable {
 	}
 
 	public boolean isFull() {
-		if (staff == staffCapacity)
+		if (staff >= staffCapacity)
 			return true;
 		else
 			return false;
@@ -169,12 +185,14 @@ public class Administration extends Function implements Serializable {
 	 * 
 	 * @throws BuildingException if person would exceed office space capacity.
 	 */
-	public void addstaff() {
-		staff++;
-		if (staff > staffCapacity) {
-			staff = staffCapacity;
-			logger.info("[" + building.getSettlement() + "] The office space in " + building.getNickName() + " is full.");
+	public void addStaff() {
+		if (staff >= staffCapacity) {
+			LogConsolidated.flog(Level.INFO, 10_000, sourceName,
+					"[" + building.getSettlement() + "] The office space in " 
+					+ building.getNickName() + " was full.");
 		}
+		else
+			staff++;
 	}
 
 	/**
@@ -186,7 +204,9 @@ public class Administration extends Function implements Serializable {
 		staff--;
 		if (staff < 0) {
 			staff = 0;
-			logger.severe("[" + building.getSettlement() + "] Miscalculating the office space occupancy in " + building.getNickName() + ".");
+			LogConsolidated.flog(Level.SEVERE, 10_000, sourceName,
+					"[" + building.getSettlement() 
+					+ "] Miscalculating the office space occupancy in " + building.getNickName() + ".");
 		}
 	}
 

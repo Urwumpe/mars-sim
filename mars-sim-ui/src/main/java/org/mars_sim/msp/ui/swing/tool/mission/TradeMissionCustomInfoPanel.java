@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TradeMissionCustomInfoPanel.java
- * @version 3.1.0 2017-11-01
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -31,8 +31,8 @@ import com.alee.laf.table.WebTable;
 /**
  * A panel for displaying trade mission information.
  */
-public class TradeMissionCustomInfoPanel
-extends MissionCustomInfoPanel {
+@SuppressWarnings("serial")
+public class TradeMissionCustomInfoPanel extends MissionCustomInfoPanel {
 
 	// Data members.
 	private Trade mission;

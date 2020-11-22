@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * CookMeal.java
- * @version 3.1.0 2017-09-15
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -17,11 +17,12 @@ import java.util.logging.Logger;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.RoboticAttributeType;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -43,8 +44,8 @@ public class CookMeal extends Task implements Serializable {
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(CookMeal.class.getName());
 
-	private static String sourceName = logger.getName();
-
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			 logger.getName().length());
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.cookMeal"); //$NON-NLS-1$
 
@@ -82,9 +83,12 @@ public class CookMeal extends Task implements Serializable {
 	public CookMeal(Person person) {
 		// Use Task constructor
 		super(NAME, person, true, false, STRESS_MODIFIER, false, 0D);
-
-		sourceName = sourceName.substring(sourceName.lastIndexOf(".") + 1, sourceName.length());
-
+		
+		if (person.isOutside()) {
+//			walkBackInside();
+			endTask();
+		}
+		
 		// Initialize data members
 		setDescription(Msg.getString("Task.description.cookMeal.detail", getTypeOfMeal())); // $NON-NLS-1$
 
@@ -95,7 +99,7 @@ public class CookMeal extends Task implements Serializable {
 			kitchen = kitchenBuilding.getCooking();
 
 			// Walk to kitchen building.
-			walkToActivitySpotInBuilding(kitchenBuilding, false);
+			walkToTaskSpecificActivitySpotInBuilding(kitchenBuilding, false);
 
 			// int size = kitchen.getMealRecipesWithAvailableIngredients().size();
 			int size = kitchen.getNumCookableMeal();
@@ -109,10 +113,7 @@ public class CookMeal extends Task implements Serializable {
 					size = kitchen.getMealRecipesWithAvailableIngredients().size();
 					kitchen.setNumCookableMeal(size);
 				}
-			}
-
-			if (size == 0) {
-
+			
 //	        	// display the msg when no ingredients are detected at first and after n warnings
 //	        	if (counter % 30 == 0 && counter < 150) {
 //	        		logger.severe("Warning: cannot cook meals in "
@@ -124,7 +125,7 @@ public class CookMeal extends Task implements Serializable {
 
 				log.append("[" + person.getSettlement().getName() + "] ").append(person).append(NO_INGREDIENT);
 
-				LogConsolidated.log(logger, Level.WARNING, 5000, sourceName, log.toString(), null);
+				LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName, log.toString());
 
 				endTask();
 
@@ -154,7 +155,7 @@ public class CookMeal extends Task implements Serializable {
 			kitchen = kitchenBuilding.getCooking();
 
 			// Walk to kitchen building.
-			walkToActivitySpotInBuilding(kitchenBuilding, false);
+			walkToTaskSpecificActivitySpotInBuilding(kitchenBuilding, false);
 
 			// int size = kitchen.getMealRecipesWithAvailableIngredients().size();
 			int numGoodRecipes = kitchen.getNumCookableMeal();
@@ -179,7 +180,7 @@ public class CookMeal extends Task implements Serializable {
 
 				StringBuilder log = new StringBuilder();
 
-				log.append("[" + robot.getSettlement().getName() + "] ").append(robot).append(NO_INGREDIENT);
+				log.append("[" + robot.getSettlement().getName() + "] ").append(robot.getNickName()).append(NO_INGREDIENT);
 
 				LogConsolidated.log(logger, Level.WARNING, 5000, logger.getName(), log.toString(), null);
 
@@ -197,12 +198,12 @@ public class CookMeal extends Task implements Serializable {
 	}
 
 	@Override
-	protected FunctionType getLivingFunction() {
+	public FunctionType getLivingFunction() {
 		return FunctionType.COOKING;
 	}
 
 	@Override
-	protected FunctionType getRoboticFunction() {
+	public FunctionType getRoboticFunction() {
 		return FunctionType.COOKING;
 	}
 
@@ -242,7 +243,7 @@ public class CookMeal extends Task implements Serializable {
 
 		if (person != null) {
 			// If meal time is over, end task.
-			if (!isMealTime(person.getCoordinates())) {
+			if (!isLocalMealTime(person.getCoordinates(), 20)) {
 				logger.finest(person + " ending cooking due to meal time over.");
 				endTask();
 				return time;
@@ -259,7 +260,7 @@ public class CookMeal extends Task implements Serializable {
 			nameOfMeal = kitchen.addWork(workTime, person);
 		} else if (robot != null) {
 			// If meal time is over, end task.
-			if (!isMealTime(robot)) {
+			if (!isMealTime(robot, 20)) {
 				logger.finest(robot + " ending cooking due to meal time over.");
 				endTask();
 				return time;
@@ -329,9 +330,9 @@ public class CookMeal extends Task implements Serializable {
 		newPoints *= getTeachingExperienceModifier();
 
 		if (person != null) {
-			person.getMind().getSkillManager().addExperience(SkillType.COOKING, newPoints);
+			person.getSkillManager().addExperience(SkillType.COOKING, newPoints, time);
 		} else if (robot != null) {
-			robot.getBotMind().getSkillManager().addExperience(SkillType.COOKING, newPoints);
+			robot.getSkillManager().addExperience(SkillType.COOKING, newPoints, time);
 		}
 	}
 
@@ -356,9 +357,9 @@ public class CookMeal extends Task implements Serializable {
 
 		if (person != null)
 			// Cooking skill modification.
-			skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.COOKING);
+			skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.COOKING);
 		else if (robot != null)
-			skill = robot.getBotMind().getSkillManager().getEffectiveSkillLevel(SkillType.COOKING);
+			skill = robot.getSkillManager().getEffectiveSkillLevel(SkillType.COOKING);
 
 		if (skill <= 3) {
 			chance *= (4 - skill);
@@ -383,28 +384,34 @@ public class CookMeal extends Task implements Serializable {
 	}
 
 	/**
-	 * Checks if it is currently a meal time at the location.
+	 * Checks if it is currently a meal time at the location. Need to estimate the prepTime 
+	 * e.g. the cook needs to be in the chow hall to begin cooking 20 millisols prior to 
+	 * 'starting' the meal time 
 	 * 
 	 * @param location the coordinate location to check for.
+	 * @param prepTime the number of millisols prior to meal time that needs to be accounted for.
 	 * @return true if meal time
 	 */
-	public static boolean isMealTime(Coordinates location) {
+	public static boolean isLocalMealTime(Coordinates location, int prepTime) {
 		double timeDiff = 1000D * (location.getTheta() / (2D * Math.PI));
-		return mealTime(timeDiff);
+		return isMealTime(timeDiff, prepTime);
 	}
 
-	public static boolean isMealTime(Robot robot) {
-		// double timeDiff = 1000D * (robot.getCoordinates().getTheta() / (2D *
-		// Math.PI));
-		// return mealTime(timeDiff);
-		return isMealTime(robot.getCoordinates());
+	public static boolean isMealTime(Robot robot, int prepTime) {
+		return isLocalMealTime(robot.getCoordinates(), prepTime);
 	}
 
-	public static boolean mealTime(double timeDiff) {
+	/**
+	 * Checks if it's the meal time
+	 * 
+	 * @param timeDiff
+	 * @return
+	 */
+	public static boolean isMealTime(double timeDiff, int prepTime) {
 
 		boolean result = false;
-		double timeOfDay = Simulation.instance().getMasterClock().getMarsClock().getMillisol();
-		double modifiedTime = timeOfDay + timeDiff;
+		double timeOfDay = marsClock.getMillisol();
+		double modifiedTime = timeOfDay + timeDiff + prepTime;
 		if (modifiedTime >= 1000D) {
 			modifiedTime -= 1000D;
 		}
@@ -439,7 +446,7 @@ public class CookMeal extends Task implements Serializable {
 		else if (robot != null)
 			timeDiff = 1000D * (robot.getCoordinates().getTheta() / (2D * Math.PI));
 
-		double timeOfDay = Simulation.instance().getMasterClock().getMarsClock().getMillisol();
+		double timeOfDay = marsClock.getMillisol();
 
 		double modifiedTime = timeOfDay + timeDiff;
 		if (modifiedTime >= 1000D) {
@@ -538,9 +545,9 @@ public class CookMeal extends Task implements Serializable {
 	public int getEffectiveSkillLevel() {
 		SkillManager manager = null;
 		if (person != null) {
-			manager = person.getMind().getSkillManager();
+			manager = person.getSkillManager();
 		} else if (robot != null) {
-			manager = robot.getBotMind().getSkillManager();
+			manager = robot.getSkillManager();
 		}
 
 		return manager.getEffectiveSkillLevel(SkillType.COOKING);

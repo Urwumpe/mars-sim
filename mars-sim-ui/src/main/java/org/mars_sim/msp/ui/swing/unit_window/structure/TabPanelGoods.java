@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TabPanelGoods.java
- * @version 3.1.0 2017-10-03
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -11,7 +11,7 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.util.List;
 
-
+import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -32,15 +32,18 @@ import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
-import com.jidesoft.swing.SearchableUtils;
-import com.jidesoft.swing.TableSearchable;
 
-public class TabPanelGoods
-extends TabPanel {
+@SuppressWarnings("serial")
+public class TabPanelGoods extends TabPanel {
 
 	// Data members
-	private WebTable goodsTable;
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
+	/** The Settlement instance. */
+	private Settlement settlement;
+	
+	private JTable goodsTable;
 	private GoodsTableModel goodsTableModel;
 
 	/**
@@ -57,6 +60,17 @@ extends TabPanel {
 			unit, desktop
 		);
 
+		settlement = (Settlement) unit;
+
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
 		// Prepare goods label panel.
 		WebPanel goodsLabelPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
 		topContentPanel.add(goodsLabelPanel);
@@ -80,22 +94,24 @@ extends TabPanel {
 		// Prepare goods table.
 		goodsTable = new ZebraJTable(goodsTableModel);
 		goodsScrollPane.setViewportView(goodsTable);
-		goodsTable.setCellSelectionEnabled(false);
-		goodsTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2));
+		goodsTable.setRowSelectionAllowed(true);
+		
+		// Override default cell renderer for formatting double values.
+		goodsTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2, true));
+		
 		goodsTable.getColumnModel().getColumn(0).setPreferredWidth(140);
-		goodsTable.getColumnModel().getColumn(1).setPreferredWidth(140);
+		goodsTable.getColumnModel().getColumn(1).setPreferredWidth(80);
+		
 		// Added the two methods below to make all heatTable columns
 		// Resizable automatically when its Panel resizes
 		goodsTable.setPreferredScrollableViewportSize(new Dimension(225, -1));
 		//goodsTable.setAutoResizeMode(WebTable.AUTO_RESIZE_ALL_COLUMNS);
-		//goodsTablePanel.add(goodsTable.getTableHeader(), BorderLayout.NORTH);
-		//goodsTablePanel.add(goodsTable, BorderLayout.CENTER);
 
 		// Align the preference score to the center of the cell
 		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
-		renderer.setHorizontalAlignment(SwingConstants.CENTER);
+		renderer.setHorizontalAlignment(SwingConstants.RIGHT);
 		goodsTable.getColumnModel().getColumn(0).setCellRenderer(renderer);
-		goodsTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
+//		goodsTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
 
 		// Added sorting
 		goodsTable.setAutoCreateRowSorter(true);
@@ -103,10 +119,10 @@ extends TabPanel {
 		TableStyle.setTableStyle(goodsTable);
 
      	// Added goodsSearchable
-     	TableSearchable searchable = SearchableUtils.installSearchable(goodsTable);
-        searchable.setPopupTimeout(5000);
-     	searchable.setCaseSensitive(false);
-        searchable.setMainIndex(0); // -1 = search for all columns
+//     	TableSearchable searchable = SearchableUtils.installSearchable(goodsTable);
+//        searchable.setPopupTimeout(5000);
+//     	searchable.setCaseSensitive(false);
+//        searchable.setMainIndex(0); // -1 = search for all columns
 
 	}
 
@@ -115,6 +131,9 @@ extends TabPanel {
 	 */
 	@Override
 	public void update() {
+		if (!uiDone)
+			this.initializeUI();
+		
 		TableStyle.setTableStyle(goodsTable);
 		goodsTableModel.update();
 	}
@@ -126,7 +145,7 @@ extends TabPanel {
 	extends AbstractTableModel {
 
 		/** default serial id. */
-		private static final long serialVersionUID = 1L;
+//		private static final long serialVersionUID = 1L;
 		// Data members
 		GoodsManager manager;
 		List<?> goods;
@@ -168,7 +187,7 @@ extends TabPanel {
 			if (row < getRowCount()) {
 				Good good = (Good) goods.get(row);
 				// Capitalized good's names
-				if (column == 0) return Conversion.capitalize(good.getName());
+				if (column == 0) return Conversion.capitalize(good.getName()) + " ";
 				else if (column == 1) {
 					try {
 						// Note: twoDecimal format is in conflict with Table column number sorting

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SFMT19937.java
- * @version 3.1.0 2017-11-06
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.tool;

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * UnitTableCellRenderer.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -17,6 +17,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 /**
  * Cell renderer for unit tables that marks failure cells as red.
  */
+@SuppressWarnings("serial")
 class UnitTableCellRenderer extends DefaultTableCellRenderer {
 
 	// Private data members.

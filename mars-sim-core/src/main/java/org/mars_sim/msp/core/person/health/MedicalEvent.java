@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MedicalEvent.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.health;
@@ -40,7 +40,8 @@ extends HistoricalEvent implements Serializable {
 				person.getTaskDescription(),
 				person.getName(),
 				person.getLocationTag().getImmediateLocation(),
-				person.getLocationTag().getLocale()
+				person.getLocationTag().getLocale(),
+				person.getAssociatedSettlement().getName()
 				);
 		
 		this.person = person;

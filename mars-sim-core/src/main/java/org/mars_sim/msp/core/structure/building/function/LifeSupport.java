@@ -1,12 +1,11 @@
 /**
  * Mars Simulation Project
  * LifeSupport.java
- * @version 3.1.0 2017-03-09
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
@@ -49,8 +48,6 @@ public class LifeSupport extends Function implements Serializable {
 
 	private Building building;
 
-	private Inventory inv;
-
 	private Collection<Person> occupants;
 
 	/**
@@ -66,14 +63,10 @@ public class LifeSupport extends Function implements Serializable {
 
 		occupants = new ConcurrentLinkedQueue<Person>();
 
-		inv = building.getSettlementInventory();
-
-		BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
-
 		// Set occupant capacity.
-		occupantCapacity = config.getLifeSupportCapacity(building.getBuildingType());
+		occupantCapacity = buildingConfig.getLifeSupportCapacity(building.getBuildingType());
 
-		powerRequired = config.getLifeSupportPowerRequirement(building.getBuildingType());
+		powerRequired = buildingConfig.getLifeSupportPowerRequirement(building.getBuildingType());
 
 		length = building.getLength();
 		width = building.getWidth();
@@ -141,8 +134,8 @@ public class LifeSupport extends Function implements Serializable {
 
 		// Subtract power usage cost per sol.
 		double power = config.getLifeSupportPowerRequirement(buildingName);
-		double hoursInSol = MarsClock.convertMillisolsToSeconds(1000D) / 60D / 60D;
-		double powerPerSol = power * hoursInSol;
+//		double hoursInSol = MarsClock.convertMillisolsToSeconds(1000D) / 60D / 60D;
+		double powerPerSol = power * MarsClock.HOURS_PER_MILLISOL * 1000D;
 		double powerValue = powerPerSol * settlement.getPowerGrid().getPowerValue() / 1000D;
 		result -= powerValue;
 
@@ -211,15 +204,16 @@ public class LifeSupport extends Function implements Serializable {
 	public void addPerson(Person person) {
 		if (!occupants.contains(person)) {
 			// Remove person from any other inhabitable building in the settlement.
-			Iterator<Building> i = building.getBuildingManager().getBuildings().iterator(); // getACopyOfBuildings().iterator();
+			Iterator<Building> i = building.getBuildingManager().getBuildings().iterator(); 
 			while (i.hasNext()) {
 				Building building = i.next();
 				if (building.hasFunction(THE_FUNCTION)) {
-					// remove this person from this building first
-					BuildingManager.removePersonOrRobotFromBuilding(person, building);
+					// remove this person from the old building first
+					BuildingManager.removePersonFromBuilding(person, building);
+//					building.getLifeSupport().removePerson(person);
 				}
 			}
-
+			
 			// Add person to this building.
 			occupants.add(person);
 			logger.finest("Adding " + person + " to " + building + " life support.");
@@ -252,15 +246,12 @@ public class LifeSupport extends Function implements Serializable {
 
 		// TODO: Skip calling for thermal control for Hallway ?
 
-		if (inv == null)
-			inv = building.getSettlementInventory();
-
 		if (occupants != null && occupants.size() > 0) {
 			// Make sure all occupants are actually in settlement inventory.
 			// If not, remove them as occupants.
 			Iterator<Person> i = occupants.iterator();
 			while (i.hasNext()) {
-				if (!inv.containsUnit(i.next()))
+				if (!building.getInventory().containsUnit(i.next()))
 					i.remove();
 			}
 		}
@@ -325,7 +316,6 @@ public class LifeSupport extends Function implements Serializable {
 		super.destroy();
 
 		building = null;
-		inv = null;
 		occupants.clear();
 		occupants = null;
 	}

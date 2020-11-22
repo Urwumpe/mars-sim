@@ -1,14 +1,13 @@
 /**
  * Mars Simulation Project
  * UnitWindow.java
- * @version 3.1.0 2017-09-19
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.unit_window;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -16,41 +15,46 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.List;
 
 import javax.swing.ImageIcon;
+import javax.swing.JTabbedPane;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ShiftType;
-import org.mars_sim.msp.core.person.TaskSchedule;
-import org.mars_sim.msp.ui.javafx.MainScene;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule;
+import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
+import org.mars_sim.msp.ui.swing.MainWindow;
+import org.mars_sim.msp.ui.swing.ModalInternalFrame;
 import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfo;
 import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfoFactory;
 
-import com.alee.laf.desktoppane.WebInternalFrame;
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
+import com.alee.laf.tabbedpane.WebTabbedPane;
 import com.alee.managers.tooltip.TooltipManager;
 import com.alee.managers.tooltip.TooltipWay;
-import com.jidesoft.plaf.LookAndFeelFactory;
-import com.jidesoft.swing.JideTabbedPane;
+
 
 /**
  * The UnitWindow is the base window for displaying units.
  */
-public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFrame
+@SuppressWarnings("serial")
+public abstract class UnitWindow extends ModalInternalFrame implements ChangeListener {
 
 	// private static final int BLUR_SIZE = 7;
 
-	public static final int WIDTH = 480;// 512;
-	public static final int HEIGHT = 625;//605;
+	public static final int WIDTH = 530;// 512;
+	public static final int HEIGHT = 630;//605;
 
 	// private BufferedImage image;
 	public static final String USER = Msg.getString("icon.user");
@@ -74,10 +78,15 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 	// private static final String DETAILS_ICON = Msg.getString("icon.details");
 
 	// Data members
-	private int themeCache = -1;
-
-	private String oldRoleString = "", oldJobString = "", oldTownString = "";
+//	private int themeCache = -1;
+	private boolean hasDescription;
+	
+	private String oldRoleString = "";
+	private String oldJobString = "";
+	private String oldTownString = "";
+	
 	private ShiftType oldShiftType = null;
+	
 	private WebLabel townLabel;
 	private WebLabel jobLabel;
 	private WebLabel roleLabel;
@@ -85,19 +94,21 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 
 	private WebPanel statusPanel;
 	/** The tab panels. */
-	private Collection<TabPanel> tabPanels;
+	private List<TabPanel> tabPanels;
 	/** The center panel. */
-	// private JTabbedPane tabPanel;
-	private JideTabbedPane tabPanel;
-	// private JTabbedPane tabPanel;
-
+	private JTabbedPane tabPane;
+//	private JideTabbedPane tabPanel;
+	
+	/** The cache for the currently selected TabPanel. */
+	private TabPanel oldTab;
+	
 	/** Main window. */
 	protected MainDesktopPane desktop;
 	/** Unit for this window. */
 	protected Unit unit;
-//	protected SlidePaneFactory factory;
-	protected MainScene mainScene;
 
+//	private static ImageIcon icon = MainWindow.getLanderIcon();
+	
 	/**
 	 * Constructor
 	 *
@@ -111,17 +122,40 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 
 		// Initialize data members
 		this.desktop = desktop;
-		mainScene = desktop.getMainScene();
 		this.unit = unit;
+		this.hasDescription = hasDescription;
 
-		this.setMaximumSize(new Dimension(WIDTH, HEIGHT));
-		this.setPreferredSize(new Dimension(WIDTH, HEIGHT));
-
+		setFrameIcon(MainWindow.getLanderIcon());
+		
+		if (unit instanceof Person) {
+			setMaximumSize(new Dimension(WIDTH, HEIGHT));
+			setPreferredSize(new Dimension(WIDTH, HEIGHT));
+		}
+		else if (unit instanceof Settlement) {
+			setMaximumSize(new Dimension(WIDTH, HEIGHT + 30));
+			setPreferredSize(new Dimension(WIDTH, HEIGHT + 30));
+		}
+		else { //if (unit instanceof Vehicle) {
+			setMaximumSize(new Dimension(WIDTH, HEIGHT - 50));
+			setPreferredSize(new Dimension(WIDTH, HEIGHT - 50));
+		}		
+//		else if (unit instanceof Equipment) {
+//			setMaximumSize(new Dimension(WIDTH, HEIGHT - 50));
+//			setPreferredSize(new Dimension(WIDTH, HEIGHT - 50));
+//		}	
+		
+		this.setIconifiable(false);
+		
+		initializeUI();
+	}
+	
+	private void initializeUI() {
+    
 		tabPanels = new ArrayList<TabPanel>();
-
+        
 		// Create main panel
 		WebPanel mainPane = new WebPanel(new BorderLayout());
-		mainPane.setBorder(new MarsPanelBorder());// setBorder(MainDesktopPane.newEmptyBorder());
+//		mainPane.setBorder(new MarsPanelBorder());// setBorder(MainDesktopPane.newEmptyBorder());
 		setContentPane(mainPane);
 
 		// Create status panel
@@ -135,30 +169,30 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 		
 		if (unit instanceof Person) {
 			statusPanel.setPreferredSize(new Dimension(WIDTH / 8, 60));
-		}
+//		}
 
-		int theme = 0;
-		if (mainScene != null) {
-			theme = MainScene.getTheme();
-			if (themeCache != theme) {
-				themeCache = theme;
-				// pale blue : Color(198, 217, 217)) = new Color(0xC6D9D9)
-				// pale grey : Color(214,217,223) = D6D9DF
-				// pale mud : (193, 191, 157) = C1BF9D
-			}
-		}
+//		int theme = 0;
+//		if (mainScene != null) {
+//			theme = MainScene.getTheme();
+//			if (themeCache != theme) {
+//				themeCache = theme;
+//				// pale blue : Color(198, 217, 217)) = new Color(0xC6D9D9)
+//				// pale grey : Color(214,217,223) = D6D9DF
+//				// pale mud : (193, 191, 157) = C1BF9D
+//			}
+//		}
+//
+//		else
+//			theme = 7;
 
-		else
-			theme = 7;
-
-		if (unit instanceof Person) {
+//		if (unit instanceof Person) {
 
 			WebLabel nameLabel = new WebLabel(name, displayInfo.getButtonIcon(unit), SwingConstants.CENTER);
 			nameLabel.setMinimumSize(new Dimension(80, 60));
 
 			Font font = null;
 
-			if (MainScene.OS.contains("linux")) {
+			if (MainWindow.OS.contains("linux")) {
 				new Font("DIALOG", Font.BOLD, 8);
 			} else {
 				new Font("DIALOG", Font.BOLD, 10);
@@ -175,7 +209,7 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 			if (hasDescription) {
 
 				WebLabel townIconLabel = new WebLabel();
-				TooltipManager.setTooltip(townIconLabel, "Associated Settlement", TooltipWay.down);
+				TooltipManager.setTooltip(townIconLabel, "Hometown", TooltipWay.down);
 				setImage(TOWN, townIconLabel);
 
 				WebLabel jobIconLabel = new WebLabel();
@@ -207,7 +241,7 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 				shiftLabel = new WebLabel();
 				shiftLabel.setFont(font);
 
-				statusUpdate();
+				statusUpdate((Person)unit);
 
 				townPanel.add(townIconLabel);
 				townPanel.add(townLabel);
@@ -226,7 +260,7 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 				shiftPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 				WebPanel rowPanel = new WebPanel(new GridLayout(2, 2, 0, 0));
-				// rowPanel.setBorder(new MarsPanelBorder());
+//				 rowPanel.setBorder(new MarsPanelBorder());
 
 				rowPanel.add(townPanel);// , FlowLayout.LEFT);
 				rowPanel.add(rolePanel);// , FlowLayout.LEFT);
@@ -236,72 +270,147 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 				statusPanel.add(rowPanel);
 				rowPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-//	            }
 			}
 
 			// factory.add(centerPanel, DETAILS, getImage(DETAILS_ICON), true);
 		}
 
-		tabPanel = new JideTabbedPane();
-		tabPanel.setPreferredSize(new Dimension(WIDTH - 15, 512));
-		tabPanel.setBorder(null);
-
-		tabPanel.setBoldActiveTab(true);
-		tabPanel.setScrollSelectedTabOnWheel(true);
-		tabPanel.setTabShape(JideTabbedPane.SHAPE_WINDOWS_SELECTED);
+//		com.jidesoft.plaf.LookAndFeelFactory.installJideExtension(com.jidesoft.plaf.LookAndFeelFactory.OFFICE2003_STYLE);
+//		tabPanel.setColorTheme(JideTabbedPane.COLOR_THEME_OFFICE2003); // COLOR_THEME_VSNET);
 		
-		if (MainScene.getTheme() == 7) {
-			LookAndFeelFactory.installJideExtension(LookAndFeelFactory.OFFICE2003_STYLE);
-			tabPanel.setColorTheme(JideTabbedPane.COLOR_THEME_OFFICE2003); // COLOR_THEME_VSNET);
-		} else {
-			LookAndFeelFactory.installJideExtension(LookAndFeelFactory.VSNET_STYLE);
-			tabPanel.setColorTheme(JideTabbedPane.COLOR_THEME_VSNET);
+//		if (MainWindow.OS.contains("linux")) {
+//			try {
+//				UIManager.setLookAndFeel("javax.swing.plaf.metal.MetalLookAndFeel");
+//			} catch (ClassNotFoundException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			} catch (InstantiationException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			} catch (IllegalAccessException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			} catch (UnsupportedLookAndFeelException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			}
+//			
+//			LookAndFeelFactory.installJideExtension(UIManager.getLookAndFeelDefaults(), UIManager.getLookAndFeel(), LookAndFeelFactory.VSNET_STYLE);////.installDefaultLookAndFeelAndExtension(); //installJideExtension(LookAndFeelFactory.ECLIPSE_STYLE);//.EXTENSION_STYLE_XERTO);//
+//		}
+//		
+//		else
+//			LookAndFeelFactory.installJideExtension(LookAndFeelFactory.VSNET_STYLE);
+		
+//		logger.config(UIManager.getLookAndFeel().getName() + " is used in MainWindow.");
+		
+//		tabPanel = new JideTabbedPane();
+////		tabPanel.setColorTheme(JideTabbedPane.COLOR_THEME_VSNET);
+//		tabPanel.setPreferredSize(new Dimension(WIDTH - 15, 512));
+//		tabPanel.setBorder(null);
+//
+//		tabPanel.setBoldActiveTab(true);
+//		tabPanel.set2SelectedTabOnWheel(true);
+//		tabPanel.setTabShape(JideTabbedPane.SHAPE_WINDOWS_SELECTED);
+//		
+//		// Setting foreground color for tab text.
+//		tabPanel.setForeground(Color.DARK_GRAY);
+//		tabPanel.setTabPlacement(JideTabbedPane.LEFT);
+
+		tabPane = new WebTabbedPane(WebTabbedPane.LEFT, WebTabbedPane.SCROLL_TAB_LAYOUT); // WRAP_TAB_LAYOUT);//
+//		tabPane.setPreferredSize(new Dimension(WIDTH - 50, HEIGHT - 40));
+		if (unit instanceof Person) {
+//			setMaximumSize(new Dimension(WIDTH, HEIGHT + 25));
+			tabPane.setPreferredSize(new Dimension(WIDTH - 45, HEIGHT - 120));
 		}
-		// Setting foreground color for tab text.
-		tabPanel.setForeground(Color.DARK_GRAY);
-		tabPanel.setTabPlacement(JideTabbedPane.LEFT);
+		else if (unit instanceof Settlement) {
+//			setMaximumSize(new Dimension(WIDTH, HEIGHT + 35));
+			tabPane.setPreferredSize(new Dimension(WIDTH - 45, HEIGHT - 40));
+		}
+		else  { //if (unit instanceof Vehicle) {
+//			setMaximumSize(new Dimension(WIDTH, HEIGHT - 20));
+			tabPane.setPreferredSize(new Dimension(WIDTH - 45, HEIGHT - 120));
+		}	
+//		else if (unit instanceof Equipment) {
+////			setMaximumSize(new Dimension(WIDTH, HEIGHT - 20));
+//			tabPane.setPreferredSize(new Dimension(WIDTH - 45, HEIGHT - 120));
+//		}	
+		
+//		tabPane.putClientProperty ( StyleId.STYLE_PROPERTY, StyleId.tabbedpane);
+//		tabPane.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+//		UIManager.put("TabbedPane.unselectedBackground", Color.GRAY);
+//		Color bk = tabPane.getBackground();
+//		UIManager.put("TabbedPane.tabAreaBackground", bk);//ColorUIResource.RED);
+		
+		// Add a listener for the tab changes
+		tabPane.addChangeListener(new ChangeListener() {
+			public void stateChanged(ChangeEvent e) {
+				TabPanel newTab = getSelected();
+//				System.out.println("oldTab : " + oldTab + "    newTab : " + newTab);
+				if (!newTab.isUIDone()) {
+					if (oldTab == null || newTab != oldTab) {
+						oldTab = newTab;
+						newTab.initializeUI();
+					}
+				}
+			}
+		});
 
-		WebPanel centerPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
-		centerPanel.add(tabPanel);
-		centerPanel.setPreferredSize(new Dimension(WIDTH - 5, 512));
-
-		// update();
+		
+		WebPanel centerPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+//		centerPanel.setOpaque(false);
+//		centerPanel.setBackground(new Color(0,0,0,128));
+		centerPanel.add(tabPane);
 
 		mainPane.add(centerPanel, BorderLayout.CENTER);
-		// add focusListener to play sounds and alert users of critical conditions.
-
+		
+		// TODO: add focusListener to play sounds and alert users of critical conditions.
 		// TODO: disabled in SVN while in development
 		// this.addInternalFrameListener(new
 		// UniversalUnitWindowListener(UnitInspector.getGlobalInstance()));
+		
+		desktop.getMainWindow().initializeTheme();//initializeWeblaf();
 	}
 
 	/**
-	 * Sets weather image.
+	 * Sets the image on the label
+	 * 
+	 * @param imageLocation
+	 * @param label
 	 */
 	public void setImage(String imageLocation, WebLabel label) {
 		ImageIcon imageIcon = ImageLoader.getNewIcon(imageLocation);
 		label.setIcon(imageIcon);
 	}
 
+	/**
+	 * Gets the image from the location
+	 * 
+	 * @param imageLocation
+	 * @return
+	 */
 	public Image getImage(String imageLocation) {
-	
 		return ImageLoader.getNewIcon(imageLocation).getImage();
 	}
 
 	/*
 	 * Updates the status of an unit
 	 */
-	public void statusUpdate() {
-
-		Person p = (Person) unit;
+	public void statusUpdate(Person p) {
 
 		String townString = null;
 
-		if (p.getPhysicalCondition().isDead())
-			townString = DEAD;// + p.getBuriedSettlement();
-		else
-			townString = Conversion.capitalize(unit.getDescription());
-		// System.out.println("Description is : " + text);
+		if (p.getPhysicalCondition().isDead()) {
+			if (p.getAssociatedSettlement() != null)
+				townString = Conversion.capitalize(p.getAssociatedSettlement().getName());
+			else if (p.getBuriedSettlement() != null)
+				townString = Conversion.capitalize(p.getBuriedSettlement().getName());
+			else if (p.getPhysicalCondition().getDeathDetails().getPlaceOfDeath() != null)
+				townString = Conversion.capitalize(p.getPhysicalCondition().getDeathDetails().getPlaceOfDeath());
+		}
+			
+		else if (p.getAssociatedSettlement() != null)
+			townString = Conversion.capitalize(p.getAssociatedSettlement().getName());
+
 		if (!oldTownString.equals(townString)) {
 			oldJobString = townString;
 			if (townString.length() > 40)
@@ -330,6 +439,12 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 		}
 	}
 
+	/**
+	 * Gets the time period string
+	 * 
+	 * @param shiftType
+	 * @return
+	 */
 	public String getTimePeriod(ShiftType shiftType) {
 		String time = null;
 		if (shiftType == ShiftType.A)
@@ -360,6 +475,11 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 		}
 	}
 
+	/**
+	 * Adds a tab panel to the center panel.
+	 *
+	 * @param panel the tab panel to add.
+	 */
 	protected final void addTopPanel(TabPanel panel) {
 		if (!tabPanels.contains(panel)) {
 			tabPanels.add(panel);
@@ -367,10 +487,13 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 		}
 	}
 
+	/**
+	 * Sorts tab panels.
+	 */
 	protected void sortTabPanels() {
 		tabPanels.stream().sorted((t1, t2) -> t2.getTabTitle().compareTo(t1.getTabTitle()));
 		tabPanels.forEach(panel -> {
-			tabPanel.addTab(panel.getTabTitle(), panel.getTabIcon(), panel, null);// panel.getTabToolTip());
+			tabPane.addTab(panel.getTabTitle(), panel.getTabIcon(), panel, null);// panel.getTabToolTip());
 		});
 
 	}
@@ -390,17 +513,50 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 	public void update() {
 		// Update each of the tab panels.
 		for (TabPanel tabPanel : tabPanels) {
-			tabPanel.update();
-			// tabPanel.validate();
+			if (tabPanel.isVisible() && tabPanel.isShowing()) { // 
+				SwingUtilities.invokeLater(() -> 
+					tabPanel.update()
+				);
+//				tabPanel.updateUI();
+//			tabPanel.validate();
+			}
 		}
 
+		setTitle(unit.getName());
+		
 		if (unit instanceof Person) {
-			statusUpdate();
-
+			statusUpdate((Person)unit);
 		}
 
 	}
+	
+	@Override
+    public String getName() {
+		if (unit != null && unit.getName() != null)
+			return unit.getName() +"'s unit window";
+		return null;
+    }
+    
+	public void setTitle(String value) {
+		super.setTitle(unit.getName());
+	}
 
+	/**
+	 * Return the currently selected tab.
+	 *
+	 * @return Monitor tab being displayed.
+	 */
+	public TabPanel getSelected() {
+		// SwingUtilities.updateComponentTreeUI(this);
+		TabPanel selected = null;
+		int selectedIdx = tabPane.getSelectedIndex();
+		if ((selectedIdx != -1) && (selectedIdx < tabPanels.size()))
+			selected = tabPanels.get(selectedIdx);
+		return selected;
+	}
+	
+//	public abstract void tabChanged(boolean reloadSearch);
+	
 	/**
 	 * Prepares unit window for deletion.
 	 */
@@ -409,7 +565,7 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 		if (tabPanels != null)
 			tabPanels.clear();
 		tabPanels = null;
-		tabPanel = null;
+		tabPane = null;
 		oldShiftType = null;
 		townLabel = null;
 		jobLabel = null;
@@ -417,6 +573,6 @@ public abstract class UnitWindow extends WebInternalFrame { // ModalInternalFram
 		shiftLabel = null;
 		desktop = null;
 		unit = null;
-		mainScene = null;
+//		mainScene = null;
 	}
 }

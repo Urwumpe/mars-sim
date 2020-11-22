@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SimuLoggingFilter.java
- * @version 3.1.0 2018-09-29
+ * @version 3.1.2 2020-09-02
  * @author Sebastien Venot
  * $LastChangedDate$
  * $LastChangedRevision$
@@ -26,7 +26,8 @@ public class SimuLoggingFilter implements Filter {
 //			}
 //			return true;
 //		}
-		if (record.getLoggerName().startsWith(PREFIX)) {
+		if (record.getLoggerName().startsWith(PREFIX)
+				|| record.getLoggerName() == null) {
 			return true;
 		}
 	

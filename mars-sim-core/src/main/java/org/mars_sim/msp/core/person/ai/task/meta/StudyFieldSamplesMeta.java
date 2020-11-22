@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * StudyFieldSamplesMeta.java
- * @version 3.08 2015-06-08
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -13,20 +13,21 @@ import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.mars.MarsSurface;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
-import org.mars_sim.msp.core.person.ai.task.PerformLaboratoryExperiment;
 import org.mars_sim.msp.core.person.ai.task.StudyFieldSamples;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.core.structure.Lab;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * Meta task for the StudyFieldSamples task.
@@ -58,27 +59,24 @@ public class StudyFieldSamplesMeta implements MetaTask, Serializable {
 
         double result = 0D;
 
-        if (person.isInVehicle()) {
-	        // Check if person is in a moving rover.
-	        if (PerformLaboratoryExperiment.inMovingRover(person)) {
-	            result = -50D;
-	            return 0;
-	        }
-	        else
-	        // the penalty for performing experiment inside a vehicle
-	        	result = -20D;
-        }
+        // Probability affected by the person's stress and fatigue.
+        PhysicalCondition condition = person.getPhysicalCondition();
+        double fatigue = condition.getFatigue();
+        double stress = condition.getStress();
+        double hunger = condition.getHunger();
+        
+        if (fatigue > 1000 || stress > 50 || hunger > 500)
+        	return 0;
         
         if (person.isInside()) {
 	
 	        // Check that there are available field samples to study.
 	        try {
 	            Unit container = person.getContainerUnit();
-	            if (container != null) {
+				if (!(container instanceof MarsSurface)) {
 	                Inventory inv = container.getInventory();
 	                //AmountResource rockSamples = AmountResource.findAmountResource("rock samples");
-	                if (inv.getAmountResourceStored(ResourceUtil.rockSamplesAR, false) < StudyFieldSamples.SAMPLE_MASS) {
-	                    result = 0D;
+	                if (inv.getAmountResourceStored(ResourceUtil.rockSamplesID, false) < StudyFieldSamples.SAMPLE_MASS) {
 	                    return 0;
 	                }
 	            }
@@ -91,8 +89,8 @@ public class StudyFieldSamplesMeta implements MetaTask, Serializable {
 	        List<ScienceType> fieldSciences = StudyFieldSamples.getFieldSciences();
 	
 	        // Add probability for researcher's primary study (if any).
-	        ScientificStudyManager studyManager = Simulation.instance().getScientificStudyManager();
-	        ScientificStudy primaryStudy = studyManager.getOngoingPrimaryStudy(person);
+//	        ScientificStudyManager studyManager = Simulation.instance().getScientificStudyManager();
+	        ScientificStudy primaryStudy = scientificStudyManager.getOngoingPrimaryStudy(person);
 	        if ((primaryStudy != null) && ScientificStudy.RESEARCH_PHASE.equals(primaryStudy.getPhase())) {
 	            if (!primaryStudy.isPrimaryResearchCompleted()) {
 	                if (fieldSciences.contains(primaryStudy.getScience())) {
@@ -124,12 +122,12 @@ public class StudyFieldSamplesMeta implements MetaTask, Serializable {
 	        }
 	
 	        // Add probability for each study researcher is collaborating on.
-	        Iterator<ScientificStudy> i = studyManager.getOngoingCollaborativeStudies(person).iterator();
+	        Iterator<ScientificStudy> i = scientificStudyManager.getOngoingCollaborativeStudies(person).iterator();
 	        while (i.hasNext()) {
 	            ScientificStudy collabStudy = i.next();
 	            if (ScientificStudy.RESEARCH_PHASE.equals(collabStudy.getPhase())) {
 	                if (!collabStudy.isCollaborativeResearchCompleted(person)) {
-	                    ScienceType collabScience = collabStudy.getCollaborativeResearchers().get(person);
+	                    ScienceType collabScience = collabStudy.getCollaborativeResearchers().get(person.getIdentifier());
 	                    if (fieldSciences.contains(collabScience)) {
 	                        try {
 	                            Lab lab = StudyFieldSamples.getLocalLab(person, collabScience);
@@ -181,7 +179,20 @@ public class StudyFieldSamplesMeta implements MetaTask, Serializable {
 	
 	    }
         
-        if (result < 0) result = 0;
+        if (result <= 0) 
+        	result = 0;
+        else  if (person.isInVehicle()) {	
+	        // Check if person is in a moving rover.
+	        if (Vehicle.inMovingRover(person)) {
+		        // the bonus inside a vehicle, 
+	        	// rather than having nothing to do if a person is not driving
+	        	result += 30;
+	        } 	       
+	        else
+		        // the bonus inside a vehicle, 
+	        	// rather than having nothing to do if a person is not driving
+	        	result += 10;
+        }
         
         return result;
     }

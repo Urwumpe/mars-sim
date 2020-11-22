@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SpaceXMissionControl.java
- * @version 3.1.0 2017-06-17
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -9,8 +9,7 @@ package org.mars_sim.msp.core.reportingAuthority;
 
 import java.io.Serializable;
 
-import org.mars_sim.msp.core.reportingAuthority.objectives.BuildingSelfSustainingColonies;
-import org.mars_sim.msp.core.reportingAuthority.objectives.DeterminingHabitability;
+import org.mars_sim.msp.core.reportingAuthority.objectives.MakingLifeMultiplanetary;
 
 /*
  * This class represents the Mission Control of the Mars Society
@@ -36,7 +35,7 @@ implements Serializable {
 	}
 
 	private SpaceXMissionControl() {
-		missionAgenda = new BuildingSelfSustainingColonies();
+		missionAgenda = new MakingLifeMultiplanetary();
 	}
 
 	public static SpaceXMissionControl createMissionControl() {

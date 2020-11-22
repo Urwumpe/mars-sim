@@ -1,22 +1,22 @@
 /**
  * Mars Simulation Project
  * EventTableModel.java
- * @version 3.1.0 2017-03-09
+ * @version 3.1.2 2020-09-02
  * @author Barry Evans
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 
-import org.controlsfx.control.Notifications;
+import org.mars_sim.msp.core.GameManager;
+import org.mars_sim.msp.core.GameManager.GameMode;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.events.HistoricalEvent;
 import org.mars_sim.msp.core.events.HistoricalEventCategory;
 import org.mars_sim.msp.core.events.HistoricalEventListener;
@@ -25,22 +25,16 @@ import org.mars_sim.msp.core.events.SimpleEvent;
 import org.mars_sim.msp.core.person.EventType;
 import org.mars_sim.msp.core.time.ClockListener;
 import org.mars_sim.msp.core.tool.Conversion;
-import org.mars_sim.msp.ui.javafx.MainScene;
-import org.mars_sim.msp.ui.javafx.MainSceneMenu;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.notification.NotificationMenu;
 import org.mars_sim.msp.ui.swing.notification.NotificationWindow;
-
-import javafx.application.Platform;
-import javafx.geometry.Pos;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 
 /**
  * This class provides a table model for use with the MonitorWindow that
  * provides a mean to display the Historical Event. This is actually an Adapter
  * onto the existing Event Manager.
  */
+@SuppressWarnings("serial")
 public class EventTableModel extends AbstractTableModel
 		implements MonitorModel, HistoricalEventListener, ClockListener {
 
@@ -102,38 +96,27 @@ public class EventTableModel extends AbstractTableModel
 	private boolean displayTask = false;
 	private boolean displayTransport = false;
 
-	private HistoricalEventManager manager;
 	private NotificationWindow notifyBox;
 	private MainDesktopPane desktop;
 	private NotificationMenu nMenu;
-	private MainSceneMenu mainSceneMenu;
+//	private MainSceneMenu mainSceneMenu;
 
 	private List<String> messageCache = new ArrayList<>();
-
-	private Map<Integer, Image> appIconSet = new LinkedHashMap<>();
-
-	private static Image icon_med = new Image(
-			EventTableModel.class.getResource("/icons/notification/medical_48.png").toExternalForm());
-	private static Image icon_mal = new Image(
-			EventTableModel.class.getResource("/icons/notification/tool_48.png").toExternalForm());
-	private static Image icon_mission = new Image(
-			EventTableModel.class.getResource("/icons/notification/car_48.png").toExternalForm());
-	private static Image icon_hazard = new Image(
-			EventTableModel.class.getResource("/icons/notification/hazard_48.png").toExternalForm());
 
 //	private transient List<HistoricalEvent> cachedEvents = new ArrayList<HistoricalEvent>();
 	private transient List<SimpleEvent> cachedEvents = new ArrayList<>();
 
+	private static UnitManager unitManager = Simulation.instance().getUnitManager();
+	private static HistoricalEventManager eventManager = Simulation.instance().getEventManager();
+	
 	/**
 	 * constructor. Create a new Event model based on the specified event manager.
 	 * 
 	 * @param manager   Manager to extract events from.
 	 * @param notifyBox to present notification message to user.
 	 */
-	// 2014-11-29 Added NotificationWindow as param
-	// 2015-01-14 Added desktop as param
-	public EventTableModel(HistoricalEventManager manager, NotificationWindow notifyBox, MainDesktopPane desktop) {
-		this.manager = manager;
+	public EventTableModel(NotificationWindow notifyBox, MainDesktopPane desktop) {
+
 		this.notifyBox = notifyBox;
 		this.desktop = desktop;
 
@@ -143,28 +126,40 @@ public class EventTableModel extends AbstractTableModel
 		updateCachedEvents();
 
 		// Add this model as an event listener.
-		manager.addListener(this);
+		eventManager.addListener(this);
 
-		appIconSet.put(0, icon_mal);
-		appIconSet.put(1, icon_med);
-		appIconSet.put(2, icon_mission);
-		appIconSet.put(3, icon_hazard);
+//		appIconSet.put(0, icon_mal);
+//		appIconSet.put(1, icon_med);
+//		appIconSet.put(2, icon_mission);
+//		appIconSet.put(3, icon_hazard);
 
 	}
 
 	private synchronized void updateCachedEvents() {
+		List<SimpleEvent> events = null;
+		
 		// Clean out existing cached events for the Event Table.
 //		cachedEvents = new ArrayList<HistoricalEvent>();
 		cachedEvents = new ArrayList<SimpleEvent>();
-
-		int size = manager.getEvents().size();
+		
+//		int size = manager.getEvents().size();
+		
+		if (GameManager.mode == GameMode.COMMAND) {
+			int id = unitManager.getCommanderSettlement().getIdentifier();
+			events = new ArrayList<SimpleEvent>(eventManager.getEvents(id));
+		}
+		else {
+			events = new ArrayList<SimpleEvent>(eventManager.getEvents());
+		}
 		
 		// TODO: find a way to optimize this so that it doesn't have to redo the sort everytime a new event is added.
 		
 		// Filter events based on category.
-		for (int x = 0; x < size; x++) {
-//			HistoricalEvent event = manager.getEvent(x);
-			SimpleEvent event = manager.getEvent(x);
+//		for (int x = 0; x < size; x++) {
+////			HistoricalEvent event = manager.getEvent(x);
+//			SimpleEvent event = manager.getEvent(x);
+			
+		for (SimpleEvent event : events) {	
 			HistoricalEventCategory category = HistoricalEventCategory.int2enum((int) (event.getCat()));
 			EventType eventType = EventType.int2enum((event.getType()));
 			if (category.equals(HistoricalEventCategory.HAZARD) && displayHazard) {
@@ -185,6 +180,7 @@ public class EventTableModel extends AbstractTableModel
 
 			else if (category.equals(HistoricalEventCategory.MISSION) && displayMission
 					&& (eventType == EventType.MISSION_EMERGENCY_BEACON_ON
+						|| eventType == EventType.MISSION_EMERGENCY_BEACON_OFF
 							|| eventType == EventType.MISSION_EMERGENCY_DESTINATION
 							|| eventType == EventType.MISSION_NOT_ENOUGH_RESOURCES
 							|| eventType == EventType.MISSION_MEDICAL_EMERGENCY
@@ -332,27 +328,27 @@ public class EventTableModel extends AbstractTableModel
 					break;
 
 				case CAUSE: {
-					result = manager.getWhat(event.getWhat());
+					result = eventManager.getWhat(event.getWhat());
 				}
 					break;
 
 				case WHILE: {
-					result = manager.getWhileDoing(event.getWhileDoing());
+					result = eventManager.getWhileDoing(event.getWhileDoing());
 				}
 					break;
 					
 				case WHO: {
-					result = manager.getWho(event.getWho());
+					result = eventManager.getWho(event.getWho());
 				}
 					break;
 
 				case LOCATION0: {
-					result = manager.getLoc0(event.getLoc0());
+					result = eventManager.getLoc0(event.getLoc0());
 				}
 					break;
 
 				case LOCATION1: {
-					result = manager.getLoc1(event.getLoc1());
+					result = eventManager.getLoc1(event.getLoc1());
 				}
 					break;
 				}
@@ -371,12 +367,12 @@ public class EventTableModel extends AbstractTableModel
 	}
 
 	public synchronized void eventAdded(int index, SimpleEvent se, HistoricalEvent he) {
-		if (desktop.getMainScene() != null) {
-			eventAdded(index, se);
-		}
-		else {
+//		if (desktop.getMainScene() != null) {
+//			eventAdded(index, se);
+//		}
+//		else {
 			eventAdded(index, he);
-		}
+//		}
 	}
 	
 	/**
@@ -386,15 +382,14 @@ public class EventTableModel extends AbstractTableModel
 	 */
 	public synchronized void eventAdded(int index, SimpleEvent event) {
 
-		if (mainSceneMenu == null) {
-			try {
-				mainSceneMenu = desktop.getMainScene().getMainSceneMenu();
-			} catch (NullPointerException e) {
-			}
-
-		} 
-		
-		if (mainSceneMenu != null) {
+//		if (mainSceneMenu == null) {
+//			try {
+//				mainSceneMenu = desktop.getMainScene().getMainSceneMenu();
+//			} catch (NullPointerException e) {
+//			}
+//
+//		} 
+//		if (mainSceneMenu != null) {
 
 			updateCachedEvents();
 
@@ -406,11 +401,11 @@ public class EventTableModel extends AbstractTableModel
 
 				String header = null;
 				String message = null;
-				String cause = manager.getWhat(event.getWhat());
-				String during = (manager.getWhileDoing(event.getWhileDoing()));
-				String who = manager.getWho(event.getWho());
-				String location0 = manager.getLoc0(event.getLoc0());
-				String location1 = manager.getLoc1(event.getLoc1());
+				String cause = eventManager.getWhat(event.getWhat());
+				String during = (eventManager.getWhileDoing(event.getWhileDoing()));
+				String who = eventManager.getWho(event.getWho());
+				String location0 = eventManager.getLoc0(event.getLoc0());
+				String location1 = eventManager.getLoc1(event.getLoc1());
 				
 				HistoricalEventCategory category = HistoricalEventCategory.int2enum(event.getCat());
 				EventType eventType = EventType.int2enum(event.getType());
@@ -497,17 +492,26 @@ public class EventTableModel extends AbstractTableModel
 							phrase = " is complaining about the " + cause;//" is suffering from ";
 						
 						willNotify = true;
-						message = who + phrase + " while " + during + " in/outside " + location0 + " at " + location1;
+						
+						if (!during.equals("sleeping"))
+							during = "falling asleep";
+						if (!location0.equals("outside on Mars"))
+							location0 = " in " + location0;
+						message = who + phrase + " while " + during + location0 + " at " + location1;
 
 					} else if (eventType == EventType.MEDICAL_DEATH) {
 
 						willNotify = true;
-						message = who + " died from " + cause + " in/outside " + location0 + " at " + location1;
+						if (!location0.equals("outside on Mars"))
+							location0 = " in " + location0;
+						message = who + " died from " + cause + location0 + " at " + location1;
 						
 					} else if (eventType == EventType.MEDICAL_TREATED) {
 
 						willNotify = true;
-						message = who + " was being treated for " + cause + " in/outside " + location0 + " at " + location1;
+						if (!location0.equals("outside on Mars"))
+							location0 = " in " + location0;
+						message = who + " was being treated for " + cause + location0 + " at " + location1;
 						
 //					} else if (eventType == EventType.MEDICAL_CURED) {
 //
@@ -534,10 +538,10 @@ public class EventTableModel extends AbstractTableModel
 						willNotify = true;
 					}
 					else if (eventType == EventType.MISSION_EMERGENCY_BEACON_ON
+							|| eventType == EventType.MISSION_EMERGENCY_BEACON_OFF
 							|| eventType == EventType.MISSION_EMERGENCY_DESTINATION
 //							|| eventType == EventType.MISSION_NOT_ENOUGH_RESOURCES
-							|| eventType == EventType.MISSION_MEDICAL_EMERGENCY
-							) {
+							|| eventType == EventType.MISSION_MEDICAL_EMERGENCY) {
 						message = who + " has " + Conversion.setFirstWordLowercase(cause) 
 							+ " while " + during.toLowerCase() + " in " + location0 + " at " + location1;	
 						willNotify = true;
@@ -588,10 +592,11 @@ public class EventTableModel extends AbstractTableModel
 				
 			
 				// Use controlsfx's notification window for javaFX UI
-				if (willNotify)
-					Platform.runLater(new NotifyFXLauncher(header, message, type));
+				if (willNotify);
+				
+//					Platform.runLater(new NotifyFXLauncher(header, message, type));
 			}
-		}
+//		}
 
 	}
 
@@ -610,7 +615,7 @@ public class EventTableModel extends AbstractTableModel
 
 			if (nMenu == null) {
 //				try {
-					nMenu = desktop.getMainWindow().getMainWindowMenu().getNotificationMenu();
+//					nMenu = desktop.getMainWindow().getMainWindowMenu().getNotificationMenu();
 //				} catch (NullPointerException e) {
 					// TODO Auto-generated catch block
 					// e.printStackTrace();
@@ -765,71 +770,71 @@ public class EventTableModel extends AbstractTableModel
 		updateCachedEvents();
 	}
 
-	/**
-	 * Internal class for launching a notify window.
-	 */
-	private class NotifyFXLauncher implements Runnable {
-		private String header;
-		private String message;
-		private Pos pos = null;
-		private int type = -1;
-
-		private NotifyFXLauncher(String header, String message, int type) {
-			this.header = header;
-			this.message = message;
-			this.type = type;
-
-			if (type == 0) {
-				pos = Pos.BOTTOM_RIGHT;
-			}
-
-			else if (type == 1) {
-				pos = Pos.BOTTOM_LEFT;
-			}
-
-			else if (type == 2) {
-				pos = Pos.TOP_RIGHT;
-			}
-
-			else if (type == 3) {
-				pos = Pos.TOP_LEFT;
-			}
-
-		}
-
-		public void run() {
-			System.out.println("EventTableModel : " + message);
-
-			int theme = MainScene.getTheme();
-
-			if (theme == 7) {// use dark theme
-				Notifications.create().title(header).text(message).position(pos)
-//		    		.onAction(new EventHandler<ActionEvent>() {
-//		    			@Override
-//		    			public void handle(ActionEvent event){
-//		    				logger.config("A notification box titled " + "header" + " with " + message + "' has just been clicked.");
-//		    			}
-//		    		})
-						.graphic(new ImageView(appIconSet.get(type)))
-						.darkStyle().owner(desktop.getMainScene().getStage()).show();
-			}
-
-			else {// use light theme
-				Notifications.create().title(header).text(message).position(pos)
-//		    		.onAction(new EventHandler<ActionEvent>() {
-//		    			@Override
-//		    			public void handle(ActionEvent event){
-//		    				logger.config("A notification box titled " + "header" + " with " + message + "' has just been clicked.");
-//		    			}
-//		    		})
-						.graphic(new ImageView(appIconSet.get(type)))
-						.owner(desktop.getMainScene().getStage()).show();
-//		    		.showWarning();
-			}
-
-			desktop.getMainScene().sendMsg(message);
-		}
-	}
+//	/**
+//	 * Internal class for launching a notify window.
+//	 */
+//	private class NotifyFXLauncher implements Runnable {
+//		private String header;
+//		private String message;
+//		private Pos pos = null;
+//		private int type = -1;
+//
+//		private NotifyFXLauncher(String header, String message, int type) {
+//			this.header = header;
+//			this.message = message;
+//			this.type = type;
+//
+//			if (type == 0) {
+//				pos = Pos.BOTTOM_RIGHT;
+//			}
+//
+//			else if (type == 1) {
+//				pos = Pos.BOTTOM_LEFT;
+//			}
+//
+//			else if (type == 2) {
+//				pos = Pos.TOP_RIGHT;
+//			}
+//
+//			else if (type == 3) {
+//				pos = Pos.TOP_LEFT;
+//			}
+//
+//		}
+//
+//		public void run() {
+////			System.out.println("EventTableModel : " + message);
+//
+//			int theme = 7;//MainScene.getTheme();
+//
+//			if (theme == 7) {// use dark theme
+//				Notifications.create().title(header).text(message).position(pos)
+////		    		.onAction(new EventHandler<ActionEvent>() {
+////		    			@Override
+////		    			public void handle(ActionEvent event){
+////		    				logger.config("A notification box titled " + "header" + " with " + message + "' has just been clicked.");
+////		    			}
+////		    		})
+//						.graphic(new ImageView(appIconSet.get(type)))
+//						.darkStyle().owner(desktop.getMainScene().getStage()).show();
+//			}
+//
+//			else {// use light theme
+//				Notifications.create().title(header).text(message).position(pos)
+////		    		.onAction(new EventHandler<ActionEvent>() {
+////		    			@Override
+////		    			public void handle(ActionEvent event){
+////		    				logger.config("A notification box titled " + "header" + " with " + message + "' has just been clicked.");
+////		    			}
+////		    		})
+//						.graphic(new ImageView(appIconSet.get(type)))
+//						.owner(desktop.getMainScene().getStage()).show();
+////		    		.showWarning();
+//			}
+//
+//			desktop.getMainScene().sendMsg(message);
+//		}
+//	}
 
 	/**
 	 * Internal class for launching a notify window.
@@ -874,19 +879,20 @@ public class EventTableModel extends AbstractTableModel
 	 * Prepares the model for deletion.
 	 */
 	public void destroy() {
-		Simulation.instance().getMasterClock().removeClockListener(this);
-		manager.removeListener(this);
-		manager = null;
+		if (Simulation.instance().getMasterClock() != null)
+			Simulation.instance().getMasterClock().removeClockListener(this);
+		eventManager.removeListener(this);
+		eventManager = null;
 		notifyBox = null;
 		desktop = null;
 		nMenu = null;
-		mainSceneMenu = null;
+//		mainSceneMenu = null;
 		messageCache = null;
-		appIconSet = null;
-		icon_med = null;
-		icon_mal = null;
-		icon_mission = null;
-		icon_hazard = null;
+//		appIconSet = null;
+//		icon_med = null;
+//		icon_mal = null;
+//		icon_mission = null;
+//		icon_hazard = null;
 		cachedEvents.clear();
 		cachedEvents = null;
 	}

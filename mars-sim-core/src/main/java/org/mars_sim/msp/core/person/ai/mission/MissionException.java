@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * MissionException.java
- * @version 3.1.0 2017-10-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission;
@@ -11,6 +11,7 @@ package org.mars_sim.msp.core.person.ai.mission;
  */
 public class MissionException extends Exception {
 
+	private static final long serialVersionUID = 1L;
 	// Domain members
 	private String phase;
 

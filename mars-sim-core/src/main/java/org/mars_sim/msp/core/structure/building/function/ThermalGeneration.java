@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ThermalGeneration.java
- * @version 3.1.0 2017-08-17
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -17,9 +17,6 @@ import java.util.logging.Logger;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingException;
-import org.mars_sim.msp.core.SimulationConfig;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
-import org.mars_sim.msp.core.structure.building.function.HeatMode;
 
 /**
  * The ThermalGeneration class handles how the buildings of a settlement
@@ -35,7 +32,7 @@ implements Serializable {
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(ThermalGeneration.class.getName());
 
-	DecimalFormat fmt = new DecimalFormat("#.#######");
+	DecimalFormat fmt = new DecimalFormat("#.#####");
 
 	/** TODO Name of the building function needs to be internationalized. */
 	private static final FunctionType FUNCTION = FunctionType.THERMAL_GENERATION;
@@ -53,11 +50,7 @@ implements Serializable {
 	
 	private HeatSource heatSource;
 	
-	//private PowerMode powerMode;
-	
 	private List<HeatSource> heatSources;
-	
-	private static BuildingConfig buildingConfig;
 	
 	/**
 	 * Constructor
@@ -70,10 +63,7 @@ implements Serializable {
 		heating = new Heating(building);
 
 		// Determine heat sources.
-		buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
 		heatSources = buildingConfig.getHeatSources(building.getBuildingType());
-
-		//powerMode = building.getPowerMode();
 	}
 
 	/**
@@ -124,32 +114,30 @@ implements Serializable {
 		double result = 0D;
 
 		for (HeatSource source : heatSources) {
-/*
-			if (source instanceof ElectricHeatSource) {
-				result += source.getMaxHeat();
-			}
-			else if (source instanceof SolarHeatSource) {
-				result += source.getMaxHeat();
-			}
-			else if (source instanceof FuelHeatSource) {
-				result += source.getMaxHeat();
-			}
-			else
-*/				
+
+//			if (source instanceof ElectricHeatSource) {
+//				result += source.getMaxHeat();
+//			}
+//			else if (source instanceof SolarHeatSource) {
+//				result += source.getMaxHeat();
+//			}
+//			else if (source instanceof FuelHeatSource) {
+//				result += source.getMaxHeat();
+//			}
+//			else				
 				result += source.getMaxHeat();
 		}
 
 		return result;
 	}
 
-	/**
-	 * Checks if there is enough heat  for all buildings to be set to full heat.
-	 * @return true if sufficient heat
-
-	public boolean isSufficientHeat() {
-		return sufficientHeat;
-	}
-	 */
+//	/**
+//	 * Checks if there is enough heat  for all buildings to be set to full heat.
+//	 * @return true if sufficient heat
+//	 */
+//	public boolean isSufficientHeat() {
+//		return sufficientHeat;
+//	}
 
 	/**
 	 * Gets the total amount of heat that this building is capable of producing (regardless malfunctions).
@@ -172,15 +160,20 @@ implements Serializable {
 		return heatGeneratedCache; // = 0.0 if heatMode == HeatMode.POWER_DOWN
 	}
 
+	/**
+	 * Gets the total amount of power that this building is CURRENTLY producing
+	 * @return power generated in kW ()
+	 */
 	public double getGeneratedPower() {
 		return powerGeneratedCache; 
 	}
 
 	/**
 	 * Calculate the total amount of heat that this building is CURRENTLY producing
+	 * and also the power required to generate the heat
+	 * 
 	 * @return heat generated in kW
 	 */
-	// 2014-11-02 Created calculateGeneratedHeat()
 	public double calculateGeneratedHeat(double time) {
 
 		double result = 0D;
@@ -219,24 +212,24 @@ implements Serializable {
 				while (i.hasNext()) {
 					HeatSource heatSource = i.next();
 				    if (heatSource.getType().equals(HeatSourceType.SOLAR_HEATING)) {
-				    	heatSource.switch2Half();
+				    	heatSource.switch2ThreeQuarters();
 				    	result += heatSource.getCurrentHeat(getBuilding());
-				    	heatSource.switch2Quarter();
-				    	result += heatSource.getCurrentHeat(getBuilding());
+//				    	heatSource.switch2Quarter();
+//				    	result += heatSource.getCurrentHeat(getBuilding());
 				    }
 				    else if (heatSource.getType().equals(HeatSourceType.ELECTRIC_HEATING)) {
-				    	heatSource.switch2Half();
+				    	heatSource.switch2ThreeQuarters();
 				    	powerReq2 = heatSource.getCurrentHeat(getBuilding());
-				    	heatSource.switch2Quarter();
-				    	powerReq2 += heatSource.getCurrentHeat(getBuilding());
+//				    	heatSource.switch2Quarter();
+//				    	powerReq2 += heatSource.getCurrentHeat(getBuilding());
 				    	result += powerReq2;
 				    }
 				    else if (heatSource.getType().equals(HeatSourceType.FUEL_HEATING)) {
 				    	heatSource.setTime(time);
-				    	heatSource.switch2Half();
+				    	heatSource.switch2ThreeQuarters();
 				    	result += heatSource.getCurrentHeat(getBuilding());
-				    	heatSource.switch2Quarter();
-				    	result += heatSource.getCurrentHeat(getBuilding());
+//				    	heatSource.switch2Quarter();
+//				    	result += heatSource.getCurrentHeat(getBuilding());
 				    }
 				}
 			}
@@ -265,34 +258,35 @@ implements Serializable {
 				while (i.hasNext()) {
 					HeatSource heatSource = i.next();
 				    if (heatSource.getType().equals(HeatSourceType.SOLAR_HEATING)) {
-				    	heatSource.switch2Quarter();
+				    	heatSource.switch2OneQuarter();
 				    	result += heatSource.getCurrentHeat(getBuilding());
 				    }
 				    else if (heatSource.getType().equals(HeatSourceType.ELECTRIC_HEATING)) {
-				    	heatSource.switch2Quarter();
+				    	heatSource.switch2OneQuarter();
 				    	powerReq4 = heatSource.getCurrentHeat(getBuilding());
 				    	result += powerReq4;
 				    }
 				    else if (heatSource.getType().equals(HeatSourceType.FUEL_HEATING)) {
 				    	heatSource.setTime(time);
-				    	heatSource.switch2Quarter();
+				    	heatSource.switch2OneQuarter();
 				    	result +=  heatSource.getCurrentHeat(getBuilding());
 				    }
 				}
 			}
 		//}
-
-		building.setPowerRequiredForHeating(powerReq1+powerReq2+powerReq3+powerReq4);
+		double req = powerReq1 + powerReq2 + powerReq3 + powerReq4;
+//		logger.info(building.getNickName() + " power required: " + Math.round(req * 100.0)/100.0 + " kW");
+		building.setPowerRequiredForHeating(req);
 			
 		return result;
 	}
 
 
 	/**
-	 * Calculate the total amount of heat that this building is CURRENTLY producing
-	 * @return heat generated in kW
+	 * Calculate the total amount of power that this building is CURRENTLY producing from heat sources
+	 * 
+	 * @return power generated in kW
 	 */
-	// 2015-05-04 Created calculateGeneratedPower()
 	public double calculateGeneratedPower() {
 
 		double result = 0D;
@@ -316,8 +310,7 @@ implements Serializable {
 					    	heatSource.switch2Full();
 					    	result += heatSource.getCurrentPower(getBuilding());
 					    }
-				    }
-				    
+				    }		    
 				}
 			}
 			else if (heatMode == HeatMode.THREE_QUARTER_HEAT) {
@@ -326,12 +319,12 @@ implements Serializable {
 				while (i.hasNext()) {
 					HeatSource heatSource = i.next();
 				    if (heatSource.getType().equals(HeatSourceType.SOLAR_HEATING)) {
-				    	heatSource.switch2Quarter();
+				    	heatSource.switch2OneQuarter();
 				    	result += heatSource.getCurrentPower(getBuilding());
 				    }
 				    else if (heatSource.getType().equals(HeatSourceType.FUEL_HEATING)) {
 					    if (!sufficientPower) {
-					    	heatSource.switch2Quarter();
+					    	heatSource.switch2OneQuarter();
 					    	result += heatSource.getCurrentPower(getBuilding());
 					    }
 				    }
@@ -360,16 +353,13 @@ implements Serializable {
 				while (i.hasNext()) {
 					HeatSource heatSource = i.next();
 				    if (heatSource.getType().equals(HeatSourceType.SOLAR_HEATING)) {
-				    	// Note : May get up to three quarters of power (and one quarter of heat)
-				    	heatSource.switch2Quarter();
-				    	// multiply result by 3
-				    	result += heatSource.getCurrentPower(getBuilding())*3D;
+				    	// Note : May get up to three quarters for power (and one quarter for heat)
+				    	heatSource.switch2ThreeQuarters();
+				    	result += heatSource.getCurrentPower(getBuilding());
 				    }
 				    else if (heatSource.getType().equals(HeatSourceType.FUEL_HEATING)) {
 					    if (!sufficientPower) {
-					    	heatSource.switch2Quarter();
-					    	result += heatSource.getCurrentPower(getBuilding());
-					    	heatSource.switch2Half();
+					    	heatSource.switch2ThreeQuarters();
 					    	result += heatSource.getCurrentPower(getBuilding());
 					    }
 				    }
@@ -408,40 +398,40 @@ implements Serializable {
 		}
 		
 		// set new efficiency 
-/*		
-		for (HeatSource source : heatSources)
-			if (source instanceof SolarHeatSource) {
-				SolarHeatSource solarHeatSource = (SolarHeatSource) source;
-				//System.out.println("solarHeatSource.getMaxHeat() is "+ solarHeatSource.getMaxHeat());
-				double factor = solarHeatSource.getCurrentHeat(getBuilding()) / solarHeatSource.getMaxHeat();
-				// TODO : use HeatMode.FULL_POWER ?
-				double d_factor = SolarHeatSource.DEGRADATION_RATE_PER_SOL * time/1000D;
-				double eff = solarHeatSource.getEfficiency() ;
-				double new_eff = eff - eff * d_factor * factor;
-				solarHeatSource.setEfficiency(new_eff);
-				//System.out.println("new_eff is " + new_eff);
-			}
-			else if (source instanceof ElectricHeatSource) {
-				//ElectricHeatSource electricHeatSource = (ElectricHeatSource) source;
-				//System.out.println("solarHeatSource.getMaxHeat() is "+ solarHeatSource.getMaxHeat());
-				//double factor = electricHeatSource.getCurrentHeat(getBuilding()) / electricHeatSource.getMaxHeat();
-				//double d_factor = ElectricHeatSource.DEGRADATION_RATE_PER_SOL * time/1000D;
-				//double eff = electricHeatSource.getEfficiency() ;
-				//double new_eff = eff - eff * d_factor * factor;
-				//electricHeatSource.setEfficiency(new_eff); // at 70% flat
-				//System.out.println("new_eff is " + new_eff);
-			}
-			else if (source instanceof FuelHeatSource) {
-				//FuelHeatSource fuelHeatSource = (FuelHeatSource) source;
-				//System.out.println("solarHeatSource.getMaxHeat() is "+ solarHeatSource.getMaxHeat());
-				//double factor = fuelHeatSource.getCurrentHeat(getBuilding()) / fuelHeatSource.getMaxHeat();
-				//double d_factor = FuelHeatSource.DEGRADATION_RATE_PER_SOL * time/1000D;
-				//double eff = fuelHeatSource.getEfficiency() ;
-				//double new_eff = eff - eff * d_factor * factor;
-				//fuelHeatSource.setEfficiency(5new_eff);
-				//System.out.println("new_eff is " + new_eff);
-			}
-*/
+		
+//		for (HeatSource source : heatSources)
+//			if (source instanceof SolarHeatSource) {
+//				SolarHeatSource solarHeatSource = (SolarHeatSource) source;
+//				//System.out.println("solarHeatSource.getMaxHeat() is "+ solarHeatSource.getMaxHeat());
+//				double factor = solarHeatSource.getCurrentHeat(getBuilding()) / solarHeatSource.getMaxHeat();
+//				// TODO : use HeatMode.FULL_POWER ?
+//				double d_factor = SolarHeatSource.DEGRADATION_RATE_PER_SOL * time/1000D;
+//				double eff = solarHeatSource.getEfficiency() ;
+//				double new_eff = eff - eff * d_factor * factor;
+//				solarHeatSource.setEfficiency(new_eff);
+//				//System.out.println("new_eff is " + new_eff);
+//			}
+//			else if (source instanceof ElectricHeatSource) {
+//				//ElectricHeatSource electricHeatSource = (ElectricHeatSource) source;
+//				//System.out.println("solarHeatSource.getMaxHeat() is "+ solarHeatSource.getMaxHeat());
+//				//double factor = electricHeatSource.getCurrentHeat(getBuilding()) / electricHeatSource.getMaxHeat();
+//				//double d_factor = ElectricHeatSource.DEGRADATION_RATE_PER_SOL * time/1000D;
+//				//double eff = electricHeatSource.getEfficiency() ;
+//				//double new_eff = eff - eff * d_factor * factor;
+//				//electricHeatSource.setEfficiency(new_eff); // at 70% flat
+//				//System.out.println("new_eff is " + new_eff);
+//			}
+//			else if (source instanceof FuelHeatSource) {
+//				//FuelHeatSource fuelHeatSource = (FuelHeatSource) source;
+//				//System.out.println("solarHeatSource.getMaxHeat() is "+ solarHeatSource.getMaxHeat());
+//				//double factor = fuelHeatSource.getCurrentHeat(getBuilding()) / fuelHeatSource.getMaxHeat();
+//				//double d_factor = FuelHeatSource.DEGRADATION_RATE_PER_SOL * time/1000D;
+//				//double eff = fuelHeatSource.getEfficiency() ;
+//				//double new_eff = eff - eff * d_factor * factor;
+//				//fuelHeatSource.setEfficiency(5new_eff);
+//				//System.out.println("new_eff is " + new_eff);
+//			}
+
 		
 
 	}
@@ -592,13 +582,13 @@ implements Serializable {
 		building = null;
 		heatSource = null;
 		heatSources = null;
-/*		
-		Iterator<HeatSource> i = heatSources.iterator();
-		while (i.hasNext()) {
-			i.next().destroy();
-		}
-		heatSources.clear();
-*/		
+	
+//		Iterator<HeatSource> i = heatSources.iterator();
+//		while (i.hasNext()) {
+//			i.next().destroy();
+//		}
+//		heatSources.clear();
+	
 	}
 
 }

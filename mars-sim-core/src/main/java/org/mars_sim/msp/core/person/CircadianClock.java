@@ -1,21 +1,18 @@
 /**
  * Mars Simulation Project
  * CircadianClock.java
- * @version 3.1.0 2017-09-02
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.core.person;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.LifeSupportType;
+import org.mars_sim.msp.core.LifeSupportInterface;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.time.MarsClock;
 
@@ -29,9 +26,10 @@ public class CircadianClock implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(CircadianClock.class.getName());
+//	private static Logger logger = Logger.getLogger(CircadianClock.class.getName());
 
-	private static String sourceName = logger.getName();
+//	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+//			logger.getName().length());
 
 	/** Sleep Habit Map resolution. */
 	private static double SLEEP_INFLATION = 1.15;
@@ -44,10 +42,10 @@ public class CircadianClock implements Serializable {
 
 	private boolean awake = true;
 
-	private int solCache = 0;
-	private int numSleep = 0;
-	private int suppressHabit = 0;
-	private int spaceOut = 0;
+	private int solCache;
+	private int numSleep;
+	private int suppressHabit;
+	private int spaceOut;
 
 	// From http://www.webmd.com/diet/features/your-hunger-hormones#1,
 	// Leptin, aka the safety hormone, is a hormone, made by fat cells, that
@@ -85,41 +83,28 @@ public class CircadianClock implements Serializable {
 
 	private Person person;
 
-	// private PhysicalCondition condition;
-
 	/** Sleep habit map keeps track of the sleep cycle */
 	private Map<Integer, Integer> sleepCycleMap;
 
 	/** The amount of Sleep [millisols] a person on each mission sol */
-	private List<Double> sleepTime;
-	
-	// private static PersonConfig personConfig;
+	private Map<Integer, Double> sleepTime;
 
 	private static MarsClock marsClock;
 
+	static {
+		if (marsClock == null)
+			marsClock = Simulation.instance().getMasterClock().getMarsClock();
+	}
+	
 	public CircadianClock(Person person) {
 		this.person = person;
 
-		init();
-
-	}
-
-	public void init() {
-		sourceName = sourceName.substring(sourceName.lastIndexOf(".") + 1, sourceName.length());
-		// PersonConfig personConfig =
-		// SimulationConfig.instance().getPersonConfiguration();
-		// condition = person.getPhysicalCondition();
-		
 		sleepCycleMap = new HashMap<>();
-
-		sleepTime = new ArrayList<>();
-
-		if (Simulation.instance().getMasterClock() != null) // for passing maven test
-			marsClock = Simulation.instance().getMasterClock().getMarsClock();
-
+		sleepTime = new HashMap<>();
+		
 	}
-
-	public void timePassing(double time, LifeSupportType support) {
+	
+	public void timePassing(double time, LifeSupportInterface support) {
 
 		int solElapsed = marsClock.getMissionSol();
 
@@ -131,7 +116,7 @@ public class CircadianClock implements Serializable {
 
 			if (solCache == 0) {
 				double dev = Math.sqrt(
-						person.getBaseMass() / Person.AVERAGE_WEIGHT * person.getHeight() / Person.AVERAGE_HEIGHT); 
+						person.getBaseMass() / Person.getAverageWeight() * person.getHeight() / Person.getAverageHeight()); 
 				// condition.getBodyMassDeviation();
 				// person.getBaseMass()
 				// Person.AVERAGE_WEIGHT;
@@ -513,20 +498,28 @@ public class CircadianClock implements Serializable {
 	 * @param time in millisols
 	 */
 	public void recordSleep(double time) {
-		int size = sleepTime.size();
-		if (size == solCache) {
-			double msol = sleepTime.get(size-1);
-			sleepTime.remove(size-1);
-			double newMSol = msol + time;
-			sleepTime.add(newMSol);
+		int today = marsClock.getMissionSol();
+		if (sleepTime.containsKey(today)) {
+			double oldTime = sleepTime.get(today);
+			double newTime = oldTime + time;
+			sleepTime.put(today, newTime);
 		}
 		else {
-			sleepTime.add(time);
+			sleepTime.put(today, time);
 		}
 	}
 	
-	public List<Double> getSleepTime() {
+	public Map<Integer, Double> getSleepTime() {
 		return sleepTime;
+	}
+	
+	/**
+	 * Reloads instances after loading from a saved sim
+	 * 
+	 * @param clock
+	 */
+	public static void initializeInstances(MarsClock clock) {
+		marsClock = clock;
 	}
 	
 	/**
@@ -537,7 +530,11 @@ public class CircadianClock implements Serializable {
 		// personConfig = null;
 		marsClock = null;
 		// condition = null;
+		sleepCycleMap.clear();
 		sleepCycleMap = null;
+		
+		sleepTime.clear();
+		sleepTime = null;
 
 	}
 

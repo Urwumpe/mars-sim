@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * BuildingPanelMedicalCare.java
- * @version 3.1.0 2017-09-15
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
@@ -12,6 +12,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridLayout;
 
+import javax.swing.JTable;
 import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.Msg;
@@ -23,12 +24,12 @@ import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
 
 /**
  * The MedicalCareBuildingPanel class is a building function panel representing
  * the medical info of a settlement building.
  */
+@SuppressWarnings("serial")
 public class BuildingPanelMedicalCare
 extends BuildingFunctionPanel {
 
@@ -67,8 +68,6 @@ extends BuildingFunctionPanel {
 		labelPanel.setBackground(new Color(0,0,0,128));
 
 		// Create medical care label
-		// 2014-11-21 Changed font type, size and color and label text
-		// 2014-11-21 Added internationalization for labels
 		WebLabel medicalCareLabel = new WebLabel(Msg.getString("BuildingPanelMedicalCare.title"), WebLabel.CENTER);
 		medicalCareLabel.setFont(new Font("Serif", Font.BOLD, 16));
 		//medicalCareLabel.setForeground(new Color(102, 51, 0)); // dark brown
@@ -100,7 +99,7 @@ extends BuildingFunctionPanel {
 		medicalTableModel = new MedicalTableModel(medical);
 
 		// Prepare medical table
-		WebTable medicalTable = new ZebraJTable(medicalTableModel);
+		JTable medicalTable = new ZebraJTable(medicalTableModel);
 		medicalTable.setCellSelectionEnabled(false);
 		scrollPanel.setViewportView(medicalTable);
 	}

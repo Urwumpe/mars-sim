@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MissionAgenda.java
- * @version 3.1.0 2017-01-14
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -13,6 +13,10 @@ public interface MissionAgenda {
 
 	public void gatherSamples();
 
+	public int[][] getMissionModifiers();
+	
+//	public void setMissionDirectives();
+	
 	public String getObjectiveName();
 
 	String[] getPhases();

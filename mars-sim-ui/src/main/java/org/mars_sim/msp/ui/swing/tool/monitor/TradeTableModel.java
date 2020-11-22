@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TradeTableModel.java
- * @version 3.1.0 2017-09-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -28,18 +28,22 @@ import org.mars_sim.msp.core.structure.goods.Good;
 import org.mars_sim.msp.core.structure.goods.GoodType;
 import org.mars_sim.msp.core.structure.goods.GoodsUtil;
 import org.mars_sim.msp.ui.swing.tool.Conversion;
-
+@SuppressWarnings("serial")
 public class TradeTableModel
 extends AbstractTableModel
 implements UnitListener, MonitorModel, UnitManagerListener {
 
-	private static final String TRADE_GOODS = "Trade Goods";
-	private static final String VP_AT = "VP at ";
+	private static final String TRADE_GOODS = "Name of Goods";
+	private static final String VP_AT = "Value @ ";
+	private static final String PRICE_AT = "Price $ @ ";
 	private static final String CATEGORY = "Category";
 	private static final String ONE_SPACE = " ";
+	
 	// Data members
 	private List<Good> goodsList;
 	private List<Settlement> settlements;
+
+	protected static UnitManager unitManager = Simulation.instance().getUnitManager();
 
 	/**
 	 * Constructor.
@@ -48,8 +52,6 @@ implements UnitListener, MonitorModel, UnitManagerListener {
 
 		// Initialize goods list.
 		goodsList = GoodsUtil.getGoodsList();
-
-		UnitManager unitManager = Simulation.instance().getUnitManager();
 
 		// Initialize settlements.
 		settlements = new ArrayList<Settlement>(unitManager.getSettlements());
@@ -83,7 +85,9 @@ implements UnitListener, MonitorModel, UnitManagerListener {
 		while (i.hasNext()) i.next().removeUnitListener(this);
 
 		// Remove as listener to unit manager.
-		Simulation.instance().getUnitManager().removeUnitManagerListener(this);
+		unitManager.removeUnitManagerListener(this);
+		
+		unitManager = null;
 	}
 
 	/**
@@ -132,8 +136,11 @@ implements UnitListener, MonitorModel, UnitManagerListener {
 		if (columnIndex == 0) return TRADE_GOODS;
 		else if (columnIndex == 1) return CATEGORY;
 		else {
-			// 2014-11-16 Added "VP at "
-			return VP_AT + settlements.get(columnIndex - 2).getName();
+			int col = columnIndex - 2;
+			if (col % 2 == 0) // is even
+				return VP_AT + settlements.get(col/2).getName();
+			else // is odd
+				return PRICE_AT + settlements.get(col/2).getName();
 		}
 	}
 
@@ -148,7 +155,7 @@ implements UnitListener, MonitorModel, UnitManagerListener {
 	}
 
 	public int getColumnCount() {
-		return settlements.size() + 2;
+		return settlements.size() * 2 + 2;
 	}
 
 	public int getRowCount() {
@@ -157,36 +164,33 @@ implements UnitListener, MonitorModel, UnitManagerListener {
 
 	public Object getValueAt(int rowIndex, int columnIndex) {
 		if (columnIndex == 0) {
-			// 2014-11-17 Capitalized Resource Names
-			//Object result =  goodsList.get(rowIndex).getName();
 			return Conversion.capitalize(goodsList.get(rowIndex).getName().toString());
 		}
 
 		else if (columnIndex == 1) {
-			// 2014-11-17 Capitalized Category Names
-			//Object result = getGoodCategoryName(goodsList.get(rowIndex));
 			return Conversion.capitalize(getGoodCategoryName(goodsList.get(rowIndex)).toString());
 		}
 
 		else {
-			try {
-				//Settlement settlement = settlements.get(columnIndex - 2);
-				//Good good = goodsList.get(rowIndex);
-				//Object result = settlement.getGoodsManager().getGoodValuePerItem(good);
-				//return result;
-				return settlements.get(columnIndex - 2).getGoodsManager().getGoodValuePerItem(goodsList.get(rowIndex));
-			}
-			catch (Exception e) {
-				return null;
-			}
+			int col = columnIndex - 2;
+			if (col % 2 == 0) // is even
+				return settlements.get(col/2).getGoodsManager().getGoodValuePerItem(goodsList.get(rowIndex));
+			else // is odd
+				return settlements.get(col/2).getGoodsManager().getPricePerItem(goodsList.get(rowIndex));
 		}
 	}
 
-	/** gives back the internationalized name of a good's category. */
+
+	/**
+	 * Gets the good category name in the internationalized string
+	 * @param good
+	 * @return
+	 */
 	public String getGoodCategoryName(Good good) {
 		String key = good.getCategory().getMsgKey();
 		if (good.getCategory() == GoodType.EQUIPMENT) {
-			if (Container.class.isAssignableFrom(good.getClassType())) key = "GoodType.container"; //$NON-NLS-1$
+			if (Container.class.isAssignableFrom(good.getClassType())) 
+				key = "GoodType.container"; //$NON-NLS-1$
 		}
 		return Msg.getString(key);
 	}
@@ -203,10 +207,11 @@ implements UnitListener, MonitorModel, UnitManagerListener {
 		}
 
 		public void run() {
-			if (event.getTarget() == null) fireTableDataChanged();
+			if (event.getTarget() == null) 
+				fireTableDataChanged();
 			else {
 				int rowIndex = goodsList.indexOf(event.getTarget());
-				int columnIndex = settlements.indexOf(event.getSource()) + 2;
+				int columnIndex = settlements.indexOf(event.getSource()) * 2 + 2; 
 				fireTableCellUpdated(rowIndex, columnIndex);
 			}
 		}

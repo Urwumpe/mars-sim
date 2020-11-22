@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Mathematician.java
- * @version 3.07 2014-12-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.job;
@@ -10,15 +10,10 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
-import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
-import org.mars_sim.msp.core.person.ai.mission.EmergencySupplyMission;
-import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
-import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
 import org.mars_sim.msp.core.person.ai.task.AssistScientificStudyResearcher;
 import org.mars_sim.msp.core.person.ai.task.CompileScientificStudyResults;
 import org.mars_sim.msp.core.person.ai.task.ConsolidateContainers;
@@ -47,6 +42,10 @@ implements Serializable {
 
 	//	private static Logger logger = Logger.getLogger(Mathematician.class.getName());
 
+	private final int JOB_ID = 9;
+	
+	private double[] roleProspects = new double[] {5.0, 15.0, 15.0, 15.0, 15.0, 5.0, 30.0};
+	
 	/**
 	 * Constructor.
 	 */
@@ -71,21 +70,15 @@ implements Serializable {
 		jobTasks.add(ConsolidateContainers.class);
 
 		// Add mathematician-related missions.
-		jobMissionStarts.add(TravelToSettlement.class);
-		jobMissionJoins.add(TravelToSettlement.class);
-		jobMissionStarts.add(RescueSalvageVehicle.class);
-		jobMissionJoins.add(RescueSalvageVehicle.class);
-		jobMissionJoins.add(BuildingConstructionMission.class);
-		jobMissionJoins.add(BuildingSalvageMission.class);
-		jobMissionStarts.add(EmergencySupplyMission.class);
-		jobMissionJoins.add(EmergencySupplyMission.class);
+//		jobMissionJoins.add(BuildingConstructionMission.class);
+//		jobMissionJoins.add(BuildingSalvageMission.class);
 	}
 
 	@Override
 	public double getCapability(Person person) {
 		double result = 0D;
 
-		int mathematicsSkill = person.getMind().getSkillManager().getSkillLevel(SkillType.MATHEMATICS);
+		int mathematicsSkill = person.getSkillManager().getSkillLevel(SkillType.MATHEMATICS);
 		result = mathematicsSkill;
 
 		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
@@ -99,20 +92,37 @@ implements Serializable {
 
 	@Override
 	public double getSettlementNeed(Settlement settlement) {
-		double result = 0D;
+		double result = 0.1;
 
+		int population = settlement.getNumCitizens();
+		
 		// Add (labspace * tech level / 2) for all labs with mathematics specialties.
 		List<Building> laboratoryBuildings = settlement.getBuildingManager().getBuildings(FunctionType.RESEARCH);
 		Iterator<Building> i = laboratoryBuildings.iterator();
 		while (i.hasNext()) {
 			Building building = i.next();
-			Research lab = (Research) building.getFunction(FunctionType.RESEARCH);
+			Research lab = building.getResearch();
 			if (lab.hasSpecialty(ScienceType.MATHEMATICS)) {
-				result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 2D);
+				result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 16D);
 			}
 		}
 
+		result = (result + population / 20D) / 2.0;
+
+//		System.out.println(settlement + " Mathematician need: " + result);
+		
 		return result;
 	}
 
+	public double[] getRoleProspects() {
+		return roleProspects;
+	}
+	
+	public void setRoleProspects(int index, int weight) {
+		roleProspects[index] = weight;
+	}
+	
+	public int getJobID() {
+		return JOB_ID;
+	}
 }

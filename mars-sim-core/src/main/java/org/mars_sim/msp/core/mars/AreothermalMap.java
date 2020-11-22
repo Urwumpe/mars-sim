@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * AreothermalMap.java
- * @version 3.1.0 2017-10-03
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.mars;
@@ -23,10 +23,12 @@ import java.util.logging.Logger;
 import javax.swing.ImageIcon;
 
 import org.mars_sim.msp.core.Coordinates;
+import org.mars_sim.msp.core.Msg;
 
 /**
  * A map of areothermal power generation potential on the Martian surface.
  */
+//@JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, include = As.PROPERTY, property = "@class")
 public class AreothermalMap implements Serializable {
 
 	/** default serial id. */
@@ -36,9 +38,13 @@ public class AreothermalMap implements Serializable {
 	private static Logger logger = Logger.getLogger(AreothermalMap.class.getName());
 
 	// Static members.
-	private static final String AREOTHERMAL_MAP_NAME = "TopographyVolcanic.png";
-
+	private static final String VOLCANIC_IMG = Msg.getString("RandomMineralMap.image.volcanic"); //$NON-NLS-1$
+	
+	private static final int W = 300;
+	private static final int H = 150;
+	
 	// Data members
+	
 	private Set<Coordinates> hotspots;
 	private Map<Coordinates, Double> areothermalPotentialCache;
 
@@ -55,23 +61,23 @@ public class AreothermalMap implements Serializable {
 	 */
 	private void loadHotspots() {
 		hotspots = new HashSet<Coordinates>(700);
-		URL imageMapURL = getClass().getResource("/images/" + AREOTHERMAL_MAP_NAME);
+		URL imageMapURL = getClass().getResource("/images/" + VOLCANIC_IMG);
 		ImageIcon mapIcon = new ImageIcon(imageMapURL);
 		Image mapImage = mapIcon.getImage();
 
-		int[] mapPixels = new int[300 * 150];
-		PixelGrabber grabber = new PixelGrabber(mapImage, 0, 0, 300, 150, mapPixels, 0, 300);
+		int[] mapPixels = new int[W * H];
+		PixelGrabber grabber = new PixelGrabber(mapImage, 0, 0, W, H, mapPixels, 0, W);
 		try {
 			grabber.grabPixels();
 		} catch (InterruptedException e) {
 			logger.log(Level.SEVERE, "grabber error" + e);
 		}
 		if ((grabber.status() & ImageObserver.ABORT) != 0)
-			logger.info("grabber error");
+			logger.severe("grabber error");
 
-		for (int x = 0; x < 150; x++) {
-			for (int y = 0; y < 300; y++) {
-				int pixel = mapPixels[(x * 300) + y];
+		for (int x = 0; x < H; x++) {
+			for (int y = 0; y < W; y++) {
+				int pixel = mapPixels[(x * W) + y];
 				Color color = new Color(pixel);
 				if (Color.white.equals(color)) {
 					double pixel_offset = (Math.PI / 150D) / 2D;
@@ -111,7 +117,7 @@ public class AreothermalMap implements Serializable {
 			while (i.hasNext()) {
 				Coordinates hotspot = i.next();
 				double distance = location.getDistance(hotspot);
-				double pixelRadius = (Mars.MARS_CIRCUMFERENCE / 300D) / 2D;
+				double pixelRadius = (Mars.MARS_CIRCUMFERENCE / W) / 2D;
 
 				double a = 25D; // value at pixel radius.
 				double b = 15D; // ratio max / ratio mid.

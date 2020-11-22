@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SalvageGood.java
- * @version 3.07 2015-01-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -16,14 +16,16 @@ import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.location.LocationStateType;
 import org.mars_sim.msp.core.manufacture.ManufactureUtil;
 import org.mars_sim.msp.core.manufacture.SalvageProcess;
 import org.mars_sim.msp.core.manufacture.SalvageProcessInfo;
-import org.mars_sim.msp.core.person.LocationSituation;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
@@ -77,7 +79,7 @@ implements Serializable {
 			workshop = (Manufacture) manufactureBuilding.getFunction(FunctionType.MANUFACTURE);
 
 			// Walk to manufacturing workshop.
-			walkToActivitySpotInBuilding(manufactureBuilding, false);
+			walkToTaskSpecificActivitySpotInBuilding(manufactureBuilding, false);
 		}
 		else {
 			endTask();
@@ -100,7 +102,7 @@ implements Serializable {
 	}
 
     @Override
-    protected FunctionType getLivingFunction() {
+    public FunctionType getLivingFunction() {
         return FunctionType.MANUFACTURE;
     }
 
@@ -114,7 +116,7 @@ implements Serializable {
 		int experienceAptitude = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
 		newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
 		newPoints *= getTeachingExperienceModifier();
-		person.getMind().getSkillManager().addExperience(SkillType.MATERIALS_SCIENCE, newPoints);
+		person.getSkillManager().addExperience(SkillType.MATERIALS_SCIENCE, newPoints, time);
 	}
 
 	@Override
@@ -126,7 +128,7 @@ implements Serializable {
 
 	@Override
 	public int getEffectiveSkillLevel() {
-		SkillManager manager = person.getMind().getSkillManager();
+		SkillManager manager = person.getSkillManager();
 		return manager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
 	}
 
@@ -238,10 +240,10 @@ implements Serializable {
 
 		Building result = null;
 
-		SkillManager skillManager = person.getMind().getSkillManager();
+		SkillManager skillManager = person.getSkillManager();
 		int skill = skillManager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
 
-		if (person.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
+		if (person.getLocationStateType() == LocationStateType.INSIDE_SETTLEMENT) {
 			BuildingManager manager = person.getSettlement().getBuildingManager();
 			List<Building> manufacturingBuildings = manager.getBuildings(FunctionType.MANUFACTURE);
 			manufacturingBuildings = BuildingManager.getNonMalfunctioningBuildings(manufacturingBuildings);
@@ -382,10 +384,10 @@ implements Serializable {
 
 		double highestProcessValue = 0D;
 
-		int skillLevel = person.getMind().getSkillManager().getEffectiveSkillLevel(
+		int skillLevel = person.getSkillManager().getEffectiveSkillLevel(
 				SkillType.MATERIALS_SCIENCE);
 
-		Manufacture manufacturingFunction = (Manufacture) manufacturingBuilding.getFunction(FunctionType.MANUFACTURE);
+		Manufacture manufacturingFunction = manufacturingBuilding.getManufacture();
 		int techLevel = manufacturingFunction.getTechLevel();
 
 		Iterator<SalvageProcessInfo> i = ManufactureUtil.getSalvageProcessesForTechSkillLevel(
@@ -394,7 +396,7 @@ implements Serializable {
 			SalvageProcessInfo process = i.next();
 			if (ManufactureUtil.canSalvageProcessBeStarted(process, manufacturingFunction) ||
 					isSalvageProcessRunning(process, manufacturingFunction)) {
-				Settlement settlement = manufacturingBuilding.getBuildingManager().getSettlement();
+				Settlement settlement = manufacturingBuilding.getSettlement();
 				double processValue = ManufactureUtil.getSalvageProcessValue(process, settlement,
 						person);
 				if (processValue > highestProcessValue) {
@@ -456,7 +458,7 @@ implements Serializable {
 	private SalvageProcess createNewSalvageProcess() {
 		SalvageProcess result = null;
 
-		if (workshop.getTotalProcessNumber() < workshop.getSupportingProcesses()) {
+		if (workshop.getCurrentProcesses() < workshop.getNumPrintersInUse()) {
 
 			int skillLevel = getEffectiveSkillLevel();
 			int techLevel = workshop.getTechLevel();

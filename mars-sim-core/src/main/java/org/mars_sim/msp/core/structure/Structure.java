@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Structure.java
- * @version 3.1.0 2017-11-04
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -15,8 +15,11 @@ import org.mars_sim.msp.core.Unit;
  * man-made structure such as a settlement, a building, a transponder or
  * a supply cache.
  */
-public abstract class Structure
-extends Unit {
+//@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = As.PROPERTY, property = "@class")
+//@JsonSubTypes({ @Type(value = Settlement.class, name = "settlement"),
+//				@Type(value = Building.class, name = "building"),
+//				@Type(value = ConstructionSite.class, name = "constructionSite")})
+public abstract class Structure extends Unit {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;

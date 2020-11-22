@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * CollectRegolith.java
- * @version 3.1.0 2017-10-14
+ * @version 3.1.2 2020-09-02
  * @author Sebastien Venot
  */
 package org.mars_sim.msp.core.person.ai.mission;
@@ -11,8 +11,8 @@ import java.util.List;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.equipment.Bag;
 import org.mars_sim.msp.core.equipment.EquipmentType;
+import org.mars_sim.msp.core.equipment.LargeBag;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -27,20 +27,25 @@ public class CollectRegolith extends CollectResourcesMission {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	// private static Logger logger =
-	// Logger.getLogger(CollectRegolith.class.getName());
+//  private static Logger logger = Logger.getLogger(CollectRegolith.class.getName());
+
+//	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+//			 logger.getName().length());
 
 	/** Default description. */
 	public static final String DEFAULT_DESCRIPTION = Msg.getString("Mission.description.collectRegolith"); //$NON-NLS-1$
 
+	/** Mission Type enum. */
+	public static final MissionType missionType = MissionType.COLLECT_REGOLITH;
+	
 	/** Amount of regolith to be gathered at a given site (kg). */
-	private static final double SITE_GOAL = 1000D;
+	private static final double SITE_GOAL = 2000D;
 
-	/** Number of bags required for the mission. */
-	public static final int REQUIRED_BAGS = 20;
+	/** Number of large bags required for the mission. */
+	public static final int REQUIRED_LARGE_BAGS = 15;
 
 	/** Collection rate of regolith during EVA (kg/millisol). */
-	private static final double COLLECTION_RATE = 5D;
+	private static final double BASE_COLLECTION_RATE = 10D;
 
 	/** Number of collection sites. */
 	private static final int NUM_SITES = 1;
@@ -56,8 +61,8 @@ public class CollectRegolith extends CollectResourcesMission {
 	 */
 	public CollectRegolith(Person startingPerson) {
 		// Use CollectResourcesMission constructor.
-		super(DEFAULT_DESCRIPTION, startingPerson, ResourceUtil.regolithID, SITE_GOAL, COLLECTION_RATE,
-				EquipmentType.str2int(Bag.TYPE), REQUIRED_BAGS, NUM_SITES, MIN_PEOPLE);
+		super(DEFAULT_DESCRIPTION, missionType, startingPerson, ResourceUtil.regolithID, SITE_GOAL, BASE_COLLECTION_RATE,
+				EquipmentType.convertName2ID(LargeBag.TYPE), REQUIRED_LARGE_BAGS, NUM_SITES, MIN_PEOPLE);
 	}
 
 	/**
@@ -74,8 +79,8 @@ public class CollectRegolith extends CollectResourcesMission {
 			List<Coordinates> regolithCollectionSites, Rover rover, String description) {
 
 		// Use CollectResourcesMission constructor.
-		super(description, members, startingSettlement, ResourceUtil.regolithID, SITE_GOAL, COLLECTION_RATE,
-				EquipmentType.str2int(Bag.TYPE), REQUIRED_BAGS, regolithCollectionSites.size(),
+		super(description, missionType, members, startingSettlement, ResourceUtil.regolithID, SITE_GOAL, BASE_COLLECTION_RATE,
+				EquipmentType.convertName2ID(LargeBag.TYPE), REQUIRED_LARGE_BAGS, regolithCollectionSites.size(),
 				RoverMission.MIN_GOING_MEMBERS, rover, regolithCollectionSites);
 	}
 

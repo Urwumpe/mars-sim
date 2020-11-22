@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
- * MineralMap.java
- * @version 3.1.0 2017-10-03
+ * MineralMapConfig.java
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -11,8 +11,8 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdom.Document;
-import org.jdom.Element;
+import org.jdom2.Document;
+import org.jdom2.Element;
 
 public class MineralMapConfig implements Serializable {
 
@@ -38,13 +38,12 @@ public class MineralMapConfig implements Serializable {
 		this.mineralDoc = mineralDoc;
 	}
 
-	@SuppressWarnings("unchecked")
 	List<MineralType> getMineralTypes() {
 		if (mineralTypes != null)
 			return mineralTypes;
 		else {
 			mineralTypes = new ArrayList<MineralType>();
-
+//			if (mineralDoc == null) System.out.println("mineralDoc = null");
 			Element root = mineralDoc.getRootElement();
 			List<Element> minerals = root.getChildren(MINERAL);
 

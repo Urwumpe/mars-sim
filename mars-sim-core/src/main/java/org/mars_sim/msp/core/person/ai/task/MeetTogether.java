@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MeetTogether.java
- * @version 3.1.0 2017-09-13
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -12,14 +12,19 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.RoleType;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.role.RoleType;
 import org.mars_sim.msp.core.person.ai.social.Relationship;
 import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
@@ -36,8 +41,11 @@ implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** default logger. */
-//    private static Logger logger = Logger.getLogger(MeetTogether.class.getName());
+    private static Logger logger = Logger.getLogger(MeetTogether.class.getName());
 
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			logger.getName().length());
+	
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.meetTogether"); //$NON-NLS-1$
@@ -65,7 +73,10 @@ implements Serializable {
      */
     public MeetTogether(Person person) {
         // Use Task constructor.
-        super(NAME, person, true, false, STRESS_MODIFIER - RandomUtil.getRandomDouble(.2), true, 5D + RandomUtil.getRandomDouble(10));
+        super(NAME, person, true, false, 
+        		STRESS_MODIFIER - RandomUtil.getRandomDouble(.2), 
+        		true, 
+        		5D + RandomUtil.getRandomDouble(10));
 
         this.person = person;
         
@@ -149,16 +160,28 @@ implements Serializable {
     }
 
     
-    public MeetTogether(Person person, Person inviter) {
+    // TODO: how to use this version of MeetTogether
+    public MeetTogether(Person candidate, Person inviter) {
         // Use Task constructor.
-        super(NAME, person, true, false, STRESS_MODIFIER - RandomUtil.getRandomDouble(.2), true, 5D + RandomUtil.getRandomDouble(10));
+        super(NAME, candidate, true, false, STRESS_MODIFIER - RandomUtil.getRandomDouble(.2), true, 5D + RandomUtil.getRandomDouble(10));
         
         this.inviter = inviter;
         
-        settlement = person.getSettlement();
+        settlement = candidate.getSettlement();
         
         if (settlement != null) {
-        	
+            // Check if existing relationship between primary researcher and invitee.
+            if (relationshipManager == null)
+            	relationshipManager = Simulation.instance().getRelationshipManager();
+            	
+            if (!relationshipManager.hasRelationship(candidate, inviter)) {
+                // Add new communication meeting relationship.
+                relationshipManager.addRelationship(candidate, inviter, Relationship.COMMUNICATION_MEETING);
+            }
+
+            Relationship relationship = relationshipManager.getRelationship(candidate, inviter);
+            double currentOpinion = relationship.getPersonOpinion(inviter);
+            relationship.setPersonOpinion(inviter, currentOpinion + RandomUtil.getRandomDouble(1));
         }
     }
     
@@ -189,6 +212,8 @@ implements Serializable {
     	
     	if (inviter == null) {
     		// The person is setting up and inviting the candidate
+    		// e.g. Joe is meeting with Mary
+    		
        		Building building = settlement.getBuildingManager()
         					.getBuildings(FunctionType.COMMUNICATION)
 							.stream()
@@ -200,6 +225,9 @@ implements Serializable {
 
 				setDescription(Msg.getString("Task.description.meetTogether.detail", candidate.getName())); //$NON-NLS-1$
 			
+				LogConsolidated.log(logger, Level.FINER, 5000, sourceName,
+						"[" + person.getLocationTag().getLocale() + "] " +  Msg.getString("Task.description.meetTogether.detail", candidate.getName()), null);
+	
 		        //if (isDone()) {
 		        //    return time;
 		        //}
@@ -220,19 +248,22 @@ implements Serializable {
 		            relationship.setPersonOpinion(candidate, currentOpinion + RandomUtil.getRandomDouble(1));
 		 
 		        }
-
 		    }
     	}
     	
-    	else {
+    	else if (inviter != null) {
     		// The person is invited to a meeting setup by the inviter
+    		// e.g. Joe is invited to meet with Mary
     		
     		Building building = inviter.getBuildingLocation();
   			    		
 			walkToActivitySpotInBuilding(building, FunctionType.COMMUNICATION, false);
 
-			setDescription(Msg.getString("Task.description.meetTogether.detail.invited", person.getName())); //$NON-NLS-1$
-
+			setDescription(Msg.getString("Task.description.meetTogether.detail.invited", inviter.getName())); //$NON-NLS-1$
+			
+			LogConsolidated.log(logger, Level.FINER, 5000, sourceName,
+					"[" + inviter.getLocationTag().getLocale() + "] " 
+						+  Msg.getString("Task.description.meetTogether.detail.invited", inviter.getName()));
     	}
 	    	
         return 0D;

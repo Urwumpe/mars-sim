@@ -1,13 +1,12 @@
 /**
  * Mars Simulation Project
  * ThermalSystem.java
- * @version 3.1.0 2017-11-04
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.structure;
 
 import java.io.Serializable;
-import java.text.DecimalFormat;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -34,7 +33,7 @@ implements Serializable {
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(ThermalSystem.class.getName());
 
-	DecimalFormat fmt = new DecimalFormat("#.####");
+//	private DecimalFormat fmt = new DecimalFormat("#.####");
 
 	// Data members
 	private double powerGeneratedCache;
@@ -47,14 +46,10 @@ implements Serializable {
 	
 	private double heatValue;
 
-	//private boolean sufficientHeat;
-
 	private Settlement settlement;
 
 	private BuildingManager manager;
 	
-	//private ThermalGeneration heater;
-
 	/**
 	 * Constructor.
 	 */
@@ -67,8 +62,6 @@ implements Serializable {
 		heatStored = 0D;
 
 		heatRequired = 0D;
-		//sufficientHeat = true;
-
 	}
 
 
@@ -128,8 +121,8 @@ implements Serializable {
 	 */
 	public void timePassing(double time) {
 
-		if(logger.isLoggable(Level.FINE)) {
-			logger.fine(
+		if(logger.isLoggable(Level.FINEST)) {
+			logger.finest(
 				Msg.getString(
 					"ThermalSystem.log.settlementHeatSituation",
 					settlement.getName()
@@ -166,8 +159,8 @@ implements Serializable {
 		}
 		setGeneratedHeat(heat);
 
-		if(logger.isLoggable(Level.FINE)) {
-			logger.fine(
+		if(logger.isLoggable(Level.FINEST)) {
+			logger.finest(
 				Msg.getString(
 					"ThermalSystem.log.totalHeatGenerated", //$NON-NLS-1$
 					Double.toString(heat)
@@ -199,8 +192,8 @@ implements Serializable {
 		setGeneratedPower(power);
 		//System.out.println("total power : " + power);
 
-		if(logger.isLoggable(Level.FINE)) {
-			logger.fine(
+		if(logger.isLoggable(Level.FINEST)) {
+			logger.finest(
 				Msg.getString(
 					"ThermalSystem.log.totalPowerGenerated", //$NON-NLS-1$
 					Double.toString(power)

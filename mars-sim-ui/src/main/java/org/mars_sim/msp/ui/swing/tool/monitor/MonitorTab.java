@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MonitorTab.java
-* @version 3.1.0 2017-09-14
+ * @version 3.1.2 2020-09-02
  * @author Barry Evans
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -11,18 +11,20 @@ import java.util.Iterator;
 import java.util.List;
 
 import javax.swing.Icon;
+import javax.swing.JPanel;
 
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-
-import com.alee.laf.panel.WebPanel;
+import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
 
 /**
  * This class represents an abstraction of a view displayed in the Monitor
  * Window. The view is displayed inside a tab panel within the window and
  * depends on a UnitTableModel
  */
-public abstract class MonitorTab extends WebPanel {
+@SuppressWarnings("serial")
+public abstract class MonitorTab extends JPanel {
 
 	/** Model providing the data. */
 	private MonitorModel model;
@@ -30,7 +32,7 @@ public abstract class MonitorTab extends WebPanel {
 	private boolean mandatory;
 
 	/**
-	 * constructor. Create a view within a tab displaying the specified model.
+	 * Tee constructor that creates a view within a tab displaying the specified model.
 	 * 
 	 * @param model     The model of entities to display.
 	 * @param mandatory This view is a mandatory view can can not be removed.
@@ -40,14 +42,12 @@ public abstract class MonitorTab extends WebPanel {
 		this.model = model;
 		this.icon = icon;
 		this.mandatory = mandatory;
+		
 		this.setOpaque(false);
-
-		// TableStyle.setTableStyle(new ZebraJTable(model));
 
 		// Create a panel
 		setLayout(new BorderLayout());
 		// setBorder(MainDesktopPane.newEmptyBorder());
-
 	}
 
 	/**
@@ -68,6 +68,10 @@ public abstract class MonitorTab extends WebPanel {
 			Object selected = it.next();
 			if (selected instanceof Unit)
 				desktop.openUnitWindow((Unit) selected, false);
+			else if (selected instanceof Mission) {
+				((MissionWindow) desktop.getToolWindow(MissionWindow.NAME)).selectMission((Mission) selected);
+				desktop.openToolWindow(MissionWindow.NAME);
+			}
 		}
 	}
 

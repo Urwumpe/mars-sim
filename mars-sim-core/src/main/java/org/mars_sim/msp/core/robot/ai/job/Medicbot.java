@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Medicbot.java
- * @version 3.07 2015-02-17
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.robot.ai.job;
@@ -48,7 +48,7 @@ implements Serializable {
 
 		double result = 0D;
 
-		int kkill = robot.getBotMind().getSkillManager().getSkillLevel(SkillType.MEDICINE);
+		int kkill = robot.getSkillManager().getSkillLevel(SkillType.MEDICINE);
 		result = kkill;
 
 		RoboticAttributeManager attributes = robot.getRoboticAttributeManager();

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ConsolidateContainers.java
-  * @version 3.1.0 2017-09-13
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -16,15 +16,16 @@ import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.equipment.Container;
-
-import org.mars_sim.msp.core.person.NaturalAttributeType;
+import org.mars_sim.msp.core.equipment.Equipment;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.resource.AmountResource;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.RoboticAttributeType;
+import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.vehicle.Rover;
 
 /** 
@@ -69,26 +70,27 @@ implements Serializable {
         // Use Task constructor
         super(NAME, person, true, false, STRESS_MODIFIER, true, DURATION);
                 
-        if (person.getTopContainerUnit() == null) {
+        if (person.isOutside()) {//.getTopContainerUnit() == null) {
         	endTask();
         	return;
         }
         
-        topInventory = person.getTopContainerUnit().getInventory();
-
-        if (topInventory != null) {
-            
-            if (person.isInVehicle()) {//.getLocationSituation() == LocationSituation.IN_VEHICLE) {
-                // If person is in rover, walk to passenger activity spot.
-                if (person.getVehicle() instanceof Rover) {
-                    walkToPassengerActivitySpotInRover((Rover) person.getVehicle(), true);
-                }
-            }
-            else {
-                // Walk to location to consolidate containers.
-                walkToRandomLocation(true);
+        else if (person.isInVehicle()) {
+        	topInventory = person.getTopContainerUnit().getInventory();
+            // If person is in rover, walk to passenger activity spot.
+            if (person.getVehicle() instanceof Rover) {
+                walkToPassengerActivitySpotInRover((Rover) person.getVehicle(), true);
             }
         }
+        
+        else if (person.isInSettlement()) {
+        	topInventory = person.getTopContainerUnit().getInventory();
+        	Building storage = person.getSettlement().getBuildingManager().getABuilding(FunctionType.STORAGE);
+        	walkToActivitySpotInBuilding(storage, FunctionType.STORAGE, true);
+            // Walk to location to consolidate containers.
+//            walkToRandomLocation(true);
+        }
+        
         else {
             logger.severe("A top inventory could not be determined for consolidating containers for " + 
                     person.getName());
@@ -99,24 +101,24 @@ implements Serializable {
         addPhase(CONSOLIDATING);
         setPhase(CONSOLIDATING);
     }
+    
     public ConsolidateContainers(Robot robot) {
         // Use Task constructor
         super(NAME, robot, true, false, STRESS_MODIFIER, true, DURATION);
-                
-        topInventory = robot.getTopContainerUnit().getInventory();
-        if (topInventory != null) {
-            
-            if (robot.isInVehicle()) {//.getLocationSituation() == LocationSituation.IN_VEHICLE) {
-                // If robot is in rover, walk to passenger activity spot.
-                if (robot.getVehicle() instanceof Rover) {
-                    walkToPassengerActivitySpotInRover((Rover) robot.getVehicle(), true);
-                }
-            }
-            else {
-                // Walk to location to consolidate containers.
-                walkToRandomLocation(false);
+        
+        if (robot.isInVehicle()) {
+           	topInventory = robot.getContainerUnit().getInventory();
+            // If robot is in rover, walk to passenger activity spot.
+            if (robot.getVehicle() instanceof Rover) {
+                walkToPassengerActivitySpotInRover((Rover) robot.getVehicle(), true);
             }
         }
+        else if (robot.isInSettlement()) {
+        	topInventory = robot.getContainerUnit().getInventory();
+        	Building storage = robot.getSettlement().getBuildingManager().getABuilding(FunctionType.STORAGE);
+        	walkToActivitySpotInBuilding(storage, FunctionType.STORAGE, true);
+        }
+        
         else {
             logger.severe("A top inventory could not be determined for consolidating containers for " + 
                     robot.getName());
@@ -127,34 +129,36 @@ implements Serializable {
         addPhase(CONSOLIDATING);
         setPhase(CONSOLIDATING);
     }    
+    
     /**
      * Checks if containers need resource consolidation at the person's location.
      * @param person the person.
      * @return true if containers need resource consolidation.
      */
     public static boolean needResourceConsolidation(Person person) {
-        Inventory inv = person.getTopContainerUnit().getInventory();    
+        Inventory inv = person.getTopContainerUnit().getInventory();
         return consolidate(inv);
     }
+    
     public static boolean needResourceConsolidation(Robot robot) {
-        Inventory inv = robot.getTopContainerUnit().getInventory();     
+        Inventory inv = robot.getTopContainerUnit().getInventory(); 
         return consolidate(inv);
     }
     
     public static boolean consolidate(Inventory inv) {   	
         boolean result = false;
         
-        Set<AmountResource> partialResources = new HashSet<AmountResource>();
+        Set<Integer> partialResources = new HashSet<Integer>();
         
-        Iterator<Unit> i = inv.getContainedUnits().iterator();
+        Iterator<Equipment> i = inv.findAllContainers().iterator();
         while (i.hasNext() && !result) {
-            Unit unit = i.next();
-            if (unit instanceof Container) {
-                Inventory contInv = unit.getInventory();
+        	Equipment e = i.next();
+//            if (e instanceof Container) {
+                Inventory contInv = e.getInventory();
                 if (!contInv.isEmpty(false)) {
                     // Only check one type of amount resource for container.
-                    AmountResource resource = null;
-                    Iterator<AmountResource> j = contInv.getAllAmountResourcesStored(false).iterator();
+                    Integer resource = null;
+                    Iterator<Integer> j = contInv.getAllARStored(false).iterator();
                     while (j.hasNext()) {
                         resource = j.next();
                     }
@@ -179,8 +183,7 @@ implements Serializable {
                         }
                     }
                 }
-            }
-            
+//            }
         }
     	
     	return result;
@@ -219,16 +222,16 @@ implements Serializable {
         double totalAmountLoading = LOAD_RATE * strengthModifier * time;
         double remainingAmountLoading = totalAmountLoading;
         
-        // Go through each container in top inventory.
-        Iterator<Unit> i = topInventory.getContainedUnits().iterator();
+        // Go through each container in top inventory.     
+        Iterator<Equipment> i = topInventory.findAllContainers().iterator();
         while (i.hasNext() && (remainingAmountLoading > 0D)) {
-            Unit unit = i.next();
-            if (unit instanceof Container) {
-                Inventory contInv = unit.getInventory();
+        	Equipment e = i.next();
+//            if (e instanceof Container) {  
+                Inventory contInv = e.getInventory();
                 if (!contInv.isEmpty(false)) {
                     // Only check one type of amount resource for container.
-                    AmountResource resource = null;
-                    Iterator<AmountResource> j = contInv.getAllAmountResourcesStored(false).iterator();
+                	Integer resource = null;
+                    Iterator<Integer> j = contInv.getAllARStored(false).iterator();
                     while (j.hasNext()) {
                         resource = j.next();
                     }
@@ -261,10 +264,10 @@ implements Serializable {
                         if (!isFull) {
                             
                             // Go through each other container in top inventory and try to consolidate resource.
-                            Iterator<Unit> k = topInventory.getContainedUnits().iterator();
+                            Iterator<Equipment> k = topInventory.findAllContainers().iterator();
                             while (k.hasNext() && (remainingAmountLoading > 0D) && (amount > 0D)) {
-                                Unit otherUnit = k.next();
-                                if ((otherUnit != unit) && (otherUnit instanceof Container)) {
+                            	Equipment otherUnit = k.next();
+                                if (otherUnit != e) {// && (otherUnit instanceof Container)) {
                                     Inventory otherContInv = otherUnit.getInventory();
                                     double otherAmount = otherContInv.getAmountResourceStored(resource, false);
                                     if (otherAmount > 0D) {
@@ -293,7 +296,7 @@ implements Serializable {
                         }
                     }
                 }
-            }
+//            }
         }
         
         double remainingTime = (remainingAmountLoading / totalAmountLoading) * time;

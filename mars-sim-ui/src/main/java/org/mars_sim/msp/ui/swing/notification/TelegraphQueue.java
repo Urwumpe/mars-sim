@@ -1,8 +1,7 @@
 /**
  * Mars Simulation Project 
  * TelegraphQueue.java
- * @version 3.07 2014-12-10
-
+ * @version 3.1.2 2020-09-02
  * @author Modified by Manny Kung
  */
 
@@ -53,7 +52,7 @@ import javax.swing.Timer;
  * of {@link Telegraph} objects
  * 
  * @author Paulo Roberto Massa Cereda
- * @version 2.1
+ * @version 3.1.2 2020-09-02
  * @since 2.0
  */
 public class TelegraphQueue implements ActionListener {
@@ -80,7 +79,7 @@ public class TelegraphQueue implements ActionListener {
 
 		// set everything
 		//queue = new LinkedList<Telegraph>();//
-		//2014-12-11 Changed from LinkedList to ConcurrentLinkedQueue 
+		// Change from LinkedList to ConcurrentLinkedQueue 
 		queue = new ConcurrentLinkedQueue<Telegraph>();
 		timer = new Timer(100, this);
 		current = null;

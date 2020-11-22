@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ReviewJobReassignment.java
- * @version 3.1.0 2017-09-07
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -15,13 +15,15 @@ import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.RoleType;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.job.JobAssignment;
 import org.mars_sim.msp.core.person.ai.job.JobAssignmentType;
-import org.mars_sim.msp.core.person.ai.job.JobManager;
+import org.mars_sim.msp.core.person.ai.job.JobUtil;
+import org.mars_sim.msp.core.person.ai.role.RoleType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.Administration;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
@@ -84,15 +86,18 @@ public class ReviewJobReassignment extends Task implements Serializable {
 				if (officeBuilding != null) {
 					// Walk to the office building.
 					office = officeBuilding.getAdministration();
-					office.addstaff();
-					walkToActivitySpotInBuilding(officeBuilding, true);
+					if (!office.isFull()) {
+						office.addStaff();
+						// Walk to the office building.
+						walkToTaskSpecificActivitySpotInBuilding(officeBuilding, true);
+					}
 				}
 				else {
-					Building dining = EatMeal.getAvailableDiningBuilding(person, false);
+					Building dining = EatDrink.getAvailableDiningBuilding(person, false);
 					// Note: dining building is optional
 					if (dining != null) {
 						// Walk to the dining building.
-						walkToActivitySpotInBuilding(dining, true);
+						walkToTaskSpecificActivitySpotInBuilding(dining, true);
 					}
 //					else {
 //						// work anywhere
@@ -116,7 +121,7 @@ public class ReviewJobReassignment extends Task implements Serializable {
 	}
 
 	@Override
-	protected FunctionType getLivingFunction() {
+	public FunctionType getLivingFunction() {
 		return FunctionType.ADMINISTRATION;
 	}
 
@@ -139,7 +144,7 @@ public class ReviewJobReassignment extends Task implements Serializable {
 	 */
 	private double reviewingPhase(double time) {
 		// Iterates through each person
-		Iterator<Person> i = person.getSettlement().getAllAssociatedPeople().iterator();
+		Iterator<Person> i = person.getAssociatedSettlement().getAllAssociatedPeople().iterator();
 		while (i.hasNext()) {
 			Person tempPerson = i.next();
 			List<JobAssignment> list = tempPerson.getJobHistory().getJobAssignmentList();
@@ -173,23 +178,22 @@ public class ReviewJobReassignment extends Task implements Serializable {
 				String s = person.getAssociatedSettlement().getName();
 				
 				if (rating < 2.5 || cumulative_rating < 2.5) {
-					tempPerson.getMind().reassignJob(lastJobStr, true, JobManager.USER,
+					tempPerson.getMind().reassignJob(lastJobStr, true, JobUtil.USER,
 							JobAssignmentType.NOT_APPROVED, approvedBy);
 
 					LogConsolidated.log(logger, Level.INFO, 3000, sourceName,
 							"[" + s + "] " + approvedBy + " did NOT approve " + tempPerson
 							+ "'s job reassignment as " + pendingJobStr + "."
 							//+ "Try again when the performance rating is higher."
-							, null);
+							);
 				} else {
 
 					// Updates the job
-					tempPerson.getMind().reassignJob(pendingJobStr, true, JobManager.USER,
+					tempPerson.getMind().reassignJob(pendingJobStr, true, JobUtil.USER,
 							JobAssignmentType.APPROVED, approvedBy);
 					LogConsolidated.log(logger, Level.INFO, 3000, sourceName,
 							"[" + s + "] " + approvedBy + " just approved " + tempPerson
-							+ "'s job reassignment as " + pendingJobStr + "."
-							, null);
+							+ "'s job reassignment as " + pendingJobStr + ".");
 				}
 				
 				addExperience(time);
@@ -212,7 +216,7 @@ public class ReviewJobReassignment extends Task implements Serializable {
                     NaturalAttributeType.LEADERSHIP);
             newPoints += newPoints * (experienceAptitude + leadershipAptitude- 100D) / 100D;
             newPoints *= getTeachingExperienceModifier();
-            person.getMind().getSkillManager().addExperience(SkillType.MANAGEMENT, newPoints);
+            person.getSkillManager().addExperience(SkillType.MANAGEMENT, newPoints, time);
 //        }
 //        else if (robot != null) {	
 //        }

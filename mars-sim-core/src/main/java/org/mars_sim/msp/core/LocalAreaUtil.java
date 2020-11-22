@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * LocalAreaUtil.java
- * @version 3.1.0 2017-11-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -23,6 +23,7 @@ import java.util.logging.Logger;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.construction.ConstructionSite;
+import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
@@ -49,11 +50,16 @@ public class LocalAreaUtil {
 	/** Time stamps for obstacle area cache. */
 	private static final Map<Coordinates, String> obstacleAreaTimestamps = new HashMap<Coordinates, String>();
 
+	private static Simulation sim = Simulation.instance();
+	private static UnitManager unitManager = sim.getUnitManager();
+	private static MarsClock marsClock = sim.getMasterClock().getMarsClock();
+	
 	/**
 	 * Private empty constructor for utility class.
 	 */
 	private LocalAreaUtil() {
-		// Do nothing
+		unitManager = sim.getUnitManager();
+		marsClock = sim.getMasterClock().getMarsClock();
 	}
 
 	/**
@@ -203,14 +209,14 @@ public class LocalAreaUtil {
 	 * @param coordinates the global coordinate location to check.
 	 * @return true if location doesn't collide with anything.
 	 */
-	public static boolean checkLocationCollision(double xLoc, double yLoc, Coordinates coordinates) {
+	public static boolean isLocationCollisionFree(double xLoc, double yLoc, Coordinates coordinates) {
 
 		boolean result = true;
 
 		Iterator<LocalBoundedObject> i = getAllLocalBoundedObjectsAtLocation(coordinates).iterator();
-		while (i.hasNext() && result) {
-			LocalBoundedObject object = i.next();
-			if (checkLocationWithinLocalBoundedObject(xLoc, yLoc, object)) {
+		while (i.hasNext()) {// && result) {
+//			LocalBoundedObject object = i.next();
+			if (isLocationWithinLocalBoundedObject(xLoc, yLoc, i.next())) {
 				// result = false;
 				// logger.info("checkLocationCollision(): a point location is colliding with an
 				// existing vehicle, building, or construction site");
@@ -238,7 +244,7 @@ public class LocalAreaUtil {
 		Iterator<LocalBoundedObject> i = getAllImmovableBoundedObjectsAtLocation(coordinates).iterator();
 		while (i.hasNext() && result) {
 			LocalBoundedObject object = i.next();
-			if (checkLocationWithinLocalBoundedObject(xLoc, yLoc, object)) {
+			if (isLocationWithinLocalBoundedObject(xLoc, yLoc, object)) {
 				// result = false;
 				// logger.info("checkImmovableCollision(): Colliding with an immovable object (a
 				// building or construction site");
@@ -271,7 +277,7 @@ public class LocalAreaUtil {
 				result = true;
 				if (needToMove) {
 					Vehicle v = (Vehicle) vehicle;
-					v.determinedSettlementParkedLocationAndFacing();
+					v.findNewParkingLoc();
 					logger.info("checkVehicleBoundedOjectIntersected(): Colliding with vehicle " + v
 							+ ". Moving it to another location");
 					// Call again recursively to clear any vehicles
@@ -299,11 +305,11 @@ public class LocalAreaUtil {
 		Iterator<LocalBoundedObject> i = getAllVehicleBoundedObjectsAtLocation(coordinates).iterator();
 		while (i.hasNext()) {
 			LocalBoundedObject object = i.next();
-			if (checkLocationWithinLocalBoundedObject(xLoc, yLoc, object)) {
+			if (isLocationWithinLocalBoundedObject(xLoc, yLoc, object)) {
 				result = false;
 				if (needToMove) {
 					Vehicle v = (Vehicle) object;
-					v.determinedSettlementParkedLocationAndFacing();
+					v.findNewParkingLoc();
 					logger.warning(
 							"checkVehicleCollision(): Colliding with vehicle " + v + ". Moving it to another location");
 					// Call again recursively to clear any vehicles
@@ -347,7 +353,7 @@ public class LocalAreaUtil {
 		Set<LocalBoundedObject> result = new HashSet<LocalBoundedObject>();
 
 		// Add all vehicles at location.
-		Iterator<Vehicle> i = Simulation.instance().getUnitManager().getVehicles().iterator();
+		Iterator<Vehicle> i = unitManager.getVehicles().iterator();
 		while (i.hasNext()) {
 			Vehicle vehicle = i.next();
 			if (vehicle.getCoordinates().equals(coordinates)) {
@@ -394,7 +400,7 @@ public class LocalAreaUtil {
 		Set<LocalBoundedObject> result = new HashSet<LocalBoundedObject>();
 
 		// Check for any settlements at coordinates.
-		Iterator<Settlement> l = Simulation.instance().getUnitManager().getSettlements().iterator();
+		Iterator<Settlement> l = unitManager.getSettlements().iterator();
 		while (l.hasNext()) {
 			Settlement settlement = l.next();
 			if (settlement.getCoordinates().equals(coordinates)) {
@@ -430,7 +436,7 @@ public class LocalAreaUtil {
 		Set<LocalBoundedObject> result = new HashSet<LocalBoundedObject>();
 
 		// Add all vehicles at location.
-		Iterator<Vehicle> i = Simulation.instance().getUnitManager().getVehicles().iterator();
+		Iterator<Vehicle> i = unitManager.getVehicles().iterator();
 		while (i.hasNext()) {
 			Vehicle vehicle = i.next();
 			if (vehicle.getCoordinates().equals(coordinates)) {
@@ -439,7 +445,7 @@ public class LocalAreaUtil {
 		}
 
 		// Check for any settlements at coordinates.
-		Iterator<Settlement> l = Simulation.instance().getUnitManager().getSettlements().iterator();
+		Iterator<Settlement> l = unitManager.getSettlements().iterator();
 		while (l.hasNext()) {
 			Settlement settlement = l.next();
 			if (settlement.getCoordinates().equals(coordinates)) {
@@ -469,7 +475,7 @@ public class LocalAreaUtil {
 	 * @param object the local bounded object.
 	 * @return true if location is within object bounds.
 	 */
-	public static boolean checkLocationWithinLocalBoundedObject(double xLoc, double yLoc, LocalBoundedObject object) {
+	public static boolean isLocationWithinLocalBoundedObject(double xLoc, double yLoc, LocalBoundedObject object) {
 		boolean result = false;
 		// Below gets java.lang.NullPointerException after resuming from power saving in
 		// windows os
@@ -477,14 +483,7 @@ public class LocalAreaUtil {
 		Rectangle2D rect = new Rectangle2D.Double(object.getXLocation() - (object.getWidth() / 2D),
 				object.getYLocation() - (object.getLength() / 2D), object.getWidth(), object.getLength());
 		Path2D path = getPathFromRectangleRotation(rect, object.getFacing());
-		Area area = new Area(path); // Exception in thread "pool-4-thread-1" java.lang.StackOverflowError
-
-		// Notes:
-		// (Severe) [x341] Walk : Tracy Kilmar cannot exit airlock at Desert Rose. From
-		// Walk's canExitAllAirlocks()
-		// (Severe) [x1060] EVAOperation : Tracy Kilmar cannot walk to outside site.
-		// From EVAOperation's walkToOutsideSitePhase()
-
+		Area area = new Area(path);
 		if (area.contains(xLoc, yLoc)) {
 			result = true;
 		}
@@ -563,7 +562,7 @@ public class LocalAreaUtil {
 	 * @param useCache    true if caching should be used.
 	 * @return true if line path doesn't collide with anything.
 	 */
-	public static boolean checkLinePathCollision(Line2D line, Coordinates coordinates, boolean useCache) {
+	public static boolean isLinePathCollisionFree(Line2D line, Coordinates coordinates, boolean useCache) {
 
 		boolean result = true;
 
@@ -611,7 +610,6 @@ public class LocalAreaUtil {
 		return new Point2D.Double(x, y);
 	}
 
-	// 2015-12-08 Added getTwoBoundedOjectsArea()
 	public static Area getBoundedObjectArea(LocalBoundedObject object) {
 
 		Rectangle2D rect = new Rectangle2D.Double(object.getXLocation() - (object.getWidth() / 2D),
@@ -761,7 +759,9 @@ public class LocalAreaUtil {
 		boolean cached = false;
 		Area obstacleArea = null;
 		if (useCache && obstacleAreaCache.containsKey(coordinates)) {
-			String currentTimestamp = Simulation.instance().getMasterClock().getMarsClock().getDateTimeStamp();
+			if (marsClock == null)
+				marsClock = Simulation.instance().getMasterClock().getMarsClock();
+			String currentTimestamp = marsClock.getDateTimeStamp();
 			String cachedTimestamp = obstacleAreaTimestamps.get(coordinates);
 			if (currentTimestamp.equals(cachedTimestamp)) {
 				cached = true;
@@ -774,7 +774,7 @@ public class LocalAreaUtil {
 			Iterator<LocalBoundedObject> i = getAllLocalBoundedObjectsAtLocation(coordinates).iterator();
 			while (i.hasNext()) {
 				LocalBoundedObject lbo = i.next();
-				if (lbo != object) {
+				if (object == null || lbo != object) {
 					Rectangle2D objectRect = new Rectangle2D.Double(lbo.getXLocation() - (lbo.getWidth() / 2D),
 							lbo.getYLocation() - (lbo.getLength() / 2D), lbo.getWidth(), lbo.getLength());
 					Path2D objectPath = getPathFromRectangleRotation(objectRect, lbo.getFacing());
@@ -798,14 +798,17 @@ public class LocalAreaUtil {
 				// (slower).
 				Area pathArea = new Area(path);
 				result = !doAreasCollide(pathArea, obstacleArea);
+//				logger.info("collision is " + result + " at " + pathArea.getBounds2D());
 			}
 		}
 
 		// Store cached obstacle area for location with current timestamp if needed.
 		if (useCache && !cached && (obstacleArea != null)) {
 			obstacleAreaCache.put(coordinates, obstacleArea);
-			String currentTimestamp = Simulation.instance().getMasterClock().getMarsClock().getDateTimeStamp();
-			obstacleAreaTimestamps.put(coordinates, currentTimestamp);
+//			String currentTimestamp = marsClock.getDateTimeStamp();
+			if (marsClock == null)
+				marsClock = Simulation.instance().getMasterClock().getMarsClock();
+			obstacleAreaTimestamps.put(coordinates, marsClock.getDateTimeStamp());
 		}
 
 		return result;
@@ -860,10 +863,20 @@ public class LocalAreaUtil {
 	 * @return distance (meters).
 	 */
 	public static double getDistance(Point2D point1, Point2D point2) {
-
 		return Point2D.Double.distance(point1.getX(), point1.getY(), point2.getX(), point2.getY());
 	}
 
+	/**
+	 * Gets the distance between two points.
+	 * 
+	 * @param point1 the first point.
+	 * @param point2 the second point.
+	 * @return distance (meters).
+	 */
+	public static double getDistance(double x1, double y1, double x2, double y2) {
+		return Point2D.Double.distance(x1, y1, x2, y2);
+	}
+	
 	/**
 	 * Checks if two locations are very close together.
 	 * 
@@ -872,8 +885,16 @@ public class LocalAreaUtil {
 	 * @return true if very close together
 	 */
 	public static boolean areLocationsClose(Point2D point1, Point2D point2) {
-
-		double distance = getDistance(point1, point2);
-		return (distance < VERY_SMALL_DISTANCE);
+		return (getDistance(point1, point2) < VERY_SMALL_DISTANCE);
+	}
+	/**
+	 * Checks if two locations are very close together.
+	 * 
+	 * @param point1 the first point.
+	 * @param point2 the second point.
+	 * @return true if very close together
+	 */
+	public static boolean areLocationsClose(double x1, double y1, double x2, double y2) {
+		return (getDistance(x1, y1, x2, y2) < VERY_SMALL_DISTANCE);
 	}
 }

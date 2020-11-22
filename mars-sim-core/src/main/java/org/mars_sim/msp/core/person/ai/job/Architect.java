@@ -1,25 +1,23 @@
 /**
  * Mars Simulation Project
  * Architect.java
- * @version 3.07 2014-12-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.job;
 
 import java.io.Serializable;
 
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
 import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
-import org.mars_sim.msp.core.person.ai.mission.EmergencySupplyMission;
-import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
-import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
 import org.mars_sim.msp.core.person.ai.task.ConsolidateContainers;
 import org.mars_sim.msp.core.person.ai.task.ConstructBuilding;
 import org.mars_sim.msp.core.person.ai.task.ManufactureConstructionMaterials;
+import org.mars_sim.msp.core.person.ai.task.ManufactureGood;
 import org.mars_sim.msp.core.person.ai.task.SalvageBuilding;
 import org.mars_sim.msp.core.structure.Settlement;
 
@@ -35,7 +33,11 @@ implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	//private static Logger logger = Logger.getLogger(Architect.class.getName());
-
+	
+	public final static int JOB_ID = 0;
+	
+	private double[] roleProspects = new double[] {5.0, 30.0, 10.0, 15.0, 10.0, 15.0, 15.0};
+	
 	/** Constructor. */
 	public Architect() {
 		// Use Job constructor.
@@ -45,6 +47,7 @@ implements Serializable {
 		jobTasks.add(ConsolidateContainers.class);
 		jobTasks.add(ConstructBuilding.class);
 		jobTasks.add(ManufactureConstructionMaterials.class);
+		jobTasks.add(ManufactureGood.class);
 		jobTasks.add(SalvageBuilding.class);
 
 		// Add side tasks
@@ -53,14 +56,9 @@ implements Serializable {
 		// Add architect-related missions.
 		jobMissionStarts.add(BuildingConstructionMission.class);
 		jobMissionJoins.add(BuildingConstructionMission.class);
+		
 		jobMissionStarts.add(BuildingSalvageMission.class);
 		jobMissionJoins.add(BuildingSalvageMission.class);
-		jobMissionStarts.add(TravelToSettlement.class);
-		jobMissionJoins.add(TravelToSettlement.class);
-		jobMissionStarts.add(RescueSalvageVehicle.class);
-		jobMissionJoins.add(RescueSalvageVehicle.class);
-		jobMissionStarts.add(EmergencySupplyMission.class);
-		jobMissionJoins.add(EmergencySupplyMission.class);
 
 	}
 
@@ -69,7 +67,7 @@ implements Serializable {
 
 		double result = 0D;
 
-		int constructionSkill = person.getMind().getSkillManager().getSkillLevel(SkillType.CONSTRUCTION);
+		int constructionSkill = person.getSkillManager().getSkillLevel(SkillType.CONSTRUCTION);
 		result = constructionSkill;
 
 		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
@@ -81,15 +79,36 @@ implements Serializable {
 
 		if (person.getPhysicalCondition().hasSeriousMedicalProblems()) result = 0;
 
+//		System.out.println(person + " arch : " + Math.round(result*100.0)/100.0);
+
 		return result;
 	}
 
 	@Override
 	public double getSettlementNeed(Settlement settlement) {
-		double result = 0D;
+		double result = .1;
+		
+		int population = settlement.getNumCitizens();
+		
 		// Add number of buildings currently at settlement.
-		result += settlement.getBuildingManager().getNumBuilding() / 10D;
+		result += settlement.getBuildingManager().getNumBuildings() / 24D;
+		
+		result = (result + population / 24D) / 2.0;
+
+//		System.out.println(settlement + " Architect need: " + result);
+		
 		return result;
 	}
 
+	public double[] getRoleProspects() {
+		return roleProspects;
+	}
+	
+	public void setRoleProspects(int index, int weight) {
+		roleProspects[index] = weight;
+	}
+	
+	public int getJobID() {
+		return JOB_ID;
+	}
 }

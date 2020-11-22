@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Research.java
- * @version 3.1.0 2017-09-18
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -12,7 +12,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.person.Person;
@@ -33,7 +36,12 @@ implements Lab, Serializable {
 
     /** default serial id. */
     private static final long serialVersionUID = 1L;
+    
+	private static transient Logger logger = Logger.getLogger(Research.class.getName());
 
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			logger.getName().length());
+	
     private static final FunctionType FUNCTION = FunctionType.RESEARCH;
 
 	private static final int NUM_INSPECTIONS = 2;
@@ -49,9 +57,9 @@ implements Lab, Serializable {
     private Map<String, Integer> tissueCultureMap;
     //private List<String> tissueCultureList;
     
-    private static BuildingConfig config;
-    private static MarsClock marsClock;
+    private Building building;
     
+
     /**
      * Constructor.
      * @param building the building this function is for.
@@ -60,19 +68,15 @@ implements Lab, Serializable {
         // Use Function constructor
         super(FUNCTION, building);
 
-        config = SimulationConfig.instance().getBuildingConfiguration();
-
-        marsClock = Simulation.instance().getMasterClock().getMarsClock();
-        
         setupTissueCultures();
         
         String type = building.getBuildingType();
-        techLevel = config.getResearchTechLevel(type);
-        researcherCapacity = config.getResearchCapacity(type);
-        researchSpecialties = config.getResearchSpecialties(type);
+        techLevel = buildingConfig.getResearchTechLevel(type);
+        researcherCapacity = buildingConfig.getResearchCapacity(type);
+        researchSpecialties = buildingConfig.getResearchSpecialties(type);
 
         // Load activity spots
-        loadActivitySpots(config.getResearchActivitySpots(type));
+        loadActivitySpots(buildingConfig.getResearchActivitySpots(type));
     }
 
     /**
@@ -87,16 +91,13 @@ implements Lab, Serializable {
 
         double result = 0D;
 
-        if (config == null)
-        	config = SimulationConfig.instance().getBuildingConfiguration();
-        
-        List<ScienceType> specialties = config.getResearchSpecialties(buildingName);
+        List<ScienceType> specialties = buildingConfig.getResearchSpecialties(buildingName);
 
         for (ScienceType specialty : specialties) {
             double researchDemand = 0D;
             Iterator<Person> j = settlement.getAllAssociatedPeople().iterator();
             while (j.hasNext())
-                researchDemand += j.next().getMind().getSkillManager().getSkillLevel(specialty.getSkill());
+                researchDemand += j.next().getSkillManager().getSkillLevel(specialty.getSkill());
 
             double researchSupply = 0D;
             boolean removedBuilding = false;
@@ -122,8 +123,8 @@ implements Lab, Serializable {
 
             double existingResearchValue = researchDemand / (researchSupply + 1D);
 
-            int techLevel = config.getResearchTechLevel(buildingName);
-            int labSize = config.getResearchCapacity(buildingName);
+            int techLevel = buildingConfig.getResearchTechLevel(buildingName);
+            int labSize = buildingConfig.getResearchCapacity(buildingName);
             double buildingResearchSupply = techLevel * labSize;
 
             result += buildingResearchSupply * existingResearchValue;
@@ -211,10 +212,14 @@ implements Lab, Serializable {
         researcherNum --;
         if (researcherNum < 0) {
             researcherNum = 0;
-            throw new IllegalStateException("Lab is already empty of researchers.");
+            Settlement s = building.getSettlement();
+			LogConsolidated.flog(Level.SEVERE, 5000, sourceName,
+					"[" + s + "] "
+					+ building + "'s lab has no researchers.");
+//            throw new IllegalStateException("Lab is already empty of researchers.");
         }
     }
-
+	
     /**
      * Time passing for the building.
      * @param time amount of time passing (in millisols)
@@ -253,13 +258,13 @@ implements Lab, Serializable {
 
     public void setupTissueCultures() {
        	tissueCultureMap = new HashMap<>();
-/*
-        Set<AmountResource> tissues = SimulationConfig.instance().getResourceConfiguration().getTissueCultures();
-        for (AmountResource ar : tissues) {
-        	String s = ar.getName();
-        	tissueCultureMap.put(s, 0);
-        }	
-*/        
+
+//        Set<AmountResource> tissues = SimulationConfig.instance().getResourceConfiguration().getTissueCultures();
+//        for (AmountResource ar : tissues) {
+//        	String s = ar.getName();
+//        	tissueCultureMap.put(s, 0);
+//        }	
+        
     }
     
 	public List<String> getUncheckedTissues() {
@@ -275,12 +280,19 @@ implements Lab, Serializable {
     	tissueCultureMap.put(s, tissueCultureMap.get(s) + 1);
     }
     
-    public boolean addTissueCulture(String tissueName) {
+    
+    /**
+     * Checks if the lab has tissue culture in stock
+     * 
+     * @param tissueName
+     * @return true if the lab has it
+     */
+    public boolean hasTissueCulture(String tissueName) {
     	if (!tissueCultureMap.containsKey(tissueName)) {
     		tissueCultureMap.put(tissueName, 0);
-    		return true;
+    		return false;
     	}
-    	return false;
+    	return true;
     }
     
     @Override

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ItemResourceUtil.java
- * @version 3.1.0 2017-09-05
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -14,13 +14,14 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
-import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
+import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
-import org.mars_sim.msp.core.structure.building.function.Manufacture;
+import org.mars_sim.msp.core.malfunction.MalfunctionFactory;
 
 public class ItemResourceUtil implements Serializable {
 
@@ -30,34 +31,37 @@ public class ItemResourceUtil implements Serializable {
 	// Light utility vehicle attachment parts for mining.
 	public static final String PNEUMATIC_DRILL = "pneumatic drill";
 	public static final String BACKHOE = "backhoe";
-	public static final String SMALL_HAMMER = "small hammer";
-//	public static final String HAMMER = "hammer";
 	public static final String SOCKET_WRENCH = "socket wrench";
 	public static final String PIPE_WRENCH = "pipe wrench";
+	
+	// Other strings
 	public static final String EXTINGUSHER = "fire extinguisher";
 	public static final String WORK_GLOVES = "work gloves";
 	public static final String CONTAINMENT = "mushroom containment kit";
+	public static final String SMALL_HAMMER = "small hammer";
+	public static final String LASER_SINTERING_3D_PRINTER = "laser sintering 3d printer";
+	
 
-	private static PartConfig partConfig = SimulationConfig.instance().getPartConfiguration();
-
-	public static Part pneumaticDrillAR = (Part) findItemResource(PNEUMATIC_DRILL);
-	public static Part backhoeAR = (Part) findItemResource(BACKHOE);
-	public static Part smallHammerAR = (Part) findItemResource(SMALL_HAMMER);
-	public static Part socketWrenchAR = (Part) findItemResource(SOCKET_WRENCH);
-	public static Part pipeWrenchAR = (Part) findItemResource(PIPE_WRENCH);
-	public static Part fireExtinguisherAR = (Part) findItemResource(EXTINGUSHER);
-	public static Part workGlovesAR = (Part) findItemResource(WORK_GLOVES);
-	public static Part mushroomBoxAR = (Part) findItemResource(CONTAINMENT);
+	public static final Part pneumaticDrillAR = (Part) findItemResource(PNEUMATIC_DRILL);
+	public static final Part backhoeAR = (Part) findItemResource(BACKHOE);
+	public static final Part socketWrenchAR = (Part) findItemResource(SOCKET_WRENCH);
+	public static final Part pipeWrenchAR = (Part) findItemResource(PIPE_WRENCH);
+	
+	public static final Part fireExtinguisherAR = (Part) findItemResource(EXTINGUSHER);
+	public static final Part workGlovesAR = (Part) findItemResource(WORK_GLOVES);
+	public static final Part mushroomBoxAR = (Part) findItemResource(CONTAINMENT);
+	public static final Part smallHammerAR = (Part) findItemResource(SMALL_HAMMER);
 
 	public static int pneumaticDrillID;
 	public static int backhoeID;
-	public static int smallHammerID;
-//	public static int hammerID;
 	public static int socketWrenchID;
 	public static int pipeWrenchID;
+	
 	public static int fireExtinguisherID;
 	public static int workGlovesID;
 	public static int mushroomBoxID;
+	public static int smallHammerID;
+
 	public static int printerID;
 
 	private static Map<String, Part> itemResourceMap;
@@ -68,26 +72,61 @@ public class ItemResourceUtil implements Serializable {
 
 	private static List<Part> sortedParts;
 
+	private static MalfunctionFactory factory;
+
+	private static PartConfig partConfig = SimulationConfig.instance().getPartConfiguration();
+
+	
+	/**
+	 * Constructor
+	 */
 	public ItemResourceUtil() {
+		factory = Simulation.instance().getMalfunctionFactory();		
+		
 		partSet = getItemResources();
+		
 		createMaps();
 
 		createIDs();
 	}
 
+	/**
+	 * Creates an item resource
+	 * 
+	 * @param resourceName
+	 * @param id
+	 * @param description
+	 * @param massPerItem
+	 * @param solsUsed
+	 * @return
+	 */
+	public static Part createItemResource(String resourceName, int id, String description, double massPerItem,
+			int solsUsed) {
+		Part p = new Part(resourceName, id, description, massPerItem, solsUsed);
+		ItemResourceUtil.registerBrandNewPart(p);
+		return p;
+	}
+	
+	/**
+	 * Prepares the id's of a few item resources
+	 */
 	public void createIDs() {
 		pneumaticDrillID = findIDbyItemResourceName(PNEUMATIC_DRILL);
 		backhoeID = findIDbyItemResourceName(BACKHOE);
-		smallHammerID = findIDbyItemResourceName(SMALL_HAMMER);
-		// hammerID = findIDbyItemResourceName("hammer");
 		socketWrenchID = findIDbyItemResourceName(SOCKET_WRENCH);
 		pipeWrenchID = findIDbyItemResourceName(PIPE_WRENCH);
+		
 		fireExtinguisherID = findIDbyItemResourceName(EXTINGUSHER);
 		workGlovesID = findIDbyItemResourceName(WORK_GLOVES);
 		mushroomBoxID = findIDbyItemResourceName(CONTAINMENT);
-		printerID = findIDbyItemResourceName(Manufacture.LASER_SINTERING_3D_PRINTER);
+		smallHammerID = findIDbyItemResourceName(SMALL_HAMMER);
+
+		printerID = findIDbyItemResourceName(LASER_SINTERING_3D_PRINTER);
 	}
 
+	/**
+	 * Prepares maps for storing all item resources
+	 */
 	public static void createMaps() {
 		itemResourceMap = new HashMap<>();
 		sortedParts = new ArrayList<>(partSet);
@@ -95,7 +134,6 @@ public class ItemResourceUtil implements Serializable {
 
 		for (Part p : sortedParts) {
 			itemResourceMap.put(p.getName(), p);
-			// System.out.println(resource.getName());
 		}
 
 		itemResourceIDMap = new HashMap<>();
@@ -110,10 +148,24 @@ public class ItemResourceUtil implements Serializable {
 	}
 
 	/**
-	 * Register the brand new part in all 3 item resource maps
+	 * Prepares maps for storing all item resources
+	 */
+	public static void createTestMaps() {		
+		partSet = getItemResources();
+		itemResourceMap = new HashMap<>();
+		sortedParts = new ArrayList<>(partSet);
+		Collections.sort(sortedParts);
+
+		partIDNameMap = new HashMap<Integer, String>();
+		for (Part p : sortedParts) {
+			partIDNameMap.put(p.getID(), p.getName());
+		}
+	}
+	
+	/**
+	 * Register a new part in all 3 item resource maps
 	 * 
 	 * @param p {@link Part}
-	 * 
 	 */
 	public static void registerBrandNewPart(Part p) {
 		itemResourceMap.put(p.getName(), p);
@@ -132,7 +184,6 @@ public class ItemResourceUtil implements Serializable {
 		// Use Java 8 stream
 		return getItemResources().stream().filter(item -> item.getName().equals(name.toLowerCase())).findFirst()
 				.orElse(null);// .get();
-
 		// return getItemResourcesMap().get(name.toLowerCase());
 	}
 
@@ -155,7 +206,14 @@ public class ItemResourceUtil implements Serializable {
 //		return Collections.unmodifiableSet(partConfig.getItemResources());
 //	}
 
+	/**
+	 * Creates a set of item resources
+	 * 
+	 * @return
+	 */
 	public static Set<Part> getItemResources() {
+		if (partConfig == null)
+			partConfig = SimulationConfig.instance().getPartConfiguration();
 		if (partSet == null)
 			partSet = Collections.unmodifiableSet(partConfig.getPartSet());
 		return partSet;
@@ -170,15 +228,25 @@ public class ItemResourceUtil implements Serializable {
 		return itemResourceIDMap.keySet();
 	}
 
+	/**
+	 * Gets a list of sorted parts
+	 * 
+	 * @return
+	 */
 	public static List<Part> getSortedParts() {
 		sortedParts = new ArrayList<>(partSet);
 		Collections.sort(sortedParts);
 		return sortedParts;
 	}
 
+	
+	/**
+	 * Gets a map of parts
+	 * 
+	 * @return
+	 */
 	public static Map<String, Part> getItemResourcesMap() {
-		// if (partConfig == null) System.err.println("partConfig == null");
-		return partConfig.getNamePartMap();
+		return factory.getNamePartMap();
 	}
 
 	/**
@@ -191,6 +259,18 @@ public class ItemResourceUtil implements Serializable {
 		return partIDNameMap;
 	}
 
+	/**
+	 * Finds an item resource name by id.
+	 * 
+	 * @param id the resource's id.
+	 * @return resource name
+	 * @throws ResourceException if resource could not be found.
+	 */
+	public static String findItemResourceName(int id) {
+		return partIDNameMap.get(id);
+	}
+	
+	
 	/**
 	 * Finds an amount resource by name.
 	 * 
@@ -236,7 +316,7 @@ public class ItemResourceUtil implements Serializable {
 	 * 
 	 * @return set of amount resources.
 	 */
-	public Set<Integer> getARIDs() {
+	public static Set<Integer> getIDs() {
 		return itemResourceIDMap.keySet();
 	}
 
@@ -283,5 +363,6 @@ public class ItemResourceUtil implements Serializable {
 		Collections.sort(resourceNames);
 		return resourceNames;
 	}
+
 
 }

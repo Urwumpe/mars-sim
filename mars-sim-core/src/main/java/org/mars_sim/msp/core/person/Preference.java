@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Preference.java
- * @version 3.1.0 2017-02-20
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -16,8 +16,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.task.meta.AssistScientificStudyResearcherMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.CompileScientificStudyResultsMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.ConnectWithEarthMeta;
@@ -26,7 +26,7 @@ import org.mars_sim.msp.core.person.ai.task.meta.ConstructBuildingMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.CookMealMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.DigLocalIceMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.DigLocalRegolithMeta;
-import org.mars_sim.msp.core.person.ai.task.meta.EatMealMeta;
+import org.mars_sim.msp.core.person.ai.task.meta.EatDrinkMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.HaveConversationMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.InviteStudyCollaboratorMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.ListenToMusicMeta;
@@ -36,8 +36,6 @@ import org.mars_sim.msp.core.person.ai.task.meta.MaintenanceEVAMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.MaintenanceMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.ManufactureConstructionMaterialsMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.ManufactureGoodMeta;
-import org.mars_sim.msp.core.person.ai.task.meta.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.meta.MetaTaskUtil;
 import org.mars_sim.msp.core.person.ai.task.meta.ObserveAstronomicalObjectsMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.PeerReviewStudyPaperMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.PerformLaboratoryExperimentMeta;
@@ -48,6 +46,7 @@ import org.mars_sim.msp.core.person.ai.task.meta.PrepareDessertMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.ProduceFoodMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.ProposeScientificStudyMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.ReadMeta;
+import org.mars_sim.msp.core.person.ai.task.meta.RecordActivityMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.RelaxMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.RepairEVAMalfunctionMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.RepairMalfunctionMeta;
@@ -66,47 +65,53 @@ import org.mars_sim.msp.core.person.ai.task.meta.UnloadVehicleGarageMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.WorkoutMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.WriteReportMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.YogaMeta;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTaskUtil;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
- * The Preference class handles the task preferences of a person
+ * The Preference class determines the task preferences of a person
  */
 public class Preference implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
-
+	/** Meta static string. */
 	private static final String META = "Meta";
-
+	/** The cache for mission sol. */
 	private int solCache = 0;
 
-	private NaturalAttributeManager naturalAttributeManager;
-
-	private Person person;
-
-	private static MarsClock marsClock;
-
-	private List<MetaTask> metaTaskList;
-	private List<String> scoreList;
-	// private List<MetaMission> metaMissionList;
-
-	private Map<MetaTask, Integer> scoreMap; // store preference scores
-	private Map<MetaTask, Integer> priorityMap; // store priority scores for scheduled tasks
-	private Map<MetaTask, Boolean> oneADayMap; // true if the activity can only be done once a day
-	private Map<MetaTask, Boolean> taskAccomplishedMap; // true if the activity has been accomplished
-
+	/** A list of MetaTasks. */
+//	private List<MetaTask> metaTaskList;
+	/** A string list of Tasks. */
+	private List<String> taskList;
+	/** A map of MetaTasks and preference scores. */
+	private Map<MetaTask, Integer> scoreMap;
+	/** A map of priority scores for scheduled task. */
+	private Map<MetaTask, Integer> priorityMap;
+	/** A map of MetaTasks that can only be done once a day. */
+	private Map<MetaTask, Boolean> onceADayMap;
+	/** A map of MetaTasks that has been accomplished once a day. */
+	private Map<MetaTask, Boolean> taskAccomplishedMap;
+	/**  A string map of tasks and preference scores. */
 	private Map<String, Integer> scoreStringMap;
-
+	/**  A string map of future MetaTasks. */
 	private Map<MarsClock, MetaTask> futureTaskMap;
 
+	/** The Person instance. */
+	private Person person;
+	/** The MarsClock instance. */
+	private static MarsClock marsClock;
+	
+	
 	public Preference(Person person) {
 
 		this.person = person;
 
-		metaTaskList = MetaTaskUtil.getAllMetaTasks();
-		scoreList = new ArrayList<>();
-		// metaMissionList = MetaMissionUtil.getMetaMissions();
+//		metaTaskList = MetaTaskUtil.getAllMetaTasks();
+		taskList = new ArrayList<>();
 
 		scoreMap = new ConcurrentHashMap<>();
 		scoreStringMap = new ConcurrentHashMap<>();
@@ -114,7 +119,7 @@ public class Preference implements Serializable {
 		futureTaskMap = new ConcurrentHashMap<>();
 		taskAccomplishedMap = new ConcurrentHashMap<>();
 		priorityMap = new ConcurrentHashMap<>();
-		oneADayMap = new ConcurrentHashMap<>();
+		onceADayMap = new ConcurrentHashMap<>();
 
 		// scheduleTask("WriteReportMeta", 600, 900);
 		// scheduleTask("ConnectWithEarthMeta", 700, 950);
@@ -126,11 +131,52 @@ public class Preference implements Serializable {
 	 */
 	public void initializePreference() {
 
-		if (naturalAttributeManager == null)
-			naturalAttributeManager = person.getNaturalAttributeManager();
+		NaturalAttributeManager naturalAttributeManager = person.getNaturalAttributeManager();
 
 		int result = 0;
+		double ast = 0;
+		double cook = 0;
+		double field = 0;
+		double game = 0;
+		double lab = 0;
+		double ops = 0;
+		double research = 0;
+		double sport = 0;
+		double plant = 0;
+		double tinker = 0;
 
+		FavoriteType hobby = person.getFavorite().getFavoriteActivity();
+		
+		if (hobby == FavoriteType.ASTRONOMY)
+			ast = 2;
+		
+		if (hobby == FavoriteType.COOKING)
+			cook = 1;
+		
+		if (hobby == FavoriteType.FIELD_WORK)
+			field = 1;
+			
+		if (hobby == FavoriteType.GAMING)
+			game = 1;
+		
+		if (hobby == FavoriteType.LAB_EXPERIMENTATION)
+			lab = 2;
+		
+		if (hobby == FavoriteType.OPERATION)
+			ops = 1;
+		
+		if (hobby == FavoriteType.RESEARCH)
+			research = 2;
+		
+		if (hobby == FavoriteType.SPORT)
+			sport = 1;
+		
+		if (hobby == FavoriteType.TENDING_PLANTS)
+			plant = 1;
+		
+		if (hobby == FavoriteType.TINKERING)
+			tinker = 1;
+			
 		// Computes the adjustment from a person's natural attributes
 		double aa = naturalAttributeManager.getAttribute(NaturalAttributeType.ACADEMIC_APTITUDE) / 50D * 1.5;
 		double t = naturalAttributeManager.getAttribute(NaturalAttributeType.TEACHING) / 50D * 1.5;
@@ -153,61 +199,142 @@ public class Preference implements Serializable {
 
 		// TODO: how to incorporate EXPERIENCE_APTITUDE ?
 
-		Iterator<MetaTask> i = metaTaskList.iterator();
+		Iterator<MetaTask> i = MetaTaskUtil.getMetaTasksSet().iterator();
 		while (i.hasNext()) {
 			MetaTask metaTask = i.next();
 
 			// Set them up in random
-			result = RandomUtil.getRandomInt(-2, 2);
-
+			double rand = RandomUtil.getRandomDouble(5.0) - RandomUtil.getRandomDouble(5.0);
+			
 			// Note: the preference score on a metaTask is modified by a person's natural
 			// attributes
 			// TODO: turn these hardcoded relationship between attributes and task
 			// preferences into a XML/JSON file
 
+			// PART 1 : Influenced by FavoriteType 
+			
+			if (metaTask instanceof ObserveAstronomicalObjectsMeta)
+				rand += ast * RandomUtil.getRandomDouble(3);
+			
+			if (metaTask instanceof EatDrinkMeta 
+					|| metaTask instanceof ProduceFoodMeta 
+					|| metaTask instanceof CookMealMeta
+					|| metaTask instanceof PrepareDessertMeta)
+				rand += cook * RandomUtil.getRandomDouble(3);
+			
+			if (metaTask instanceof StudyFieldSamplesMeta)
+				rand += field * RandomUtil.getRandomDouble(3);
+			
+			if (metaTask instanceof PlayHoloGameMeta)
+				rand += game * RandomUtil.getRandomDouble(3);			
+			
+			if (metaTask instanceof PerformLaboratoryExperimentMeta
+					|| metaTask instanceof PerformLaboratoryResearchMeta)
+				rand += lab * RandomUtil.getRandomDouble(3);
+			
+			if (metaTask instanceof ConsolidateContainersMeta || metaTask instanceof ConstructBuildingMeta
+					|| metaTask instanceof DigLocalIceMeta || metaTask instanceof DigLocalRegolithMeta
+					|| metaTask instanceof LoadVehicleEVAMeta || metaTask instanceof LoadVehicleGarageMeta 
+					|| metaTask instanceof UnloadVehicleEVAMeta || metaTask instanceof UnloadVehicleGarageMeta 
+					|| metaTask instanceof SalvageBuildingMeta || metaTask instanceof SalvageGoodMeta
+					|| metaTask instanceof RepairEVAMalfunctionMeta	|| metaTask instanceof RepairMalfunctionMeta
+					|| metaTask instanceof MaintenanceMeta || metaTask instanceof MaintenanceEVAMeta)
+				rand += ops * RandomUtil.getRandomDouble(3);
+			
+			if (metaTask instanceof AssistScientificStudyResearcherMeta
+					|| metaTask instanceof CompileScientificStudyResultsMeta
+					|| metaTask instanceof PeerReviewStudyPaperMeta
+					|| metaTask instanceof PerformLaboratoryResearchMeta
+					|| metaTask instanceof PerformMathematicalModelingMeta
+					|| metaTask instanceof ProposeScientificStudyMeta
+					|| metaTask instanceof RespondToStudyInvitationMeta)
+				rand += research * RandomUtil.getRandomDouble(3);
+			
+			if (metaTask instanceof PlayHoloGameMeta)
+				rand += game * RandomUtil.getRandomDouble(3);
+			
+			if (metaTask instanceof WorkoutMeta)
+				rand += sport * RandomUtil.getRandomDouble(3);
+
+			if (metaTask instanceof TendGreenhouseMeta)
+				rand += plant * RandomUtil.getRandomDouble(3);
+			
+			if (metaTask instanceof ConsolidateContainersMeta || metaTask instanceof ConstructBuildingMeta
+					|| metaTask instanceof SalvageBuildingMeta || metaTask instanceof SalvageGoodMeta
+					|| metaTask instanceof RepairEVAMalfunctionMeta	|| metaTask instanceof RepairMalfunctionMeta
+					|| metaTask instanceof MaintenanceMeta || metaTask instanceof MaintenanceEVAMeta
+					|| metaTask instanceof ManufactureConstructionMaterialsMeta || metaTask instanceof ManufactureGoodMeta)
+				rand += tinker * RandomUtil.getRandomDouble(3);
+			
+			
+			// PART 2 : influenced by natural attribute
+			
 			// Academically driven
 			if (metaTask instanceof AssistScientificStudyResearcherMeta
 					|| metaTask instanceof CompileScientificStudyResultsMeta || metaTask instanceof MaintenanceEVAMeta
-					|| metaTask instanceof MaintenanceMeta || metaTask instanceof ObserveAstronomicalObjectsMeta
+					|| metaTask instanceof MaintenanceMeta 
+					|| metaTask instanceof ObserveAstronomicalObjectsMeta
 					|| metaTask instanceof PeerReviewStudyPaperMeta
 					|| metaTask instanceof PerformLaboratoryExperimentMeta
 					|| metaTask instanceof PerformLaboratoryResearchMeta
 					|| metaTask instanceof PerformMathematicalModelingMeta
 					|| metaTask instanceof ProposeScientificStudyMeta
-					|| metaTask instanceof RespondToStudyInvitationMeta || metaTask instanceof RepairEVAMalfunctionMeta
-					|| metaTask instanceof RepairMalfunctionMeta || metaTask instanceof StudyFieldSamplesMeta)
-				result += (int) aa;
+					|| metaTask instanceof RespondToStudyInvitationMeta 
+					|| metaTask instanceof StudyFieldSamplesMeta)
+				rand += aa + .5;
 
 			// Teaching excellence
 			if (metaTask instanceof TeachMeta || metaTask instanceof ReadMeta
 					|| metaTask instanceof PeerReviewStudyPaperMeta || metaTask instanceof WriteReportMeta)
-				result += (int) t;
+				rand += .7 * t + .3 * aa;
 
 			// Endurance & strength related
 			if (metaTask instanceof ConsolidateContainersMeta || metaTask instanceof ConstructBuildingMeta
 					|| metaTask instanceof DigLocalIceMeta || metaTask instanceof DigLocalRegolithMeta
-					|| metaTask instanceof EatMealMeta || metaTask instanceof LoadVehicleEVAMeta
-					|| metaTask instanceof LoadVehicleGarageMeta || metaTask instanceof UnloadVehicleEVAMeta
-					|| metaTask instanceof UnloadVehicleGarageMeta || metaTask instanceof SalvageBuildingMeta
-					|| metaTask instanceof SalvageGoodMeta || metaTask instanceof RepairEVAMalfunctionMeta
-					|| metaTask instanceof RepairMalfunctionMeta || metaTask instanceof MaintenanceEVAMeta
-					|| metaTask instanceof MaintenanceMeta)
-				result += (int) es;
+					|| metaTask instanceof EatDrinkMeta 
+					|| metaTask instanceof LoadVehicleEVAMeta || metaTask instanceof LoadVehicleGarageMeta 
+					|| metaTask instanceof UnloadVehicleEVAMeta || metaTask instanceof UnloadVehicleGarageMeta 
+					|| metaTask instanceof SalvageBuildingMeta || metaTask instanceof SalvageGoodMeta
+					|| metaTask instanceof RepairEVAMalfunctionMeta	|| metaTask instanceof RepairMalfunctionMeta
+					|| metaTask instanceof MaintenanceMeta || metaTask instanceof MaintenanceEVAMeta)
+				rand += .7 * es + .3 * cou;
 
 			// leadership
 			if (metaTask instanceof ProposeScientificStudyMeta || metaTask instanceof InviteStudyCollaboratorMeta
 					|| metaTask instanceof ReviewJobReassignmentMeta || metaTask instanceof ReviewMissionPlanMeta
 					|| metaTask instanceof WriteReportMeta)
-				result += (int) l;
+				rand += l;
 
+			// stress & emotion & spiritually
 			if (metaTask instanceof TreatMedicalPatientMeta)
 				// need patience and stability to administer healing
-				result += (int) ((se + ss) / 2D);
+				rand += (se + ss) / 2D;
 
+			// stress & emotion
 			if (metaTask instanceof RequestMedicalTreatmentMeta || metaTask instanceof YogaMeta)
 				// if a person is stress-resilient and relatively emotional stable,
 				// he will more likely endure pain and less likely ask to be medicated.
-				result -= (int) se;
+				rand -= se;
+
+			// people oriented
+			if (metaTask instanceof ConnectWithEarthMeta || metaTask instanceof HaveConversationMeta)
+				rand += ca;
+
+			// Artistic quality
+			if (metaTask instanceof ConstructBuildingMeta 
+					|| metaTask instanceof ManufactureConstructionMaterialsMeta || metaTask instanceof ManufactureGoodMeta 
+					|| metaTask instanceof ObserveAstronomicalObjectsMeta
+					|| metaTask instanceof ProduceFoodMeta 
+					|| metaTask instanceof CookMealMeta
+					|| metaTask instanceof PrepareDessertMeta
+					|| metaTask instanceof RecordActivityMeta
+					|| metaTask instanceof SalvageGoodMeta
+					|| metaTask instanceof TendGreenhouseMeta)
+				rand += art;
+
+			if (metaTask instanceof WorkoutMeta || metaTask instanceof PlayHoloGameMeta
+					|| metaTask instanceof YogaMeta)
+				rand += ag;
 
 			if (metaTask instanceof RelaxMeta || metaTask instanceof PlayHoloGameMeta
 			// || metaTask instanceof SleepMeta
@@ -216,27 +343,14 @@ public class Preference implements Serializable {
 				// if a person has high spirituality score and has alternative ways to deal with
 				// stress,
 				// he will less likely require extra time to relax/sleep/workout/do yoga.
-				result -= (int) ss;
-
-			if (metaTask instanceof ConnectWithEarthMeta || metaTask instanceof HaveConversationMeta)
-				result += (int) ca;
-
-			// Artistic quality
-			if (metaTask instanceof ConstructBuildingMeta || metaTask instanceof CookMealMeta
-					|| metaTask instanceof ManufactureConstructionMaterialsMeta
-					|| metaTask instanceof ManufactureGoodMeta || metaTask instanceof ObserveAstronomicalObjectsMeta
-					|| metaTask instanceof ProduceFoodMeta || metaTask instanceof PrepareDessertMeta
-					|| metaTask instanceof ProduceFoodMeta || metaTask instanceof SalvageGoodMeta
-					|| metaTask instanceof TendGreenhouseMeta)
-				result += (int) art;
-
-			if (metaTask instanceof WorkoutMeta || metaTask instanceof PlayHoloGameMeta)
-				result += (int) ag;
-
-			if (result > 7)
-				result = 7;
-			else if (result < -7)
-				result = -7;
+				rand -= ss;
+			
+			result = (int) Math.round(rand);
+			
+			if (result > 8)
+				result = 8;
+			else if (result < -8)
+				result = -8;
 
 			String s = getStringName(metaTask);
 			if (!scoreStringMap.containsKey(s)) {
@@ -250,10 +364,10 @@ public class Preference implements Serializable {
 		}
 
 		for (MetaTask key : scoreMap.keySet()) {
-			scoreList.add(getStringName(key));
+			taskList.add(getStringName(key));
 		}
 
-		Collections.sort(scoreList);
+		Collections.sort(taskList);
 
 		// Add metaMissionList (NOT READY to publish metaMissionList as preferences)
 //        Iterator<MetaMission> ii = metaMissionList.iterator();
@@ -304,7 +418,7 @@ public class Preference implements Serializable {
 		}
 
 		if (futureTaskMap.containsValue(metaTask) && (taskAccomplishedMap.get(metaTask) != null)
-				&& !taskAccomplishedMap.get(metaTask) && oneADayMap.get(metaTask)) {
+				&& !taskAccomplishedMap.get(metaTask) && onceADayMap.get(metaTask)) {
 			// preference scores are not static. They are influenced by priority scores
 			result += obtainPrioritizedScore(metaTask);
 		}
@@ -373,9 +487,12 @@ public class Preference implements Serializable {
 //		     }
 //		  }
 
-		String ss = s.replaceAll("(?!^)([A-Z])", " $1").replace("Meta", "").replace("E V A ", "EVA ").replace("To ",
-				"to ");
-		return ss;
+		String ss = s.replaceAll("(?!^)([A-Z])", " $1")
+				.replace("Meta", "")
+				.replace("E V A ", "EVA ")
+				.replace("With ", "with ")
+				.replace("To ", "to ");
+		return ss.trim();
 	}
 
 	/***
@@ -386,8 +503,11 @@ public class Preference implements Serializable {
 	 */
 	public static String getStringName(Task task) {
 		String s = task.getClass().getSimpleName();
-		String ss = s.replaceAll("(?!^)([A-Z])", " $1").replace("E V A ", "EVA ").replace("To ", "to ");
-		return ss;
+		String ss = s.replaceAll("(?!^)([A-Z])", " $1")
+				.replace("E V A ", "EVA ")
+				.replace("With ", "with ")
+				.replace("To ", "to ");
+		return ss.trim();
 	}
 
 //	public void scheduleTask(String s, int t1, int t2, boolean onceOnly, int priority) {
@@ -416,29 +536,28 @@ public class Preference implements Serializable {
 	 * @param time amount of time passing (in millisols).
 	 */
 	public void timePassing(double time) {
-		if (marsClock == null)
-			marsClock = Simulation.instance().getMasterClock().getMarsClock();
-
-		int solElapsed = marsClock.getMissionSol();
-		if (solElapsed != solCache) {
-
+//		if (marsClock == null)
+//			marsClock = Simulation.instance().getMasterClock().getMarsClock();
+//
+//		int solElapsed = marsClock.getMissionSol();
+//		if (solElapsed != solCache) {
 //			Iterator<Entry<MarsClock, MetaTask>> i = futureTaskMap.entrySet().iterator();
 //			while (i.hasNext()) {
 //				MetaTask mt = i.next().getValue();
 //				// if this meta task is not a recurrent task, remove it.
-//				if (!frequencyMap.get(mt)) {
-//					futureTaskMap.remove(mt);
-//					frequencyMap.remove(mt);
-//					statusMap.remove(mt);
+//				if (!onceADayMap.get(mt)) {
+////					futureTaskMap.remove(mt);
 //					priorityMap.remove(mt);
+//					onceADayMap.remove(mt);
+//					taskAccomplishedMap.remove(mt);
 //				}
 //			}
-			// scheduleTask("WriteReportMeta", 500, 800, true, 750);
-			// scheduleTask("ConnectWithEarthMeta", 700, 900, true, 950);
-
-			solCache = solElapsed;
-		}
-
+//			
+//			// scheduleTask("WriteReportMeta", 500, 800, true, 750);
+////			 scheduleTask("ConnectWithEarthMeta", 700, 900, true, 950);
+//
+//			solCache = solElapsed;
+//		}
 	}
 
 	/**
@@ -470,10 +589,13 @@ public class Preference implements Serializable {
 		MetaTask mt = convertTask2MetaTask(task);
 
 		// if this accomplished meta task is once-a-day task, remove it.
-		if (value && oneADayMap.get(mt) != null && !oneADayMap.isEmpty())
-			if (oneADayMap.get(mt) != null && oneADayMap.get(mt)) {
-				futureTaskMap.remove(mt);
-				oneADayMap.remove(mt);
+		if (value && onceADayMap.get(mt) != null && !onceADayMap.isEmpty())
+			if (onceADayMap.get(mt) != null && onceADayMap.get(mt)) {
+				for (MarsClock c : futureTaskMap.keySet()) {
+					if (futureTaskMap.get(c).equals(mt))
+						futureTaskMap.remove(c);
+				}
+				onceADayMap.remove(mt);
 				taskAccomplishedMap.remove(mt);
 				priorityMap.remove(mt);
 			} else
@@ -502,23 +624,23 @@ public class Preference implements Serializable {
 		return scoreStringMap;
 	}
 
-	public List<String> getScoreStringList() {
-		return scoreList;
+	public List<String> getTaskStringList() {
+		return taskList;
 	}
 
 	/**
 	 * Prepare object for garbage collection.
 	 */
 	public void destroy() {
-		naturalAttributeManager = null;
+//		naturalAttributeManager = null;
 		person = null;
 		marsClock = null;
-		metaTaskList = null;
-		scoreList = null;
+//		metaTaskList = null;
+		taskList = null;
 		// metaMissionList = null;
 		scoreMap = null;
 		priorityMap = null;
-		oneADayMap = null;
+		onceADayMap = null;
 		taskAccomplishedMap = null;
 		scoreStringMap = null;
 		futureTaskMap = null;

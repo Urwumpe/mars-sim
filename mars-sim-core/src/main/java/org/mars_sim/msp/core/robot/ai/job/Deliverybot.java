@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Deliverybot.java
- * @version 3.07 2015-03-02
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.robot.ai.job;
@@ -57,7 +57,7 @@ implements Serializable {
 
 		double result = 0D;
 
-		int tradingSkill = robot.getBotMind().getSkillManager().getSkillLevel(SkillType.TRADING);
+		int tradingSkill = robot.getSkillManager().getSkillLevel(SkillType.TRADING);
 		result = tradingSkill;
 
 		RoboticAttributeManager attributes = robot.getRoboticAttributeManager();
@@ -82,7 +82,7 @@ implements Serializable {
 
         double result = 0D;
 
-        Iterator<Settlement> i = settlement.getUnitManager().getSettlements().iterator();
+        Iterator<Settlement> i = unitManager.getSettlements().iterator();
         while (i.hasNext()) {
             Settlement otherSettlement = i.next();
             if (otherSettlement != settlement) {

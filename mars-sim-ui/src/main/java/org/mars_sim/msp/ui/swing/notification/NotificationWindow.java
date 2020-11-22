@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * NotificationWindow.java
- * @version 3.07 2014-12-17
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.notification;
@@ -24,6 +24,7 @@ import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.events.HistoricalEvent;
 import org.mars_sim.msp.core.events.HistoricalEventCategory;
+import org.mars_sim.msp.core.mars.MarsSurface;
 import org.mars_sim.msp.core.person.EventType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -38,9 +39,6 @@ import org.mars_sim.msp.ui.swing.MainDesktopPane;
  * Events are based from HistoricalEvent.java
  */
 // TODO: Does subclassing JDialog have slower performance than not? 
-// 2014-11-29 Renamed NotificationManager to NotificationWindow 
-// 2014-11-29 Relocated its instantiation from EventTableModel to MonitorWindow
-// 2014-12-05 Added notification settings to msp
 public class NotificationWindow extends JDialog implements ClockListener {
 
 	private static final long serialVersionUID = 1L;
@@ -57,20 +55,14 @@ public class NotificationWindow extends JDialog implements ClockListener {
 	private boolean showMalfunctionCache = true;	
 	private boolean willNotify= false;
 	private boolean areAnySettingsChanged = false;
-	// 2014-12-17 Added isPaused	
+
 	private boolean isPaused = false;
 	
 	private int maxNumMsg = 99;
 	private int maxNumMsgCache = 99;
 	private int displayTime = 2;
 	private int displayTimeCache = 2;	
-	//private int messageCounter = 0;
-	//TODO: need to create an array of two element with name 
-	// as array[0] and header as array[1]
-	//private String header;
-	//private String message = "";		
-	//	private String matchedWord1 = "fixed";
-	//	private String matchedWord2 = "recovering";
+
 	protected String name;
 	private String oldMsgCache = "";
 	
@@ -138,7 +130,6 @@ public class NotificationWindow extends JDialog implements ClockListener {
 		
 	}
 	
-	// 2014-12-10 Added Timer
 	public class CancelTimer extends TimerTask {
 		@Override
 		public void run() {
@@ -166,8 +157,6 @@ public class NotificationWindow extends JDialog implements ClockListener {
 		}	
 	}
 
-	// 2014-11-15 Created sendAlert()
-	// 2014-12-10 Renamed to setupTelegraph() and moved some codes to setupTelegraph()
 	public void setupTelegraph(HistoricalEvent event, 
 			String message, String header) {
 
@@ -226,7 +215,6 @@ public class NotificationWindow extends JDialog implements ClockListener {
 	public void sendTelegraph(TelegraphConfig telegraphConfig, 
 			String msg, String header) {
 				
-		// 2014-12-17 Added isPaused and if then else clause
 		//boolean isPaused = Simulation.instance().getMasterClock().isPaused();
 		if (isPaused) {
 			System.out.println("NotificationWindow.java : sendTelegraph() : isPaused is true");
@@ -281,25 +269,22 @@ public class NotificationWindow extends JDialog implements ClockListener {
 		    }
 		}
 		
-		if (willNotify) setupTelegraph(event, message, header);
+//		if (willNotify) setupTelegraph(event, message, header);
 	}
 	
-	// 2014-11-16 Added modifyMsg()
-	//TODO: 
+
 	public String parseMsg(String msg) {
 		
 		// or use String replaced = string.replace("abcd", "dddd");
 		msg = msg.toUpperCase();
 		msg = msg.replaceAll("OCCURRED", "");
 
-		/*
-		message = message.replaceAll("COLD", "a COLD");
-		message = message.replaceAll("FLU", "a FLU");
-		message = message.replaceAll("NAVIGATION", "a NAVIGATION");
-		message = message.replaceAll("MAJOR", "a MAJOR");
-		message = message.replaceAll("MINOR", "a MINOR");
-		message = message.replaceAll("FUEL", "a FUEL");
-		 */
+//		message = message.replaceAll("COLD", "a COLD");
+//		message = message.replaceAll("FLU", "a FLU");
+//		message = message.replaceAll("NAVIGATION", "a NAVIGATION");
+//		message = message.replaceAll("MAJOR", "a MAJOR");
+//		message = message.replaceAll("MINOR", "a MINOR");
+//		message = message.replaceAll("FUEL", "a FUEL");
 
 		msg = "a " + msg;
 		
@@ -330,7 +315,13 @@ public class NotificationWindow extends JDialog implements ClockListener {
 		return msg;
 	}
 	
-	//prepare the notification box for displaying the message
+	/**
+	 * Prepare the notification box for displaying the message
+	 * 
+	 * @param event
+	 * @param msg
+	 * @return
+	 */
 	public String generateMsg(HistoricalEvent event, String msg)  {
 		//count++;
 
@@ -366,7 +357,7 @@ public class NotificationWindow extends JDialog implements ClockListener {
 			    // Loop through the hierarchy of container units for this source unit.
 			    Unit tempUnit = unit;
 			    Unit containerUnit = unit.getContainerUnit();
-			    while (containerUnit != null) {
+			    while (!(containerUnit instanceof MarsSurface)) {
 			        
 			        if (containerUnit instanceof Person) {
 			            locationBuff.append(" carried by " + containerUnit.getName());
@@ -399,7 +390,7 @@ public class NotificationWindow extends JDialog implements ClockListener {
 			    
 			    // If top container unit is a person, add that he/she is outside.
 			    Unit topContainerUnit = unit.getTopContainerUnit();
-			    if (((topContainerUnit == null) && (unit instanceof Person)) || (topContainerUnit instanceof Person)) {
+			    if (topContainerUnit instanceof MarsSurface && unit instanceof Person) {
 			        locationBuff.append(" outside");
 			    }
 			    
@@ -410,7 +401,7 @@ public class NotificationWindow extends JDialog implements ClockListener {
 			else if (source instanceof Building) {
 			    
 			    Building building = (Building) source;
-			    Settlement settlement = building.getBuildingManager().getSettlement();
+			    Settlement settlement = building.getSettlement();
 			    locationName = "in " + settlement.getName();
 			    
 			    message = building.getNickName() + " " + action + " " + formatMsg(message) + " " + locationName;
@@ -587,7 +578,6 @@ public class NotificationWindow extends JDialog implements ClockListener {
 		logger.info(message);
 		message = "<html><CENTER><FONT COLOR=RED>" + message + "</FONT COLOR=RED></CENTER></html>";
 
-		// 2014-11-16 Added modifyMsg()
 		return message;
 	}
 	

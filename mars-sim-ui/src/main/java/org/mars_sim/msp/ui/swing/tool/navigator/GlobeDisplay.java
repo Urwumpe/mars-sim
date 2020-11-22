@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * GlobeDisplay.java
- * @version 3.1.0 2017-02-03
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.navigator;
@@ -28,9 +28,10 @@ import org.mars_sim.msp.core.IntPoint;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.time.ClockListener;
-import org.mars_sim.msp.ui.javafx.MainScene;
+import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfo;
@@ -43,17 +44,16 @@ import com.alee.managers.style.StyleId;
  * The Globe Display class displays a graphical globe of Mars in the Navigator
  * tool.
  */
+@SuppressWarnings("serial")
 public class GlobeDisplay extends WebComponent implements ClockListener {
-
-	/** default serial id. */
-	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(GlobeDisplay.class.getName());
 
 //	private static double PERIOD_IN_MILLISOLS = 10D * 500D / MarsClock.SECONDS_PER_MILLISOL;
 
-	public final static int GLOBE_BOX_HEIGHT = MarsGlobe.map_height;
+//	public final static int HEIGHT_OFFSET = 40;
+	public final static int GLOBE_BOX_HEIGHT = NavigatorWindow.HORIZONTAL_SURFACE_MAP;//SurfaceMapPanel.MAP_H;
 	public final static int GLOBE_BOX_WIDTH = GLOBE_BOX_HEIGHT;
 	public final static int LIMIT = 60; // the max amount of pixels in each mouse drag that the globe will update itself
 
@@ -61,19 +61,8 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 	private static int dragx, dragy, dxCache = 0, dyCache = 0;
 
 	// Data members
-//	private double timeCache = 0;
-	/** Real surface sphere object. */
-	private MarsGlobe marsSphere;
-	/** Topographical sphere object. */
-	private MarsGlobe topoSphere;
-	/** Spherical coordinates for globe center. */
-	private Coordinates centerCoords;
-	/** Refresh thread. */
-	// private Thread showThread;
-	/**
-	 * <code>true</code> if in topographical mode, false if in real surface mode.
-	 */
-	private boolean topo;
+	/** The Map type. 0 = surface, 1 = topo, 2 = geology. */
+	private int mapType;
 	/** <code>true</code> if globe needs to be regenerated */
 	private boolean recreate;
 	/** width of the globe display component. */
@@ -89,8 +78,34 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 	/** <code>true</code> if globe should be updated. */
 	private boolean update;
 	/** <code>true</code> if refresh thread should continue. */
-	private boolean keepRunning;
+//	private boolean keepRunning;
+	
+	/** Real surface sphere object. */
+	private MarsMap marsSphere;
+	/** Topographical sphere object. */
+	private MarsMap topoSphere;
+	/** Geological sphere object. */
+	private MarsMap geoSphere;
+	/** Spherical coordinates for globe center. */
+	private Coordinates centerCoords;
+	/** A mouse adapter class. */
+	private Dragger dragger;
+	
+	private Graphics dbg;
+	private Image dbImage = null;
+	private Image starfield;
+	
+	/**
+	 * Stores the font for drawing lon/lat strings in
+	 * {@link #drawCrossHair(Graphics)}.
+	 */
+	private Font positionFont = new Font("Helvetica", Font.PLAIN, 10);
+	/** measures the pixels needed to display text. */
+	private FontMetrics positionMetrics = getFontMetrics(positionFont);
 
+	private double globeCircumference;
+	private double rho;
+	
 	/**
 	 * stores the internationalized string for reuse in
 	 * {@link #drawCrossHair(Graphics)}.
@@ -101,40 +116,22 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 	 * {@link #drawCrossHair(Graphics)}.
 	 */
 	private String latitude = Msg.getString("direction.latitude"); //$NON-NLS-1$
-	/**
-	 * stores the font for drawing lon/lat strings in
-	 * {@link #drawCrossHair(Graphics)}.
-	 */
-	private Font positionFont = new Font("Helvetica", Font.PLAIN, 10);
-	/** measures the pixels needed to display text. */
-	private FontMetrics positionMetrics = getFontMetrics(positionFont);
+
 	/**
 	 * stores the position for drawing lon/lat strings in
 	 * {@link #drawCrossHair(Graphics)}.
 	 */
-	int leftWidth = positionMetrics.stringWidth(latitude);
+	private int leftWidth = positionMetrics.stringWidth(latitude);
 	/**
 	 * stores the position for drawing lon/lat strings in
 	 * {@link #drawCrossHair(Graphics)}.
 	 */
-	int rightWidth = positionMetrics.stringWidth(longitude);
-
-	// private Mars mars;
-	private MainDesktopPane desktop;
-//	private NavigatorWindow navwin;
-	private SurfaceFeatures surfaceFeatures;
-	private MainScene mainScene;
-
-//	private static MasterClock masterClock = Simulation.instance().getMasterClock();
-
-	private Graphics dbg;
-	private Image dbImage = null;
-	private Image starfield;
-
-//	private boolean isOpenCache = false; // justLoaded = true,
-	// private int difxCache, difyCache;
-	private double globeCircumference;
-	private double rho;
+	private int rightWidth = positionMetrics.stringWidth(longitude);
+	
+	private static MainDesktopPane desktop;
+	private static SurfaceFeatures surfaceFeatures;
+	private static MasterClock masterClock;
+	private static UnitManager unitManager = Simulation.instance().getUnitManager();
 
 	/**
 	 * Constructor.
@@ -147,7 +144,7 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 
 //		this.navwin = navwin;
 		this.desktop = navwin.getDesktop();
-		this.mainScene = desktop.getMainScene();
+//		this.mainScene = desktop.getMainScene();
 
 		// Initialize data members
 		this.width = GLOBE_BOX_WIDTH;
@@ -159,7 +156,8 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 		// starfield = ImageLoader.getImage("starfield.gif"); //TODO: localize
 		starfield = ImageLoader.getImage(Msg.getString("img.mars.starfield300")); //$NON-NLS-1$
 
-		Simulation.instance().getMasterClock().addClockListener(this);
+		masterClock = Simulation.instance().getMasterClock();
+		masterClock.addClockListener(this);
 
 		if (surfaceFeatures == null)
 			surfaceFeatures = Simulation.instance().getMars().getSurfaceFeatures();
@@ -169,132 +167,155 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 		setMaximumSize(getPreferredSize());
 //		setMinimumSize(getPreferredSize());
 
-		// Construct sphere objects for both real and topographical modes
-		marsSphere = new MarsGlobe(MarsGlobeType.SURFACE_MID, this);
-		topoSphere = new MarsGlobe(MarsGlobeType.TOPO_MID, this);
+		// Construct sphere objects for both real surface and topographical modes
+		marsSphere = new MarsMap(MarsMapType.SURFACE_MID, this);
+		topoSphere = new MarsMap(MarsMapType.TOPO_MID, this);
+		geoSphere = new MarsMap(MarsMapType.GEO_MID, this);
 
 		// Initialize global variables
 		centerCoords = new Coordinates(HALF_PI, 0D);
 		update = true;
-		topo = false;
+		mapType = 0;
 		recreate = true;
-		keepRunning = true;
+//		keepRunning = true;
 		useUSGSMap = false;
 		shadingArray = new int[width * height * 2 * 2];
 		showDayNightShading = true;
 
-		addMouseMotionListener(new MouseAdapter() {
-
-			@Override
-			public void mouseDragged(MouseEvent e) {
-				// setCursor(new Cursor(Cursor.MOVE_CURSOR));
-				int dx, dy, x = e.getX(), y = e.getY();
-
-				dx = dragx - x;
-				dy = dragy - y;
-
-				if (dx != 0 || dy != 0) {// (dx < -2 || dx > 2) || (dy < -2 || dy > 2)) {
-					if (dx > -LIMIT && dx < LIMIT && dy > -LIMIT && dy < LIMIT) {
-						if ((dxCache - dx) > -LIMIT && (dxCache - dx) < LIMIT && (dyCache - dy) > -LIMIT
-								&& (dyCache - dy) < LIMIT) {
-							if (x > 50 && x < 245 && y > 50 && y < 245) {
-								// System.out.print("(dragx, dragy) is (" + dragx + ", " + dragy + ")");
-								// System.out.print("(x, y) is (" + x + ", " + y + ")");
-								// System.out.print("\t(delta_x, delta_y) is (" + (dxCache - dx) + ", " +
-								// (dyCache - dy) + ")");
-								// System.out.print("\t(dx, dy) is (" + dx + ", " + dy + ")");
-
-								// Globe circumference in pixels.
-								// double globeCircumference = height *2;
-								// double rho = globeCircumference / (2D * Math.PI);
-								centerCoords = centerCoords.convertRectToSpherical((double) dx, (double) dy, rho);
-
-								recreate = false;
-
-								// Regenerate globe if recreate is true, then display
-								drawSphere();
-
-								// System.out.println("\tDrawn");
-							}
-						}
-					}
-				}
-
-				dxCache = dx;
-				dyCache = dy;
-
-				dragx = x;
-				dragy = y;
-
-				// e.consume();
-				// super.mouseDragged(e);
-				// setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-			}
-		});
-
-		addMouseListener(new MouseAdapter() {
-
-			@Override
-			public void mousePressed(MouseEvent e) {
-				// System.out.println("mousepressed X = " + e.getX());
-				// System.out.println(" Y = " + e.getY());
-				dragx = e.getX();
-				dragy = e.getY();
-				navwin.setCursor(new Cursor(Cursor.MOVE_CURSOR));
-
-				// e.consume();
-			}
-
-			@Override
-			public void mouseReleased(MouseEvent e) {
-				dragx = 0;
-				dragy = 0;
-				navwin.updateCoords(centerCoords);
-				navwin.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-
-				// e.consume();
-			}
-		});
+		dragger = new Dragger(navwin);
+		addMouseMotionListener(dragger);
 
 		// Initially show real surface globe
 		showSurf();
-
-		// drawSphere();
-
-//		MouseEvent me = new MouseEvent(this, 0, 0, 0, 150, 150, 1, false);
-//		for (MouseListener ml: this.getMouseListeners())
-//		    ml.mousePressed(me);
-//		for (MouseMotionListener l: this.getMouseMotionListeners())
-//		    l.mouseDragged(me);
-
 	}
+	
+	public class Dragger extends MouseAdapter {
+		NavigatorWindow navwin;
+		
+		public Dragger (NavigatorWindow navwin) {
+			this.navwin = navwin;
+	    }
+		
+//		@Override
+//		public void mouseMoved(MouseEvent e) {
+//			navwin.setCursor(new Cursor(Cursor.CROSSHAIR_CURSOR));
+//		}
+//		
+		@Override
+		public void mousePressed(MouseEvent e) {
+			navwin.setCursor(new Cursor(Cursor.MOVE_CURSOR));
+			// System.out.println("mousepressed X = " + e.getX());
+			// System.out.println(" Y = " + e.getY());
+			dragx = e.getX();
+			dragy = e.getY();
 
+			e.consume();
+		}
+
+		@Override
+		public void mouseReleased(MouseEvent e) {
+			navwin.setCursor(new Cursor(Cursor.HAND_CURSOR));
+			dragx = 0;
+			dragy = 0;
+			navwin.updateCoords(centerCoords);
+			e.consume();
+		}
+		
+		@Override
+	    public void mouseEntered(MouseEvent e){
+			navwin.setCursor(new Cursor(Cursor.HAND_CURSOR));
+	    }
+	    @Override
+	    public void mouseExited(MouseEvent e){
+	    	navwin.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+	    }
+	    
+		@Override
+		public void mouseDragged(MouseEvent e) {
+			setCursor(new Cursor(Cursor.MOVE_CURSOR));
+			int dx, dy, x = e.getX(), y = e.getY();
+
+			dx = dragx - x;
+			dy = dragy - y;
+
+			if (dx != 0 || dy != 0) {// (dx < -2 || dx > 2) || (dy < -2 || dy > 2)) {
+				if (dx > -LIMIT && dx < LIMIT && dy > -LIMIT && dy < LIMIT) {
+					if ((dxCache - dx) > -LIMIT && (dxCache - dx) < LIMIT && (dyCache - dy) > -LIMIT
+							&& (dyCache - dy) < LIMIT) {
+						if (x > 50 && x < 245 && y > 50 && y < 245) {
+							// System.out.print("(dragx, dragy) is (" + dragx + ", " + dragy + ")");
+							// System.out.print("(x, y) is (" + x + ", " + y + ")");
+							// System.out.print("\t(delta_x, delta_y) is (" + (dxCache - dx) + ", " +
+							// (dyCache - dy) + ")");
+							// System.out.print("\t(dx, dy) is (" + dx + ", " + dy + ")");
+
+							// Globe circumference in pixels.
+							// double globeCircumference = height *2;
+							// double rho = globeCircumference / (2D * Math.PI);
+							centerCoords = centerCoords.convertRectToSpherical((double) dx, (double) dy, rho);
+							navwin.updateCoords(centerCoords);
+							
+							recreate = false;
+
+							// Regenerate globe if recreate is true, then display
+							drawSphere();
+
+							// System.out.println("\tDrawn");
+						}
+					}
+				}
+			}
+
+			dxCache = dx;
+			dyCache = dy;
+
+			dragx = x;
+			dragy = y;
+
+			e.consume();
+			// super.mouseDragged(e);
+			// setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+		}
+	}
 	/**
 	 * Displays real surface globe, regenerating if necessary
 	 */
 	public void showSurf() {
-		if (topo) {
+		if (mapType != 0) {
 			recreate = true;
 		}
-		topo = false;
+		mapType = 0;
 		showGlobe(centerCoords);
 	}
 
-	public boolean isTopo() {
-		return topo;
+	public int getMapType() {
+		return mapType;
 	}
 
 	/**
 	 * Displays topographical globe, regenerating if necessary
 	 */
 	public void showTopo() {
-		if (!topo) {
+		if (mapType != 1) {
 			recreate = true;
 		}
-		topo = true;
+		mapType = 1;
 		showGlobe(centerCoords);
 	}
 
+
+	/**
+	 * Displays geological globe, regenerating if necessary
+	 */
+	public void showGeo() {
+		if (mapType != 2) {
+			recreate = true;
+		}
+		mapType = 2;
+		showGlobe(centerCoords);
+	}
+	
+	
 	/**
 	 * Displays globe at given center regardless of mode, regenerating if necessary
 	 *
@@ -332,7 +353,7 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 		 * loop, refreshing the globe display when necessary
 		 */
 //	public void refreshLoop() {
-		if (keepRunning) {
+//		if (keepRunning) {
 			if (recreate) {
 				// System.out.println("recreate is true");
 				recreate = false;
@@ -356,7 +377,7 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 				// e.printStackTrace(); // if enable, will print sleep interrupted
 				// }
 			}
-		}
+//		}
 	}
 
 	// active rendering the buffer image to the screen
@@ -377,12 +398,14 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 
 	public void drawSphere() {
 
-		if (topo) {
-			topoSphere.drawSphere(centerCoords);
-		} else {
+		if (mapType == 0) {
 			marsSphere.drawSphere(centerCoords);
+		} else if (mapType == 1) {
+			topoSphere.drawSphere(centerCoords);
+		} else if (mapType == 2) {
+			geoSphere.drawSphere(centerCoords);
 		}
-
+		
 		paintDoubleBuffer();
 		repaint();
 
@@ -416,18 +439,24 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 		g2d.drawImage(starfield, 0, 0, Color.black, null);
 
 		// Draw real or topo globe
-		MarsGlobe globe = topo ? topoSphere : marsSphere;
-
+		MarsMap globe = null;
+		
+		if (mapType == 0) {
+			globe = marsSphere;
+		} else if (mapType == 1) {
+			globe = topoSphere;
+		} else if (mapType == 2) {
+			globe = geoSphere;
+		}
+		
 		Image image = globe.getGlobeImage();
 		if (image != null) {
 			if (globe.isImageDone()) {
 				g2d.drawImage(image, 0, 0, this);
 			} else {
-				System.out.println("globe.isImageDone() is false");
 				return;
 			}
-		} else
-			System.out.println("image is null");
+		}
 
 		if (showDayNightShading) {
 			drawShading(g2d);
@@ -502,8 +531,7 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 
 					double sunlight = 1D;
 					try {
-						sunlight = surfaceFeatures.getSurfaceSunlight(location);
-//					    sunlight =surfaceFeatures.getSolarIrradiance(location) / SurfaceFeatures.MEAN_SOLAR_IRRADIANCE;
+						sunlight = surfaceFeatures.getSurfaceSunlightRatio(location);
 					} catch (NullPointerException e) {
 						// Do nothing.
 						// This may be caused if simulation hasn't been fully initialized yet.
@@ -552,21 +580,25 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 //		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 //		g.setRenderingHint( RenderingHints.  KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 
-		Iterator<Unit> i = Simulation.instance().getUnitManager().getUnits().iterator();
+		Iterator<Unit> i = unitManager.getDisplayUnits().iterator();
 		while (i.hasNext()) {
 			Unit unit = i.next();
 			UnitDisplayInfo displayInfo = UnitDisplayInfoFactory.getUnitDisplayInfo(unit);
-			if (displayInfo.isGlobeDisplayed(unit)) {
+			if (displayInfo != null && displayInfo.isGlobeDisplayed(unit)) {
 				Coordinates unitCoords = unit.getCoordinates();
 				if (centerCoords.getAngle(unitCoords) < HALF_PI) {
-					if (topo) {
-						g.setColor(displayInfo.getTopoGlobeColor());
-					} else {
-						g.setColor(displayInfo.getSurfGlobeColor());
-					}
 
+					if (mapType == 0) {
+						g.setColor(displayInfo.getSurfGlobeColor());
+					} else if (mapType == 1) {
+						g.setColor(displayInfo.getTopoGlobeColor());
+					} else if (mapType == 2) {
+						g.setColor(displayInfo.getGeologyGlobeColor());
+					}
+					
+					
 					IntPoint tempLocation = getUnitDrawLocation(unitCoords);
-					g.fillRect(tempLocation.getiX(), tempLocation.getiY(), 1, 1);
+					g.fillRect(tempLocation.getiX(), tempLocation.getiY(), 3, 3);
 				}
 			}
 		}
@@ -586,11 +618,11 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 		g.setColor(Color.orange);
 
 		// If USGS map is used, use small crosshairs.
-		if (useUSGSMap & !topo) {
+		if (useUSGSMap & mapType == 0) {
 			g.drawRect(72, 72, 6, 6);
 			g.drawLine(0, 75, 71, 75);
 			g.drawLine(79, 75, 149, 75);
-			g.drawLine(75, 0, 75, 71);
+			g.drawLine(75, 20, 75, 71);
 			g.drawLine(75, 79, 75, 149);
 		}
 		// If not USGS map, use large crosshairs.
@@ -604,7 +636,7 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 			g.drawRect(118, 118, 66, 66);
 			g.drawLine(0, 150, 117, 150);
 			g.drawLine(184, 150, 299, 150);
-			g.drawLine(150, 0, 150, 117);
+			g.drawLine(150, 20, 150, 117);
 			g.drawLine(150, 185, 150, 300);
 
 //			g.drawRect(105, 105, 53, 53);
@@ -619,9 +651,9 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 
 		// Draw longitude and latitude strings using prepared measurements
 		// g.drawString(latitude, 5, 130);
-		g.drawString(latitude, 25, 270);
+		g.drawString(latitude, 25, 30);
 		// g.drawString(longitude, 145 - rightWidth, 130);
-		g.drawString(longitude, 275 - rightWidth, 270);
+		g.drawString(longitude, 275 - rightWidth, 30);
 
 		String latString = centerCoords.getFormattedLatitudeString();
 		String longString = centerCoords.getFormattedLongitudeString();
@@ -634,8 +666,8 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 
 		// g.drawString(latString, latPosition, 142);
 		// g.drawString(longString, longPosition, 142);
-		g.drawString(latString, latPosition, 284);
-		g.drawString(longString, longPosition, 284);
+		g.drawString(latString, latPosition, 50);
+		g.drawString(longString, longPosition, 50);
 
 	}
 
@@ -701,21 +733,12 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 
 	@Override
 	public void uiPulse(double time) {
-		if (mainScene != null) {
-			if (!mainScene.isMinimized() && mainScene.isMapTabOpen() && mainScene.isMinimapOn()) {// &&
-																									// !masterClock.isPaused())
-																									// {
-//				timeCache += time;
-//				if (timeCache > PERIOD_IN_MILLISOLS * time) {
-				// Repaint map panel
-				updateDisplay();
-//					timeCache = 0;
-//				}
-			}
-		} else if (desktop.isToolWindowOpen(NavigatorWindow.NAME)) {
+		if (desktop.isToolWindowOpen(NavigatorWindow.NAME)) {
 //			timeCache += time;
 //			if (timeCache > PERIOD_IN_MILLISOLS * time) {
-			updateDisplay();
+//				keepRunning = true;
+				updateDisplay();
+//				keepRunning = false;
 //				timeCache = 0;
 //			}
 		}
@@ -749,14 +772,20 @@ public class GlobeDisplay extends WebComponent implements ClockListener {
 	 * Prepare globe for deletion.
 	 */
 	public void destroy() {
-		Simulation.instance().getMasterClock().removeClockListener(this);
+		masterClock.removeClockListener(this);
+		removeMouseListener(dragger);
+		dragger = null;
+		masterClock = null;
+		unitManager = null;
+		surfaceFeatures = null;
+		desktop  = null;
+
 		// showThread = null;
-		update = false;
-		keepRunning = false;
+
 		marsSphere = null;
 		topoSphere = null;
 		centerCoords = null;
-		surfaceFeatures = null;
+
 		dbg = null;
 		dbImage = null;
 		starfield = null;

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ConstructedBuildingsPanel.java
- * @version 3.1.0 2017-10-18
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -38,7 +38,7 @@ extends JPanel {
 		super();
 
 		setLayout(new BorderLayout(0, 0));
-		setBorder(new MarsPanelBorder());
+//		setBorder(new MarsPanelBorder());
 
 		JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		add(titlePanel, BorderLayout.NORTH);
@@ -52,38 +52,20 @@ extends JPanel {
 		scrollPanel.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 		add(scrollPanel, BorderLayout.CENTER);
 
-		// Prepare outer table panel.
-		//JPanel outerTablePanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-		//outerTablePanel.setBorder(new MarsPanelBorder());
-		//scrollPanel.setViewportView(outerTablePanel);
-
-		// Prepare constructed table panel.
-		//JPanel constructedTablePanel = new JPanel(new BorderLayout(0, 0));
-		//outerTablePanel.add(constructedTablePanel);
-
 		// Prepare constructed table model.
 		constructedTableModel = new ConstructedBuildingTableModel(manager);
 
 		// Prepare constructed table.
 		constructedTable = new ZebraJTable(constructedTableModel);
 		scrollPanel.setViewportView(constructedTable);
-		constructedTable.setCellSelectionEnabled(false);
+		constructedTable.setRowSelectionAllowed(true);
 		constructedTable.getColumnModel().getColumn(0).setPreferredWidth(105);
 		constructedTable.getColumnModel().getColumn(1).setPreferredWidth(105);
 
-		// 2014-12-03 Added the two methods below to make all heatTable columns
-		//resizable automatically when its Panel resizes
 		constructedTable.setPreferredScrollableViewportSize(new Dimension(225, -1));
 		constructedTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-		//constructedTablePanel.add(constructedTable.getTableHeader(), BorderLayout.NORTH);
-		//constructedTablePanel.add(constructedTable, BorderLayout.CENTER);
-
-		// 2015-06-08 Added sorting
 		constructedTable.setAutoCreateRowSorter(true);
-		//if (!MainScene.OS.equals("linux")) {
-		//	constructedTable.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
-		//}
-		// 2015-06-08 Added setTableStyle()
+	
 		TableStyle.setTableStyle(constructedTable);
 
 	}

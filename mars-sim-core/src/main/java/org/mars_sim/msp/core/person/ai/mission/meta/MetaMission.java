@@ -1,14 +1,18 @@
 /**
  * Mars Simulation Project
  * MetaMission.java
- * @version 3.1.0 2017-09-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission.meta;
 
+import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
+import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.science.ScientificStudyManager;
+import org.mars_sim.msp.core.time.MarsClock;
 
 /**
  * Interface for a meta mission, responsible for determining mission probability
@@ -16,6 +20,11 @@ import org.mars_sim.msp.core.robot.Robot;
  */
 public interface MetaMission {
 
+	static Simulation sim = Simulation.instance();
+    static MissionManager missionManager = sim.getMissionManager();
+    static MarsClock marsClock = sim.getMasterClock().getMarsClock();
+    static ScientificStudyManager studyManager = sim.getScientificStudyManager();
+	
 	/**
 	 * Gets the associated mission name.
 	 * 

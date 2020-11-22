@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * StructureMapLayer.java
- * @version 3.1.0 2017-04-15
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.settlement;
@@ -16,9 +16,11 @@ import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import org.apache.batik.gvt.GraphicsNode;
 import org.mars_sim.msp.core.LocalAreaUtil;
@@ -28,14 +30,20 @@ import org.mars_sim.msp.core.structure.building.connection.BuildingConnector;
 import org.mars_sim.msp.core.structure.building.connection.Hatch;
 import org.mars_sim.msp.core.structure.construction.ConstructionSite;
 import org.mars_sim.msp.core.structure.construction.ConstructionStage;
+import org.mars_sim.msp.ui.swing.tool.svg.SVGMapUtil;
 
 /**
  * A settlement map layer for displaying buildings and construction sites.
  */
 public class StructureMapLayer implements SettlementMapLayer {
+	// default logger.
+	private static final Logger logger = Logger.getLogger(StructureMapLayer.class.getName());
 
     // Static members
     private static final Color BUILDING_COLOR = Color.GREEN;
+    
+    private static final Color SELECTED_BUILDING_BORDER_COLOR = Color.WHITE;//new Color(119, 85, 0); // dark orange
+    
     private static final Color CONSTRUCTION_SITE_COLOR = new Color(119, 59, 0); // dark orange
     private static final Color SELECTED_CONSTRUCTION_SITE_COLOR = new Color(119, 85, 0); // dark orange
     
@@ -43,11 +51,21 @@ public class StructureMapLayer implements SettlementMapLayer {
     private static final Color BUILDING_SPLIT_CONNECTOR_COLOR = Color.WHITE;
 
     private static final Color SITE_BORDER_COLOR = Color.BLACK;
-    private final static float dash[] = { 1.0f };
-    private final static BasicStroke dashed = new BasicStroke(0.2f,
-    	      BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 5.0f, dash, 0.0f);
+    private final static float dash[] = {50.0f, 20.0f, 10.0f, 20.0f};
+    
+    // See https://docstore.mik.ua/orelly/java-ent/jfc/ch04_05.htm for instructions on BasicStroke
+    private final static BasicStroke THIN_DASHES = new BasicStroke(2.0f,
+    	      BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, dash, 0.0f);
+    
+//    private final static BasicStroke THICK_DASHES = new BasicStroke(3, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{5}, 0);
+    
+    private final static BasicStroke THICK_DASHES = new BasicStroke(10.0f,
+  	      BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 50.0f, dash, 0.0f);
+ 
     
     // Data members
+    private boolean selected = false;
+    
     private double scale;
     private SettlementMapPanel mapPanel;
     private Map<Double, Map<BuildingKey, BufferedImage>> svgImageCache;
@@ -96,8 +114,6 @@ public class StructureMapLayer implements SettlementMapLayer {
     }
 
     @Override
-
- // 2014-11-04 Added new parameter building
     public void displayLayer(
             Graphics2D g2d, Settlement settlement, Building building, double xPos,
             double yPos, int mapWidth, int mapHeight, double rotation, double scale) {
@@ -148,7 +164,6 @@ public class StructureMapLayer implements SettlementMapLayer {
         }
     }
 
-	// 2014-11-04 Added drawOneBuilding() for displaying a building's svg image in unit window
     public void drawOneBuilding(Building building, Graphics2D g2d) {
 
         GraphicsNode svg = SVGMapUtil.getBuildingSVG(building.getBuildingType().toLowerCase());
@@ -172,7 +187,7 @@ public class StructureMapLayer implements SettlementMapLayer {
      */
     private void drawBuildings(Graphics2D g2d, Settlement settlement) {
         if (settlement != null) {
-            Iterator<Building> i = settlement.getBuildingManager().getBuildings().iterator();
+            Iterator<Building> i = new ArrayList<>(settlement.getBuildingManager().getBuildings()).iterator();
             while (i.hasNext()) drawBuilding(i.next(), g2d);
         }
     }
@@ -184,9 +199,15 @@ public class StructureMapLayer implements SettlementMapLayer {
      */
     public void drawBuilding(Building building, Graphics2D g2d) {
 
+    	// Check if it's drawing the mouse-picked building 
+    	if (building.equals(mapPanel.getSelectedBuilding()))
+   			selected = true;
+    	else
+    		selected = false;
+    	
         // Use SVG image for building if available.
-		// 2014-10-29 : Need to STAY getName() or getBuildingType(), NOT changing to getNickName()
-    	// or else svg for the building won't load up
+    	if (building.getBuildingType() == null)
+    		logger.info("StructureMapLayer : " + building);
         GraphicsNode svg = SVGMapUtil.getBuildingSVG(building.getBuildingType().toLowerCase());
         if (svg != null) {
 
@@ -421,7 +442,9 @@ public class StructureMapLayer implements SettlementMapLayer {
 
         // Save original graphics transforms.
         AffineTransform saveTransform = g2d.getTransform();
-
+        // Save original stroke
+        Stroke oldStroke = g2d.getStroke();
+        
         // Determine bounds.
         Rectangle2D bounds = null;
         if (isSVG) bounds = svg.getBounds();
@@ -438,42 +461,57 @@ public class StructureMapLayer implements SettlementMapLayer {
         double translationY = (-1D * yLoc * scale) - centerY - boundsPosY;
         double facingRadian = facing / 180D * Math.PI;
 
-        // Apply graphic transforms for structure.
         AffineTransform newTransform = new AffineTransform();
+        AffineTransform newTransform1 = new AffineTransform();
+        
+        // Apply graphic transforms for structure.		
         newTransform.translate(translationX, translationY);
         newTransform.rotate(facingRadian, centerX + boundsPosX, centerY + boundsPosY);
-
+    
         if (isSVG) {
             // Draw buffered image of structure.
             BufferedImage image = getBufferedImage(svg, width, length, patternSVG);
             if (image != null) {
                 g2d.transform(newTransform);
                 
-                if (mapPanel != null)
-                	g2d.drawImage(image, 0, 0, mapPanel);
-                
+                if (mapPanel != null) {              	
+                	g2d.drawImage(image, 0, 0, mapPanel);      
+                }
             }
         }
+        
         else {
             // Else draw colored rectangle for construction site.
 
             // Draw filled rectangle.
             newTransform.scale(scalingWidth, scalingLength);
             g2d.transform(newTransform);
+            
             g2d.setColor(color);
             g2d.fill(bounds);
             
         	if (color.equals(SELECTED_CONSTRUCTION_SITE_COLOR)) {
                 // Draw the dashed border
                 g2d.setPaint(SITE_BORDER_COLOR);
-                g2d.setStroke(dashed);
+                g2d.setStroke(THIN_DASHES);
                 g2d.draw(bounds);
-                Stroke oldStroke = g2d.getStroke();
                 g2d.setStroke(oldStroke);
         	}
-              
         }
 
+        if (selected) {
+	
+        	newTransform1.scale(scalingWidth, scalingLength);
+            g2d.transform(newTransform1);
+         
+			// Draw the dashed border over the selected building
+			g2d.setPaint(SELECTED_BUILDING_BORDER_COLOR);
+			g2d.setStroke(THICK_DASHES);                                           
+			g2d.draw(bounds);
+			// Restore the stroke
+			g2d.setStroke(oldStroke);
+        }
+        
         // Restore original graphic transforms.
         g2d.setTransform(saveTransform);
     }
@@ -629,6 +667,10 @@ public class StructureMapLayer implements SettlementMapLayer {
         return bufferedImage;
     }
 
+    public void setSelected(boolean value) {
+    	selected = value;
+    }
+    
     @Override
     public void destroy() {
         // Clear all buffered image caches.

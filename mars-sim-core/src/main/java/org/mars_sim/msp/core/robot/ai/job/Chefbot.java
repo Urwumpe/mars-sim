@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Chefbot.java
- * @version 3.07 2015-02-17
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.robot.ai.job;
@@ -55,7 +55,7 @@ implements Serializable {
 
 		double result = 10D;
 
-		int cookingSkill = robot.getBotMind().getSkillManager().getSkillLevel(SkillType.COOKING);
+		int cookingSkill = robot.getSkillManager().getSkillLevel(SkillType.COOKING);
 		result += cookingSkill;
 
 		RoboticAttributeManager attributes = robot.getRoboticAttributeManager();

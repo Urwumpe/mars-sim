@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MaintenanceEVAMeta.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -12,23 +12,24 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.malfunction.MalfunctionFactory;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.task.EVAOperation;
 import org.mars_sim.msp.core.person.ai.task.Maintenance;
 import org.mars_sim.msp.core.person.ai.task.MaintenanceEVA;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.Structure;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
+import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * Meta task for the MaintenanceEVA task.
@@ -38,14 +39,14 @@ public class MaintenanceEVAMeta implements MetaTask, Serializable {
     /** default serial id. */
     private static final long serialVersionUID = 1L;
 
+    /** default logger. */
+    private static Logger logger = Logger.getLogger(MaintenanceEVAMeta.class.getName());
+
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.maintenanceEVA"); //$NON-NLS-1$
 
-    /** default logger. */
-    private static Logger logger = Logger.getLogger(MaintenanceEVAMeta.class.getName());
-
-    private SurfaceFeatures surface;
+	private static final double FACTOR = 1D;
 
     @Override
     public String getName() {
@@ -63,6 +64,35 @@ public class MaintenanceEVAMeta implements MetaTask, Serializable {
   
         if (person.isInSettlement()) {
         	
+            // Check if an airlock is available
+            if (EVAOperation.getWalkableAvailableAirlock(person) == null)
+	    		return 0;
+
+            // Check if it is night time.
+            if (EVAOperation.isGettingDark(person))
+            	return 0;
+
+            // Checks if the person's settlement is at meal time and is hungry
+            if (EVAOperation.isHungryAtMealTime(person))
+            	return 0;
+            
+            // Checks if the person is physically drained
+			if (EVAOperation.isExhausted(person))
+				return 0;
+			
+            // Checks if a EVA suit is good
+            if (EVAOperation.noEVAProblem(person))
+            	return 0;	
+            
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double fatigue = condition.getFatigue();
+            double stress = condition.getStress();
+            double hunger = condition.getHunger();
+            
+            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            	return 0;
+            
         	Settlement settlement = person.getSettlement();
     	
         	// Check for radiation events
@@ -72,48 +102,52 @@ public class MaintenanceEVAMeta implements MetaTask, Serializable {
     			return 0;
     		}
 
-            // Check if an airlock is available
-            if (EVAOperation.getWalkableAvailableAirlock(person) == null)
-	    		return 0;
-
-            // Check if it is night time.
-            surface = Simulation.instance().getMars().getSurfaceFeatures();
-            if (surface.getSolarIrradiance(person.getCoordinates()) == 0D)
-                if (!surface.inDarkPolarRegion(person.getCoordinates()))
-                    return 0;
-
-            if (settlement.getIndoorPeopleCount() > settlement.getPopulationCapacity())
-                result *= 2D;
-
             try {
                 // Total probabilities for all malfunctionable entities in person's local.
                 Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(person).iterator();
 
                 while (i.hasNext()) {
                     Malfunctionable entity = i.next();
-                    boolean isStructure = (entity instanceof Structure);
+                    
+                    boolean isStructure = (entity instanceof Structure);	
                     boolean uninhabitableBuilding = false;
                     if (entity instanceof Building)
                         uninhabitableBuilding = !((Building) entity).hasFunction(FunctionType.LIFE_SUPPORT);
-
+                    
+                    if (!isStructure && !uninhabitableBuilding)
+                    	return 0;
+                    
                     MalfunctionManager manager = entity.getMalfunctionManager();
-                    boolean hasMalfunction = manager.hasMalfunction();
-                    boolean hasParts = Maintenance.hasMaintenanceParts(person, entity);
-                    double effectiveTime = manager.getEffectiveTimeSinceLastMaintenance();
-                    boolean minTime = (effectiveTime >= 1000D);
-                    if ((isStructure || uninhabitableBuilding) && !hasMalfunction && minTime && hasParts) {
-                        double entityProb = manager.getEffectiveTimeSinceLastMaintenance() / 1000D;
-                        if (entityProb > 100D) {
-                            entityProb = 100D;
-                        }
-                        result += entityProb;
-                    }
+					boolean hasMalfunction = manager.hasMalfunction();
+					if (hasMalfunction) {
+						return 0;
+					}
+					
+					boolean hasParts = Maintenance.hasMaintenanceParts(person, entity);
+					if (!hasParts) {
+						return 0;
+					}
+					
+					double effectiveTime = manager.getEffectiveTimeSinceLastMaintenance();
+					boolean minTime = (effectiveTime >= 1000D);
+					
+					if (minTime) {
+						double entityProb = effectiveTime / 1000D;
+						if (entityProb > 100D) {
+							entityProb = 100D;
+						}
+						result += entityProb * FACTOR;
+					}         
                 }
             }
             catch (Exception e) {
                 logger.log(Level.SEVERE,"getProbability()",e);
             }
 
+            
+            if (settlement.getIndoorPeopleCount() > settlement.getPopulationCapacity())
+                result *= 2D;
+            
             // Job modifier.
             Job job = person.getMind().getJob();
             if (job != null) {
@@ -125,10 +159,10 @@ public class MaintenanceEVAMeta implements MetaTask, Serializable {
 
             // Modify if tinkering is the person's favorite activity.
             if (person.getFavorite().getFavoriteActivity() == FavoriteType.TINKERING) {
-                result *= 1.5D;
+                result += RandomUtil.getRandomInt(1, 20);
             }
 
-            // 2015-06-07 Added Preference modifier
+            // Added Preference modifier
             if (result > 0D) {
                 result = result + result * person.getPreference().getPreferenceScore(this)/5D;
             }
@@ -147,66 +181,48 @@ public class MaintenanceEVAMeta implements MetaTask, Serializable {
         return result;
     }
 
+	public double getSettlementProbability(Settlement settlement) {
+		double result = 0D;
+
+        try {
+            // Total probabilities for all malfunctionable entities in person's local.
+            Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(settlement).iterator();
+
+            while (i.hasNext()) {
+                Malfunctionable entity = i.next();
+                boolean isStructure = (entity instanceof Structure);
+                boolean uninhabitableBuilding = false;
+                if (entity instanceof Building)
+                    uninhabitableBuilding = !((Building) entity).hasFunction(FunctionType.LIFE_SUPPORT);
+
+                MalfunctionManager manager = entity.getMalfunctionManager();
+                boolean hasMalfunction = manager.hasMalfunction();
+                boolean hasParts = Maintenance.hasMaintenanceParts(settlement, entity);
+                double effectiveTime = manager.getEffectiveTimeSinceLastMaintenance();
+                boolean minTime = (effectiveTime >= 1000D);
+                if ((isStructure || uninhabitableBuilding) && !hasMalfunction && minTime && hasParts) {
+                    double entityProb = manager.getEffectiveTimeSinceLastMaintenance() / 1000D;
+                    if (entityProb > 100D) {
+                        entityProb = 100D;
+                    }
+                    result += entityProb;
+                }
+            }
+        }
+        catch (Exception e) {
+            logger.log(Level.SEVERE,"getProbability()",e);
+        }
+
+		return result;
+	}
+	
 	@Override
 	public Task constructInstance(Robot robot) {
-        return null;//new MaintenanceEVA(robot);
+        return null;
 	}
 
 	@Override
 	public double getProbability(Robot robot) {
-
-        double result = 0D;
-/*
-        if (robot.getBotMind().getRobotJob() instanceof Repairbot) {
-
-	        if (robot.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
-
-		        try {
-		            // Total probabilities for all malfunctionable entities in robot's local.
-		            Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(robot).iterator();
-		            while (i.hasNext()) {
-		                Malfunctionable entity = i.next();
-		                boolean isStructure = (entity instanceof Structure);
-		                boolean uninhabitableBuilding = false;
-		                if (entity instanceof Building) {
-		                    uninhabitableBuilding = !((Building) entity).hasFunction(BuildingFunction.LIFE_SUPPORT);
-		                }
-		                MalfunctionManager manager = entity.getMalfunctionManager();
-		                boolean hasMalfunction = manager.hasMalfunction();
-		                boolean hasParts = Maintenance.hasMaintenanceParts(robot, entity);
-		                double effectiveTime = manager.getEffectiveTimeSinceLastMaintenance();
-		                boolean minTime = (effectiveTime >= 1000D);
-		                if ((isStructure || uninhabitableBuilding) && !hasMalfunction && minTime && hasParts) {
-		                    double entityProb = manager.getEffectiveTimeSinceLastMaintenance() / 1000D;
-		                    if (entityProb > 100D) {
-		                        entityProb = 100D;
-		                    }
-		                    result += entityProb;
-		                }
-		            }
-
-		            // Effort-driven task modifier.
-		            result *= robot.getPerformanceRating();
-
-		            // Check if it is night time.
-		            SurfaceFeatures surface = Simulation.instance().getMars().getSurfaceFeatures();
-		            if (surface.getSolarIrradiance(robot.getCoordinates()) == 0D) {
-		                if (!surface.inDarkPolarRegion(robot.getCoordinates())) {
-		                    result = 0D;
-		                }
-		            }
-
-		            // Check if an airlock is available
-	                if (EVAOperation.getWalkableAvailableAirlock(robot) == null) {
-	                    result = 0D;
-	                }
-		        }
-		        catch (Exception e) {
-		            logger.log(Level.SEVERE,"getProbability()",e);
-		        }
-	        }
-        }
-*/
-        return result;
+        return 0;
 	}
 }

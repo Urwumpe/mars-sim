@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Repairbot.java
- * @version 3.1.0 2018-09-29
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -52,7 +52,7 @@ public class Repairbot extends RobotJob implements Serializable {
 		double result = 15D;
 
 		// Add number of buildings in settlement.
-		result += settlement.getBuildingManager().getNumBuilding() / 3D;
+		result += settlement.getBuildingManager().getNumBuildings() / 3D;
 
 		// Add number of vehicles parked at settlement.
 		result += settlement.getParkedVehicleNum() / 3D;
@@ -70,7 +70,7 @@ public class Repairbot extends RobotJob implements Serializable {
 
 		double result = 0D; // robot should be less capable than the person counterpart
 
-		int mechanicSkill = robot.getBotMind().getSkillManager().getSkillLevel(SkillType.MECHANICS);
+		int mechanicSkill = robot.getSkillManager().getSkillLevel(SkillType.MECHANICS);
 		result += mechanicSkill;
 
 		RoboticAttributeManager attributes = robot.getRoboticAttributeManager();

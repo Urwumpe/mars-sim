@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Areologist.java
- * @version 3.07 2014-12-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.job;
@@ -10,25 +10,20 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.mission.AreologyStudyFieldMission;
-import org.mars_sim.msp.core.person.ai.mission.BiologyStudyFieldMission;
+import org.mars_sim.msp.core.person.ai.mission.AreologyFieldStudy;
+import org.mars_sim.msp.core.person.ai.mission.BiologyFieldStudy;
 import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
 import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
 import org.mars_sim.msp.core.person.ai.mission.CollectIce;
 import org.mars_sim.msp.core.person.ai.mission.CollectRegolith;
-import org.mars_sim.msp.core.person.ai.mission.EmergencySupplyMission;
 import org.mars_sim.msp.core.person.ai.mission.Exploration;
 import org.mars_sim.msp.core.person.ai.mission.Mining;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionManager;
-import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
 import org.mars_sim.msp.core.person.ai.mission.RoverMission;
-import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
 import org.mars_sim.msp.core.person.ai.task.AssistScientificStudyResearcher;
 import org.mars_sim.msp.core.person.ai.task.CompileScientificStudyResults;
 import org.mars_sim.msp.core.person.ai.task.ConsolidateContainers;
@@ -59,16 +54,16 @@ public class Areologist extends Job implements Serializable {
 
 	// private static Logger logger = Logger.getLogger(Areologist.class.getName());
 
-	private static MissionManager missionManager;
+	public final static int JOB_ID = 1;
 
+	private double[] roleProspects = new double[] {5.0, 5.0, 5.0, 20.0, 25.0, 10.0, 30.0};
+	
 	/**
 	 * Constructor.
 	 */
 	public Areologist() {
 		// Use Job constructor
 		super(Areologist.class);
-
-		missionManager = Simulation.instance().getMissionManager();
 
 		// Add areologist-related tasks.
 		jobTasks.add(StudyFieldSamples.class);
@@ -87,25 +82,26 @@ public class Areologist extends Job implements Serializable {
 		jobTasks.add(ConsolidateContainers.class);
 
 		// Add areologist-related missions.
+		jobMissionStarts.add(AreologyFieldStudy.class);
+		jobMissionJoins.add(AreologyFieldStudy.class);
+		
+		jobMissionJoins.add(BiologyFieldStudy.class);
+		
 		jobMissionStarts.add(Exploration.class);
 		jobMissionJoins.add(Exploration.class);
+		
 		jobMissionStarts.add(CollectIce.class);
 		jobMissionJoins.add(CollectIce.class);
+		
 		jobMissionStarts.add(CollectRegolith.class);
 		jobMissionJoins.add(CollectRegolith.class);
-		jobMissionStarts.add(TravelToSettlement.class);
-		jobMissionJoins.add(TravelToSettlement.class);
-		jobMissionStarts.add(RescueSalvageVehicle.class);
-		jobMissionJoins.add(RescueSalvageVehicle.class);
+			
 		jobMissionStarts.add(Mining.class);
 		jobMissionJoins.add(Mining.class);
+		
 		jobMissionJoins.add(BuildingConstructionMission.class);
+//		
 		jobMissionJoins.add(BuildingSalvageMission.class);
-		jobMissionStarts.add(AreologyStudyFieldMission.class);
-		jobMissionJoins.add(AreologyStudyFieldMission.class);
-		jobMissionJoins.add(BiologyStudyFieldMission.class);
-		jobMissionStarts.add(EmergencySupplyMission.class);
-		jobMissionJoins.add(EmergencySupplyMission.class);
 	}
 
 	/**
@@ -116,19 +112,21 @@ public class Areologist extends Job implements Serializable {
 	 */
 	public double getCapability(Person person) {
 
-		double result = 0D;
+		double result = 1D;
 
-		int areologySkill = person.getMind().getSkillManager().getSkillLevel(SkillType.AREOLOGY);
+		int areologySkill = person.getSkillManager().getSkillLevel(SkillType.AREOLOGY);
 		result = areologySkill;
 
 		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
 		int academicAptitude = attributes.getAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
 		int experienceAptitude = attributes.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
 		double averageAptitude = (academicAptitude + experienceAptitude) / 2D;
-		result += result * ((averageAptitude - 50D) / 100D);
+		result += result * ((averageAptitude - 100D) / 100D);
 
 		if (person.getPhysicalCondition().hasSeriousMedicalProblems())
 			result = 0D;
+
+//		System.out.println(person + " areology : " + Math.round(result*100.0)/100.0);
 
 		return result;
 	}
@@ -140,8 +138,10 @@ public class Areologist extends Job implements Serializable {
 	 * @return the base need >= 0
 	 */
 	public double getSettlementNeed(Settlement settlement) {
-		double result = 0D;
+		double result = .1;
 
+		int population = settlement.getNumCitizens();
+		
 		// Add (labspace * tech level / 2) for all labs with areology specialties.
 		List<Building> laboratoryBuildings = settlement.getBuildingManager().getBuildings(FunctionType.RESEARCH);
 		Iterator<Building> i = laboratoryBuildings.iterator();
@@ -149,7 +149,7 @@ public class Areologist extends Job implements Serializable {
 			Building building = i.next();
 			Research lab = building.getResearch();
 			if (lab.hasSpecialty(ScienceType.AREOLOGY)) {
-				result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 2D);
+				result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 10D);
 			}
 		}
 
@@ -163,7 +163,7 @@ public class Areologist extends Job implements Serializable {
 				if (rover.hasLab()) {
 					Lab lab = rover.getLab();
 					if (lab.hasSpecialty(ScienceType.AREOLOGY)) {
-						result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 2D);
+						result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 12D);
 					}
 				}
 			}
@@ -181,14 +181,29 @@ public class Areologist extends Job implements Serializable {
 					if (rover.hasLab()) {
 						Lab lab = rover.getLab();
 						if (lab.hasSpecialty(ScienceType.AREOLOGY)) {
-							result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 2D);
+							result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 8D);
 						}
 					}
 				}
 			}
 		}
 
+		result = (result + population / 10D) / 2.0;
+		
+//		System.out.println(settlement + " Areologist need: " + result);
+		
 		return result;
 	}
 
+	public double[] getRoleProspects() {
+		return roleProspects;
+	}
+	
+	public void setRoleProspects(int index, int weight) {
+		roleProspects[index] = weight;
+	}
+	
+	public int getJobID() {
+		return JOB_ID;
+	}
 }

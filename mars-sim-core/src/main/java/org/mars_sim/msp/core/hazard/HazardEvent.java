@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * HazardEvent.java
- * @version 3.1.0 2018-06-21
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.hazard;
@@ -43,7 +43,7 @@ public class HazardEvent extends HistoricalEvent implements Serializable {
 	 * @param location1   the settlement/coordinate where it occurs.
 	 */
 	public HazardEvent(EventType type, Object source, String whatCause, String whileDoing, String whoAffected,
-			String location0, String location1) {
-		super(HistoricalEventCategory.HAZARD, type, source, whatCause, whileDoing, whoAffected, location0, location1);
+			String location0, String location1, String associatedSettlement) {
+		super(HistoricalEventCategory.HAZARD, type, source, whatCause, whileDoing, whoAffected, location0, location1, associatedSettlement);
 	}
 }

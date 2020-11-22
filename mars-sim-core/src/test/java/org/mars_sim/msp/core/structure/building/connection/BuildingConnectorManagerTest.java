@@ -5,6 +5,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.structure.BuildingTemplate;
 import org.mars_sim.msp.core.structure.MockSettlement;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -18,7 +20,9 @@ public class BuildingConnectorManagerTest extends TestCase {
     private static final double SMALL_DELTA = .0000001D;
 
     public void testConstructorNoBuildingTemplates() {
-
+        SimulationConfig.instance().loadConfig();
+        Simulation.instance().testRun();
+        
         Settlement settlement = new MockSettlement();
 
         List<BuildingTemplate> buildingTemplates = new ArrayList<BuildingTemplate>(0);
@@ -32,11 +36,13 @@ public class BuildingConnectorManagerTest extends TestCase {
     }
 
     public void testConstructorWithBuildingTemplates() {
-
+        SimulationConfig.instance().loadConfig();
+        Simulation.instance().testRun();
+        
         Settlement settlement = new MockSettlement();
         BuildingManager buildingManager = settlement.getBuildingManager();
 
-        MockBuilding building0 = new MockBuilding(buildingManager);
+        MockBuilding building0 = new MockBuilding(buildingManager, "B0");
         building0.setTemplateID(0);
         building0.setName("building 0");
         building0.setWidth(9D);
@@ -48,7 +54,7 @@ public class BuildingConnectorManagerTest extends TestCase {
         buildingTemplate0.addBuildingConnection(2, -4.5D, 0D);
         buildingManager.addBuilding(building0, false);
 
-        MockBuilding building1 = new MockBuilding(buildingManager);
+        MockBuilding building1 = new MockBuilding(buildingManager, "B1");
         building1.setTemplateID(1);
         building1.setName("building 1");
         building1.setWidth(6D);
@@ -60,7 +66,7 @@ public class BuildingConnectorManagerTest extends TestCase {
         buildingTemplate1.addBuildingConnection(2, 0D, 4.5D);
         buildingManager.addBuilding(building1, false);
 
-        MockBuilding building2 = new MockBuilding(buildingManager);
+        MockBuilding building2 = new MockBuilding(buildingManager, "B2");
         building2.setTemplateID(2);
         building2.setName("building 2");
         building2.setWidth(2D);
@@ -133,11 +139,13 @@ public class BuildingConnectorManagerTest extends TestCase {
     }
 
     public void testDetermineShortestPath() {
-
+        SimulationConfig.instance().loadConfig();
+        Simulation.instance().testRun();
+        
         Settlement settlement = new MockSettlement();
         BuildingManager buildingManager = settlement.getBuildingManager();
 
-        MockBuilding building0 = new MockBuilding(buildingManager);
+        MockBuilding building0 = new MockBuilding(buildingManager, "B0");
         building0.setTemplateID(0);
         building0.setName("building 0");
         building0.setWidth(9D);
@@ -149,7 +157,7 @@ public class BuildingConnectorManagerTest extends TestCase {
         buildingTemplate0.addBuildingConnection(2, -4.5D, 0D);
         buildingManager.addBuilding(building0, false);
 
-        MockBuilding building1 = new MockBuilding(buildingManager);
+        MockBuilding building1 = new MockBuilding(buildingManager, "B1");
         building1.setTemplateID(1);
         building1.setName("building 1");
         building1.setWidth(6D);
@@ -161,7 +169,7 @@ public class BuildingConnectorManagerTest extends TestCase {
         buildingTemplate1.addBuildingConnection(2, 0D, 4.5D);
         buildingManager.addBuilding(building1, false);
 
-        MockBuilding building2 = new MockBuilding(buildingManager);
+        MockBuilding building2 = new MockBuilding(buildingManager, "B2");
         building2.setTemplateID(2);
         building2.setName("building 2");
         building2.setWidth(2D);

@@ -46,7 +46,7 @@ import org.pushingpixels.trident.Timeline;
  * Implements the telegraph window.
  *
  * @author Paulo Roberto Massa Cereda
- * @version 2.1
+ * @version 3.1.2 2020-09-02
  * @since 2.0
  */
 @SuppressWarnings("serial")
@@ -74,10 +74,8 @@ public class TelegraphWindow extends JWindow {
 	 */
 	private boolean discarded = false;
 
-	//2014-12-17 Added telegraph
 	private Telegraph telegraph;
 
-	// 2014-12-17 Added Timer
 	//private Timer pauseTimer;
 	/**
 	 * Default constructor which initializes everything...

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TradeMeta.java
- * @version 3.1.0 2017-01-19
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission.meta;
@@ -16,10 +16,9 @@ import org.mars_sim.msp.core.person.ai.job.Trader;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.RoverMission;
 import org.mars_sim.msp.core.person.ai.mission.Trade;
+import org.mars_sim.msp.core.person.ai.mission.Trade.TradeProfitInfo;
 import org.mars_sim.msp.core.person.ai.mission.TradeUtil;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
-import org.mars_sim.msp.core.person.ai.mission.Trade.TradeProfitInfo;
-import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.time.MarsClock;
@@ -31,17 +30,19 @@ import org.mars_sim.msp.core.vehicle.Rover;
 public class TradeMeta implements MetaMission {
 
 	/** Mission name */
-	private static final String NAME = Msg.getString("Mission.description.trade"); //$NON-NLS-1$
+	private static final String DEFAULT_DESCRIPTION = Msg.getString("Mission.description.trade"); //$NON-NLS-1$
 
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(TradeMeta.class.getName());
 
+//    private static final double LIMIT = 50D;
+    
 	private Person person;
 	private Robot robot;
 
 	@Override
 	public String getName() {
-		return NAME;
+		return DEFAULT_DESCRIPTION;
 	}
 
 	@Override
@@ -65,21 +66,58 @@ public class TradeMeta implements MetaMission {
 					// TODO: checkMission() gives rise to a NULLPOINTEREXCEPTION that points to
 					// Inventory
 					// It happens only when this sim is a loaded saved sim.
-					missionProbability = checkMission(settlement);
+					missionProbability = getSettlementProbability(settlement);
 
 				} catch (Exception e) {
 					logger.log(Level.SEVERE,
 							person + " can't compute the exact need for trading now at " + settlement + ". ", e);
 					e.printStackTrace();
 
-					missionProbability = 200D;
+					missionProbability = 0D;
 				}
-
+				
 			} else {
 				missionProbability = 0;
 			}
-		}
+			
+    		if (missionProbability <= 0)
+    			return 0;
+    		
+			int numEmbarked = VehicleMission.numEmbarkingMissions(settlement);
+			int numThisMission = Simulation.instance().getMissionManager().numParticularMissions(DEFAULT_DESCRIPTION, settlement);
+	
+	   		// Check for # of embarking missions.
+    		if (Math.max(1, settlement.getNumCitizens()) / 8.0 < numEmbarked + numThisMission) {
+    			return 0;
+    		}		
+    		
+    		if (numThisMission > 1)
+    			return 0;	
+    		
 
+			int f1 = 2*numEmbarked + 1;
+			int f2 = 2*numThisMission + 1;
+			
+			missionProbability *= settlement.getNumCitizens() / f1 / f2 / 2D * ( 1 + settlement.getMissionDirectiveModifier(7));
+		
+			if (missionProbability > Trade.MAX_STARTING_PROBABILITY)
+				missionProbability = Trade.MAX_STARTING_PROBABILITY;
+			
+			// if introvert, score  0 to  50 --> -2 to 0
+			// if extrovert, score 50 to 100 -->  0 to 2
+			// Reduce probability if introvert
+			int extrovert = person.getExtrovertmodifier();
+			missionProbability += extrovert;
+			
+			if (missionProbability < 0)
+				missionProbability = 0;
+		}
+		
+//        if (missionProbability > 0)
+//        	logger.info("TradeMeta's probability : " +
+//				 Math.round(missionProbability*100D)/100D);
+		 
+        
 		return missionProbability;
 	}
 
@@ -93,70 +131,34 @@ public class TradeMeta implements MetaMission {
 		return 0;
 	}
 
-	public double checkMission(Settlement settlement) {
+	public double getSettlementProbability(Settlement settlement) {
 
-		double missionProbability = 0;
+		double missionProbability = settlement.getMissionBaseProbability(DEFAULT_DESCRIPTION);
 
-		// Check if available rover.
-		if (!RoverMission.areVehiclesAvailable(settlement, false)) {
+		if (missionProbability == 0)
 			return 0;
-		}
 
-		// Check if available backup rover.
-		if (!RoverMission.hasBackupRover(settlement)) {
-			return 0;
-		}
-
-		// Check if minimum number of people are available at the settlement.
-		if (!RoverMission.minAvailablePeopleAtSettlement(settlement, RoverMission.MIN_STAYING_MEMBERS)) {
-			return 0;
-		}
-
-		// Check if min number of EVA suits at settlement.
-		if (Mission.getNumberAvailableEVASuitsAtSettlement(settlement) < RoverMission.MIN_GOING_MEMBERS) {
-			return 0;
-		}
-
-		// Check for embarking missions.
-		if (VehicleMission.hasEmbarkingMissions(settlement)) {
-			return 0;
-		}
-
-		// Check if settlement has enough basic resources for a rover mission.
-		if (!RoverMission.hasEnoughBasicResources(settlement, true)) {
-			return 0;
-		}
-
-		// Check if starting settlement has minimum amount of methane fuel.
-		// AmountResource methane = AmountResource.findAmountResource("methane");
-		if (settlement.getInventory().getAmountResourceStored(ResourceUtil.methaneAR,
-				false) < RoverMission.MIN_STARTING_SETTLEMENT_METHANE) {
-			return 0;
-		}
-
+		missionProbability = 0;
+		
 		// Check for the best trade settlement within range.
 		double tradeProfit = 0D;
 		try {
-			Rover rover = (Rover) RoverMission.getVehicleWithGreatestRange(settlement, false);
+			Rover rover = (Rover) RoverMission.getVehicleWithGreatestRange(Trade.missionType, settlement, false);
 			if (rover != null) {
 				// Only check every couple of Sols, else use cache.
 				// Note: this method is very CPU intensive.
 				boolean useCache = false;
-				MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
-				if (currentTime == null) {
-					throw new NullPointerException("currentTime == null");
-				}
 
 				if (Trade.TRADE_PROFIT_CACHE.containsKey(settlement)) {
 					TradeProfitInfo profitInfo = Trade.TRADE_PROFIT_CACHE.get(settlement);
-					double timeDiff = MarsClock.getTimeDiff(currentTime, profitInfo.time);
+					double timeDiff = MarsClock.getTimeDiff(marsClock, profitInfo.time);
 					if (timeDiff < 2000D) {
 						tradeProfit = profitInfo.profit;
 						useCache = true;
 					}
 				} else {
 					Trade.TRADE_PROFIT_CACHE.put(settlement,
-							new TradeProfitInfo(tradeProfit, (MarsClock) currentTime.clone()));
+							new TradeProfitInfo(tradeProfit, (MarsClock) marsClock.clone()));
 					useCache = true;
 				}
 
@@ -168,7 +170,7 @@ public class TradeMeta implements MetaMission {
 //					// + " milliseconds "
 //							+ " Profit: " + (int) tradeProfit + " VP");
 					Trade.TRADE_PROFIT_CACHE.put(settlement,
-							new TradeProfitInfo(tradeProfit, (MarsClock) currentTime.clone()));
+							new TradeProfitInfo(tradeProfit, (MarsClock) marsClock.clone()));
 					Trade.TRADE_SETTLEMENT_CACHE.put(settlement, TradeUtil.bestTradeSettlementCache);
 				}
 			}
@@ -188,6 +190,23 @@ public class TradeMeta implements MetaMission {
 			missionProbability = Trade.MAX_STARTING_PROBABILITY;
 		}
 
+		int numEmbarked = VehicleMission.numEmbarkingMissions(settlement);
+		int numThisMission = Simulation.instance().getMissionManager().numParticularMissions(DEFAULT_DESCRIPTION, settlement);
+
+   		// Check for # of embarking missions.
+		if (Math.max(1, settlement.getNumCitizens() / 8.0) < numEmbarked + numThisMission) {
+			return 0;
+		}			
+		
+		else if (numThisMission > 1)
+			return 0;	
+		
+
+		int f1 = 2*numEmbarked + 1;
+		int f2 = 2*numThisMission + 1;
+		
+		missionProbability *= settlement.getNumCitizens() / f1 / f2 / 2D;
+		
 		// Crowding modifier.
 		int crowding = settlement.getIndoorPeopleCount() - settlement.getPopulationCapacity();
 		if (crowding > 0) {

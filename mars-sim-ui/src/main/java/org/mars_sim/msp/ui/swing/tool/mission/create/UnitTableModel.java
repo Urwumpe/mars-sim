@@ -1,13 +1,15 @@
 /**
  * Mars Simulation Project
  * UnitTableModel.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
+import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.UnitManager;
 
 import javax.swing.table.AbstractTableModel;
 import java.util.ArrayList;
@@ -18,12 +20,15 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * An abstract table model for unit tables in create mission wizard.
  */
+@SuppressWarnings("serial")
 abstract class UnitTableModel extends AbstractTableModel {
 
 	// Data members.
 	protected Collection<Unit> units;
 	protected List<String> columns;
 	
+	protected static UnitManager unitManager = Simulation.instance().getUnitManager();
+
 	/**
 	 * Constructor
 	 */

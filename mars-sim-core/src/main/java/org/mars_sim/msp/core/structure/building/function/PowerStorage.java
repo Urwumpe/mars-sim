@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PowerStorage.java
- * @version 3.1.0 2017-09-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -12,14 +12,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.LogConsolidated;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.structure.PowerGrid;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.BuildingException;
-import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
@@ -121,12 +117,8 @@ implements Serializable {
 	 */
 	private boolean locked;
 	
-	private static BuildingConfig config;
-	
-	private static MarsClock marsClock;
-	
 	private Building building;
-
+	
 	/**
 	 * Constructor.
 	 * @param building the building with the function.
@@ -138,12 +130,7 @@ implements Serializable {
 		
 		this.building = building;
 
-		config = SimulationConfig.instance().getBuildingConfiguration();
-
-		if (marsClock == null)
-			marsClock = Simulation.instance().getMasterClock().getMarsClock();
-
-		max_kWh_nameplate = config.getPowerStorageCapacity(building.getBuildingType());
+		max_kWh_nameplate = buildingConfig.getPowerStorageCapacity(building.getBuildingType());
 		
 		currentMaxCap = max_kWh_nameplate;
 
@@ -162,7 +149,7 @@ implements Serializable {
 		
 		ampHours = 1000D * currentMaxCap/SECONDARY_LINE_VOLTAGE; 
 
-		// 2017-01-03 at the start of sim, set to a random value		
+		// At the start of sim, set to a random value		
 		kWhStored = RandomUtil.getRandomDouble(max_kWh_nameplate);		
 		//logger.info("initial kWattHoursStored is " + kWattHoursStored);
 		
@@ -198,7 +185,7 @@ implements Serializable {
 		double existingPowerStorageValue = demand / (supply + 1D);
 
 		//BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
-		double powerStorage = config.getPowerStorageCapacity(buildingName);
+		double powerStorage = buildingConfig.getPowerStorageCapacity(buildingName);
 
 		double value = powerStorage * existingPowerStorageValue / hrInSol;
 		if (value > 10D) value = 10D;
@@ -303,6 +290,7 @@ implements Serializable {
 				, null);
 	}
 	
+	
 	@Override
 	public void timePassing(double time) {
 		this.time = time;
@@ -391,5 +379,10 @@ implements Serializable {
 	public double getResistance() {
 		return r_total;
 	}
+	
 
+	@Override
+	public void destroy() {
+		building = null;
+	}
 }

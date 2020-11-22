@@ -1,7 +1,14 @@
 module mars-sim-core {
 
-	requires java;
+	requires java.lang;
+	requires java.nio;
+	requires sun.misc.Unsafe;
+	
     requires javax.json;
+//    requires java.json;
+//    requires java.util;
+//    requires java.text;
+	requires java;
     
     requires junit;
     requires jdom;
@@ -9,19 +16,15 @@ module mars-sim-core {
     requires guice;
     requires log4j;
     requires commons-collections;
-    requires text-io;
+//    requires text-io;
     requires gson;
     requires commons-lang3;
 //    requires xz;
     
-//	requires java.desktop;
+    requires jackson;
+	requires flogger;
+    requires kotlin;
     
-//    requires reactfx;
-//   requires fxgl;
-//    requires javafx.collections.FXCollections;
-//    requires javafx.collections.ObservableList;
-    
-//   requires mars-sim-ui;
     requires mars-sim-mapdata;
     
 	exports mars-sim-core;

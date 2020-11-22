@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * GenderType.java
- * @version 3.1.0 2017-10-03
+ * @version 3.1.2 2020-09-02
  * @author stpa
  */
 
@@ -39,5 +39,14 @@ public enum GenderType {
 	 */	
 	public static GenderType valueOfIgnoreCase(String s) {
 		return valueOf(s.toUpperCase().replace(' ','_'));
+	}
+	
+	public static String getPossessivePronoun(GenderType gender) {
+		if (gender == GenderType.MALE)
+			return "his";
+		else if (gender == GenderType.FEMALE)
+			return "her";
+		
+		return "its";
 	}
 }

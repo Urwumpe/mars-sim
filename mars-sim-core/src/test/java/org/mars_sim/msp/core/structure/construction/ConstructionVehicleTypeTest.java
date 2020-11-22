@@ -1,8 +1,7 @@
 /**
  * Mars Simulation Project
  * ConstructionVehicleTypeTest.java
- * @version 3.07 2014-12-06
-
+ * @version 3.1.0 2019-09-20
  * @author Scott Davis
  */
 
@@ -11,7 +10,6 @@ package org.mars_sim.msp.core.structure.construction;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.mars_sim.msp.core.resource.ItemResource;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
@@ -31,7 +29,7 @@ public class ConstructionVehicleTypeTest extends TestCase {
         
         List<Integer> attachments = new ArrayList<Integer>(1);
         
-        Part p = ItemResource.createBrandNewItemResource("attachment part", 1, "test resource description", 1D, 1);  		    
+        Part p = ItemResourceUtil.createItemResource("attachment part", 1, "test resource description", 1D, 1);  		    
         attachments.add(p.getID());
         
         vehicleType = new ConstructionVehicleType("Light Utility Vehicle", 

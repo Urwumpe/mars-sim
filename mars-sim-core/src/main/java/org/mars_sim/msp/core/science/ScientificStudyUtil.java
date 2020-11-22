@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ScientificStudyUtil.java
- * @version 3.1.0 2018-11-07
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.science;
@@ -10,15 +10,18 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
+import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.social.Relationship;
 import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
@@ -26,6 +29,10 @@ import org.mars_sim.msp.core.tool.RandomUtil;
  */
 public class ScientificStudyUtil {
 
+	private static Simulation sim = Simulation.instance();
+	private static UnitManager unitManager = sim.getUnitManager();
+	private static RelationshipManager relationshipManager = sim.getRelationshipManager();
+    
 	/**
 	 * Private constructor for utility class.
 	 */
@@ -39,7 +46,7 @@ public class ScientificStudyUtil {
 	public static List<Person> getAvailableCollaboratorsForInvite(ScientificStudy study) {
 		List<Person> result = new ArrayList<Person>();
 
-        Collection<Person> allPeople = Simulation.instance().getUnitManager().getPeople();
+        Collection<Person> allPeople = unitManager.getPeople();
         Iterator<Person> i = allPeople.iterator();
         while (i.hasNext()) {
             Person person = i.next();
@@ -83,15 +90,18 @@ public class ScientificStudyUtil {
         double academicAptitudeModifier = (academicAptitude - 50) / 2D;
         baseChance += academicAptitudeModifier;
         
-        Iterator<Person> i = study.getCollaborativeResearchers().keySet().iterator();
+        Map<Integer, Person> lookupPerson = unitManager.getLookupPerson();
+        
+        Iterator<Integer> i = study.getCollaborativeResearchers().keySet().iterator();
         while (i.hasNext()) {
-            Person researcher = i.next();
+        	Integer id = i.next();
+            Person researcher = lookupPerson.get(id);//unitManager.getPersonByID(id);
             double collaboratorModifier = 10D;
             
             // Modify based on collaborative researcher skill in their science.
-            ScienceType collaborativeScience = study.getCollaborativeResearchers().get(researcher);
+            ScienceType collaborativeScience = study.getCollaborativeResearchers().get(id);
             SkillType skill = collaborativeScience.getSkill();
-            int skillLevel = researcher.getMind().getSkillManager().getSkillLevel(skill);
+            int skillLevel = researcher.getSkillManager().getSkillLevel(skill);
             collaboratorModifier *= (double) skillLevel / (double) study.getDifficultyLevel();
             
             // Modify based on researcher's academic aptitude attribute.
@@ -130,10 +140,14 @@ public class ScientificStudyUtil {
         
         // Add achievement credit to collaborative researchers.
         double collaborativeAchievement = baseAchievement / 3D;
-        Iterator<Person> i = study.getCollaborativeResearchers().keySet().iterator();
+        
+        Map<Integer, Person> lookupPerson = unitManager.getLookupPerson();
+        
+        Iterator<Integer> i = study.getCollaborativeResearchers().keySet().iterator();
         while (i.hasNext()) {
-            Person researcher = i.next();
-            ScienceType collaborativeScience = study.getCollaborativeResearchers().get(researcher);
+        	Integer id = i.next();
+            Person researcher = lookupPerson.get(id);//getPersonByID(id); ?
+            ScienceType collaborativeScience = study.getCollaborativeResearchers().get(id);
             researcher.addScientificAchievement(collaborativeAchievement, collaborativeScience);
             study.setCollaborativeResearcherEarnedScientificAchievement(researcher, collaborativeAchievement);
             modifyScientistRelationshipsFromAchievement(researcher, collaborativeScience, collaborativeAchievement);
@@ -154,12 +168,11 @@ public class ScientificStudyUtil {
     private static void modifyScientistRelationshipsFromAchievement(Person researcher, 
             ScienceType science, double achievement) {
         
-        RelationshipManager manager = Simulation.instance().getRelationshipManager();
-        Iterator<Person> i = manager.getAllKnownPeople(researcher).iterator();
+        Iterator<Person> i = relationshipManager.getAllKnownPeople(researcher).iterator();
         while (i.hasNext()) {
             Person person = i.next();
             if (science == ScienceType.getJobScience(person.getMind().getJob())) {
-                Relationship relationship = manager.getRelationship(researcher, person);
+                Relationship relationship = relationshipManager.getRelationship(researcher, person);
                 if (relationship != null) {
                     double currentOpinion = relationship.getPersonOpinion(person);
                     relationship.setPersonOpinion(person, currentOpinion + achievement);
@@ -167,4 +180,14 @@ public class ScientificStudyUtil {
             }
         }
     }
+    
+	/**
+	 * initializes instances after loading from a saved sim
+	 * 
+	 * @param {{@link MarsClock}
+	 */
+	public static void initializeInstances(RelationshipManager r, UnitManager u) {
+		unitManager = u;		
+		relationshipManager = r;
+	}
 }

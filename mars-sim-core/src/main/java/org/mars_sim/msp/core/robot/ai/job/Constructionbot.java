@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Architect.java
- * @version 3.07 2015-03-02
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.robot.ai.job;
@@ -69,7 +69,7 @@ implements Serializable {
 	public double getSettlementNeed(Settlement settlement) {
 		double result = 0D;
 		// Add number of buildings currently at settlement.
-		result += settlement.getBuildingManager().getNumBuilding() / 10D;
+		result += settlement.getBuildingManager().getNumBuildings() / 10D;
 		return result;
 	}
 

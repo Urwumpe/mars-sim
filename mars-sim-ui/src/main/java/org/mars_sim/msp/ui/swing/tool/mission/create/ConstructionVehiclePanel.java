@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ConstructionVehiclePanel.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission.create;
@@ -43,6 +43,7 @@ import org.mars_sim.msp.ui.swing.tool.TableStyle;
 /**
  * A wizard panel for selecting the construction vehicles for a mission.
  */
+@SuppressWarnings("serial")
 class ConstructionVehiclePanel extends WizardPanel {
 
 	/** The wizard panel name. */
@@ -241,7 +242,7 @@ class ConstructionVehiclePanel extends WizardPanel {
                     if (column == 0) 
                         result = vehicle.getName();
                     else if (column == 1) 
-                        result = vehicle.getStatus();
+                        result = vehicle.printStatusTypes();
                     else if (column == 2) {
                         Mission mission = missionManager.getMissionForVehicle(vehicle);
                         if (mission != null) result = mission.getDescription();
@@ -281,7 +282,7 @@ class ConstructionVehiclePanel extends WizardPanel {
             LightUtilityVehicle vehicle = (LightUtilityVehicle) getUnit(row);
             
             if (column == 1) {
-    			if (vehicle.getStatus() != StatusType.PARKED && vehicle.getStatus() != StatusType.GARAGED)
+				if (!vehicle.haveStatusType(StatusType.PARKED) && !vehicle.haveStatusType(StatusType.GARAGED))
                 	result = true;
             }
             else if (column == 2) {

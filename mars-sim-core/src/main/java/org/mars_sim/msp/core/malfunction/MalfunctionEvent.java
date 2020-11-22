@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MalfunctionEvent.java
- * @version 3.1.0 2017-09-04
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.malfunction;
@@ -30,13 +30,12 @@ public class MalfunctionEvent extends HistoricalEvent implements Serializable {
 	 * @param whoAffected Who is being primarily affected by this event.
 	 * @param location0   the building/vehicle where it occurs.
 	 * @param location1   the settlement/coordinate where it occurs.
-	 * 
-	 * 
+	 * @param associatedSettlement   the associated settlement.
 	 */
 	public MalfunctionEvent(EventType type, Malfunction malfunction, String whatCause, String whileDoing,
-			String whoAffected, String location0, String location1) {
+			String whoAffected, String location0, String location1, String associatedSettlement) {
 //			Malfunctionable entity, Malfunction malfunction, EventType eventType, Object actor, String location, boolean fixed) {
 		super(HistoricalEventCategory.MALFUNCTION, type, malfunction, whatCause, whileDoing, whoAffected, location0,
-				location1);
+				location1, associatedSettlement);
 	}
 }

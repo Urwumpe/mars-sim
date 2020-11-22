@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RobotDisplayInfo.java
- * @version 3.1.0 2017-10-20
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -158,5 +158,23 @@ implements UnitDisplayInfo {
 			//}
 		}
 		return result;
+	}
+
+	@Override
+	public Icon getGeologyMapIcon(Unit unit) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Color getGeologyMapLabelColor() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Color getGeologyGlobeColor() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

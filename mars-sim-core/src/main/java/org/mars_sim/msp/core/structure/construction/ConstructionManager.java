@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ConstructionManager.java
- * @version 3.1.0 2017-09-21
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.construction;
@@ -238,24 +238,23 @@ implements Serializable {
 
 		// Move any people in building to somewhere else in the settlement.
 		if (salvagedBuilding.hasFunction(FunctionType.LIFE_SUPPORT)) {
-			LifeSupport lifeSupport = (LifeSupport) salvagedBuilding.getFunction(FunctionType.LIFE_SUPPORT);
+			LifeSupport lifeSupport = salvagedBuilding.getLifeSupport();
 			Iterator<Person> i = lifeSupport.getOccupants().iterator();
 			while (i.hasNext()) {
 				Person occupant = i.next();
-				BuildingManager.removePersonOrRobotFromBuilding(occupant, salvagedBuilding);
-				BuildingManager.addToRandomBuilding(occupant, buildingManager.getSettlement());
+				BuildingManager.removePersonFromBuilding(occupant, salvagedBuilding);
+				BuildingManager.addToRandomBuilding(occupant, buildingManager.getSettlement().getIdentifier());
 			}
 		}
 
-		// 2015-12-23 Added handling robots
 		// Move any robot in building to somewhere else in the settlement.
 		if (salvagedBuilding.hasFunction(FunctionType.ROBOTIC_STATION)) {
-			RoboticStation station = (RoboticStation) salvagedBuilding.getFunction(FunctionType.ROBOTIC_STATION);
+			RoboticStation station = salvagedBuilding.getRoboticStation();
 			Iterator<Robot> i = station.getRobotOccupants().iterator();
 			while (i.hasNext()) {
 				Robot occupant = i.next();
-				BuildingManager.removePersonOrRobotFromBuilding(occupant, salvagedBuilding);
-				BuildingManager.addToRandomBuilding(occupant, buildingManager.getSettlement());
+				BuildingManager.removeRobotFromBuilding(occupant, salvagedBuilding);
+				BuildingManager.addToRandomBuilding(occupant, buildingManager.getSettlement().getIdentifier());
 			}
 		}
 
@@ -264,7 +263,7 @@ implements Serializable {
 		site.setXLocation(salvagedBuilding.getXLocation());
 		site.setYLocation(salvagedBuilding.getYLocation());
 		site.setFacing(salvagedBuilding.getFacing());
-		ConstructionStageInfo buildingStageInfo = ConstructionUtil.getConstructionStageInfo(salvagedBuilding.getName());
+		ConstructionStageInfo buildingStageInfo = ConstructionUtil.getConstructionStageInfo(salvagedBuilding.getBuildingType());
 		if (buildingStageInfo != null) {
 			String frameName = buildingStageInfo.getPrerequisiteStage();
 			ConstructionStageInfo frameStageInfo = ConstructionUtil.getConstructionStageInfo(frameName);
@@ -287,11 +286,11 @@ implements Serializable {
 					buildingStage.setSalvaging(true);
 					site.addNewStage(buildingStage);
 				}
-				else throw new IllegalStateException("Could not find foundation construction stage for building: " + salvagedBuilding.getName());
+				else throw new IllegalStateException("Could not find foundation construction stage for building: " + salvagedBuilding.getBuildingType());
 			}
-			else throw new IllegalStateException("Could not find frame construction stage for building: " + salvagedBuilding.getName());
+			else throw new IllegalStateException("Could not find frame construction stage for building: " + salvagedBuilding.getBuildingType());
 		}
-		else throw new IllegalStateException("Could not find building construction stage for building: " + salvagedBuilding.getName());
+		else throw new IllegalStateException("Could not find building construction stage for building: " + salvagedBuilding.getBuildingType());
 
 		// Clear construction values cache.
 		values.clearCache();

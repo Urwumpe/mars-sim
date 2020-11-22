@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * TrafficLight.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 /*
  * Copyright (c) 2012, Gerrit Grunwald
  * All rights reserved.
@@ -64,6 +71,7 @@ import org.mars_sim.msp.ui.steelseries.tools.Util;
  *
  * @author Gerrit Grunwald <han.solo at muenster.de>
  */
+@SuppressWarnings("serial")
 public class TrafficLight extends JComponent implements ActionListener {
     public static final String RED_PROPERTY = "red";
     public static final String YELLOW_PROPERTY = "yellow";

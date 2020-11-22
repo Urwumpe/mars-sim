@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * WriteReport.java
-  * @version 3.1.0 2017-09-13
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -13,8 +13,10 @@ import java.util.Map;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.RoleType;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.role.RoleType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.Administration;
@@ -38,7 +40,7 @@ public class WriteReport extends Task implements Serializable {
 
 	// Static members
 	/** The stress modified per millisol. */
-	private static final double STRESS_MODIFIER = -1D;
+	private static final double STRESS_MODIFIER = .5D;
 
 	// Data members
 	/** The administration building the person is using. */
@@ -53,7 +55,7 @@ public class WriteReport extends Task implements Serializable {
 	 */
 	public WriteReport(Person person) {
 		// Use Task constructor.
-		super(NAME, person, true, false, STRESS_MODIFIER, true, 10D + RandomUtil.getRandomDouble(20D));
+		super(NAME, person, true, false, STRESS_MODIFIER, true, 10 + RandomUtil.getRandomInt(20));
 
 		if (person.isInSettlement()) {
 
@@ -61,13 +63,31 @@ public class WriteReport extends Task implements Serializable {
 			Building officeBuilding = getAvailableOffice(person);
 			if (officeBuilding != null) {
 				// Walk to the office building.
-				walkToActivitySpotInBuilding(officeBuilding, false);
+				walkToTaskSpecificActivitySpotInBuilding(officeBuilding, false);
 				office = officeBuilding.getAdministration();
-				office.addstaff();
+				if (!office.isFull()) {
+					office.addStaff();
+					// Walk to the dining building.
+					walkToTaskSpecificActivitySpotInBuilding(officeBuilding, true);
+				}
 			}
-
+			else {
+				Building dining = EatDrink.getAvailableDiningBuilding(person, false);
+				// Note: dining building is optional
+				if (dining != null) {
+					// Walk to the dining building.
+					walkToTaskSpecificActivitySpotInBuilding(dining, true);
+				}
+//				else {
+//					// work anywhere
+//				}				
+			}
+			// Initialize phase
+			addPhase(WRITING_REPORT);
+			setPhase(WRITING_REPORT);
+			
 			// set the boolean to true so that it won't be done again today
-			person.getPreference().setTaskDue(this, true);
+//			person.getPreference().setTaskDue(this, true);
 			// }
 		} else if (person.isInVehicle()) {
 
@@ -75,22 +95,22 @@ public class WriteReport extends Task implements Serializable {
 				walkToPassengerActivitySpotInRover((Rover) person.getVehicle(), true);
 
 				// set the boolean to true so that it won't be done again today
-				person.getPreference().setTaskDue(this, true);
+//				person.getPreference().setTaskDue(this, true);
+				
+				// Initialize phase
+				addPhase(WRITING_REPORT);
+				setPhase(WRITING_REPORT);
 			}
-
 		}
 
 		else {
 			endTask();
 		}
 
-		// Initialize phase
-		addPhase(WRITING_REPORT);
-		setPhase(WRITING_REPORT);
 	}
 
 	@Override
-	protected FunctionType getLivingFunction() {
+	public FunctionType getLivingFunction() {
 		return FunctionType.ADMINISTRATION;
 	}
 

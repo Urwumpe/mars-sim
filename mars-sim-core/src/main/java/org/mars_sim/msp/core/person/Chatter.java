@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Chatter.java
- * @version 3.1.0 2016-11-26
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 

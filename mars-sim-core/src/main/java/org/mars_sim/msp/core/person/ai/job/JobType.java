@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * JobType.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -23,18 +23,22 @@ public enum JobType {
 	ASTRONOMER			(Msg.getString("JobType.Astronomer")), //$NON-NLS-1$
 	BIOLOGIST			(Msg.getString("JobType.Biologist")), //$NON-NLS-1$
 	BOTANIST			(Msg.getString("JobType.Botanist")), //$NON-NLS-1$t
+	
 	CHEF				(Msg.getString("JobType.Chef")), //$NON-NLS-1$
 	CHEMIST				(Msg.getString("JobType.Chemist")), //$NON-NLS-1$
 	DOCTOR				(Msg.getString("JobType.Doctor")), //$NON-NLS-1$
-	DRIVER				(Msg.getString("JobType.Driver")), //$NON-NLS-1$
 	ENGINEER			(Msg.getString("JobType.Engineer")), //$NON-NLS-1$
 	MATHEMATICIAN		(Msg.getString("JobType.Mathematician")), //$NON-NLS-1$
+	
 	METEOROLOGIST		(Msg.getString("JobType.Meteorologist")), //$NON-NLS-1$
 	PHYSICIST			(Msg.getString("JobType.Physicist")), //$NON-NLS-1$
+	PILOT				(Msg.getString("JobType.Pilot")), //$NON-NLS-1$
 	POLITICIAN			(Msg.getString("JobType.Politician")), //$NON-NLS-1$
+	PSYCHOLOGIST		(Msg.getString("JobType.Psychologist")), //$NON-NLS-1$
+	
 	REPORTER			(Msg.getString("JobType.Reporter")), //$NON-NLS-1$
 	TECHNICIAN			(Msg.getString("JobType.Technician")), //$NON-NLS-1$
-	TRADER				(Msg.getString("JobType.Trader")) //$NON-NLS-1$
+	TRADER				(Msg.getString("JobType.Trader")), //$NON-NLS-1$
 	;
 
 	public static JobType[] JOB_TYPES = new JobType[]{
@@ -43,15 +47,19 @@ public enum JobType {
 			ASTRONOMER,
 			BIOLOGIST,
 			BOTANIST,
+			
 			CHEF,
 			CHEMIST,
 			DOCTOR,
-			DRIVER,
 			ENGINEER,
 			MATHEMATICIAN,
+			
 			METEOROLOGIST,
 			PHYSICIST,
+			PILOT,
 			POLITICIAN,
+			PSYCHOLOGIST,
+			
 			REPORTER,
 			TECHNICIAN,
 			TRADER	
@@ -124,8 +132,18 @@ public enum JobType {
 		return editedJobList.get(num);
 	}
 	
+	public static int getJobNum(String s) {
+		if (editedJobList.isEmpty())
+			getEditedList();
+		for (int i=0; i<editedJobList.size(); i++) {
+			if (editedJobList.get(i).equalsIgnoreCase(s))
+				return i;
+		}
+		return -1;
+	}
+	
 	/**
-	 * gives back a list of all valid values for the JobType enum.
+	 * Gives back a list of all valid values for the JobType enum.
 	 */
 	public static List<JobType> valuesList() {
 		return Arrays.asList(JobType.values());
