@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TabPanelFavorite.java
- * @version 3.1.0 2017-09-08
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.unit_window.person;
@@ -11,7 +11,6 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 
@@ -27,9 +26,7 @@ import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.Preference;
-import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
 import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
@@ -40,7 +37,6 @@ import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
 import com.alee.laf.text.WebTextField;
 
 //import com.vdurmont.emoji.EmojiParser;
@@ -48,12 +44,20 @@ import com.alee.laf.text.WebTextField;
 /**
  * The TabPanelFavorite is a tab panel for general information about a person.
  */
+@SuppressWarnings("serial")
 public class TabPanelFavorite
 extends TabPanel {
 
-	private WebTable table;
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	/** The Preference Table. */	
+	private JTable table;
+	/** The Preference Table Model. */	
 	private PreferenceTableModel tableModel;
+	/** The Person instance. */
+	private Person person = null;
 	
+	private Font font = new Font("SansSerif", Font.ITALIC, 12);
 
 	/**
 	 * Constructor.
@@ -69,20 +73,28 @@ extends TabPanel {
 			unit, desktop
 		);
 
-		Person person = (Person) unit;
-
+		person = (Person) unit;
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
 		// Create Favorite label panel.
 		WebPanel favoriteLabelPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
 		topContentPanel.add(favoriteLabelPanel);
 
 		// Prepare  Favorite label
 		WebLabel favoriteLabel = new WebLabel(Msg.getString("TabPanelFavorite.label"), WebLabel.CENTER); //$NON-NLS-1$
-		favoriteLabel.setFont(new Font("Serif", Font.BOLD, 16));
+		favoriteLabel.setFont(new Font("Serif", Font.BOLD, 14));
 		favoriteLabelPanel.add(favoriteLabel);
 
 		// Prepare SpringLayout for info panel.
 		WebPanel infoPanel = new WebPanel(new SpringLayout());//GridLayout(4, 2, 0, 0));
-		infoPanel.setBorder(new MarsPanelBorder());
+//		infoPanel.setBorder(new MarsPanelBorder());
 		topContentPanel.add(infoPanel, BorderLayout.NORTH);
 
 		// Prepare main dish name label
@@ -152,35 +164,36 @@ extends TabPanel {
 		                                10, 2);       //xPad, yPad
 
 		// Create label panel.
-		WebPanel labelPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+		WebPanel labelPanel = new WebPanel(new BorderLayout(0, 0));
 		centerContentPanel.add(labelPanel, BorderLayout.NORTH);
-
+		
 		// Create preference title label
-		WebLabel preferenceLabel = new WebLabel(Msg.getString("TabPanelFavorite.preferenceTable.title"), WebLabel.RIGHT); //$NON-NLS-1$
-		preferenceLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		labelPanel.add(preferenceLabel);
-
+		WebLabel preferenceLabel = new WebLabel(Msg.getString("TabPanelFavorite.preferenceTable.title"), WebLabel.CENTER); //$NON-NLS-1$
+		preferenceLabel.setFont(font);
+		labelPanel.add(preferenceLabel, BorderLayout.NORTH);
+		
 		// Create scroll panel
 		WebScrollPane scrollPane = new WebScrollPane();
-		scrollPane.setBorder(new MarsPanelBorder());
+//		scrollPane.setBorder(new MarsPanelBorder());
 		scrollPane.getVerticalScrollBar().setUnitIncrement(10);
 		scrollPane.setHorizontalScrollBarPolicy(WebScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-		centerContentPanel.add(scrollPane,  BorderLayout.CENTER);
-
+//		centerContentPanel.add(scrollPane,  BorderLayout.CENTER);
+		centerContentPanel.add(scrollPane, BorderLayout.CENTER);
+		
 		// Create skill table
 		tableModel = new PreferenceTableModel(person);
 		table = new ZebraJTable(tableModel);
 
 		// Align the preference score to the center of the cell
 		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
-		renderer.setHorizontalAlignment(SwingConstants.CENTER);
+		renderer.setHorizontalAlignment(SwingConstants.LEFT);
 		table.getColumnModel().getColumn(0).setCellRenderer(renderer);
 		table.getColumnModel().getColumn(1).setCellRenderer(renderer);
 
 		table.setPreferredScrollableViewportSize(new Dimension(225, 100));
 		table.getColumnModel().getColumn(0).setPreferredWidth(100);
 		table.getColumnModel().getColumn(1).setPreferredWidth(30);
-		table.setCellSelectionEnabled(false);
+		table.setRowSelectionAllowed(true);
 		table.setDefaultRenderer(Integer.class, new NumberCellRenderer());
 
 		// Added sorting
@@ -197,6 +210,9 @@ extends TabPanel {
 	 */
 	@Override
 	public void update() {
+		if (!uiDone)
+			initializeUI();
+		
 		TableStyle.setTableStyle(table);
 	}
 
@@ -206,9 +222,6 @@ extends TabPanel {
 	 */
 	private static class PreferenceTableModel
 	extends AbstractTableModel {
-
-		/** default serial id. */
-		private static final long serialVersionUID = 1L;
 
 		private Preference manager;
 		private List<String> scoreStringList;
@@ -222,28 +235,27 @@ extends TabPanel {
 		//String smiley = "\uf118";
 		//String frowno = "\uf119";
 		
-        byte[] smileyBytes = new byte[]{(byte)0xF0, (byte)0x9F, (byte)0x98, (byte)0x84};
-        byte[] neutralBytes = new byte[]{(byte)0xF0, (byte)0x9F, (byte)0x98, (byte)0x90};
-        byte[] cryBytes = new byte[]{(byte)0xF0, (byte)0x9F, (byte)0x98, (byte)0xA2};
+//        byte[] smileyBytes = new byte[]{(byte)0xF0, (byte)0x9F, (byte)0x98, (byte)0x84};
+//        byte[] neutralBytes = new byte[]{(byte)0xF0, (byte)0x9F, (byte)0x98, (byte)0x90};
+//        byte[] cryBytes = new byte[]{(byte)0xF0, (byte)0x9F, (byte)0x98, (byte)0xA2};
 
-        String smileyStr = new String(smileyBytes, Charset.forName("UTF-8"));
-        String neutralStr = new String(neutralBytes, Charset.forName("UTF-8"));
-        String cryStr = new String(cryBytes, Charset.forName("UTF-8"));
+//        String smileyStr = new String(smileyBytes, Charset.forName("UTF-8"));
+//        String neutralStr = new String(neutralBytes, Charset.forName("UTF-8"));
+//        String cryStr = new String(cryBytes, Charset.forName("UTF-8"));
 
 		private PreferenceTableModel(Unit unit) {
 
 			Person person = null;
-	        Robot robot = null;
+//	        Robot robot = null;
 
 	        if (unit instanceof Person) {
 	         	person = (Person) unit;
 				manager = person.getPreference();
 	        }
-	        else if (unit instanceof Robot) {
+//	        else if (unit instanceof Robot) {
+//	        }
 
-	        }
-
-	        scoreStringList = manager.getScoreStringList();
+	        scoreStringList = manager.getTaskStringList();
 	        scoreStringMap = manager.getScoreStringMap();
 
 		}
@@ -316,13 +328,13 @@ extends TabPanel {
 				WebLabel cell = (WebLabel) theResult;
 				cell.setText((String)value);
 			}
-/*
-			//WebTableHeader tableHeader = table.getTableHeader();
-		    //if (tableHeader != null) {
-		   // 	tableHeader.setForeground(TableStyle.getHeaderForegroundColor());
-		    //	tableHeader.setBackground(TableStyle.getHeaderBackgroundColor());
-		   // }
-*/
+
+//			WebTableHeader tableHeader = table.getTableHeader();
+//		    if (tableHeader != null) {
+//		    	tableHeader.setForeground(TableStyle.getHeaderForegroundColor());
+//		    	tableHeader.setBackground(TableStyle.getHeaderBackgroundColor());
+//		    }
+
 			return theResult;
 		}
 	}

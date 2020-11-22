@@ -1,12 +1,28 @@
 /**
  * Mars Simulation Project
  * MaintenanceTabPanel.java
- * @version 3.07 2015-03-06
-
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.unit_window;
+
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridLayout;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+
+import javax.swing.BoundedRangeModel;
+import javax.swing.BoxLayout;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JProgressBar;
+import javax.swing.JScrollPane;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
@@ -19,28 +35,27 @@ import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.Conversion;
 
-import javax.swing.*;
-
-import java.awt.*;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
-
 /**
  * The MaintenanceTabPanel is a tab panel for unit maintenance information.
  */
+@SuppressWarnings("serial")
 public class MaintenanceTabPanel extends TabPanel {
 
-    private JLabel wearConditionLabel; // The wear condition label.
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
     private int wearConditionCache; // The cached value for the wear condition.
-    private JLabel lastCompletedLabel; // The last completed label.
-    private BoundedRangeModel progressBarModel; // The progress bar model.
     private int lastCompletedTime; // The time since last completed maintenance.
+    
+    private JLabel wearConditionLabel; // The wear condition label.
+    private JLabel lastCompletedLabel; // The last completed label.
     private JLabel partsLabel; // Label for showing maintenance parts list.
+    private JPanel malfunctionListPanel; // Malfunction list panel.
+   
+    private BoundedRangeModel progressBarModel; // The progress bar model.
+    
     private Collection<MalfunctionPanel> malfunctionPanels; // List of malfunction panels.
     private Collection<Malfunction> malfunctionCache; // List of malfunctions.
-    private JPanel malfunctionListPanel; // Malfunction list panel.
 
     /**
      * Constructor
@@ -52,6 +67,16 @@ public class MaintenanceTabPanel extends TabPanel {
         // Use the TabPanel constructor
         super("Maint", null, "Maintenance", unit, desktop);
 
+		this.unit = unit;
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
         Malfunctionable malfunctionable = (Malfunctionable) unit;
         MalfunctionManager manager = malfunctionable.getMalfunctionManager();
 
@@ -69,9 +94,9 @@ public class MaintenanceTabPanel extends TabPanel {
 
         // Create wear condition label.
         wearConditionCache = (int) Math.round(manager.getWearCondition());
-        wearConditionLabel = new JLabel("Wear Condition: " + wearConditionCache +
+        wearConditionLabel = new JLabel("Condition: " + wearConditionCache +
                 "%", JLabel.CENTER);
-        wearConditionLabel.setToolTipText("The wear & tear condition: 100% = new; 0% = worn out");
+        wearConditionLabel.setToolTipText("The health condition due to wear & tear : 100% = new; 0% = worn out");
         maintenancePanel.add(wearConditionLabel);
 
         // Create lastCompletedLabel.
@@ -103,7 +128,7 @@ public class MaintenanceTabPanel extends TabPanel {
 
         // Prepare malfunction panel
         JPanel malfunctionPanel = new JPanel(new BorderLayout(0, 0));
-        malfunctionPanel.setBorder(new MarsPanelBorder());
+//        malfunctionPanel.setBorder(new MarsPanelBorder());
         centerContentPanel.add(malfunctionPanel, BorderLayout.CENTER);
 
         // Create malfunctions label
@@ -139,7 +164,9 @@ public class MaintenanceTabPanel extends TabPanel {
      * Update this panel
      */
     public void update() {
-
+		if (!uiDone)
+			initializeUI();
+		
         Malfunctionable malfunctionable = (Malfunctionable) unit;
         MalfunctionManager manager = malfunctionable.getMalfunctionManager();
 

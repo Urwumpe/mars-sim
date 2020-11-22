@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * LightUtilityVehiclePanel.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -28,6 +28,7 @@ import java.util.Iterator;
 /**
  * A wizard panel for selecting the mission light utility vehicle.
  */
+@SuppressWarnings("serial")
 class LightUtilityVehiclePanel
 extends WizardPanel {
 
@@ -194,7 +195,7 @@ extends WizardPanel {
 					if (column == 0) 
 						result = vehicle.getName();
 					else if (column == 1) 
-						result = vehicle.getStatus();
+						result = vehicle.printStatusTypes();
 					else if (column == 2) {
 						Mission mission = missionManager.getMissionForVehicle(vehicle);
 						if (mission != null) result = mission.getDescription();
@@ -234,7 +235,7 @@ extends WizardPanel {
 			LightUtilityVehicle vehicle = (LightUtilityVehicle) getUnit(row);
 
 			if (column == 1) {
-    			if (vehicle.getStatus() != StatusType.PARKED && vehicle.getStatus() != StatusType.GARAGED)
+				if (!vehicle.haveStatusType(StatusType.PARKED) && !vehicle.haveStatusType(StatusType.GARAGED))
 					result = true;
 			}
 			else if (column == 2) {

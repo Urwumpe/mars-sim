@@ -1,11 +1,13 @@
 /**
  * Mars Simulation Project
  * Conversion.java
- * @version 3.1.0 2017-03-31
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.core.tool;
+
+import org.mars_sim.msp.core.science.ScienceConfig;
 
 public class Conversion {
 
@@ -77,13 +79,73 @@ public class Conversion {
 //		return s.toString();
 	}
 
+	public static String capitalize0(String input) {
+	    StringBuilder titleCase = new StringBuilder();
+	    boolean nextTitleCase = true;
+
+	    if (input != null) {
+		    for (char c : input.toCharArray()) {
+		        if (Character.isSpaceChar(c) || c == '(' ) {
+		            nextTitleCase = true;
+		        } else if (nextTitleCase) {
+		            c = Character.toTitleCase(c);
+		            nextTitleCase = false;
+		        }
+	
+		        titleCase.append(c);
+		    }
+	    }
+	    
+	    return titleCase.toString();
+	}
+	
 	/**
-	 * Capitalizes the input word
+	 * Capitalizes the first letter of each word in the input phase
 	 * 
-	 * @param input
-	 * @return the modified word
+	 * @param input The input phase
+	 * @return The modified phase
 	 */
 	public static String capitalize(String input) {
+		if (input != null) {
+			StringBuilder s = new StringBuilder();
+			boolean nextTitleCase = true;
+			char[] charArray = input.toCharArray();
+			int index = 0;
+			for (char c : charArray) {
+				if (Character.isSpaceChar(c) 
+						|| c == '('
+						|| c == '-') {
+					nextTitleCase = true;
+				} else if (nextTitleCase) {
+					// Check if it is "And" string and skip making the 'a' upper-case
+					if (input.length() > 2 
+							&& charArray[index] == 'a'
+							&& charArray[index+1] == 'n'
+							&& charArray[index+2] == 'd'
+							&& Character.isSpaceChar(charArray[index+3])) {
+						nextTitleCase = false;	
+					}
+					else {
+						c = Character.toTitleCase(c);
+						nextTitleCase = false;
+					}
+				}
+				s.append(c);
+				index++;
+			}
+			return s.toString();
+			
+		} else
+			return null;
+	}
+
+	/**
+	 * Obtains the initials of each word in the input phase
+	 * 
+	 * @param input The input phase
+	 * @return The initials
+	 */
+	public static String getInitials(String input) {
 		if (input != null) {
 			StringBuilder titleCase = new StringBuilder();
 			boolean nextTitleCase = true;
@@ -93,10 +155,9 @@ public class Conversion {
 					nextTitleCase = true;
 				} else if (nextTitleCase) {
 					c = Character.toTitleCase(c);
+					titleCase.append(c);
 					nextTitleCase = false;
 				}
-
-				titleCase.append(c);
 			}
 
 			return titleCase.toString();
@@ -104,6 +165,7 @@ public class Conversion {
 			return null;
 	}
 
+	
 	public static boolean isInteger(String s, int radix) {
 	    if(s.isEmpty()) return false;
 	    for(int i = 0; i < s.length(); i++) {
@@ -147,5 +209,13 @@ public class Conversion {
 		return true;
 	}
 
+    public static void main(String[] args) {
+			new Conversion();
+			
+			String testString = "he and she are from the galaxy andromeda ! ";
+			String result = capitalize(testString);
+			System.out.println(result);
+    }
+    
 	
 }

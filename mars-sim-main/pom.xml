@@ -1,50 +1,119 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
+<project xmlns="http://maven.apache.org/POM/4.0.0" 
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">	
+	
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<artifactId>mars-sim</artifactId>
-		<groupId>net.sf</groupId>
-		<version>3.1.0-b2</version>
+		<groupId>com.github</groupId>
+		<version>3.1.2</version>
 	</parent>
-	<groupId>net.sf.mars-sim</groupId>
+	<groupId>com.github.mars-sim</groupId>
 	<artifactId>mars-sim-main</artifactId>
 	<name>mars-sim-main</name>
-	<packaging>jar</packaging>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<domainNameMainClass>org.mars_sim.main.MarsProjectStarter</domainNameMainClass>
 	</properties>
+	
+	<dependencies>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<exclusions>
+				<exclusion>
+					<artifactId>hamcrest-core</artifactId>
+					<groupId>org.hamcrest</groupId>
+				</exclusion>
+			</exclusions>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.github.mars-sim</groupId>
+			<artifactId>mars-sim-core</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.mars-sim</groupId>
+			<artifactId>mars-sim-headless</artifactId>
+			<version>${project.version}</version>
+		</dependency>	
+		<dependency>
+			<groupId>com.github.mars-sim</groupId>
+			<artifactId>mars-sim-ui</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/org.apache.commons/commons-lang3
+			 See pom.xml at core submodule
+		<dependency>
+		    <groupId>org.apache.commons</groupId>
+		    <artifactId>commons-lang3</artifactId>
+		    <version>3.9</version>
+		</dependency> -->
+	
+	</dependencies>
+	
 	<build>
-		<plugins>
+		<plugins>				
+			<!-- https://mvnrepository.com/artifact/org.codehaus.mojo/exec-maven-plugin -->
+			<!-- https://www.mojohaus.org/exec-maven-plugin/ -->
+			<!-- https://github.com/mojohaus/mojo-parent -->
 			<plugin>
-				<!-- https://mvnrepository.com/artifact/org.vafer/jdeb : 1.7 MB -->
+		        <groupId>org.codehaus.mojo</groupId>
+		        <artifactId>exec-maven-plugin</artifactId>
+		        <version>1.6.0</version>
+		        <executions>
+		            <execution>
+		                <goals>
+		                    <goal>java</goal>
+		                </goals>
+		            </execution>
+		        </executions>
+		        <configuration>
+		            <executable>java</executable>
+		            <!--mainClass>org.mars_sim.headless.MarsProjectHeadless</mainClass-->
+		            <arguments>
+               			<argument>-Djava.util.logging.config.file=logging.properties -cp .;*;jars\*</argument>
+               			<argument>-classpath</argument>
+            			<classpath/>
+            			<argument>org.mars_sim.main.MarsProject</argument>           			
+               			<argument>-Xms256m -Xmx1536m -new</argument>
+              		</arguments>
+		        </configuration>
+		    </plugin>		
+			<plugin>
+				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-jar-plugin  : 27 KB -->
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
-				<version>3.1.0</version>
+				<version>3.2.0</version>
 				<configuration>
 					<archive>
 						<manifest>
 							<addClasspath>true</addClasspath>
-							<mainClass>org.mars_sim.main.MarsProjectStarter</mainClass>
+							<mainClass>${domainNameMainClass}</mainClass>
 						</manifest>
 					</archive>
 				</configuration>
 			</plugin>
 			<plugin>
-				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-assembly-plugin/3.1.0 
+				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-assembly-plugin 
 					https://maven.apache.org/plugins/maven-assembly-plugin/ : 235 KB -->
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-assembly-plugin</artifactId>
-				<version>3.1.0</version>
+				<version>3.2.0</version>
 				<configuration>
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
 					<archive>
 						<manifest>
-							<mainClass>org.mars_sim.main.MarsProjectStarter</mainClass>
+							<mainClass>${domainNameMainClass}</mainClass>
 						</manifest>
+						<manifestEntries>
+						    <Multi-Release>true</Multi-Release>
+						</manifestEntries>						
 					</archive>
 				</configuration>
 				<executions>
@@ -58,10 +127,11 @@
 				</executions>
 			</plugin>
 			<plugin>
-				<!-- see https://github.com/tcurdt/jdeb -->
+				<!-- https://github.com/tcurdt/jdeb -->
+				<!-- https://mvnrepository.com/artifact/org.vafer/jdeb : 1.8 MB -->
 				<groupId>org.vafer</groupId>
 				<artifactId>jdeb</artifactId>
-				<version>1.6</version>
+				<version>1.8</version>
 				<executions>
 					<execution>
 						<phase>package</phase>
@@ -96,7 +166,7 @@
 									</mapper>
 								</data>
 								<data>
-									<src>${project.basedir}/src/deb/changelog.gz</src>
+									<src>${project.basedir}/src/deb/changelog</src>
 									<type>file</type>
 									<mapper>
 										<type>perm</type>
@@ -120,7 +190,7 @@
 									</mapper>
 								</data>
 								<data>
-									<src>${project.basedir}/src/deb/man/mars-sim.1.gz</src>
+									<src>${project.basedir}/src/deb/man/mars-sim.1</src>
 									<type>file</type>
 									<mapper>
 										<type>perm</type>
@@ -134,35 +204,11 @@
 			</plugin>
 		</plugins>
 	</build>
-	<dependencies>
-		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<exclusions>
-				<exclusion>
-					<artifactId>hamcrest-core</artifactId>
-					<groupId>org.hamcrest</groupId>
-				</exclusion>
-			</exclusions>
-			<version>${junit.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>net.sf.mars-sim</groupId>
-			<artifactId>mars-sim-headless</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>net.sf.mars-sim</groupId>
-			<artifactId>mars-sim-ui</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-	</dependencies>
 
 	<repositories>
 		<repository>
 			<id>jcenter</id>
-			<url>http://jcenter.bintray.com/</url>
+			<url>https://jcenter.bintray.com/</url>
 		</repository>
 	</repositories>
 </project>

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * WalkRoverInterior.java
- * @version 3.1.0 2017-02-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -11,11 +11,15 @@ import java.awt.geom.Point2D;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.vehicle.Rover;
@@ -32,16 +36,16 @@ implements Serializable {
 
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(WalkRoverInterior.class.getName());
-
-	//private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1, logger.getName().length());
-
+	private static String loggerName = logger.getName();
+	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	
 	/** Task phases. */
     private static final TaskPhase WALKING = new TaskPhase(Msg.getString(
             "Task.phase.walking")); //$NON-NLS-1$
 
 	// Static members
 	/** km per hour. */
-	private static final double WALKING_SPEED = 5D;
+	private static final double WALKING_SPEED = Walk.PERSON_WALKING_SPEED;
 	private static final double STRESS_MODIFIER = -.1D;
 	private static final double VERY_SMALL_DISTANCE = .00001D;
 
@@ -56,30 +60,28 @@ implements Serializable {
     public WalkRoverInterior(Person person, Rover rover, double destinationXLocation,
             double destinationYLocation) {
         super("Walking inside a rover", person, false, false, STRESS_MODIFIER, false, 0D);
-/*
-        // Check that the person is currently inside a rover.
-        LocationSituation location = person.getLocationSituation();
 
-        if (location == LocationSituation.IN_SETTLEMENT) {
+        // Check that the person is currently inside a rover.
+        if (!person.isInVehicle()) {
         	LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName, 
-        			person + " is in " + person.getSettlement() + " now but is calling WalkRoverInterior "
-           			+ "task and NOT in rover (" + rover.getName() + ").", null); 
+        			person + " is supposed to be inside rover "
+           			+ rover.getName() + "."); 
     	}
         
-        else if (location == LocationSituation.OUTSIDE) {
-        	LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName, 
-        			person + " is outside but is calling WalkRoverInterior task and NOT in rover (" 
-        			+ rover.getName() + ").", null); 
-            //throw new IllegalStateException(
-            //        "WalkRoverInterior task started when " + person + " is not in a rover.");
-        }
+//        else if (person.isOutside()) {
+//        	LogConsolidated.log(Level.SEVERE, 5000, sourceName, 
+//        			person + " is outside but is calling WalkRoverInterior task and NOT in rover " 
+//        			+ rover.getName() + "."); 
+//            //throw new IllegalStateException(
+//            //        "WalkRoverInterior task started when " + person + " is not in a rover.");
+//        }
 
-        else if (location != LocationSituation.IN_VEHICLE) {
-        	LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName, 
-        		"WalkRoverInterior task started when " + person + " is not in rover (" 
-        			+ rover.getName() + ").", null);
-        }
-*/     
+//        else if (person.isInVehicle()) {
+//        	LogConsolidated.log(Level.SEVERE, 5000, sourceName, 
+//        		"WalkRoverInterior task started when " + person + " is not in rover " 
+//        			+ rover.getName() + ".");
+//        }
+   
         // Initialize data members.
         this.rover = rover;
         this.destXLoc = destinationXLocation;
@@ -99,14 +101,22 @@ implements Serializable {
     public WalkRoverInterior(Robot robot, Rover rover, double destinationXLocation,
             double destinationYLocation) {
         super("Walking Rover Interior", robot, false, false, STRESS_MODIFIER, false, 0D);
-/*
+
         // Check that the robot is currently inside a rover.
-        LocationSituation location = robot.getLocationSituation();
-        if (location != LocationSituation.IN_VEHICLE) {
-            throw new IllegalStateException(
-                    "WalkRoverInterior task started when robot is not in a rover.");
-        }
-*/
+//        LocationSituation location = robot.getLocationSituation();
+//        if (location != LocationSituation.IN_VEHICLE) {
+////            throw new IllegalStateException(
+//            	LogConsolidated.log(Level.SEVERE, 5000, sourceName, 
+//                    robot + " is not in a vheicle but doing WalkRoverInterior task in rover "
+//                    		+ rover.getName() + "."); 
+//        }
+
+        if (!robot.isInVehicle()) {
+        	LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName, 
+        			robot + " is supposed to be inside rover "
+           			+ rover.getName() + "."); 
+    	}
+        
         // Initialize data members.
         this.rover = rover;
         this.destXLoc = destinationXLocation;
@@ -140,8 +150,11 @@ implements Serializable {
     double walkingPhase(double time) {
 
         // Determine walking distance.
-        double timeHours = MarsClock.convertMillisolsToSeconds(time) / 60D / 60D;
-        double distanceKm = WALKING_SPEED * timeHours;
+        double timeHours = MarsClock.HOURS_PER_MILLISOL * time;
+		person.caculateWalkSpeedMod();
+		double mod = person.getWalkSpeedMod();
+//		System.out.println("mod : " + mod);
+        double distanceKm = WALKING_SPEED * timeHours * mod;
         double distanceMeters = distanceKm * 1000D;
         double remainingWalkingDistance = 0;
         if (person != null) {
@@ -174,13 +187,21 @@ implements Serializable {
                     // Set person's location at destination.
                     person.setXLocation(destXLoc);
                     person.setYLocation(destYLoc);
-                    logger.finer(person.getName() + " walked to new location in " + rover.getName());
+//                    logger.finer(person.getName() + " walked to new location in " + rover.getName());
+        			LogConsolidated.log(logger, Level.FINER, 5000, sourceName,
+        					"[" + person.getLocationTag().getLocale() + "] "
+              						+ person + " was in " + person.getLocationTag().getImmediateLocation()
+        					+ " and walked to new location in " + rover.getName() + ".", null);
             	}
             	else if (robot != null) {
                     // Set robot's location at destination.
                     robot.setXLocation(destXLoc);
                     robot.setYLocation(destYLoc);
-                    logger.finer(robot.getName() + " walked to new location in " + rover.getName());
+//                    logger.finer(robot.getName() + " walked to new location in " + rover.getName());
+        			LogConsolidated.log(logger, Level.FINER, 5000, sourceName,
+        					"[" + robot.getLocationTag().getLocale() + "] "
+              						+ robot + " was in " + robot.getLocationTag().getImmediateLocation()
+        					+ " and walked to new location in " + rover.getName() + ".", null);
             	}
 
                 endTask();
@@ -194,13 +215,21 @@ implements Serializable {
                 // Set person's location at destination.
                 person.setXLocation(destXLoc);
                 person.setYLocation(destYLoc);
-                logger.finer(person.getName() + " walked to new location in " + rover.getName());
+//                logger.finer(person.getName() + " walked to new location in " + rover.getName());
+    			LogConsolidated.log(logger, Level.FINER, 5000, sourceName,
+    					"[" + person.getLocationTag().getLocale() + "] "
+          						+ person + " was in " + person.getLocationTag().getImmediateLocation()
+    					+ " and walked to new location in " + rover.getName() + ".", null);
             }
             else if (robot != null) {
                 // Set robot's location at destination.
                 robot.setXLocation(destXLoc);
                 robot.setYLocation(destYLoc);
-                logger.finer(robot.getName() + " walked to new location in " + rover.getName());
+//              logger.finer(robot.getName() + " walked to new location in " + rover.getName());
+    			LogConsolidated.log(logger, Level.FINER, 5000, sourceName,
+    					"[" + robot.getLocationTag().getLocale() + "] "
+          						+ robot + " was in " + robot.getLocationTag().getImmediateLocation()
+    					+ " and walked to new location in " + rover.getName() + ".", null);
             }
 
             endTask();

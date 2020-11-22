@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Technician.java
- * @version 3.07 2015-01-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -9,15 +9,10 @@ package org.mars_sim.msp.core.person.ai.job;
 
 import java.io.Serializable;
 
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
-import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
-import org.mars_sim.msp.core.person.ai.mission.EmergencySupplyMission;
-import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
-import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
 import org.mars_sim.msp.core.person.ai.task.LoadVehicleEVA;
 import org.mars_sim.msp.core.person.ai.task.LoadVehicleGarage;
 import org.mars_sim.msp.core.person.ai.task.MaintainGroundVehicleEVA;
@@ -34,12 +29,14 @@ import org.mars_sim.msp.core.person.ai.task.UnloadVehicleEVA;
 import org.mars_sim.msp.core.person.ai.task.UnloadVehicleGarage;
 import org.mars_sim.msp.core.structure.Settlement;
 
-public class Technician
-extends Job
-implements Serializable {
+public class Technician extends Job implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
+
+	private final int JOB_ID = 17;
+	
+	private double[] roleProspects = new double[] {5.0, 20.0, 15.0, 15.0, 15.0, 15.0, 15.0};
 
 	/**
 	 * Constructor.
@@ -49,9 +46,9 @@ implements Serializable {
 		super(Technician.class);
 
 		// Add technician-related tasks.
-		//jobTasks.add(ConsolidateContainers.class);
+		// jobTasks.add(ConsolidateContainers.class);
 		jobTasks.add(LoadVehicleEVA.class);
-        jobTasks.add(LoadVehicleGarage.class);
+		jobTasks.add(LoadVehicleGarage.class);
 		jobTasks.add(Maintenance.class);
 		jobTasks.add(MaintenanceEVA.class);
 		jobTasks.add(MaintainGroundVehicleGarage.class);
@@ -69,52 +66,70 @@ implements Serializable {
 		// None
 
 		// Add engineer-related missions.
-		jobMissionStarts.add(TravelToSettlement.class);
-		jobMissionJoins.add(TravelToSettlement.class);
-		jobMissionStarts.add(RescueSalvageVehicle.class);
-		jobMissionJoins.add(RescueSalvageVehicle.class);
-		jobMissionJoins.add(BuildingConstructionMission.class);
-		jobMissionJoins.add(BuildingSalvageMission.class);
-		jobMissionStarts.add(EmergencySupplyMission.class);
-		jobMissionJoins.add(EmergencySupplyMission.class);
+//		jobMissionJoins.add(BuildingConstructionMission.class);
+//		jobMissionJoins.add(BuildingSalvageMission.class);
+
 	}
 
 	/**
 	 * Gets a person's capability to perform this job.
+	 * 
 	 * @param person the person to check.
 	 * @return capability (min 0.0).
 	 */
 	public double getCapability(Person person) {
 
-		double result = 0D;
+		double result = 1D;
 
-		int mechanicSkill = person.getMind().getSkillManager().getSkillLevel(SkillType.MECHANICS);
-		result = mechanicSkill;
-
+		int materialsScienceSkill = person.getSkillManager().getSkillLevel(SkillType.MATERIALS_SCIENCE);
+		int mechanicSkill = person.getSkillManager().getSkillLevel(SkillType.MECHANICS);
+		result = mechanicSkill *.75 + materialsScienceSkill * .25;
+		
 		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
 		int experienceAptitude = attributes.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
-		result+= result * ((experienceAptitude - 50D) / 100D);
+		result += result * ((experienceAptitude - 50D) / 100D);
 
-		if (person.getPhysicalCondition().hasSeriousMedicalProblems()) result = 0D;
+		if (person.getPhysicalCondition().hasSeriousMedicalProblems())
+			result = 0D;
 
+//		System.out.println(person + " tech : " + Math.round(result*100.0)/100.0);
 		return result;
 	}
 
 	/**
 	 * Gets the base settlement need for this job.
+	 * 
 	 * @param settlement the settlement in need.
 	 * @return the base need >= 0
 	 */
 	public double getSettlementNeed(Settlement settlement) {
 
-		double result = 0D;
-
+		double result = 1;
+		
+		int population = settlement.getNumCitizens();
+		
 		// Add number of buildings in settlement.
-		result+= settlement.getBuildingManager().getNumBuilding() / 3D;
+		result += settlement.getBuildingManager().getNumBuildings() / 12D;
 
 		// Add number of vehicles parked at settlement.
-		result+= settlement.getParkedVehicleNum() / 3D;
+		result += settlement.getParkedVehicleNum() / 12D;
 
+		result = (result + population / 8D) / 2.0;
+		
+//		System.out.println(settlement + " Technician need: " + result);
+		
 		return result;
+	}
+	
+	public double[] getRoleProspects() {
+		return roleProspects;
+	}
+	
+	public void setRoleProspects(int index, int weight) {
+		roleProspects[index] = weight;
+	}
+	
+	public int getJobID() {
+		return JOB_ID;
 	}
 }

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * LargeBag.java
- * @version 3.1.0 2017-09-04
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -34,7 +34,7 @@ public class LargeBag extends Equipment implements Container, Serializable {
 	 */
 	public LargeBag(Coordinates location) {
 		// Use Equipment constructor
-		super(TYPE, location);
+		super(TYPE, TYPE, location);
 
 		// Sets the base mass of the bag.
 		setBaseMass(EMPTY_MASS);
@@ -63,18 +63,12 @@ public class LargeBag extends Equipment implements Container, Serializable {
 
 	@Override
 	public Building getBuildingLocation() {
-		// TODO Auto-generated method stub
-		return null;
+		return getContainerUnit().getBuildingLocation();
 	}
 
 	@Override
 	public Settlement getAssociatedSettlement() {
-		return this.getAssociatedSettlement();
+		return getContainerUnit().getAssociatedSettlement();
 	}
 
-	@Override
-	public Settlement getBuriedSettlement() {
-		// TODO Auto-generated method stub
-		return null;
-	}
 }

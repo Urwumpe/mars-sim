@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RobotMapLayer.java
- * @version 3.1.0 2017-09-01
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.tool.settlement;
@@ -14,8 +14,6 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -26,16 +24,13 @@ import org.mars_sim.msp.core.structure.building.Building;
 public class RobotMapLayer implements SettlementMapLayer {
 
 	// Static members
-	private static final Color ROBOT_COLOR = LabelMapLayer.ROBOT_LABEL_COLOR;//Color.green; 
-	private static final Color ROBOT_OUTLINE_COLOR = LabelMapLayer.ROBOT_LABEL_OUTLINE_COLOR;//new Color(0, 0, 0, 190);
-	private static final Color SELECTED_COLOR = LabelMapLayer.SELECTED_ROBOT_LABEL_COLOR;//Color.red; 
-	private static final Color SELECTED_OUTLINE_COLOR = LabelMapLayer.SELECTED_ROBOT_LABEL_OUTLINE_COLOR;//.new Color(0, 0, 0, 190);
+	private static final Color ROBOT_COLOR = LabelMapLayer.ROBOT_COLOR;//Color.green; 
+	private static final Color ROBOT_OUTLINE_COLOR = LabelMapLayer.ROBOT_OUTLINE_COLOR;//new Color(0, 0, 0, 190);
+	private static final Color SELECTED_COLOR = LabelMapLayer.ROBOT_SELECTED_COLOR;//Color.red; 
+	private static final Color SELECTED_OUTLINE_COLOR = LabelMapLayer.ROBOT_SELECTED_OUTLINE_COLOR;//.new Color(0, 0, 0, 190);
 
 	// Data members
 	private SettlementMapPanel mapPanel;
-	
-	private static UnitManager unitMgr;
-
 
 	/**
 	 * Constructor
@@ -43,9 +38,7 @@ public class RobotMapLayer implements SettlementMapLayer {
 	 */
 	public RobotMapLayer(SettlementMapPanel mapPanel) {
 		// Initialize data members.
-		this.mapPanel = mapPanel;
-		unitMgr = Simulation.instance().getUnitManager();
-		
+		this.mapPanel = mapPanel;		
 	}
 
 	@Override
@@ -87,7 +80,7 @@ public class RobotMapLayer implements SettlementMapLayer {
 		List<Robot> result = new ArrayList<Robot>();
 
 		if (settlement != null) {
-			Iterator<Robot> i = unitMgr.getRobots().iterator();
+			Iterator<Robot> i = unitManager.getRobots().iterator();
 			while (i.hasNext()) {
 				Robot robot = i.next();
 
@@ -139,49 +132,43 @@ public class RobotMapLayer implements SettlementMapLayer {
 	 */
 	private void drawRobot(Graphics2D g2d, Robot robot, Color iconColor, Color outlineColor, double scale) {
 
-		if (robot != null) {
+		int size = (int)(Math.round(scale / 3.0));
+		size = Math.max(size, 1);
+		
+//		int size1 = (int)(Math.round(size * 1.1));
+		
+		double radius = size / 2.0;
+		
+		// Save original graphics transforms.
+		AffineTransform saveTransform = g2d.getTransform();
 
-			// Save original graphics transforms.
-			AffineTransform saveTransform = g2d.getTransform();
+		double translationX = -1.0 * robot.getXLocation() * scale - radius;
+		double translationY = -1.0 * robot.getYLocation() * scale - radius;
 
-			double circleDiameter = 10D;
-			double centerX = circleDiameter / 2D;
-			double centerY = circleDiameter / 2D;
+		// Apply graphic transforms for label.
+		AffineTransform newTransform = new AffineTransform(saveTransform);
+		newTransform.translate(translationX, translationY);
+		newTransform.rotate(mapPanel.getRotation() * -1D, radius, radius);
+		g2d.setTransform(newTransform);
 
-			double translationX = (-1D * robot.getXLocation() * scale - centerX);
-			double translationY = (-1D * robot.getYLocation() * scale - centerY);
+//		// Set color outline color.
+//		g2d.setColor(outlineColor);
+//		
+//		// Draw outline circle.
+//		g2d.fillOval(0,  0, size1, size1);
+		
+		// Set circle color.
+		g2d.setColor(iconColor);
 
-			// Apply graphic transforms for label.
-			AffineTransform newTransform = new AffineTransform(saveTransform);
-			newTransform.translate(translationX, translationY);
-			newTransform.rotate(mapPanel.getRotation() * -1D, centerX, centerY);
-			g2d.setTransform(newTransform);
+		// Draw circle
+		g2d.fillOval(0, 0, size, size);
 
-			// Set color outline color.
-			//g2d.setColor(outlineColor);
-
-			// Draw outline circle.
-			//g2d.fillOval(0,  0, 11, 11);
-
-			// Set circle color.
-			g2d.setColor(iconColor);
-
-			int size = 1;
-			if (scale > 0)
-				size = (int)(size * scale/2.5);
-			else if (scale <= 0)
-				size = 1;
-			
-			// Draw circle
-			g2d.fillOval(0, 0, size, size);
-
-			// Restore original graphic transforms.
-			g2d.setTransform(saveTransform);
-		}
+		// Restore original graphic transforms.
+		g2d.setTransform(saveTransform);
 	}
 
 	@Override
 	public void destroy() {
-		// Do nothing
+		mapPanel = null;
 	}
 }

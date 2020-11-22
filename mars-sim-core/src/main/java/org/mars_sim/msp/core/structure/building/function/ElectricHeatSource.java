@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ElectricHeatSource.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -83,8 +83,8 @@ implements Serializable {
 	}
 	
 	@Override
-	public void switch2Quarter() {
-		factor = 1/4D;
+	public void switch2OneQuarter() {
+		factor = .25;
 	}
 	
 	@Override
@@ -95,6 +95,11 @@ implements Serializable {
 	@Override
 	public void destroy() {
 		super.destroy();
+	}
+
+	@Override
+	public void switch2ThreeQuarters() {
+		factor = .75;
 	}
 
 

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ReturnLightUtilityVehicleMeta.java
- * @version 3.08 2015-06-08
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -11,7 +11,8 @@ import java.io.Serializable;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.task.ReturnLightUtilityVehicle;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 
@@ -44,7 +45,6 @@ public class ReturnLightUtilityVehicleMeta implements MetaTask, Serializable {
         if (person.isInVehicle() && person.getVehicle() instanceof LightUtilityVehicle) {
             result = 500D;
 
-	        // 2015-06-07 Added Preference modifier
 	        if (result > 0)
             	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
 
@@ -56,7 +56,7 @@ public class ReturnLightUtilityVehicleMeta implements MetaTask, Serializable {
 
 	@Override
 	public Task constructInstance(Robot robot) {
-		return new ReturnLightUtilityVehicle(robot);
+		return null; //new ReturnLightUtilityVehicle(robot);
 	}
 
 	@Override

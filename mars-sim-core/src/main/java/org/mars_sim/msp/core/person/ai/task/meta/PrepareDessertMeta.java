@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PrepareDessertMeta.java
- * @version 3.1.0 2017-09-07
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -12,14 +12,17 @@ import java.io.Serializable;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.task.CookMeal;
 import org.mars_sim.msp.core.person.ai.task.PrepareDessert;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.ai.job.Chefbot;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.cooking.PreparingDessert;
+import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * Meta task for the PrepareSoymilk task.
@@ -60,10 +63,19 @@ public class PrepareDessertMeta implements MetaTask, Serializable {
     public double getProbability(Person person) {
 
         double result = 0D;
-
-        if (person.isInside() && CookMeal.isMealTime(person.getCoordinates())) {
+        
+        if (person.isInside() && CookMeal.isLocalMealTime(person.getCoordinates(), 10)) {
             // Desserts should be prepared during meal times.
         	
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double fatigue = condition.getFatigue();
+            double stress = condition.getStress();
+            double hunger = condition.getHunger();
+            
+            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            	return 0;
+            
             // See if there is an available kitchen.
             Building kitchenBuilding = PrepareDessert.getAvailableKitchen(person);
 
@@ -96,7 +108,7 @@ public class PrepareDessertMeta implements MetaTask, Serializable {
 
                     // Modify if cooking is the person's favorite activity.
                     if (person.getFavorite().getFavoriteActivity() == FavoriteType.COOKING) {
-                        result *= 2D;
+                        result += RandomUtil.getRandomInt(1, 20);
                     }
 
                     // 2015-06-07 Added Preference modifier
@@ -118,7 +130,7 @@ public class PrepareDessertMeta implements MetaTask, Serializable {
 
        double result = 0D;
 
-       if (CookMeal.isMealTime(robot) && robot.getBotMind().getRobotJob() instanceof Chefbot) {
+       if (CookMeal.isMealTime(robot, 10) && robot.getBotMind().getRobotJob() instanceof Chefbot) {
            // See if there is an available kitchen.
            Building kitchenBuilding = PrepareDessert.getAvailableKitchen(robot);
 

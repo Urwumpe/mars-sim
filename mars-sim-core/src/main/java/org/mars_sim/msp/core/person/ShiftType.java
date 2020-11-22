@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ShiftType.java
- * @version 3.1.0 2017-08-30
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 

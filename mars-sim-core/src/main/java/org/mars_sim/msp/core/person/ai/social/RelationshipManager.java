@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RelationshipManager.java
- * @version 3.1.0 2017-09-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.social;
@@ -22,10 +22,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
+import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.PersonalityType;
+import org.mars_sim.msp.core.person.ai.MBTIPersonality;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
@@ -75,14 +76,16 @@ public class RelationshipManager implements Serializable {
 
 	/** The relationship graph. */
 	private Graph relationshipGraph;
-	private int count = 0;
+	
+	private static UnitManager unitManager;
 
 	/**
 	 * Constructor
 	 */
 	public RelationshipManager() {
 		// Create new graph for relationships.
-		relationshipGraph = new DefaultGraph();
+		if (relationshipGraph == null)
+			relationshipGraph = new DefaultGraph();
 	}
 
 	/**
@@ -117,9 +120,9 @@ public class RelationshipManager implements Serializable {
 	private void addPerson(Person person, Collection<Person> initialGroup) {
 		if ((person == null) || (initialGroup == null))
 			throw new IllegalArgumentException("RelationshipManager.addPerson(): null parameter.");
-
-		if (!relationshipGraph.containsNode(person)) {
-			relationshipGraph.addNode(person);
+	
+		if (!relationshipGraph.containsNode(person.getIdentifier())) {
+			relationshipGraph.addNode(person.getIdentifier());
 
 			Iterator<Person> i = initialGroup.iterator();
 			while (i.hasNext()) {
@@ -128,8 +131,7 @@ public class RelationshipManager implements Serializable {
 					addRelationship(person, person2, Relationship.EXISTING_RELATIONSHIP);
 
 					if (logger.isLoggable(Level.FINEST)) {
-						logger.finest(person.getName() + " and " + person2.getName() + " have existing relationship.  "
-								+ count);
+						logger.finest(person.getName() + " and " + person2.getName() + " have existing relationship.");
 					}
 				}
 			}
@@ -147,8 +149,13 @@ public class RelationshipManager implements Serializable {
 	public void addRelationship(Person person1, Person person2, String relationshipType) {
 		try {
 			Relationship relationship = new Relationship(person1, person2, relationshipType);
-			relationshipGraph.addEdge(relationship, person1, person2, false);
-			count++;
+//			if (relationshipType.equals(Relationship.EXISTING_RELATIONSHIP))
+//				;
+//			else if (relationshipType.equals(Relationship.COMMUNICATION_MEETING))
+//				;
+//			else if (relationshipType.equals(Relationship.FIRST_IMPRESSION))
+//				;
+			relationshipGraph.addEdge(relationship, person1.getIdentifier(), person2.getIdentifier(), false);
 		} catch (NoSuchNodeException e) {
 		}
 	}
@@ -161,7 +168,7 @@ public class RelationshipManager implements Serializable {
 	 * @return true if the two people have a relationship
 	 */
 	public boolean hasRelationship(Person person1, Person person2) {
-		EdgePredicate edgePredicate = EdgePredicateFactory.createEqualsNodes(person1, person2,
+		EdgePredicate edgePredicate = EdgePredicateFactory.createEqualsNodes(person1.getIdentifier(), person2.getIdentifier(),
 				GraphUtils.UNDIRECTED_MASK);
 		return (relationshipGraph.getEdge(edgePredicate) != null);
 	}
@@ -176,7 +183,7 @@ public class RelationshipManager implements Serializable {
 	public Relationship getRelationship(Person person1, Person person2) {
 		Relationship result = null;
 		if (hasRelationship(person1, person2)) {
-			EdgePredicate edgePredicate = EdgePredicateFactory.createEqualsNodes(person1, person2,
+			EdgePredicate edgePredicate = EdgePredicateFactory.createEqualsNodes(person1.getIdentifier(), person2.getIdentifier(),
 					GraphUtils.UNDIRECTED_MASK);
 			result = (Relationship) relationshipGraph.getEdge(edgePredicate).getUserObject();
 		}
@@ -190,14 +197,16 @@ public class RelationshipManager implements Serializable {
 	 * @return a list of the person's Relationship objects.
 	 */
 	public List<Relationship> getAllRelationships(Person person) {
-		List<Relationship> result = new ArrayList<Relationship>();
-		Traverser traverser = relationshipGraph.traverser(person, GraphUtils.UNDIRECTED_TRAVERSER_PREDICATE);
-		while (traverser.hasNext()) {
-			traverser.next();
-			Relationship relationship = (Relationship) traverser.getEdge().getUserObject();
-			result.add(relationship);
-		}
-		return result;
+//		if (allRelationshipList == null) {
+		 List<Relationship> allRelationshipList = new ArrayList<Relationship>();
+			Traverser traverser = relationshipGraph.traverser(person.getIdentifier(), GraphUtils.UNDIRECTED_TRAVERSER_PREDICATE);
+			while (traverser.hasNext()) {
+				traverser.next();
+				Relationship relationship = (Relationship) traverser.getEdge().getUserObject();
+				allRelationshipList.add(relationship);
+			}
+//		}
+		return allRelationshipList;
 	}
 
 	/**
@@ -208,21 +217,21 @@ public class RelationshipManager implements Serializable {
 	 */
 	public Collection<Person> getAllKnownPeople(Person person) {
 		Collection<Person> result = new ConcurrentLinkedQueue<Person>();
-		Traverser traverser = relationshipGraph.traverser(person, GraphUtils.UNDIRECTED_TRAVERSER_PREDICATE);
+		Traverser traverser = relationshipGraph.traverser(person.getIdentifier(), GraphUtils.UNDIRECTED_TRAVERSER_PREDICATE);
 		while (traverser.hasNext()) {
-			Person knownPerson = (Person) traverser.next();
+			Person knownPerson = unitManager.getPersonByID((Integer)traverser.next());
 			result.add(knownPerson);
 		}
 		return result;
 	}
 
 	/**
-	 * Gets a map of friends
+	 * Gets a map of my opinions over them
 	 * 
 	 * @param person
-	 * @return {@link Person} array
+	 * @return {@link Person} map
 	 */
-	public Map<Person, Double> getFriends(Person person) {
+	public Map<Person, Double> getMyOpinionsOfThem(Person person) {
 		Map<Person, Double> friends = new HashMap<>();
 		Collection<Person> list = getAllKnownPeople(person);
 //		System.out.println("list : " + list);
@@ -231,6 +240,30 @@ public class RelationshipManager implements Serializable {
 		if (!list.isEmpty()) {
 			for (Person pp : list) {
 				double score = getOpinionOfPerson(person, pp);
+				if (highestScore <= score)
+					highestScore = score;
+					friends.put(pp, score);
+			}
+		}
+
+		return sortByValue(friends);
+	}
+	
+	/**
+	 * Gets a map of their opinions over me
+	 * 
+	 * @param person
+	 * @return {@link Person} map
+	 */
+	public Map<Person, Double> getTheirOpinionsOfMe(Person person) {
+		Map<Person, Double> friends = new HashMap<>();
+		Collection<Person> list = getAllKnownPeople(person);
+//		System.out.println("list : " + list);
+		double highestScore = 0;
+//		double nextScore = 0;	
+		if (!list.isEmpty()) {
+			for (Person pp : list) {
+				double score = getOpinionOfPerson(pp, person);
 				if (highestScore <= score)
 					highestScore = score;
 					friends.put(pp, score);
@@ -271,7 +304,7 @@ public class RelationshipManager implements Serializable {
 	 * @return {@link Person} array
 	 */
 	public Map<Person, Double> getBestFriends(Person person) {
-		Map<Person, Double> bestFriends = getFriends(person);
+		Map<Person, Double> bestFriends = getMyOpinionsOfThem(person);
 		int size = bestFriends.size();
 		if (size == 1) {
 			return bestFriends;
@@ -383,7 +416,7 @@ public class RelationshipManager implements Serializable {
 
 		// Go through each person in local group.
 		Iterator<Person> i = localGroup.iterator();
-		int count2 = 0;
+//		int count2 = 0;
 		while (i.hasNext()) {
 			Person localPerson = i.next();
 			double localPersonStress = localPerson.getPhysicalCondition().getStress();
@@ -394,7 +427,7 @@ public class RelationshipManager implements Serializable {
 
 				if (logger.isLoggable(Level.FINEST)) {
 					logger.finest(
-							person.getName() + " and " + localPerson.getName() + " meet for the first time.  " + count);
+							person.getName() + " and " + localPerson.getName() + " meet for the first time.");
 				}
 			}
 
@@ -438,8 +471,8 @@ public class RelationshipManager implements Serializable {
 					RandomUtil.getRandomDouble(changeAmount += genderBondingModifier);
 
 				// Modify based on personality differences.
-				PersonalityType personPersonality = person.getMind().getMBTI();
-				PersonalityType localPersonality = localPerson.getMind().getMBTI();
+				MBTIPersonality personPersonality = person.getMind().getMBTI();
+				MBTIPersonality localPersonality = localPerson.getMind().getMBTI();
 				double personalityDiffModifier = (2D
 						- (double) personPersonality.getPersonalityDifference(localPersonality.getTypeString())) / 2D;
 				personalityDiffModifier *= PERSONALITY_DIFF_MODIFIER * time;
@@ -463,7 +496,7 @@ public class RelationshipManager implements Serializable {
 				}
 			}
 		}
-		count2++;
+//		count2++;
 	}
 
 	/**
@@ -503,6 +536,39 @@ public class RelationshipManager implements Serializable {
 		else if (opinion < 95) result = Msg.getString("TabPanelSocial.opinion.7"); //$NON-NLS-1$
 		else result = Msg.getString("TabPanelSocial.opinion.8"); //$NON-NLS-1$	
 		return result.toLowerCase();
+	}
+	
+	/**
+	 * Computes the overall relationship score of a settlement
+	 * 
+	 * @param s Settlement
+	 * @return the score
+	 */
+	public double getRelationshipScore(Settlement s) {
+		double score = 0;
+
+		List<Person> list0 = new ArrayList<>(s.getAllAssociatedPeople());
+
+		int count = 0;
+		for (Person pp : list0) {
+			Map<Person, Double> friends = getTheirOpinionsOfMe(pp);//.getMyOpinionsOfThem(pp);
+			if (!friends.isEmpty()) {
+				List<Person> list = new ArrayList<>(friends.keySet());
+				for (int i = 0; i < list.size(); i++) {
+					Person p = list.get(i);
+					score += friends.get(p);
+					count++;
+				}
+			}
+		}
+		
+		score = Math.round(score/count *100.0)/100.0;
+		
+		return score;
+	}
+	
+	public static void initializeInstances(UnitManager u) {
+		unitManager = u;		
 	}
 	
 	/**

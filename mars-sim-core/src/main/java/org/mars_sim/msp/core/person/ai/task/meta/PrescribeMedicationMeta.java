@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PrescribeMedicationMeta.java
- * @version 3.1.0 2017-03-09
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -12,13 +12,14 @@ import java.util.Iterator;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.person.LocationSituation;
+//import org.mars_sim.msp.core.location.LocationSituation;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Doctor;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.task.PrescribeMedication;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.person.health.AnxietyMedication;
 import org.mars_sim.msp.core.person.health.RadiationExposure;
 import org.mars_sim.msp.core.person.health.RadioProtectiveAgent;
@@ -73,11 +74,6 @@ public class PrescribeMedicationMeta implements MetaTask, Serializable {
         
         if (job instanceof Doctor) {
             result = numPatients * 300D;
-            // 2015-06-07 Added Preference modifier
-            if (result > 0D) {
-                result = result + result * person.getPreference().getPreferenceScore(this)/5D;
-            }
-
         }
         
         else {
@@ -87,14 +83,14 @@ public class PrescribeMedicationMeta implements MetaTask, Serializable {
             }
             else {
                 result = numPatients * 150D;
-                // 2015-06-07 Added Preference modifier
-                if (result > 0D) {
-                    result = result + result * person.getPreference().getPreferenceScore(this)/5D;
-                }
-
             }
         }
             
+        double pref = person.getPreference().getPreferenceScore(this);
+        
+        if (pref > 0)
+        	result = result * 3D;
+        
         if (result < 0) result = 0;
         
         // Effort-driven task modifier.
@@ -105,12 +101,12 @@ public class PrescribeMedicationMeta implements MetaTask, Serializable {
 
     public boolean hasADoctor(Person patient) {
     	Collection<Person> list = null;
-        LocationSituation loc = patient.getLocationSituation();
-        if (LocationSituation.IN_SETTLEMENT == loc) {
+//        LocationSituation loc = patient.getLocationSituation();
+        if (patient.isInSettlement()) {//LocationSituation.IN_SETTLEMENT == loc) {
             list = patient.getSettlement().getIndoorPeople();
 
         }
-        else if (LocationSituation.IN_VEHICLE == loc) {
+        else if (patient.isInVehicle()) {//LocationSituation.IN_VEHICLE == loc) {
         	Rover rover = (Rover)patient.getContainerUnit();
         	list = rover.getCrew();
         	
@@ -169,10 +165,10 @@ public class PrescribeMedicationMeta implements MetaTask, Serializable {
         Collection<Person> patientList = null;
         
         if (p != null) {
-	        if (LocationSituation.IN_SETTLEMENT == p.getLocationSituation()) {
+	        if (p.isInSettlement()) {//LocationSituation.IN_SETTLEMENT == p.getLocationSituation()) {
 	            patientList = p.getSettlement().getIndoorPeople();
 	        }
-	        else if (LocationSituation.IN_VEHICLE == p.getLocationSituation()) {
+	        else if (p.isInVehicle()) {//LocationSituation.IN_VEHICLE == p.getLocationSituation()) {
 	            Vehicle vehicle = p.getVehicle();
 	            if (vehicle instanceof Crewable) {
 	                Crewable crewVehicle = (Crewable) vehicle;
@@ -182,10 +178,10 @@ public class PrescribeMedicationMeta implements MetaTask, Serializable {
         }
         
         else if (r != null) {
-	        if (LocationSituation.IN_SETTLEMENT == r.getLocationSituation()) {
+	        if (r.isInSettlement()) {//LocationSituation.IN_SETTLEMENT == r.getLocationSituation()) {
 	            patientList = r.getSettlement().getIndoorPeople();
 	        }
-	        else if (LocationSituation.IN_VEHICLE == r.getLocationSituation()) {
+	        else if (r.isInVehicle()) {//LocationSituation.IN_VEHICLE == r.getLocationSituation()) {
 	            Vehicle vehicle = r.getVehicle();
 	            if (vehicle instanceof Crewable) {
 	                Crewable crewVehicle = (Crewable) vehicle;

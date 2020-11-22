@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Sleep.java
- * @version 3.1.0 2017-01-19
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -15,12 +15,14 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.CircadianClock;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ShiftType;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -28,8 +30,6 @@ import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.LivingAccommodations;
 import org.mars_sim.msp.core.structure.building.function.RoboticStation;
-import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
 
@@ -45,6 +45,11 @@ public class Sleep extends Task implements Serializable {
 
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(Sleep.class.getName());
+//	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+//			logger.getName().length());
+	
+	private static final int MAX_FATIGUE = 2500;
+    private static final int MAX_SUPPRESSION = 100;
 
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.sleep"); //$NON-NLS-1$
@@ -56,239 +61,45 @@ public class Sleep extends Task implements Serializable {
 	private static final String SLEEP_MODE = Msg.getString("Task.description.sleepMode"); //$NON-NLS-1$
 
 	/** Task phases for robot. */
-	private static final TaskPhase SLEEP_MODE_PHASE = new TaskPhase(Msg.getString("Task.phase.sleepMode")); //$NON-NLS-1$
+	private static final TaskPhase SLEEPING_MODE = new TaskPhase(Msg.getString("Task.phase.sleepMode")); //$NON-NLS-1$
 
 	// Static members
 	/** The stress modified per millisol. */
-	private static final double STRESS_MODIFIER = -1.2D;
+	private static final double STRESS_MODIFIER = -2.2D;
 	/** The base alarm time (millisols) at 0 degrees longitude. */
 	private static final double BASE_ALARM_TIME = 300D;
 
 	// Data members
+	private boolean arrived = false;
 	/** The previous time (millisols). */
 	private double previousTime;
-	private double timeFactor;
-
-	/** The living accommodations if any. */
-	private LivingAccommodations accommodations;
-	private RoboticStation station;
-	private CircadianClock circadian;
-	private PhysicalCondition pc;
-
-	private static Simulation sim = Simulation.instance();
-	private static MasterClock masterClock;
-	private static MarsClock marsClock;
+	private double timeFactor = 2.0; // TODO: should vary this factor by person
 
 	/**
 	 * Constructor.
 	 * 
 	 * @param person the person to perform the task
 	 */
-	//
-	// Organized into 9 branching decisions
-	// A bed can be either empty(E) or occupied(O), either unmarked(U) or
-	// designated(D).
-	// thus a 2x2 matrix with 4 possibilities: EU, ED, OU, OD
 	public Sleep(Person person) {
-		super(NAME, person, false, false, STRESS_MODIFIER, true, (100D + RandomUtil.getRandomDouble(10D)));
-
-		if (masterClock == null)
-			masterClock = sim.getMasterClock();
-
-		if (marsClock == null)
-			marsClock = masterClock.getMarsClock();
-
-		pc = person.getPhysicalCondition();
-		circadian = person.getCircadianClock();
-
-		timeFactor = 6D; // TODO: should vary this factor by person
-
-		compute();
-	}
-
-	public void compute() {
-
-		// boolean walkSite = false;
-		// If person is in rover, walk to passenger activity spot.
-		if (person.isInVehicle() && person.getVehicle() instanceof Rover) {
-			walkToPassengerActivitySpotInRover((Rover) person.getVehicle(), true);
+		super(NAME, person, false, false, STRESS_MODIFIER, true, 
+				(50 + RandomUtil.getRandomDouble(5) - RandomUtil.getRandomDouble(5)));
+		
+		if (person.isOutside()) {
+			logger.warning(person + " was not supposed to be falling asleep outside.");
+			endTask();
 		}
-
-		// If person is in a settlement, try to find a living accommodations building.
-		else if (person.isInSettlement()) {
-
-			Settlement s1 = person.getSettlement();
-			Settlement s0 = person.getAssociatedSettlement();
-
-			// check to see if a person is a trader or on a trading mission
-			if (!s1.equals(s0)) {// || s1 != s0) {
-				// yes he is a trader/guest (Case 1-3)
-				// logger.info(person + " is a guest of a trade mission and will use an
-				// unoccupied bed randomly.");
-				// find a best empty (EU, ED) bed
-				Building q2 = getBestAvailableQuarters(person, false);
-
-				if (q2 != null) {
-					// find a best empty, unmarked (EU) bed
-					Building q1 = getBestAvailableQuarters(person, true);
-					if (q1 != null) {
-						// Case 1 : (the BEST case for a guest) the settlement does have one or more
-						// empty, unmarked (EU) bed(s)
-						accommodations = q1.getLivingAccommodations();
-						walkToActivitySpotInBuilding(q1, getLivingFunction(), false);
-						// Building startBuilding = BuildingManager.getBuilding(person);
-						// logger.fine("Case 1: " + person + " is walking from " + startBuilding + " to
-						// use his/her temporary quarters at " + q1);
-
-					} else {
-						// Case 2 : the settlement has only empty, designated (ED) bed(s) available
-						// Question : will the owner of this bed be coming back soon from duty ?
-						// TODO : will split into Case 2a and Case 2b.
-						accommodations = q2.getLivingAccommodations();
-						walkToActivitySpotInBuilding(q2, getLivingFunction(), false);
-						// Building startBuilding = BuildingManager.getBuilding(person);
-						// logger.fine("Case 2: " + person + " is walking from " + startBuilding + " to
-						// use his/her temporary quarters at " + q2);
-
-					}
-
-					accommodations.registerSleeper(person, true);
-					// walkSite = true;
-
-				} else {
-					// Case 3 : the settlement has NO empty bed(s). OU and/or OD only
-					// logger.info("Case 3: " + person + " couldn't find an empty bed at all. Will
-					// find a spot to fall asleep wherever he/she likes.");
-					// TODO: should allow him/her to sleep in gym or anywhere based on his/her usual
-					// preferences
-					// endTask();
-					// Just walk to a random location.
-					walkToRandomLocation(false);
-				}
-
-			} else {
-				// He/she is an inhabitant in this settlement
-
-				// Check if a person has a designated bed
-				Building pq = person.getQuarters();
-
-				if (pq != null) {
-					// This person has his quarters assigned with a designated bed
-					// logger.fine(person + " does have a designated bed at " + pq.getNickName());
-
-					// check if this bed is currently empty or occupied (either ED or OD)
-					Point2D bed = person.getBed();
-					accommodations = pq.getLivingAccommodations();
-					boolean empty = accommodations.isActivitySpotEmpty(bed);
-
-					if (empty) {
-						// Case 4: this designated bed is currently empty (ED)
-						// Building startBuilding = BuildingManager.getBuilding(person);
-
-						// logger.info("Case 4: " + person + " is walking from " + startBuilding + " to
-						// his private quarters at " + pq);
-						// addSubTask(new WalkSettlementInterior(person, quarters, bed.getX(),
-						// bed.getY()));
-						accommodations.registerSleeper(person, false);
-						walkToBed(accommodations, person, false); // can cause StackOverflowError from excessive log or
-																	// calling ExitAirlock
-					} else {
-						// Case 5: this designated bed is currently occupied (OD)
-						// logger.info("Case 5: " + person + " has a designated bed but is currently
-						// occupied. Will find a spot to fall asleep.");
-						// TODO: should allow him/her to sleep in gym or anywhere based on his/her usual
-						// preferences
-						// Just walk to a random location.
-						walkToRandomLocation(false);
-					}
-
-				} else {
-					// this inhabitant has never been assigned a quarter and does not have a
-					// designated bed so far
-					// logger.fine(person + " has never been designated a bed so far");
-
-					// find an empty (either marked or unmarked) bed
-					Building q7 = getBestAvailableQuarters(person, false);
-
-					if (q7 != null) {
-						// yes it has empty (either marked or unmarked) bed
-
-						// find an empty unmarked bed
-						Building q6 = getBestAvailableQuarters(person, true);
-
-						if (q6 != null) {
-							// Case 6: an empty unmarked bed is available for assigning to the person
-
-							// logger.info(q6.getNickName() + " has empty, unmarked bed (ED) that can be
-							// assigned to " + person);
-							// addSubTask(new WalkSettlementInterior(person, quarters, bed.getX(),
-							// bed.getY()));
-							// person.setQuarters(q6);
-							// Point2D bed = person.getBed();
-							accommodations = q6.getLivingAccommodations();
-							accommodations.registerSleeper(person, false);
-							walkToBed(accommodations, person, false);
-							// walkToActivitySpotInBuilding(q7, BuildingFunction.LIVING_ACCOMODATIONS,
-							// false);
-							// Building startBuilding = BuildingManager.getBuilding(person);
-							// logger.info("Case 6: " + person + " is walking from " + startBuilding + " to
-							// use his/her new quarters at " + q6);
-
-						} else {
-							logger.fine(q7.getNickName() + " has an empty, already designated (ED) bed available for "
-									+ person);
-							// Case 7: the settlement has only empty, designated (ED) bed(s) available
-							// Question : will the owner of this bed be coming back soon from duty ?
-							// TODO : will split into Case 2a and Case 2b.
-							/*
-							 * accommodations = (LivingAccommodations)
-							 * q7.getFunction(BuildingFunction.LIVING_ACCOMODATIONS);
-							 * walkToActivitySpotInBuilding(q7, BuildingFunction.LIVING_ACCOMODATIONS,
-							 * false); Building startBuilding = BuildingManager.getBuilding(person);
-							 * logger.info("Case 7a: " + person + " is walking from " + startBuilding +
-							 * " to use someone else's quarters at " + q7);
-							 * accommodations.addSleeper(person, false);
-							 */
-							// logger.info("Case 7b: " + person + " will look for a spot to fall asleep.");
-
-							// Walk to random location.
-							walkToRandomLocation(false);
-						}
-
-					} else {
-
-						// Case 8 : no empty bed at all
-						logger.info("Case 8: " + person
-								+ " couldn't find an empty bed at all. will look for a spot to fall asleep.");
-						// TODO: should allow him/her to sleep in gym or anywhere.
-						// Walk to random location.
-						walkToRandomLocation(false);
-					}
-				}
-			}
+		
+		else {
+			// Initialize phase
+			addPhase(SLEEPING);
+			setPhase(SLEEPING);
 		}
-
-		previousTime = marsClock.getMillisol();
-
-		// Initialize phase
-		addPhase(SLEEPING);
-		setPhase(SLEEPING);
+//		logger.info(person + "  End of Sleep");
 	}
 
 	public Sleep(Robot robot) {
 		super(SLEEP_MODE, robot, false, false, STRESS_MODIFIER, true, 10D);
-
-		if (masterClock == null)
-			masterClock = sim.getMasterClock();
-
-		if (marsClock == null)
-			marsClock = masterClock.getMarsClock();
-
-		botCompute();
-	}
-
-	public void botCompute() {
-
+		
 		// If robot is in a settlement, try to find a living accommodations building.
 		if (robot.isInSettlement()) {
 
@@ -300,31 +111,31 @@ public class Sleep extends Task implements Serializable {
 			// boolean atStation = false;
 			Building currentBuilding = BuildingManager.getBuilding(robot);
 			if (currentBuilding != null) {
-				if (currentBuilding.hasFunction(getRoboticFunction())) {
-					RoboticStation currentStation = currentBuilding.getRoboticStation();
-					if (currentStation.getSleepers() < currentStation.getSlots()) {
-						// atStation = true;
-						station = currentStation;
+//				if (currentBuilding.hasFunction(FunctionType.ROBOTIC_STATION)) {
+					RoboticStation station = currentBuilding.getRoboticStation();
+					if (station.getSleepers() < station.getSlots()) {
 						station.addSleeper();
 
 						// Check if robot is currently at an activity spot for the robotic station.
-						if (currentStation.hasActivitySpots() && !currentStation.isAtActivitySpot(robot)) {
+						if (station.hasActivitySpots() && !station.isAtActivitySpot(robot)) {
 							// Walk to an available activity spot.
-							walkToActivitySpotInBuilding(currentBuilding, true);
+							walkToActivitySpotInBuilding(currentBuilding, FunctionType.ROBOTIC_STATION, true);
+//							walkToTaskFunctionActivitySpot(currentBuilding, true);
 						}
 					}
-				}
+//				}
 			} else {
 				// if (!atStation) {
 				Building building = getAvailableRoboticStationBuilding(robot);
 				if (building != null) {
 					// System.out.println("building.toString() is " + building.toString() );
-					station = building.getRoboticStation();
+					RoboticStation station = building.getRoboticStation();
 					if (station != null) {
 						// TODO: see https://github.com/mars-sim/mars-sim/issues/22
 						// Question: why would the method below cause RepairBot to walk outside the
 						// settlement to a vehicle ?
-						walkToActivitySpotInBuilding(building, true);
+						walkToActivitySpotInBuilding(building, FunctionType.ROBOTIC_STATION, true);
+//						walkToTaskFunctionActivitySpot(building, true);
 						// TODO: need to add activity spots in every building or
 						// walkToActivitySpotInBuilding(building, false) will fail
 						// and create java.lang.NullPointerException
@@ -337,17 +148,17 @@ public class Sleep extends Task implements Serializable {
 		previousTime = marsClock.getMillisol();
 
 		// Initialize phase
-		addPhase(SLEEP_MODE_PHASE);
-		setPhase(SLEEP_MODE_PHASE);
+		addPhase(SLEEPING_MODE);
+		setPhase(SLEEPING_MODE);
 	}
 
 	@Override
-	protected FunctionType getLivingFunction() {
-		return FunctionType.LIVING_ACCOMODATIONS;
+	public FunctionType getLivingFunction() {
+		return FunctionType.LIVING_ACCOMMODATIONS;
 	}
 
 	@Override
-	protected FunctionType getRoboticFunction() {
+	public FunctionType getRoboticFunction() {
 		return FunctionType.ROBOTIC_STATION;
 	}
 
@@ -365,7 +176,7 @@ public class Sleep extends Task implements Serializable {
 		else if (robot != null) {
 			if (getPhase() == null)
 				throw new IllegalArgumentException("Task phase is null");
-			else if (SLEEP_MODE_PHASE.equals(getPhase()))
+			else if (SLEEPING_MODE.equals(getPhase()))
 				return sleepingPhase(time);
 			else
 				return time;
@@ -373,6 +184,190 @@ public class Sleep extends Task implements Serializable {
 		return time;
 	}
 
+	private void walkToDestination() {
+		if (!arrived) {
+			// If person is in rover, walk to passenger activity spot.
+			if (person.isInVehicle() && person.getVehicle() instanceof Rover) {
+				
+				walkToPassengerActivitySpotInRover((Rover) person.getVehicle(), true);
+			
+				previousTime = marsClock.getMillisol();
+	
+	//			logger.info(person + " will sleep at " + person.getVehicle());
+			}
+	
+			// If person is in a settlement, try to find a living accommodations building.
+			else if (person.isInSettlement()) {
+				// Double the sleep duration
+				setDuration(getDuration() * 2);
+				
+	//	    	if (BuildingManager.isInBuildingAirlock(person))
+	//	    		;
+		    	
+				// Note: A bed can be either unmarked(U) or marked(M); and either empty(E) or occupied(O).
+				// 4 possibilities : ME, MO, UE, or UO
+	
+				Settlement s1 = person.getSettlement();
+				Settlement s0 = person.getAssociatedSettlement();
+				
+				if (s1 != null && !s1.equals(s0)) {
+					// This person is a trader, a tourist, or a guest to this settlement
+					
+	//				logger.info(person + " (from " + person.getAssociatedSettlement() + ") is in " + person.getSettlement());
+					
+					//////////////////// Case 1 - 3 /////////////////////////
+	
+					Building q0 = getBestAvailableQuarters(person, true);
+					
+					if (q0 != null) {
+						// Case 1 : (the BEST case for a guest) unmarked, empty (UE) bed(s)
+						
+	//					accommodations = q0.getLivingAccommodations();
+						// TODO: need to figure out first how to deregister a trader/tourist once he departs 
+	//					accommodations.registerSleeper(person, true);
+						
+						walkToActivitySpotInBuilding(q0, FunctionType.LIVING_ACCOMMODATIONS, true);
+	//					walkToAnUnoccupiedBed(q0, true);
+						// addSubTask(new WalkSettlementInterior(person, quarters, bed.getX(), bed.getY()));
+					} 
+					
+					else { // no unmarked bed
+						
+						q0 = getBestAvailableQuarters(person, false);
+						
+						if (q0 != null) {
+							// Case 2 : marked, empty (ME) bed(s)
+							
+	//						accommodations = q0.getLivingAccommodations();
+							// TODO: need to figure out first how to deregister a trader/tourist once he departs 
+	//						accommodations.registerSleeper(person, true);
+							
+							walkToActivitySpotInBuilding(q0, FunctionType.LIVING_ACCOMMODATIONS, true);
+	//						walkToAnUnoccupiedBed(q0, true);
+						}
+						else { 
+							// Case 3 :  NO empty bed(s)
+							
+							walkToRandomLocation(true);
+							// TODO: should allow him/her to sleep in gym or anywhere based on his/her usual
+							// preferences
+						}
+					}
+				}
+				
+				else {
+					//////////////////// Case 4 - ? /////////////////////////
+					
+					// He/she is an inhabitant in this settlement
+	//				logger.info(person + " (from " + person.getAssociatedSettlement() + ") is also in " + person.getSettlement());
+					
+					// Check if a person has a designated quarters and a marked bed
+					Building q1 = person.getQuarters();
+	
+					if (q1 != null) {
+						// This person has his quarters and have a designated bed
+						// logger.fine(person + " does have a designated bed at " + pq.getNickName());
+	
+						// check if this bed is currently empty or occupied (either ED or OD)
+						Point2D bed = person.getBed();
+						double x = bed.getX();
+						double y = bed.getY();
+						
+	//					accommodations = q1.getLivingAccommodations();
+						// Concert the coordinate back 
+						Point2D spot = new Point2D.Double(x - q1.getXLocation(), y - q1.getYLocation());
+						
+						boolean empty = q1.getLivingAccommodations().isActivitySpotEmpty(spot);
+	
+						if (empty) {
+							// the BEST case for an inhabitant
+							// Case 4: marked and empty (ME)
+	
+							// addSubTask(new WalkSettlementInterior(person, quarters, bed.getX(),
+							// bed.getY()));
+	
+							walkToBed(q1, person, true);
+						} 
+						
+						else { // unfortunately his/her marked bed is not empty
+	
+							q1 = getBestAvailableQuarters(person, true);
+							
+							if (q1 != null)
+								// Case 5: unmarked empty (UE)
+							
+								walkToActivitySpotInBuilding(q1, FunctionType.LIVING_ACCOMMODATIONS, true);
+	//							walkToAnUnoccupiedBed(q1, true);
+							
+							else { // no unmarked bed
+								
+								q1 = getBestAvailableQuarters(person, false);
+								
+								if (q1 != null) {
+									// Case 6: this marked bed is currently empty (ME) 	
+									
+									walkToActivitySpotInBuilding(q1, FunctionType.LIVING_ACCOMMODATIONS, true);
+	//								walkToAnUnoccupiedBed(q1, true);
+								}
+								
+								else {
+									// Case 7: No beds available, go to any activity spots
+									
+									walkToRandomLocation(true);
+									
+									// TODO: should allow him/her to sleep in gym or anywhere based on his/her usual
+									// preferences
+								}
+							}
+						}
+					}
+					
+					else {
+						// this inhabitant has never registered a bed and have no designated quarter
+						// logger.fine(person + " has never been designated a bed so far");
+	
+						q1 = getBestAvailableQuarters(person, true);
+						
+	//					accommodations = q1.getLivingAccommodations();
+	//					
+	//					Point2D bed = q1.getLivingAccommodations().registerSleeper(person, false);
+						
+						if (q1 != null && q1.getLivingAccommodations().registerSleeper(person, false) != null) {
+							// Case 8: unmarked, empty (UE) bed
+							
+							walkToBed(q1, person, true);
+							
+						}
+						
+						else { // no unmarked bed
+							
+							q1 = getBestAvailableQuarters(person, false);
+							
+							if (q1 != null)
+								// Case 9: marked, empty (ME)
+			
+								walkToActivitySpotInBuilding(q1, FunctionType.LIVING_ACCOMMODATIONS, true);
+	//							walkToAnUnoccupiedBed(q1, true);
+							else
+								// Case 10: No beds available, go to any activity spots
+								
+								walkToRandomLocation(true);
+							
+							// TODO: should allow him/her to sleep in gym or anywhere based on his/her usual
+							// preferences
+						}
+					}
+				}
+	
+				previousTime = marsClock.getMillisol();
+
+	//			logger.info(person + " will sleep at " + person.getSettlement());
+			}
+			
+			arrived = true;
+		}
+	}
+	
 	/**
 	 * Performs the sleeping phase.
 	 * 
@@ -380,50 +375,110 @@ public class Sleep extends Task implements Serializable {
 	 * @return the amount of time (millisols) left over after performing the phase.
 	 */
 	private double sleepingPhase(double time) {
-		if (masterClock == null)
-			masterClock = sim.getMasterClock();
-
-		if (marsClock == null)
-			marsClock = masterClock.getMarsClock();// needed for loading a saved sim
-
+//		logger.info(person + " at sleepingPhase()");
+		
 		if (person != null) {
 
+			// Clear the sub task to avoid getting stuck at walkin
+			endSubTask();
+			
+			// Walk to a bed if possible
+			walkToDestination();
+			
+			PhysicalCondition pc = person.getPhysicalCondition();
+			CircadianClock circadian = person.getCircadianClock();
+			
 			pc.recoverFromSoreness(.05);
 
-			// Obtain the fractionOfRest to restore fatigue faster in high fatigue case
-			double fractionOfRest = time / 1000 * timeFactor;
-
-			// Note : timeFactor is 3 since a person typically spent 1/3 of time sleeping in
-			// a day.
-
+			double fractionOfRest = time * timeFactor;
+			double newFatigue = 0;
+			// Calculate the residualFatigue to speed up the recuperation for the high fatigue case
+			double residualFatigue = 0;
 			double f = pc.getFatigue();
 
-			double residualFatigue = 0;
+			if (f < 62.5)
+				residualFatigue = f / 150.0;
 
-			if (f > 1000)
-				residualFatigue = (f - 1000) / 2000;
+			else if (f < 125)
+				residualFatigue = (f - 62.5) / 140.0;
 
-			// Reduce person's fatigue
-			double newFatigue = f - f * fractionOfRest + residualFatigue;
+			else if (f < 250)
+				residualFatigue = (f - 125) / 130.0;
 
+			else if (f < 500)
+				residualFatigue = (f - 250) / 120.0;
+
+			else if (f < 750)
+				residualFatigue = (f - 500) / 110.0;
+
+			else if (f < 1000)
+				residualFatigue = (f - 750) / 100.0;
+
+			else if (f < 1250)
+				residualFatigue = (f - 1000) / 90.0;
+			
+			else if (f < 1500)
+				residualFatigue = (f - 1250) / 80.0;
+
+			else if (f < 1750)
+				residualFatigue = (f - 1500) / 70.0;
+			
+			else if (f < 2000)
+				residualFatigue = (f - 1750) / 60.0;
+
+			else if (f < MAX_FATIGUE) 
+				residualFatigue = (f - 2000) / 50.0;
+			
+			else 
+				residualFatigue = (f - MAX_FATIGUE) / 40.0;
+			
+			newFatigue = f - fractionOfRest - residualFatigue;	
+//			logger.info(person + " f : " + Math.round(f*10.0)/10.0
+//					+ "   time : " + Math.round(time*1000.0)/1000.0
+//					+ "   residualFatigue : " + Math.round(residualFatigue*10.0)/10.0  
+//					+ "   fractionOfRest : " + Math.round(fractionOfRest*10.0)/10.0  
+//							+ "   newFatigue : " + Math.round(newFatigue*10.0)/10.0);
+				
+			if (newFatigue < 0)
+				newFatigue = 0;
+			
 			pc.setFatigue(newFatigue);
-
+				
 			circadian.setAwake(false);
+			
+//			totalSleepTime += time;
+//			logger.info(person + "  time: " + Math.round(time*1000.0)/1000.0
+//					+ "  totalSleepTime: " + Math.round(totalSleepTime*1000.0)/1000.0);
+			
+			// Adjust the leptin and ghrelin level
 			circadian.getRested(time);
 
 			// Record the sleep time [in millisols]
 			circadian.recordSleep(time);
 			
-			circadian.setNumSleep(circadian.getNumSleep() + 1);
-			circadian.updateSleepCycle((int) marsClock.getMillisol(), true);
-
-			// Check if alarm went off
+			if (person.getTaskSchedule().isShiftHour(marsClock.getMillisolInt())) {
+				// Reduce the probability if it's not the right time to sleep
+				refreshSleepHabit(person, circadian);
+			}
+			
 			double newTime = marsClock.getMillisol();
+			
+			// Check if fatigue is zero
+			if (newFatigue <= 0) {
+				logger.info(person.getName() + " woke up, totally refreshed from a good sleep at " + (int)newTime + " millisols.");;
+				circadian.setAwake(true);
+				endTask();
+			}
+			
 			double alarmTime = getAlarmTime();
 
+			// Check if alarm went off
 			if ((previousTime <= alarmTime) && (newTime >= alarmTime)) {
+				circadian.setNumSleep(circadian.getNumSleep() + 1);
+				circadian.updateSleepCycle((int) marsClock.getMillisol(), true);
+				logger.finer(person.getName() + " woke up by the alarm at " + (int)alarmTime + " millisols.");
+				circadian.setAwake(true);
 				endTask();
-				logger.finest(person.getName() + " woke up from alarm.");
 			} else {
 				previousTime = newTime;
 			}
@@ -431,12 +486,13 @@ public class Sleep extends Task implements Serializable {
 		}
 
 		else if (robot != null) {
-			// Check if alarm went off.
 			double newTime = marsClock.getMillisol();
 			double alarmTime = getAlarmTime();
+			
+			// Check if alarm went off
 			if ((previousTime <= alarmTime) && (newTime >= alarmTime)) {
+				logger.finer(robot.getName() + " woke up by the alarm at " + (int)alarmTime + " millisols.");
 				endTask();
-				logger.finest(robot.getName() + " woke up from alarm.");
 			} else {
 				previousTime = newTime;
 			}
@@ -452,25 +508,24 @@ public class Sleep extends Task implements Serializable {
 
 	@Override
 	public void endTask() {
-		super.endTask();
-
 		if (person != null) {
+//	    	logger.info(person.getNickName() + " called endTask() in " + this);
 			// Remove person from living accommodations bed so others can use it.
-			if (accommodations != null && accommodations.getSleepers() > 0) {
-				accommodations.removeSleeper(person);
-			}
-
-			circadian.setAwake(true);
+//			if (accommodations != null && accommodations.getRegisteredSleepers() > 0) {
+//				accommodations.removeSleeper(person);
+//			}
 
 		} else if (robot != null) {
 			// Remove robot from stations so other robots can use it.
-			if (station != null && station.getSleepers() > 0) {
-				station.removeSleeper();
+//			if (station != null && station.getSleepers() > 0) {
+//				station.removeSleeper();
 				// TODO: assess how well this work
-//	        	logger.info(robot.getNickName() + " was done sleeping and waking up.");
-				walkToAssignedDutyLocation(robot, false);
-			}
+//			}
+//    		logger.info(robot.getNickName() + " was done sleeping and waking up.");
+			walkToAssignedDutyLocation(robot, true);
 		}
+		
+		super.endTask();
 	}
 
 	/**
@@ -490,13 +545,16 @@ public class Sleep extends Task implements Serializable {
 		if (person.isInSettlement()) {
 			// BuildingManager manager = person.getSettlement().getBuildingManager();
 			List<Building> quartersBuildings = person.getSettlement().getBuildingManager()
-					.getBuildings(FunctionType.LIVING_ACCOMODATIONS);
+					.getBuildings(FunctionType.LIVING_ACCOMMODATIONS);
 			quartersBuildings = BuildingManager.getNonMalfunctioningBuildings(quartersBuildings);
 			quartersBuildings = getQuartersWithEmptyBeds(quartersBuildings, unmarked);
 			if (quartersBuildings.size() > 0) {
 				quartersBuildings = BuildingManager.getLeastCrowdedBuildings(quartersBuildings);
 			}
-			if (quartersBuildings.size() > 0) {
+			if (quartersBuildings.size() == 1) {
+				return quartersBuildings.get(0);
+			}
+			else if (quartersBuildings.size() > 1) {
 				Map<Building, Double> quartersBuildingProbs = BuildingManager.getBestRelationshipBuildings(person,
 						quartersBuildings);
 				result = RandomUtil.getWeightedRandomObject(quartersBuildingProbs);
@@ -546,19 +604,27 @@ public class Sleep extends Task implements Serializable {
 
 		for (Building building : buildingList) {
 			LivingAccommodations quarters = building.getLivingAccommodations();
-			boolean notFull = quarters.getSleepers() < quarters.getBeds();
+			boolean notFull = quarters.getNumEmptyActivitySpots() > 0;//quarters.getRegisteredSleepers() < quarters.getBedCap();
 			// Check if an unmarked bed is wanted
-			if (unmarked && notFull && quarters.hasAnUnmarkedBed()) {
-				result.add(building);
-			} else if (notFull) {
+			if (unmarked) {
+				if (quarters.hasAnUnmarkedBed() && notFull) {
+					result.add(building);
+				}
+			}
+			else if (notFull) {
 				result.add(building);
 			}
-
 		}
 
 		return result;
 	}
 
+	/***
+	 * Gets a list of robotic stations with empty spots
+	 * 
+	 * @param buildingList
+	 * @return
+	 */
 	private static List<Building> getRoboticStationsWithEmptySlots(List<Building> buildingList) {
 		List<Building> result = new ArrayList<Building>();
 
@@ -575,43 +641,211 @@ public class Sleep extends Task implements Serializable {
 	}
 
 	/**
-	 * Gets the wakeup alarm time for the person's longitude.
+	 * Gets the wake-up alarm time, based on a person's shift
 	 * 
 	 * @return alarm time in millisols.
 	 */
 	private double getAlarmTime() {
 		double timeDiff = 0;
-		double modifiedAlarmTime = 0;
+		double time = 0;
 
 		if (person != null) {
 			ShiftType shiftType = person.getTaskSchedule().getShiftType();
-			// Set to 50 millisols prior to the beginning of the duty shift hour
+			// Set to 30 millisols prior to the beginning of the duty shift hour
 			if (shiftType == ShiftType.A)
-				modifiedAlarmTime = 950;
+				time = TaskSchedule.A_START - 30; // 220
 			else if (shiftType == ShiftType.B)
-				modifiedAlarmTime = 450;
+				time = TaskSchedule.B_START - 30; // 721;
 			else if (shiftType == ShiftType.X)
-				modifiedAlarmTime = 950;
+				time = TaskSchedule.X_START - 30; // 970;
 			else if (shiftType == ShiftType.Y)
-				modifiedAlarmTime = 283;
+				time = TaskSchedule.Y_START - 30; // 304;
 			else if (shiftType == ShiftType.Z)
-				modifiedAlarmTime = 616;
-			else if (shiftType == ShiftType.ON_CALL) { // if only one person is at the settlement, go with this schedule
+				time = TaskSchedule.Z_START - 30; // 637;
+			else if (shiftType == ShiftType.ON_CALL) { 
+				// if a person is on a mission outside, assume the day begins with 
+				// the sun rises at ~250 milisols at 0 longitude
 				timeDiff = 1000D * (person.getCoordinates().getTheta() / (2D * Math.PI));
-				modifiedAlarmTime = BASE_ALARM_TIME - timeDiff;
+				time = BASE_ALARM_TIME - timeDiff;
+				if (time < 0D) {
+					time += 1000D;
+				}
 			}
 
 		} else if (robot != null) {
 			timeDiff = 1000D * (robot.getCoordinates().getTheta() / (2D * Math.PI));
-
+			time = BASE_ALARM_TIME - timeDiff;
+			if (time < 0D) {
+				time += 1000D;
+			}
 		}
 
-		if (modifiedAlarmTime < 0D) {
-			modifiedAlarmTime += 1000D;
-		}
-		return modifiedAlarmTime;
+		return time;
 	}
 
+	/**
+     * Refreshes a person's sleep habit based on his/her latest work shift 
+     * 
+     * @param person
+     */
+    public void refreshSleepHabit(Person person, CircadianClock circadian) {
+    	int now = marsClock.getMillisolInt();
+
+        // if a person is NOT on-call
+        if (person.getTaskSchedule().getShiftType() != ShiftType.ON_CALL) {
+	        // if a person is on shift right now
+           	if (person.getTaskSchedule().isShiftHour(now)) {
+
+           		int habit = circadian.getSuppressHabit();
+           		int spaceOut = circadian.getSpaceOut();
+	           	// limit adjustment to 10 times and space it out to at least 50 millisols apart
+           		if (spaceOut < now && habit < MAX_SUPPRESSION) {
+	           		// Discourage the person from forming the sleep habit at this time
+		  	  		person.updateSleepCycle(now, false);
+			    	//System.out.println("spaceOut : " + spaceOut + "   now : " + now + "  suppressHabit : " + habit);
+
+		  	  		int rand = RandomUtil.getRandomInt(2);
+		  	  		if (rand == 2) {
+				    	circadian.setSuppressHabit(habit+1);
+				    	spaceOut = now + 20;
+				    	if (spaceOut > 1000) {
+				    		spaceOut = spaceOut - 1000;
+				    	}
+				    	circadian.setSpaceOut(spaceOut);
+		  	  		}
+           		}
+		    }
+
+//           	else {
+//           		int future = now;
+//                // Check if person's work shift will begin within the next 50 millisols.
+//           		future += 50;
+//	            if (future > 1000)
+//	            	future = future - 1000;
+//
+//	            boolean willBeShiftHour = person.getTaskSchedule().isShiftHour(future);
+//	            if (willBeShiftHour) {
+//	            	//if work shift is slated to begin in the next 50 millisols, probability of sleep reduces to one tenth of its value
+//	                result = result / 10D;
+//	            }
+//	            //else
+//	            	//result = result * 2D;
+//           	}
+	    }
+        
+//        else {
+//        	// if he's on-call
+//        	result = result * 1.1D;
+//        }
+
+    }
+    
+//    /**
+//     * Walks back inside
+//     * 
+//     * @return true if this unit can walk back inside
+//     */
+//	public boolean walkBackInside() {
+//		if (!person.isOutside())
+//			return false;
+//		LocalBoundedObject interiorObject = null;
+//		boolean canWalkInside = true;
+//		// Get closest airlock building at settlement.
+//		Settlement s = person.getLocationTag().findSettlementVicinity();
+//		if (s != null) {
+//			interiorObject = (Building)(s.getClosestAvailableAirlock(person).getEntity()); 
+////			System.out.println("interiorObject is " + interiorObject);
+//			if (interiorObject == null)
+//				interiorObject = (LocalBoundedObject)(s.getClosestAvailableAirlock(person).getEntity());
+////			System.out.println("interiorObject is " + interiorObject);
+//			LogConsolidated.log(logger, Level.INFO, 4000, sourceName,
+//					"[" + person.getLocationTag().getLocale() + "] " + person.getName()
+//					+ " at "
+//					+ person.getLocationTag().getImmediateLocation()
+//					+ " found " + ((Building)interiorObject).getNickName()
+//					+ " as the closest building with an airlock to enter.");
+//		}
+//		else {
+//			// near a vehicle
+//			Rover r = (Rover)person.getVehicle();
+//			interiorObject = (LocalBoundedObject) (r.getAirlock()).getEntity();
+//			LogConsolidated.log(logger, Level.INFO, 4000, sourceName,
+//					"[" + person.getLocationTag().getLocale() + "] " + person.getName()
+//					+ " was near " + r.getName()
+//					+ " and had to walk back inside the vehicle.");
+//		}
+//		
+//		 Point2D returnInsideLoc;
+//		 
+//		if (interiorObject == null) {
+//			LogConsolidated.log(logger, Level.WARNING, 4000, sourceName,
+//				"[" + person.getLocationTag().getLocale() + "] " + person.getName()
+//				+ " was near " + person.getLocationTag().getImmediateLocation()
+//				+ " at (" + Math.round(returnInsideLoc.getX()*10.0)/10.0 + ", " 
+//				+ Math.round(returnInsideLoc.getY()*10.0)/10.0 + ") "
+//				+ " but interiorObject is null.");
+//			canWalkInside = false;
+//		}
+//		else {
+//			// Set return location.
+//			Point2D rawReturnInsideLoc = LocalAreaUtil.getRandomInteriorLocation(interiorObject);
+//			returnInsideLoc = LocalAreaUtil.getLocalRelativeLocation(rawReturnInsideLoc.getX(),
+//					rawReturnInsideLoc.getY(), interiorObject);
+//			
+//			if (returnInsideLoc != null && !LocalAreaUtil.checkLocationWithinLocalBoundedObject(returnInsideLoc.getX(),
+//						returnInsideLoc.getY(), interiorObject)) {
+//				LogConsolidated.log(logger, Level.WARNING, 4000, sourceName,
+//						"[" + person.getLocationTag().getLocale() + "] " + person.getName()
+//						+ " was near " + ((Building)interiorObject).getNickName() //person.getLocationTag().getImmediateLocation()
+//						+ " at (" + Math.round(returnInsideLoc.getX()*10.0)/10.0 + ", " 
+//						+ Math.round(returnInsideLoc.getY()*10.0)/10.0 + ") "
+//						+ " but could not be found inside " + interiorObject);
+//				canWalkInside = false;
+//			}
+//		}
+//
+//		// If not at return inside location, create walk inside subtask.
+//        Point2D personLocation = new Point2D.Double(person.getXLocation(), person.getYLocation());
+//        boolean closeToLocation = LocalAreaUtil.areLocationsClose(personLocation, returnInsideLoc);
+//        
+//		// If not inside, create walk inside subtask.
+//		if (interiorObject != null && !closeToLocation) {
+//			String name = "";
+//			if (interiorObject instanceof Building) {
+//				name = ((Building)interiorObject).getNickName();
+//			}
+//			else if (interiorObject instanceof Vehicle) {
+//				name = ((Vehicle)interiorObject).getNickName();
+//			}
+//					
+//			LogConsolidated.log(logger, Level.FINEST, 10_000, sourceName,
+//						"[" + person.getLocationTag().getLocale() + "] " + person.getName()
+//						+ " was near " +  name 
+//						+ " at (" + Math.round(returnInsideLoc.getX()*10.0)/10.0 + ", " 
+//						+ Math.round(returnInsideLoc.getY()*10.0)/10.0 
+//						+ ") and was attempting to enter its airlock.");
+//			
+//			if (Walk.canWalkAllSteps(person, returnInsideLoc.getX(), returnInsideLoc.getY(), 0, interiorObject)) {
+//				Task walkingTask = new Walk(person, returnInsideLoc.getX(), returnInsideLoc.getY(), 0, interiorObject);
+//				addSubTask(walkingTask);
+//			} 
+//			
+//			else {
+//				LogConsolidated.log(logger, Level.SEVERE, 4000, sourceName,
+//						person.getName() + " was " + person.getTaskDescription().toLowerCase() 
+//						+ " and cannot find a valid path to enter an airlock. Will see what to do.");
+//				canWalkInside = false;
+//			}
+//		} else {
+//			LogConsolidated.log(logger, Level.SEVERE, 4000, sourceName,
+//					person.getName() + " was " + person.getTaskDescription().toLowerCase() 
+//					+ " and cannot find the building airlock to walk back inside. Will see what to do.");
+//			canWalkInside = false;
+//		}
+//		
+//		return canWalkInside;
+//	}
+	
 	@Override
 	public int getEffectiveSkillLevel() {
 		return 0;
@@ -626,12 +860,8 @@ public class Sleep extends Task implements Serializable {
 	@Override
 	public void destroy() {
 		super.destroy();
-		station = null;
-		accommodations = null;
-		circadian = null;
-		pc = null;
-		// sim = null;
-		// masterClock = null;
-		// marsClock = null;
+		
+		SLEEPING_MODE.destroy();
+		SLEEPING.destroy();
 	}
 }

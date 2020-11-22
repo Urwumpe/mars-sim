@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ImageLoader.java
- * @version 3.1.0 2017-03-12
+ * @version 3.1.2 2020-09-02
  * @author Barry Evans
  */
 
@@ -11,8 +11,11 @@ import java.awt.Image;
 import java.awt.Toolkit;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.logging.Logger;
 
 import javax.swing.ImageIcon;
+
+import org.mars_sim.msp.ui.swing.tool.settlement.SettlementTransparentPanel;
 
 /**
  * This is a static class that acts as a helper to load Images for use in the
@@ -21,6 +24,9 @@ import javax.swing.ImageIcon;
  * strategies can be easily implemented within this class.
  */
 public class ImageLoader {
+	
+	/** default logger. */
+	private static Logger logger = Logger.getLogger(ImageLoader.class.getName());
 
 	private static HashMap<String, ImageIcon> iconCache = new HashMap<String, ImageIcon>();
 	private static HashMap<String, Image> imageCache = new HashMap<String, Image>();
@@ -32,6 +38,10 @@ public class ImageLoader {
 	/* [landrus, 26.11.09]: use classloader compatible paths */
 	public final static String IMAGE_DIR = "/images/";
 
+	public final static String ICON_DIR = "/icons/";
+
+	public final static String VEHICLE_ICON_DIR = "/icons/vehicle/";
+	
 	/**
 	 * Static singleton
 	 */
@@ -48,21 +58,67 @@ public class ImageLoader {
 	 * @return ImageIcon containing image of specified name.
 	 */
 	public static ImageIcon getIcon(String imagename) {
-		return getIcon(imagename, "png");
+		return getIcon(imagename, "png", IMAGE_DIR);
 	}
 
+	/**
+	 * Load the image icon with the specified name and a "png" image extension. This
+	 * operation may either create a new Image Icon of returned a previously created
+	 * one.
+	 *
+	 * @param imagename
+	 *            Name of the image to load.
+	 * @return ImageIcon containing image of specified name.
+	 */
+	public static ImageIcon getIcon(String imagename, String dir) {
+		return getIcon(imagename, "png", dir);
+	}
+	
 	public static ImageIcon getNewIcon(String imagename) {
-		String ext = "png";
-		String fullImageName = imagename.endsWith(ext) ? imagename : imagename + "." + ext;
-		ImageIcon found = iconCache.get(fullImageName);
-		if (found == null) {
-			String fileName = fullImageName.startsWith("/") ? fullImageName : "/" + fullImageName;
-
-			/* [landrus, 26.11.09]: don't use the system classloader in a webstart env. */
-			URL resource = ImageLoader.class.getResource(fileName);// ClassLoader.getSystemResource(fileName);
-			found = new ImageIcon(resource);
-			iconCache.put(fullImageName, found);
+		ImageIcon found = null;
+		
+		if (imagename == null || imagename.equals("")) {
+			return found;
 		}
+		
+//		else if (imagename.contains(".svg")) {
+//    		
+//        	if (imagename.equals(MainWindow.SANDSTORM_SVG)) {
+//        		found = SettlementTransparentPanel.sandstorm;
+//        	}
+//        	else if (imagename.equals(MainWindow.DUST_DEVIL_SVG)) {
+//        		found = SettlementTransparentPanel.dustDevil;
+//        	}
+//        	else if (imagename.equals(MainWindow.SNOWFLAKE_SVG)) {
+//        		found = SettlementTransparentPanel.snowflake;
+//        	}
+//        	else if (imagename.equals(MainWindow.COLD_WIND_SVG)) {
+//        		found = SettlementTransparentPanel.wind;
+//        	}
+//        	else if (imagename.equals("")) {
+//        		found = SettlementTransparentPanel.emptyIcon;
+//        	}
+//    	}
+//    	
+//    	else {
+		
+			String ext = "png";
+			String fullImageName = imagename.endsWith(ext) ? imagename : imagename + "." + ext;
+			found = iconCache.get(fullImageName);
+			if (found == null) {
+				String fileName = fullImageName.startsWith("/") ? fullImageName : "/" + fullImageName;
+	
+				/* [landrus, 26.11.09]: don't use the system classloader in a webstart env. */
+				URL resource = ImageLoader.class.getResource(fileName);// ClassLoader.getSystemResource(fileName);
+				if (resource == null) {
+	    			logger.severe("'" + fileName + "' cannot be found");
+	    		}
+				
+				found = new ImageIcon(resource);
+		    	
+				iconCache.put(fullImageName, found);
+			}
+//    	}
 
 		return found;
 	}
@@ -75,21 +131,24 @@ public class ImageLoader {
 	 *            Name of the image to load.
 	 * @param ext
 	 *            the file extension (ex. "png", "jpg").
+	 * @param idr
+	 *            the direcotyr of the file .  
 	 * @return ImageIcon containing image of specified name.
 	 */
-	public static ImageIcon getIcon(String imagename, String ext) {
+	public static ImageIcon getIcon(String imagename, String ext, String dir) {
 		String fullImageName = imagename.endsWith(ext) ? imagename : imagename + "." + ext;
 		ImageIcon found = iconCache.get(fullImageName);
 		if (found == null) {
-			String fileName = fullImageName.startsWith("/") ? fullImageName : IMAGE_DIR + fullImageName;
-			/* [landrus, 26.11.09]: don't use the system classloader in a webstart env. */
-			URL resource = ImageLoader.class.getResource(fileName);// ClassLoader.getSystemResource(fileName);
-
-			found = new ImageIcon(resource);
-
-			iconCache.put(fullImageName, found);
+			String fileName = fullImageName.startsWith("/") ? fullImageName : dir + fullImageName;
+//			logger.config("Filename : " + fileName + "   imagename : " + imagename + "    ext : "+ ext + "    dir : " + dir);
+			found = new ImageIcon(ImageLoader.class.getResource(fileName));
+//			if (found == null) {
+//				logger.severe("Filename : " + fileName + " NOT found !");
+//			}
+//			else
+				iconCache.put(fullImageName, found);
 		}
-
+		
 		return found;
 	}
 
@@ -108,9 +167,11 @@ public class ImageLoader {
 			if (usedToolkit == null) {
 				usedToolkit = Toolkit.getDefaultToolkit();
 			}
-			/* [landrus, 26.11.09]: don't use the system classloader in a webstart env. */
-			URL imageURL = ImageLoader.class.getResource(IMAGE_DIR + imagename);// ClassLoader.getSystemResource(IMAGE_DIR
-																				// + imagename);
+
+			URL imageURL = ImageLoader.class.getResource(IMAGE_DIR + imagename);
+			if (imageURL == null) {
+    			logger.severe("'" + IMAGE_DIR + imagename + "' cannot be found");
+    		}
 
 			newImage = usedToolkit.createImage(imageURL);
 			imageCache.put(imagename, newImage);

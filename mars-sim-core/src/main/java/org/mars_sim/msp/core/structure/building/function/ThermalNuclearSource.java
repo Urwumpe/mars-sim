@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ThermalNuclearSource.java
- * @version 3.1.0 2017-08-14
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -28,9 +28,6 @@ implements Serializable {
 	private double factor = 1;
 	
 	//private double area = 5 ;
-	//private Coordinates location ;
-	//private SurfaceFeatures surface ;
-	//private BuildingManager manager;
 
 	/**
 	 * Constructor.
@@ -78,13 +75,18 @@ implements Serializable {
 	}
 	
 	@Override
-	public void switch2Quarter() {
+	public void switch2OneQuarter() {
 		factor = 1/4D;
 	}
 	
 	@Override
 	public void switch2Full() {
 		factor = 1D;
+	}
+	
+	@Override
+	public void switch2ThreeQuarters() {
+		factor = .75;
 	}
 	
 	@Override

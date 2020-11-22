@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PlayHoloGameMeta.java
- * @version 3.08 2015-11-02
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -11,16 +11,17 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.task.PlayHoloGame;
 import org.mars_sim.msp.core.person.ai.task.Sleep;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * Meta task for the PlayHoloGame task.
@@ -40,17 +41,17 @@ public class PlayHoloGameMeta implements MetaTask, Serializable {
     /** default logger. */
     private static Logger logger = Logger.getLogger(PlayHoloGameMeta.class.getName());
 
-    private static Simulation sim = Simulation.instance();
-	private static MasterClock masterClock;// = sim.getMasterClock();
-	private static MarsClock marsClock;// = masterClock.getMarsClock();
+//    private static Simulation sim = Simulation.instance();
+//	private static MasterClock masterClock;// = sim.getMasterClock();
+//	private static MarsClock marsClock;// = masterClock.getMarsClock();
 
-	public PlayHoloGameMeta() {
-        masterClock = sim.getMasterClock();
-        if (masterClock != null) { // to avoid NullPointerException during maven test
-	        marsClock = masterClock.getMarsClock();
-        }
-        
-	}
+//	public PlayHoloGameMeta() {
+//        masterClock = sim.getMasterClock();
+//        if (masterClock != null) { // to avoid NullPointerException during maven test
+//	        marsClock = masterClock.getMarsClock();
+//        }
+//        
+//	}
 	
     @Override
     public String getName() {
@@ -68,18 +69,48 @@ public class PlayHoloGameMeta implements MetaTask, Serializable {
 
         if (person.isInside()) {
 
-            // Stress modifier
-        	double stress = person.getPhysicalCondition().getStress(); //0.0 to 100.0
-
-            if (stress > 20D) {
-                result += (stress - 20D) * 2;
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double fatigue = condition.getFatigue();
+            double hunger = condition.getHunger();
+            double stress = condition.getStress();
+            
+            if (fatigue > 1000)
+            	return 0;
+            
+            if (hunger > 1000)
+            	return 0;
+            
+        	double pref = person.getPreference().getPreferenceScore(this);
+            
+        	result = pref * 3D;
+            
+            if (pref > 0) {
+             	if (stress > 45D)
+             		result*=1.5;
+             	else if (stress > 65D)
+             		result*=2D;
+             	else if (stress > 85D)
+             		result*=3D;
+             	else
+             		result*=4D;
             }
 
-            if (person.isInVehicle()) {
-            	result *= RandomUtil.getRandomDouble(1.5);
+            
+            if (person.isInVehicle()) {	
+    	        // Check if person is in a moving rover.
+    	        if (Vehicle.inMovingRover(person)) {
+    		        // the bonus inside a vehicle, 
+    	        	// rather than having nothing to do if a person is not driving
+    	        	result += -20;
+    	        } 	       
+    	        else
+    		        // the bonus inside a vehicle, 
+    	        	// rather than having nothing to do if a person is not driving
+    	        	result += 20;
             }
             
-            else {
+            else { // the person is in the settlement
             	
             	try {
                     	
@@ -117,12 +148,14 @@ public class PlayHoloGameMeta implements MetaTask, Serializable {
                 result*= WORK_SHIFT_MODIFIER;
             }
 
+            if (result <= 0) return 0;
+            
+	        // Modify if research is the person's favorite activity.
+	        if (person.getFavorite().getFavoriteActivity() == FavoriteType.GAMING) {
+	            result = result + result / RandomUtil.getRandomInt(1, 20);
+	        }
+	        
             result *= person.getAssociatedSettlement().getGoodsManager().getTourismFactor();
-
-            // Add Preference modifier
-            if (result > 0)
-            	result = result + result * person.getPreference().getPreferenceScore(this)/2D;
-
             		
             if (result < 0) result = 0;
 

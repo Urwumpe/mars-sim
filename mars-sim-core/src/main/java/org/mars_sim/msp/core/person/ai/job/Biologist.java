@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Biologist.java
- * @version 3.07 2014-12-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.job;
@@ -10,22 +10,17 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.mission.AreologyStudyFieldMission;
-import org.mars_sim.msp.core.person.ai.mission.BiologyStudyFieldMission;
+import org.mars_sim.msp.core.person.ai.mission.AreologyFieldStudy;
+import org.mars_sim.msp.core.person.ai.mission.BiologyFieldStudy;
 import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
 import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
-import org.mars_sim.msp.core.person.ai.mission.EmergencySupplyMission;
 import org.mars_sim.msp.core.person.ai.mission.Exploration;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionManager;
-import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
 import org.mars_sim.msp.core.person.ai.mission.RoverMission;
-import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
 import org.mars_sim.msp.core.person.ai.task.AssistScientificStudyResearcher;
 import org.mars_sim.msp.core.person.ai.task.CompileScientificStudyResults;
 import org.mars_sim.msp.core.person.ai.task.ConsolidateContainers;
@@ -58,7 +53,9 @@ implements Serializable {
 
 	//	private static Logger logger = Logger.getLogger(Biologist.class.getName());
 
-	private static MissionManager missionManager;
+	private final int JOB_ID = 3;
+
+	private double[] roleProspects = new double[] {20.0, 5.0, 5.0, 5.0, 20.0, 15.0, 30.0};
 	
 	/**
 	 * Constructor.
@@ -67,7 +64,7 @@ implements Serializable {
 		// Use Job constructor
 		super(Biologist.class);
 
-		missionManager = Simulation.instance().getMissionManager();
+//		missionManager = Simulation.instance().getMissionManager();
 		
 		// Add biologist-related tasks.
 		jobTasks.add(StudyFieldSamples.class);
@@ -87,25 +84,23 @@ implements Serializable {
 		jobTasks.add(ProduceFood.class);
 
 		// Add biologist-related missions.
-		jobMissionJoins.add(AreologyStudyFieldMission.class);
-		jobMissionStarts.add(BiologyStudyFieldMission.class);
-		jobMissionJoins.add(BiologyStudyFieldMission.class);
+		jobMissionJoins.add(AreologyFieldStudy.class);
+		
+		jobMissionStarts.add(BiologyFieldStudy.class);
+		jobMissionJoins.add(BiologyFieldStudy.class);
+		
 		jobMissionJoins.add(Exploration.class);
-		jobMissionStarts.add(TravelToSettlement.class);
-		jobMissionJoins.add(TravelToSettlement.class);
-		jobMissionStarts.add(RescueSalvageVehicle.class);
-		jobMissionJoins.add(RescueSalvageVehicle.class);
+		
 		jobMissionJoins.add(BuildingConstructionMission.class);
+		
 		jobMissionJoins.add(BuildingSalvageMission.class);
-		jobMissionStarts.add(EmergencySupplyMission.class);
-		jobMissionJoins.add(EmergencySupplyMission.class);
 	}
 
 	@Override
 	public double getCapability(Person person) {
 		double result = 0D;
 
-		int biologySkill = person.getMind().getSkillManager().getSkillLevel(SkillType.BIOLOGY);
+		int biologySkill = person.getSkillManager().getSkillLevel(SkillType.BIOLOGY);
 		result = biologySkill;
 
 		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
@@ -114,21 +109,25 @@ implements Serializable {
 
 		if (person.getPhysicalCondition().hasSeriousMedicalProblems()) result = 0D;
 
+//		System.out.println(person + " bio : " + Math.round(result*100.0)/100.0);
+		
 		return result;
 	}
 
 	@Override
 	public double getSettlementNeed(Settlement settlement) {
 		double result = 0D;
-
+		
+		int population = settlement.getNumCitizens();
+		
 		// Add (labspace * tech level / 2) for all labs with biology specialties.
 		List<Building> laboratoryBuildings = settlement.getBuildingManager().getBuildings(FunctionType.RESEARCH);
 		Iterator<Building> i = laboratoryBuildings.iterator();
 		while (i.hasNext()) {
 			Building building = i.next();
-			Research lab = (Research) building.getFunction(FunctionType.RESEARCH);
+			Research lab = building.getResearch();
 			if (lab.hasSpecialty(ScienceType.BIOLOGY)) {
-				result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 2D);
+				result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 16D);
 			}
 		}
 
@@ -141,7 +140,7 @@ implements Serializable {
 				if (rover.hasLab()) {
 					Lab lab = rover.getLab();
 					if (lab.hasSpecialty(ScienceType.BIOLOGY)) {
-						result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 2D);
+						result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 16D);
 					}
 				}
 			}
@@ -158,14 +157,29 @@ implements Serializable {
 					if (rover.hasLab()) {
 						Lab lab = rover.getLab();
 						if (lab.hasSpecialty(ScienceType.BIOLOGY)) {
-							result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 2D);
+							result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 16D);
 						}
 					}
 				}
 			}
 		}
 
+		result = (result + population / 12D) / 2.0;
+
+//		System.out.println(settlement + " Biologist need: " + result);
+				
 		return result;
 	}
 
+	public double[] getRoleProspects() {
+		return roleProspects;
+	}
+	
+	public void setRoleProspects(int index, int weight) {
+		roleProspects[index] = weight;
+	}
+	
+	public int getJobID() {
+		return JOB_ID;
+	}
 }

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * OGGSoundClip.java
- * @version 3.1.0 2017-03-17
+ * @version 3.1.2 2020-09-02
  * @author Lars Naesbye Christensen (complete rewrite for OGG)
  * Based on JOrbisPlayer example source
  */
@@ -9,7 +9,8 @@
 package org.mars_sim.msp.ui.swing.sound;
 
 import java.io.BufferedInputStream;
-
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.logging.Level;
@@ -23,7 +24,7 @@ import javax.sound.sampled.FloatControl;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.SourceDataLine;
 
-import org.mars_sim.msp.ui.javafx.mainmenu.MainMenu;
+import org.mars_sim.msp.core.Simulation;
 
 import com.jcraft.jogg.Packet;
 import com.jcraft.jogg.Page;
@@ -78,14 +79,24 @@ public class OGGSoundClip {
 	 * Create a new clip based on a reference into the class path
 	 *
 	 * @param ref The reference into the class path which the OGG can be read from
+	 * @param true if it is a background music file (Not a sound effect clip)
 	 * @throws IOException Indicated a failure to find the resource
 	 */
-	public OGGSoundClip(String ref) throws IOException {
+	public OGGSoundClip(String ref, boolean music) throws IOException {
 		name = ref;
 
 		try {
-			init(Thread.currentThread().getContextClassLoader()
+			if (music) {
+				File f = new File(Simulation.MUSIC_DIR, ref);
+				if (f.exists() && f.canRead()) {
+					InputStream targetStream = new FileInputStream(f);
+					init(targetStream);
+				}
+			}
+			else {
+				init(Thread.currentThread().getContextClassLoader()
 					.getResourceAsStream(SoundConstants.SOUNDS_ROOT_PATH + ref));
+			}
 		} catch (IOException e) {
 			// throw new IOException("Couldn't find: " + ref);
 			logger.log(Level.SEVERE, "Couldn't find: " + ref);
@@ -125,9 +136,13 @@ public class OGGSoundClip {
 
 		if (volume > 1)
 			volume = 1;
-		else if (volume < 0)
+		else if (volume <= 0) {
 			volume = 0;
-
+			pause();
+		}
+		else
+			paused = false;
+		
 		this.volume = volume;
 
 		// System.out.println("volume : " + volume);
@@ -163,13 +178,9 @@ public class OGGSoundClip {
 				double max = floatControl.getMaximum();
 				double min = floatControl.getMinimum();
 
-				/*
-				 * float range = max - min; float step = range/100f;
-				 * 
-				 * float num = gain/0.05f; float value = min + num * step;
-				 * 
-				 * if (value < min) value = min; else if (value > max) value = max;
-				 */
+//				float range = max - min; float step = range/100f; 
+//				float num = gain/0.05f; float value = min + num * step;		 
+//				if (value < min) value = min; else if (value > max) value = max;
 
 				double value = (max - min / 2f) * volume + min / 2f;
 
@@ -267,7 +278,7 @@ public class OGGSoundClip {
 	 */
 	public void resume() {
 		if (!paused) {
-			play();
+			loop();//play();
 			return;
 		}
 
@@ -397,7 +408,7 @@ public class OGGSoundClip {
 //		}
 //		else
 		AudioPlayer.disableSound();
-		MainMenu.disableSound();
+//		MainMenu.disableSound();
 	}
 
 	/**
@@ -409,7 +420,8 @@ public class OGGSoundClip {
 		}
 
 		playerThread = null;
-		outputLine.drain();
+		if (outputLine != null) 
+			outputLine.drain();
 	}
 
 	/**
@@ -610,7 +622,8 @@ public class OGGSoundClip {
 					bytes = bitStream.read(buffer, index, BUFSIZE);
 				} catch (Exception e) {
 					// throw new InternalException(e);
-					logger.log(Level.SEVERE, "Exception in reading bitstream.", e.getMessage());
+					// Note: when loading from a saved sim, the following log statement appears excessively
+//					logger.log(Level.SEVERE, "Exception in reading bitstream.", e.getMessage());
 				}
 				
 				if (bytes == 0 && i < 2) {
@@ -757,8 +770,13 @@ public class OGGSoundClip {
 			BooleanControl muteControl = (BooleanControl) outputLine.getControl(BooleanControl.Type.MUTE);
 			muteControl.setValue(mute);
 
-			// if (!mute)
-			// setGain(oldGain);
+			 if (mute)
+				 paused = true;
+			 else
+				 paused = false;
+			 
+//			 if (!mute)
+//			 setGain(oldGain);
 		}
 
 	}

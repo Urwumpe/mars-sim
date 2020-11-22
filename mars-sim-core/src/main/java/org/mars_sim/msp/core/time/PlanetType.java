@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PlanetType.java
- * @version 3.1.0 2017-10-24
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 

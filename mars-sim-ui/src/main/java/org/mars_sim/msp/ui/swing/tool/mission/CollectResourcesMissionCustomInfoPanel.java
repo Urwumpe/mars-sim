@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * CollectResourcesMissionCustomInfoPanel.java
- * @version 3.1.0 2017-11-01
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -17,6 +17,7 @@ import org.mars_sim.msp.core.person.ai.mission.CollectResourcesMission;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
 import org.mars_sim.msp.core.resource.AmountResource;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.tool.Conversion;
 import org.mars_sim.msp.core.vehicle.Rover;
 
@@ -26,16 +27,22 @@ import com.alee.laf.panel.WebPanel;
 /**
  * A panel for displaying collect resources mission information.
  */
+@SuppressWarnings("serial")
 public class CollectResourcesMissionCustomInfoPanel
 extends MissionCustomInfoPanel
 implements UnitListener {
 
 	// Data members.
+	private double resourceAmountCache;
+	
 	private CollectResourcesMission mission;
 	private AmountResource resource;
+	private AmountResource[] REGOLITH_TYPES;
+	
+	
 	private Rover missionRover;
 	private WebLabel collectionValueLabel;
-	private double resourceAmountCache;
+
 
 	/**
 	 * Constructor.
@@ -46,6 +53,14 @@ implements UnitListener {
 
 		// Initialize data members.
 		this.resource = resource;
+		
+		if (resource == ResourceUtil.regolithAR) {
+			REGOLITH_TYPES = new AmountResource[] {
+					ResourceUtil.regolithBAR,
+					ResourceUtil.regolithCAR,
+					ResourceUtil.regolithDAR
+			};
+		}
 
 		// Set layout.
 		setLayout(new BorderLayout());
@@ -57,7 +72,9 @@ implements UnitListener {
 		// Create collection title label.
 		String resourceString = resource.getName().substring(0, 1).toUpperCase() + 
 				resource.getName().substring(1);
-		WebLabel collectionTitleLabel = new WebLabel(Msg.getString("CollectResourcesMissionCustomInfoPanel.totalCollected", Conversion.capitalize(resourceString))); //$NON-NLS-1$
+		WebLabel collectionTitleLabel = new WebLabel(
+				Msg.getString("CollectResourcesMissionCustomInfoPanel.totalCollected", 
+						Conversion.capitalize(resourceString))); //$NON-NLS-1$
 		contentPanel.add(collectionTitleLabel);
 
 		// Create collection value label.
@@ -87,7 +104,7 @@ implements UnitListener {
 				missionRover.addUnitListener(this);
 			}
 
-			resourceAmountCache = this.mission.getTotalCollectedResources();
+//			resourceAmountCache = this.mission.getTotalCollectedResources();
 
 			// Update the collection value label.
 			updateCollectionValueLabel();
@@ -102,9 +119,25 @@ implements UnitListener {
 	@Override
 	public void unitUpdate(UnitEvent event) {
 		if (UnitEventType.INVENTORY_RESOURCE_EVENT == event.getType()) {
-			if (resource.equals(event.getTarget())) {
-				updateCollectionValueLabel();   
+			Object source = event.getTarget();
+			if (source instanceof AmountResource) {
+				if (resource.equals(event.getTarget())){
+					updateCollectionValueLabel(); 
+				}
+				for (AmountResource ar : REGOLITH_TYPES) {
+					if (ar.equals(event.getTarget())) {
+						updateCollectionValueLabel(); 
+					}
+				}
 			}
+				
+//			else if (source instanceof Integer) {
+//				if ((Integer)source < ResourceUtil.FIRST_ITEM_RESOURCE_ID)
+//					updateCollectionValueLabel();
+//			}
+//			if (resource.equals(event.getTarget())) {
+//				updateCollectionValueLabel();   
+//			}
 		}
 	}
 
@@ -112,21 +145,23 @@ implements UnitListener {
 	 * Updates the collection value label.
 	 */
 	private void updateCollectionValueLabel() {
-		double resourceAmount = 0D;
+		double resourceAmount = mission.getTotalCollectedResources();
 		if (missionRover != null) {
-			resourceAmount = missionRover.getInventory().getAmountResourceStored(resource, true);
-			if (resourceAmount > resourceAmountCache) {
+//			resourceAmount = missionRover.getInventory().getAmountResourceStored(resource, true);
+			if (resourceAmountCache < resourceAmount) {
 				resourceAmountCache = resourceAmount;
 			}
 			else {
 				resourceAmount = resourceAmountCache;
 			}
 		}
+		else {
+			resourceAmount = resourceAmountCache;
+		}
 
 		// Update collection value label.
 		collectionValueLabel.setText(
-			Msg.getString(
-				"CollectResourcesMissionCustomInfoPanel.kilograms", //$NON-NLS-1$
+			Msg.getString("CollectResourcesMissionCustomInfoPanel.kilograms", //$NON-NLS-1$
 				Integer.toString((int) resourceAmount)
 			)
 		);

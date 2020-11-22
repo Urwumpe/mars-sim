@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ExplorationCustomInfoPanel.java
- * @version 3.1.0 2017-08-08
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -136,18 +136,22 @@ extends MissionCustomInfoPanel {
 
 			this.completion = completion;
 
-			setLayout(new GridLayout(1, 2));
+			setLayout(new GridLayout(1, 2, 3, 3));
 
-			WebPanel namePanel = new WebPanel(new FlowLayout(FlowLayout.LEFT, 1, 10));
+			WebPanel namePanel = new WebPanel(new FlowLayout(FlowLayout.RIGHT, 3, 3));
+			namePanel.setAlignmentX(CENTER_ALIGNMENT);
 			add(namePanel);
 
-			WebLabel nameLabel = new WebLabel(Conversion.capitalize(siteName), SwingConstants.LEFT);
+			WebLabel nameLabel = new WebLabel("  " + Conversion.capitalize(siteName), SwingConstants.RIGHT);
+			nameLabel.setAlignmentX(CENTER_ALIGNMENT);
 			namePanel.add(nameLabel);
 
-			WebPanel barPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER, 1, 10));
+			WebPanel barPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
+			barPanel.setAlignmentX(CENTER_ALIGNMENT);
 			add(barPanel);
 
 			completionBar = new WebProgressBar(0, 100);
+			completionBar.setAlignmentX(CENTER_ALIGNMENT);
 			completionBar.setStringPainted(true);
 			completionBar.setValue((int) (completion * 100D));
 			barPanel.add(completionBar);

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TabPanelScience.java
- * @version 3.1.0 2017-10-18
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.person;
@@ -37,7 +37,6 @@ import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
 import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
@@ -45,17 +44,22 @@ import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.tool.science.ScienceWindow;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
-import com.alee.managers.tooltip.TooltipWay;
 //import com.alee.managers.language.data.TooltipWay;
 import com.alee.managers.tooltip.TooltipManager;
+import com.alee.managers.tooltip.TooltipWay;
 
 /**
  * A tab panel displaying a person's scientific studies and achievements.
  */
-public class TabPanelScience
-extends TabPanel {
+@SuppressWarnings("serial")
+public class TabPanelScience extends TabPanel {
 
 	// Data members
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+
+	/** The Person instance. */
+	private Person person = null;
 
 	private JTable studyTable, achievementTable;
 
@@ -65,20 +69,27 @@ extends TabPanel {
 	private StudyTableModel studyTableModel;
 	private AchievementTableModel achievementTableModel;
 
-
 	/**
 	 * Constructor.
-	 * @param person the person.
+	 * 
+	 * @param person  the person.
 	 * @param desktop the main desktop.
 	 */
 	public TabPanelScience(Person person, MainDesktopPane desktop) {
 		// Use the TabPanel constructor
-		super(
-			Msg.getString("TabPanelScience.title"), //$NON-NLS-1$
-			null,
-			Msg.getString("TabPanelScience.tooltip"), //$NON-NLS-1$
-			person, desktop
-		);
+		super(Msg.getString("TabPanelScience.title"), //$NON-NLS-1$
+				null, Msg.getString("TabPanelScience.tooltip"), //$NON-NLS-1$
+				person, desktop);
+
+		this.person = person;
+	}
+
+	public boolean isUIDone() {
+		return uiDone;
+	}
+
+	public void initializeUI() {
+		uiDone = true;
 
 		// Create the title panel.
 		JPanel titlePane = new JPanel(new FlowLayout(FlowLayout.CENTER));
@@ -86,7 +97,7 @@ extends TabPanel {
 
 		// Create the title label.
 		JLabel titleLabel = new JLabel(Msg.getString("TabPanelScience.label"), JLabel.CENTER); //$NON-NLS-1$
-		titleLabel.setFont(new Font("Serif", Font.BOLD, 16));
+		titleLabel.setFont(new Font("Serif", Font.BOLD, 14));
 		titlePane.add(titleLabel);
 
 		// Create the main panel.
@@ -95,7 +106,7 @@ extends TabPanel {
 
 		// Create the studies panel.
 		JPanel studiesPane = new JPanel(new BorderLayout());
-		studiesPane.setBorder(new MarsPanelBorder());
+//		studiesPane.setBorder(new MarsPanelBorder());
 		mainPane.add(studiesPane);
 
 		// Create the studies label.
@@ -104,7 +115,7 @@ extends TabPanel {
 
 		// Create the study scroll panel.
 		JScrollPane studyScrollPane = new JScrollPane();
-		studyScrollPane.setBorder(new MarsPanelBorder());
+//		studyScrollPane.setBorder(new MarsPanelBorder());
 		studyScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 		studiesPane.add(studyScrollPane, BorderLayout.CENTER);
 
@@ -112,25 +123,21 @@ extends TabPanel {
 		studyTableModel = new StudyTableModel(person);
 		studyTable = new ZebraJTable(studyTableModel);
 		studyTable.setPreferredScrollableViewportSize(new Dimension(225, -1));
-		studyTable.setCellSelectionEnabled(false);
+//		studyTable.setCellSelectionEnabled(false);
 		studyTable.setRowSelectionAllowed(true);
 		studyTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		studyTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
 			public void valueChanged(ListSelectionEvent event) {
 				if (event.getValueIsAdjusting()) {
-					if (studyTable.getSelectedRow() >= 0) setEnabledScienceToolButton(true);
+					if (studyTable.getSelectedRow() >= 0)
+						setEnabledScienceToolButton(true);
 				}
 			}
 		});
 		studyScrollPane.setViewportView(studyTable);
 
-		// 2015-06-08 Added sorting
 		studyTable.setAutoCreateRowSorter(true);
-	    //if (!MainScene.OS.equals("linux")) {
-	    //	studyTable.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
-	    //}
 
-		// 2015-06-08 Added setTableStyle()
 		TableStyle.setTableStyle(studyTable);
 
 		// Create the button panel.
@@ -141,8 +148,7 @@ extends TabPanel {
 		scienceToolButton = new JButton(ImageLoader.getIcon(Msg.getString("img.science"))); //$NON-NLS-1$
 		scienceToolButton.setEnabled(false);
 		scienceToolButton.setMargin(new Insets(1, 1, 1, 1));
-		//scienceToolButton.setToolTipText(Msg.getString("TabPanelScience.tooltip.science")); //$NON-NLS-1$
-		TooltipManager.setTooltip (scienceToolButton, Msg.getString("TabPanelScience.tooltip.science"), TooltipWay.down);
+		TooltipManager.setTooltip(scienceToolButton, Msg.getString("TabPanelScience.tooltip.science"), TooltipWay.down);
 		scienceToolButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				displayStudyInScienceTool();
@@ -152,7 +158,7 @@ extends TabPanel {
 
 		// Create the achievement panel.
 		JPanel achievementPane = new JPanel(new BorderLayout());
-		achievementPane.setBorder(new MarsPanelBorder());
+//		achievementPane.setBorder(new MarsPanelBorder());
 		mainPane.add(achievementPane);
 
 		// Create achievement label panel.
@@ -166,12 +172,13 @@ extends TabPanel {
 
 		DecimalFormat formatter = new DecimalFormat(Msg.getString("TabPanelScience.decimalFormat")); //$NON-NLS-1$
 		String totalAchievementString = formatter.format(person.getTotalScientificAchievement());
-		totalAchievementLabel = new JLabel(Msg.getString("TabPanelScience.totalAchievementCredit", totalAchievementString), JLabel.CENTER); //$NON-NLS-1$
+		totalAchievementLabel = new JLabel(
+				Msg.getString("TabPanelScience.totalAchievementCredit", totalAchievementString), JLabel.CENTER); //$NON-NLS-1$
 		achievementLabelPane.add(totalAchievementLabel);
 
 		// Create the achievement scroll panel.
 		JScrollPane achievementScrollPane = new JScrollPane();
-		achievementScrollPane.setBorder(new MarsPanelBorder());
+//		achievementScrollPane.setBorder(new MarsPanelBorder());
 		achievementScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 		achievementPane.add(achievementScrollPane, BorderLayout.CENTER);
 
@@ -179,28 +186,28 @@ extends TabPanel {
 		achievementTableModel = new AchievementTableModel(person);
 		achievementTable = new ZebraJTable(achievementTableModel);
 		achievementTable.setPreferredScrollableViewportSize(new Dimension(225, -1));
-		achievementTable.setCellSelectionEnabled(false);
+		achievementTable.setRowSelectionAllowed(true);
 		achievementTable.setDefaultRenderer(Double.class, new NumberCellRenderer(1));
 
-		// 2015-09-24 Align the content to the center of the cell
+		// Align the content to the center of the cell
 		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
 		renderer.setHorizontalAlignment(SwingConstants.CENTER);
 		achievementTable.getColumnModel().getColumn(0).setCellRenderer(renderer);
 		achievementTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
-
+		achievementTable.getColumnModel().getColumn(2).setCellRenderer(renderer);
+		achievementTable.getColumnModel().getColumn(3).setCellRenderer(renderer);
+		
 		achievementScrollPane.setViewportView(achievementTable);
 
-		// 2015-06-08 Added sorting
 		achievementTable.setAutoCreateRowSorter(true);
-	    ///if (!MainScene.OS.equals("linux")) {
-	    //	achievementTable.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
-	    //}
-		// 2015-06-08 Added setTableStyle()
+
 		TableStyle.setTableStyle(achievementTable);
 	}
 
 	@Override
 	public void update() {
+		if (!uiDone)
+			initializeUI();
 
 		TableStyle.setTableStyle(studyTable);
 		TableStyle.setTableStyle(achievementTable);
@@ -208,7 +215,8 @@ extends TabPanel {
 		// Get selected study in table if any.
 		int selectedStudyIndex = studyTable.getSelectedRow();
 		ScientificStudy selectedStudy = null;
-		if (selectedStudyIndex >= 0) selectedStudy = studyTableModel.getStudy(selectedStudyIndex);
+		if (selectedStudyIndex >= 0)
+			selectedStudy = studyTableModel.getStudy(selectedStudyIndex);
 
 		// Update study table model.
 		studyTableModel.update();
@@ -232,6 +240,7 @@ extends TabPanel {
 
 	/**
 	 * Sets if the science tool button is enabled or not.
+	 * 
 	 * @param enabled true if button enabled.
 	 */
 	private void setEnabledScienceToolButton(boolean enabled) {
@@ -253,8 +262,7 @@ extends TabPanel {
 	/**
 	 * Inner class for study table model.
 	 */
-	private static class StudyTableModel
-	extends AbstractTableModel {
+	private static class StudyTableModel extends AbstractTableModel {
 
 		/** default serial id. */
 		private static final long serialVersionUID = 1L;
@@ -265,6 +273,7 @@ extends TabPanel {
 
 		/**
 		 * Constructor.
+		 * 
 		 * @param person the person.
 		 */
 		private StudyTableModel(Person person) {
@@ -280,6 +289,7 @@ extends TabPanel {
 
 		/**
 		 * Returns the number of columns in the model.
+		 * 
 		 * @return the number of columns in the model.
 		 */
 		public int getColumnCount() {
@@ -288,14 +298,19 @@ extends TabPanel {
 
 		@Override
 		public String getColumnName(int columnIndex) {
-			if (columnIndex == 0) return Msg.getString("TabPanelScience.column.study"); //$NON-NLS-1$
-			else if (columnIndex == 1) return Msg.getString("TabPanelScience.column.role"); //$NON-NLS-1$
-			else if (columnIndex == 2) return Msg.getString("TabPanelScience.column.status"); //$NON-NLS-1$
-			else return null;
+			if (columnIndex == 0)
+				return Msg.getString("TabPanelScience.column.study"); //$NON-NLS-1$
+			else if (columnIndex == 1)
+				return Msg.getString("TabPanelScience.column.role"); //$NON-NLS-1$
+			else if (columnIndex == 2)
+				return Msg.getString("TabPanelScience.column.phase"); //$NON-NLS-1$
+			else
+				return null;
 		}
 
 		/**
 		 * Returns the number of rows in the model.
+		 * 
 		 * @return the number of rows in the model.
 		 */
 		public int getRowCount() {
@@ -304,7 +319,8 @@ extends TabPanel {
 
 		/**
 		 * Returns the value for the cell at columnIndex and rowIndex.
-		 * @param rowIndex the row whose value is to be queried.
+		 * 
+		 * @param rowIndex    the row whose value is to be queried.
 		 * @param columnIndex the column whose value is to be queried.
 		 * @return the value Object at the specified cell.
 		 */
@@ -312,14 +328,18 @@ extends TabPanel {
 			String result = null;
 			if ((rowIndex >= 0) && (rowIndex < studies.size())) {
 				ScientificStudy study = studies.get(rowIndex);
-				if (columnIndex == 0) result = Conversion.capitalize(study.toString());
+				if (columnIndex == 0)
+					result = Conversion.capitalize(study.toString());
 				else if (columnIndex == 1) {
-					if (person.equals(study.getPrimaryResearcher())) result = Msg.getString("TabPanelScience.primary"); //$NON-NLS-1$
-					else result = Msg.getString("TabPanelScience.collaborator"); //$NON-NLS-1$
-				}
-				else if (columnIndex == 2) {
-					if (study.isCompleted()) result = study.getCompletionState();
-					else result = study.getPhase();
+					if (person.equals(study.getPrimaryResearcher()))
+						result = Msg.getString("TabPanelScience.primary"); //$NON-NLS-1$
+					else
+						result = Msg.getString("TabPanelScience.collaborator"); //$NON-NLS-1$
+				} else if (columnIndex == 2) {
+					if (study.isCompleted())
+						result = study.getCompletionState();
+					else
+						result = study.getPhase();
 				}
 			}
 			return result;
@@ -331,12 +351,14 @@ extends TabPanel {
 		private void update() {
 			ScientificStudyManager manager = Simulation.instance().getScientificStudyManager();
 			List<ScientificStudy> newStudies = manager.getAllStudies(person);
-			if (!newStudies.equals(studies)) studies = newStudies;
+			if (!newStudies.equals(studies))
+				studies = newStudies;
 			fireTableDataChanged();
 		}
 
 		/**
 		 * Gets the scientific study in the table at a given row index.
+		 * 
 		 * @param rowIndex the row index in the table.
 		 * @return scientific study or null if invalid index.
 		 */
@@ -349,12 +371,14 @@ extends TabPanel {
 
 		/**
 		 * Gets the row index of a given scientific study.
+		 * 
 		 * @param study the scientific study.
 		 * @return the table row index or -1 if not in table.
 		 */
 		private int getStudyIndex(ScientificStudy study) {
 			int result = -1;
-			if ((study != null) && studies.contains(study)) result = studies.indexOf(study);
+			if ((study != null) && studies.contains(study))
+				result = studies.indexOf(study);
 			return result;
 		}
 	}
@@ -362,8 +386,7 @@ extends TabPanel {
 	/**
 	 * Inner class for achievement table model.
 	 */
-	private static class AchievementTableModel
-	extends AbstractTableModel {
+	private static class AchievementTableModel extends AbstractTableModel {
 
 		/** default serial id. */
 		private static final long serialVersionUID = 1L;
@@ -371,6 +394,7 @@ extends TabPanel {
 		// Data members.
 		private Person person;
 		private List<ScienceType> sciences;
+		private static ScientificStudyManager manager = Simulation.instance().getScientificStudyManager();
 
 		private AchievementTableModel(Person person) {
 			// Use AbstractTableModel constructor.
@@ -382,33 +406,49 @@ extends TabPanel {
 
 		/**
 		 * Returns the number of columns in the model.
+		 * 
 		 * @return the number of columns in the model.
 		 */
 		public int getColumnCount() {
-			return 2;
+			return 4;
 		}
 
 		@Override
 		public String getColumnName(int columnIndex) {
-			if (columnIndex == 0) return Msg.getString("TabPanelScience.column.science"); //$NON-NLS-1$
-			else if (columnIndex == 1) return Msg.getString("TabPanelScience.column.achievementCredit"); //$NON-NLS-1$
-			else return null;
+			if (columnIndex == 0)
+				return Msg.getString("TabPanelScience.column.science"); //$NON-NLS-1$
+			else if (columnIndex == 1)
+				return Msg.getString("TabPanelScience.column.numPrimary"); //$NON-NLS-1$
+			else if (columnIndex == 2)
+				return Msg.getString("TabPanelScience.column.numCollab"); //$NON-NLS-1$
+			else if (columnIndex == 3)
+				return Msg.getString("TabPanelScience.column.achievementCredit"); //$NON-NLS-1$
+			else
+				return null;
 		}
 
 		/**
 		 * Returns the most specific superclass for all the cell values in the column.
+		 * 
 		 * @param columnIndex the index of the column.
 		 * @return the common ancestor class of the object values in the model.
 		 */
 		public Class<?> getColumnClass(int columnIndex) {
 			Class<?> dataType = super.getColumnClass(columnIndex);
-			if (columnIndex == 0) dataType = String.class;
-			else if (columnIndex == 1) dataType = Double.class;
+			if (columnIndex == 0)
+				dataType = String.class;
+			else if (columnIndex == 1)
+				dataType = Integer.class;
+			else if (columnIndex == 2)
+				dataType = Integer.class;
+			else if (columnIndex == 3)
+				dataType = Double.class;
 			return dataType;
 		}
 
 		/**
 		 * Returns the number of rows in the model.
+		 * 
 		 * @return the number of rows in the model.
 		 */
 		public int getRowCount() {
@@ -417,7 +457,8 @@ extends TabPanel {
 
 		/**
 		 * Returns the value for the cell at columnIndex and rowIndex.
-		 * @param rowIndex the row whose value is to be queried.
+		 * 
+		 * @param rowIndex    the row whose value is to be queried.
 		 * @param columnIndex the column whose value is to be queried.
 		 * @return the value Object at the specified cell.
 		 */
@@ -425,8 +466,13 @@ extends TabPanel {
 			Object result = null;
 			if ((rowIndex >= 0) && (rowIndex < sciences.size())) {
 				ScienceType science = sciences.get(rowIndex);
-				if (columnIndex == 0) result = science.getName();
-				else if (columnIndex == 1) {
+				if (columnIndex == 0)
+					result = science.getName();
+				else if (columnIndex == 1)
+					result = manager.getNumCompletedPrimaryStudies(person);
+				else if (columnIndex == 2)
+					result = manager.getNumCompletedCollaborativeStudies(person);
+				else if (columnIndex == 3) {
 					result = person.getScientificAchievement(science);
 				}
 			}

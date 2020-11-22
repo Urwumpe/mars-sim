@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PeerReviewStudyPaperMeta.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -10,16 +10,18 @@ import java.io.Serializable;
 import java.util.Iterator;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.task.PeerReviewStudyPaper;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.science.ScientificStudyManager;
+import org.mars_sim.msp.core.tool.RandomUtil;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * Meta task for the PeerReviewStudyPaper task.
@@ -33,8 +35,6 @@ public class PeerReviewStudyPaperMeta implements MetaTask, Serializable {
     private static final String NAME = Msg.getString(
             "Task.description.peerReviewStudyPaper"); //$NON-NLS-1$
 
-    private static ScientificStudyManager studyManager;
-    
     @Override
     public String getName() {
         return NAME;
@@ -51,18 +51,25 @@ public class PeerReviewStudyPaperMeta implements MetaTask, Serializable {
         double result = 0D;
         
         if (person.isInside()) {
+        	
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double fatigue = condition.getFatigue();
+            double stress = condition.getStress();
+            double hunger = condition.getHunger();
+            
+            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            	return 0;
+            
 	        // Get all studies in the peer review phase.
-	        if (studyManager == null)
-	        	studyManager = Simulation.instance().getScientificStudyManager();
-	        //ScientificStudyManager studyManager = Simulation.instance().getScientificStudyManager();
-	        Iterator<ScientificStudy> i = studyManager.getOngoingStudies().iterator();
+	        Iterator<ScientificStudy> i = scientificStudyManager.getOngoingStudies().iterator();
 	        while (i.hasNext()) {
 	            ScientificStudy study = i.next();
 	            if (ScientificStudy.PEER_REVIEW_PHASE.equals(study.getPhase())) {
 
 	                // Check that person isn't a researcher in the study.
 	                if (!person.equals(study.getPrimaryResearcher()) &&
-	                        !study.getCollaborativeResearchers().keySet().contains(person)) {
+	                        !study.getCollaborativeResearchers().keySet().contains(person.getIdentifier())) {
 
 	                    // If person's current job is related to study primary science,
 	                    // add chance to review.
@@ -74,9 +81,22 @@ public class PeerReviewStudyPaperMeta implements MetaTask, Serializable {
 	                        }
 	                    }
 	                }
-	            }
+	            }            
 	        }
+	        
+	        if (result == 0) return 0;
+	        
+            if (person.isInVehicle()) {	
+    	        // Check if person is in a moving rover.
+    	        if (Vehicle.inMovingRover(person)) {
+    	        	result += -10D;
+    	        }
+    	        else
+    	        	result += 10D;
+            }
 
+	        if (result == 0) return 0;
+	        
 	        // Effort-driven task modifier.
 	        result *= person.getPerformanceRating();
 
@@ -88,10 +108,10 @@ public class PeerReviewStudyPaperMeta implements MetaTask, Serializable {
 
 	        // Modify if research is the person's favorite activity.
 	        if (person.getFavorite().getFavoriteActivity() == FavoriteType.RESEARCH) {
-	            result *= 2D;
+	            result += RandomUtil.getRandomInt(1, 20);
 	        }
 
-	        // 2015-06-07 Added Preference modifier
+	        // Add Preference modifier
             if (result > 0)
             	result = result + result * person.getPreference().getPreferenceScore(this)/2D;
 

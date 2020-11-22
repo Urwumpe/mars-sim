@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TradeMissionCustomInfoPanel.java
- * @version 3.1.0 2017-11-01
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -19,11 +19,13 @@ import java.util.Map;
 import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.person.ai.mission.Mining;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
 import org.mars_sim.msp.core.person.ai.mission.MissionEventType;
 import org.mars_sim.msp.core.resource.AmountResource;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
@@ -46,6 +48,8 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 	private ConcentrationTableModel concentrationTableModel;
 	private ExcavationTableModel excavationTableModel;
 
+	private SurfaceFeatures surfaceFeatures = Simulation.instance().getMars().getSurfaceFeatures();
+	
 	/**
 	 * Constructor
 	 * 
@@ -242,7 +246,7 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 					if (actualConcentrationMap.containsKey(minerals[row])) {
 						result = actualConcentrationMap.get(minerals[row]);
 					} else {
-						result = new Double(0D);
+						result = Double.valueOf(0D);
 					}
 				}
 			}
@@ -347,10 +351,10 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 		 */
 		private void updateTable() {
 			excavationMap.clear();
-			String[] mineralNames = Simulation.instance().getMars().getSurfaceFeatures().getMineralMap()
+			String[] mineralNames = surfaceFeatures.getMineralMap()
 					.getMineralTypeNames();
 			for (String mineralName : mineralNames) {
-				AmountResource mineral = AmountResource.findAmountResource(mineralName);
+				AmountResource mineral = ResourceUtil.findAmountResource(mineralName);
 				double amount = mission.getTotalMineralExcavatedAmount(mineral);
 				if (amount > 0D)
 					excavationMap.put(mineral, amount);

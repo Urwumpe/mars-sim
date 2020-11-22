@@ -1,8 +1,7 @@
 /**
  * Mars Simulation Project
  * StandardPowerSource.java
- * @version 3.07 2014-12-06
-
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -40,7 +39,7 @@ implements Serializable {
 
 
 	public double getAveragePower(Settlement settlement) {
-		return getMaxPower();
+		return getMaxPower() * 0.707;
 	}
 
 	@Override

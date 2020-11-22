@@ -1,17 +1,20 @@
 /**
  * Mars Simulation Project
  * AnnouncementWindow.java
- * @version 3.1.0 2017-10-18
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing;
 
-import javax.swing.*;
-import javax.swing.border.EmptyBorder;
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
 
-import org.mars_sim.msp.ui.swing.tool.ResizedFontLabel;
-
-import java.awt.*;
+import javax.swing.BorderFactory;
+import javax.swing.JInternalFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 
 /**
  * The AnnouncementWindow class is an internal frame for displaying popup
@@ -19,9 +22,7 @@ import java.awt.*;
  */
 public class AnnouncementWindow extends JInternalFrame {
 
-	private static final long serialVersionUID = 7803343954911356522L;
-
-	private ResizedFontLabel announcementLabel;
+	private JLabel announcementLabel;
 
 	private MainDesktopPane desktop;
 
@@ -40,11 +41,12 @@ public class AnnouncementWindow extends JInternalFrame {
 		// Create the main panel
 		JPanel mainPane = new JPanel();
 		mainPane.setLayout(new BorderLayout());
-		mainPane.setBorder(new EmptyBorder(0, 0, 0, 0));
+//		mainPane.setBorder(new EmptyBorder(0, 0, 0, 0));
 		setContentPane(mainPane);
 
-		mainPane.setSize(100, 40);
-		announcementLabel = new ResizedFontLabel(" "); //$NON-NLS-1$
+		mainPane.setSize(new Dimension(200, 80));
+		announcementLabel = new JLabel(" "); //$NON-NLS-1$
+		announcementLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 		announcementLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
 		mainPane.add(announcementLabel, BorderLayout.CENTER);

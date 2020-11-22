@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * HeatSourceType.java
- * @version 3.1.0 2017-08-24
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -22,15 +22,6 @@ public enum HeatSourceType {
 		this.string = string;
 	}
 
-	/**
-	 * use internationalized strings or no strings at all.
-	 * @return {@link String}
-	 * @deprecated
-	 */
-	public String getString() {
-		return this.string;
-	}
-	
 	public final String getName() {
 		return this.string;
 	}

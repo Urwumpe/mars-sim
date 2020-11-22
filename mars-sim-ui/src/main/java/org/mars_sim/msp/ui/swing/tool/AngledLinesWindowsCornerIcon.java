@@ -1,14 +1,17 @@
 /**
  * Mars Simulation Project
  * AngledLinesWindowsCornerIcon.java
- * @version 3.07 2015-01-06
+ * @version 3.1.2 2020-09-02
  * Modified by Manny Kung
  */
 
 package org.mars_sim.msp.ui.swing.tool;
 
-import javax.swing.*;
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Graphics;
+
+import javax.swing.Icon;
 
 public class AngledLinesWindowsCornerIcon implements Icon {
 
@@ -17,8 +20,8 @@ public class AngledLinesWindowsCornerIcon implements Icon {
     private static final Color GRAY_LINE_COLOR = new Color(172, 168, 153);
 
     //Dimensions
-    private static final int WIDTH = 12;
-    private static final int HEIGHT = 12;
+    private static final int WIDTH = 13;
+    private static final int HEIGHT = 13;
 
 
 

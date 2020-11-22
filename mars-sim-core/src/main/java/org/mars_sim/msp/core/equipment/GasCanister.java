@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * GasCanister.java
- * @version 3.1.0 2017-09-04
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -36,7 +36,7 @@ implements Container, Serializable {
 	 */
 	public GasCanister(Coordinates location) {
 		// Use Equipment constructor.
-		super(TYPE, location);
+		super(TYPE, TYPE, location);
 		
 		// Sets the base mass of the gas canister.
 		setBaseMass(EMPTY_MASS);
@@ -63,18 +63,11 @@ implements Container, Serializable {
 
 	@Override
 	public Building getBuildingLocation() {
-		// TODO Auto-generated method stub
-		return null;
+		return getContainerUnit().getBuildingLocation();
 	}
 
 	@Override
 	public Settlement getAssociatedSettlement() {
-		return this.getAssociatedSettlement();
-	}
-
-	@Override
-	public Settlement getBuriedSettlement() {
-		// TODO Auto-generated method stub
-		return null;
+		return getContainerUnit().getAssociatedSettlement();
 	}
 }

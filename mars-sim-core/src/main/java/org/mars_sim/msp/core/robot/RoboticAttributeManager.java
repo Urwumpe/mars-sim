@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RoboticAttributeManager.java
- * @version 3.08 2016-05-04
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -39,12 +39,15 @@ implements Serializable {
 	 * @param robot the robot with the attributes.
 	 */
 	public RoboticAttributeManager(Robot robot) {
-
 		attributeTable = new Hashtable<RoboticAttributeType, Integer>();
-
 		attributeList = new ArrayList<>();
-		
-		// Create natural attributes using random values (averaged for bell curve around 50%).
+	}
+	
+	/**
+	 * Sets some random attributes
+	 */
+	public void	setRandomAttributes() {		
+		// Create attributes using random values (averaged for bell curve around 50%).
 		// Note: this may change later.
 		for (RoboticAttributeType type : RoboticAttributeType.values()) {
 			int attributeValue = 0;

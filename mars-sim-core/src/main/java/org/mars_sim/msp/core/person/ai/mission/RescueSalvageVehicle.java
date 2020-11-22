@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RescueSalvageVehicle.java
- * @version 3.1.0 2017-04-19
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -13,24 +13,24 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Inventory;
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.events.HistoricalEvent;
 import org.mars_sim.msp.core.person.EventType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.job.Driver;
-
+import org.mars_sim.msp.core.person.ai.job.Pilot;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.vehicle.Crewable;
-import org.mars_sim.msp.core.vehicle.GroundVehicle;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
@@ -60,33 +60,38 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(RescueSalvageVehicle.class.getName());
-
+	private static final Logger logger = Logger.getLogger(RescueSalvageVehicle.class.getName());
+	private static final String loggerName = logger.getName();
+	private static final String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	
 	/** Default description. */
 	public static final String DEFAULT_DESCRIPTION = Msg.getString("Mission.description.rescueSalvageVehicle"); //$NON-NLS-1$
 
+	/** Mission Type enum. */
+	public static final MissionType missionType = MissionType.RESCUE_SALVAGE_VEHICLE;
+	
 	// Static members
 	public static final int MIN_STAYING_MEMBERS = 1;
 	public static final int MIN_GOING_MEMBERS = 2;
 	private static final int MAX_GOING_MEMBERS = 3;
 
-	public static final double BASE_RESCUE_MISSION_WEIGHT = 1000D;
-	public static final double BASE_SALVAGE_MISSION_WEIGHT = 5D;
+	public static final double BASE_RESCUE_MISSION_WEIGHT = 100D;
+	public static final double BASE_SALVAGE_MISSION_WEIGHT = 20D;
 	private static final double RESCUE_RESOURCE_BUFFER = 1D;
 
 	// Mission phases
-	final public static MissionPhase RENDEZVOUS = new MissionPhase(Msg.getString("Mission.phase.rendezvous")); //$NON-NLS-1$
+	public static final MissionPhase RENDEZVOUS = new MissionPhase(Msg.getString("Mission.phase.rendezvous")); //$NON-NLS-1$
 
+	private static final int MIN_MEMBER = 1;
+	
 	// Data members
 	private boolean rescue = false;
 
 	private Vehicle vehicleTarget;
 
-	private static MissionManager missionManager;
-
-	private static int oxygenID = ResourceUtil.oxygenID;
-	private static int waterID = ResourceUtil.waterID;
-	private static int foodID = ResourceUtil.foodID;
+	private static final int oxygenID = ResourceUtil.oxygenID;
+	private static final int waterID = ResourceUtil.waterID;
+	private static final int foodID = ResourceUtil.foodID;
 
 	/**
 	 * Constructor
@@ -96,72 +101,71 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 	 */
 	public RescueSalvageVehicle(Person startingPerson) {
 		// Use RoverMission constructor
-		super(DEFAULT_DESCRIPTION, startingPerson, MIN_GOING_MEMBERS);
-
-//		unitManager = Simulation.instance().getUnitManager();
-		missionManager = Simulation.instance().getMissionManager();
+		super(DEFAULT_DESCRIPTION, missionType, startingPerson, MIN_GOING_MEMBERS);
 
 		if (!isDone()) {
 			setStartingSettlement(startingPerson.getSettlement());
 			setMissionCapacity(MAX_GOING_MEMBERS);
 
+			// Obtain a rescuing vehicle and ensure that vehicleTarget is not included.
+			if (!reserveVehicle())
+				return;
+			
 			if (hasVehicle()) {
-				if (vehicleTarget == null)
-					vehicleTarget = findBeaconVehicle(getStartingSettlement(), getVehicle().getRange());
-
-				// Obtain a rescuing vehicle and ensure that vehicleTarget is not included.
-				if (!reserveVehicle())
-					return;
-
-				int capacity = getRover().getCrewCapacity();
-				if (capacity < MAX_GOING_MEMBERS) {
-					setMissionCapacity(capacity);
-				}
-
-				int availableSuitNum = Mission.getNumberAvailableEVASuitsAtSettlement(startingPerson.getSettlement());
-				if (availableSuitNum < getMissionCapacity()) {
-					setMissionCapacity(availableSuitNum);
-				}
-			}
-
-			if (vehicleTarget != null) {
-				if (getRescuePeopleNum(vehicleTarget) > 0) {
-					rescue = true;
-					setMinMembers(1);
-					setDescription(
-							Msg.getString("Mission.description.rescueSalvageVehicle.rescue", vehicleTarget.getName())); // $NON-NLS-1$)
-				} else {
-					setDescription(
-							Msg.getString("Mission.description.rescueSalvageVehicle.salvage", vehicleTarget.getName())); // $NON-NLS-1$)
-				}
-//				
-//				setDescription(
-//						Msg.getString("Mission.description.rescueSalvageVehicle.rescue", vehicleTarget.getName())); // $NON-NLS-1$)
 				
-				// Add navpoints for target vehicle and back home again.
-				addNavpoint(new NavPoint(vehicleTarget.getCoordinates(), vehicleTarget.getName()));
-				addNavpoint(new NavPoint(getStartingSettlement().getCoordinates(), getStartingSettlement(),
-						getStartingSettlement().getName()));
+				if (vehicleTarget == null)
+					vehicleTarget = findBeaconVehicle(getStartingSettlement(), getVehicle().getRange(missionType));
+	
+				if (vehicleTarget != null) {
+					
+					int capacity = getRover().getCrewCapacity();
+					if (capacity < MAX_GOING_MEMBERS) {
+						setMissionCapacity(capacity);
+					}
 
-				// Recruit additional members to mission.
-				if (!isDone()) {
-					recruitMembersForMission(startingPerson);
+					int availableSuitNum = Mission.getNumberAvailableEVASuitsAtSettlement(startingPerson.getSettlement());
+					if (availableSuitNum < getMissionCapacity()) {
+						setMissionCapacity(availableSuitNum);
+					}
+					
+//					if (getRescuePeopleNum(vehicleTarget) > 0) {
+						rescue = true;
+						setMinMembers(MIN_MEMBER);
+						setDescription(
+								Msg.getString("Mission.description.rescueSalvageVehicle.rescue", vehicleTarget.getName())); // $NON-NLS-1$)
+//					} 
+							
+					// Add navpoints for target vehicle and back home again.
+					addNavpoint(new NavPoint(vehicleTarget.getCoordinates(), vehicleTarget.getName()));
+					addNavpoint(new NavPoint(getStartingSettlement().getCoordinates(), getStartingSettlement(),
+							getStartingSettlement().getName()));
+
+					// Recruit additional members to mission.
+					if (!isDone()) {
+						if (!recruitMembersForMission(startingPerson))
+							return;
+					}
+
+					// Check if vehicle can carry enough supplies for the mission.
+					if (hasVehicle() && !isVehicleLoadable()) {			
+						addMissionStatus(MissionStatus.VEHICLE_NOT_LOADABLE);
+						endMission();
+					}
+
+					// Add rendezvous phase.
+					addPhase(RENDEZVOUS);
+
+					// Set initial phase
+					setPhase(VehicleMission.REVIEWING);
+					setPhaseDescription(
+							Msg.getString("Mission.phase.reviewing.description")); // $NON-NLS-1$
+					
+					logger.info(startingPerson + " had started RescueSalvageVehicle");
+					
+				} else {
+					addMissionStatus(MissionStatus.TARGET_VEHICLE_NOT_FOUND);
+					endMission();
 				}
-
-				// Check if vehicle can carry enough supplies for the mission.
-				if (hasVehicle() && !isVehicleLoadable()) {
-					endMission(VEHICLE_NOT_LOADABLE);// "Vehicle is not loadable. (RescueSalvageVehicle)");
-				}
-
-				// Add rendezvous phase.
-				addPhase(RENDEZVOUS);
-
-				// Set initial phase
-				setPhase(VehicleMission.APPROVAL);// .EMBARKING);
-				setPhaseDescription(
-						Msg.getString("Mission.phase.approval.description", getStartingSettlement().getName())); // $NON-NLS-1$
-			} else {
-				endMission(TARGET_VEHICLE_NOT_FOUND);
 			}
 		}
 	}
@@ -180,10 +184,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 			Rover rover, String description) {
 
 		// Use RoverMission constructor.
-		super(description, (MissionMember) members.toArray()[0], RoverMission.MIN_GOING_MEMBERS, rover);
-
-//		unitManager = Simulation.instance().getUnitManager();
-		missionManager = Simulation.instance().getMissionManager();
+		super(description, missionType, (MissionMember) members.toArray()[0], RoverMission.MIN_GOING_MEMBERS, rover);
 
 		setStartingSettlement(startingSettlement);
 		this.vehicleTarget = vehicleTarget;
@@ -199,7 +200,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 				new NavPoint(startingSettlement.getCoordinates(), startingSettlement, startingSettlement.getName()));
 
 		Person person = null;
-		Robot robot = null;
+//		Robot robot = null;
 
 		// Add mission members.
 		Iterator<MissionMember> i = members.iterator();
@@ -210,8 +211,8 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 				person = (Person) member;
 				person.getMind().setMission(this);
 			} else if (member instanceof Robot) {
-				robot = (Robot) member;
-				robot.getBotMind().setMission(this);
+//				robot = (Robot) member;
+//				robot.getBotMind().setMission(this);
 			}
 		}
 
@@ -219,13 +220,16 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		addPhase(RENDEZVOUS);
 
 		// Set initial phase
-		setPhase(VehicleMission.APPROVAL);// .EMBARKING);
-		setPhaseDescription(Msg.getString("Mission.phase.approval.description", getStartingSettlement().getName())); // $NON-NLS-1$
+		setPhase(VehicleMission.EMBARKING);
+		setPhaseDescription(Msg.getString("Mission.phase.embarking.description")); // $NON-NLS-1$
 
 		// Check if vehicle can carry enough supplies for the mission.
 		if (hasVehicle() && !isVehicleLoadable()) {
-			endMission("Vehicle is not loadable. (RescueSalvageVehicle)");
+			addMissionStatus(MissionStatus.VEHICLE_NOT_LOADABLE);
+			endMission();
 		}
+		
+		logger.info(startingSettlement + " had started RescueSalvageVehicle");
 	}
 
 	@Override
@@ -247,10 +251,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 			if (vehicle.isReservedForMission())
 				usable = false;
 
-			StatusType status = vehicle.getStatus();
-			if (!(vehicle.getStatus() == StatusType.PARKED || vehicle.getStatus() == StatusType.GARAGED)
-					&& !status.equals(StatusType.MAINTENANCE))
-				usable = false;
+			usable = vehicle.isVehicleReady();
 
 			if (vehicle.getInventory().getTotalInventoryMass(false) > 0D)
 				usable = false;
@@ -267,6 +268,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		if (getVehicle() == newVehicle) {
 			if (newVehicle.isReservedForMaintenance()) {
 				newVehicle.setReservedForMaintenance(false);
+				newVehicle.removeStatus(StatusType.MAINTENANCE);
 			}
 		}
 	}
@@ -295,7 +297,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 	 * @throws MissionException if problem setting a new phase.
 	 */
 	protected void determineNewPhase() {
-		if (APPROVAL.equals(getPhase())) {
+		if (REVIEWING.equals(getPhase())) {
 			setPhase(VehicleMission.EMBARKING);
 			setPhaseDescription(
 					Msg.getString("Mission.phase.embarking.description", getStartingSettlement().getDescription())); // $NON-NLS-1$
@@ -307,9 +309,13 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 			setPhaseDescription(
 					Msg.getString("Mission.phase.travelling.description", getNextNavpoint().getDescription())); // $NON-NLS-1$
 			if (rescue) {
-				logger.info(getVehicle().getName() + " has commenced a rescue mission for " + vehicleTarget.getName());
+				LogConsolidated.log(logger, Level.INFO, 3000, sourceName,
+						"[" + getVehicle().getLocationTag().getLocale() + "] " 
+								+ getVehicle().getName() + " has been embarked to rescue " + vehicleTarget.getName());
 			} else {
-				logger.info(getVehicle().getName() + " has commenced a salvage mission for " + vehicleTarget.getName());
+				LogConsolidated.log(logger, Level.INFO, 3000, sourceName,
+						"[" + getVehicle().getLocationTag().getLocale() + "] " 
+								+ getVehicle().getName() + " has been embarked to rescue " + vehicleTarget.getName());
 			}
 		}
 
@@ -338,7 +344,14 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		}
 
 		else if (DISEMBARKING.equals(getPhase())) {
-			endMission(ALL_DISEMBARKED);
+			setPhase(VehicleMission.COMPLETED);
+			setPhaseDescription(
+					Msg.getString("Mission.phase.completed.description")); // $NON-NLS-1$
+		}
+		
+		else if (COMPLETED.equals(getPhase())) {
+			addMissionStatus(MissionStatus.MISSION_ACCOMPLISHED);
+			endMission();
 		}
 	}
 
@@ -357,8 +370,9 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 	 */
 	private void rendezvousPhase(MissionMember member) {
 
-		logger.info("[" + member.getLocationTag().getQuickLocation() + "] " + getVehicle().getName()
-				+ " has arrived to rendezvous with " + vehicleTarget.getName() + ".");
+		LogConsolidated.log(logger, Level.INFO, 5000, sourceName,
+				"[" + member.getLocationTag().getLocale() + "] " + member.getName() + " in " + getVehicle().getName()
+				+ " had arrived to rendezvous with " + vehicleTarget.getName() + ".");
 
 		// If rescuing vehicle crew, load rescue life support resources into vehicle (if
 		// possible).
@@ -369,12 +383,12 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 				double amount = (Double) rescueResources.get(resource);
 				Inventory roverInv = getRover().getInventory();
 				Inventory targetInv = vehicleTarget.getInventory();
-				double amountNeeded = amount - targetInv.getARStored(resource, false);
+				double amountNeeded = amount - targetInv.getAmountResourceStored(resource, false);
 
-				if ((amountNeeded > 0) && (roverInv.getARStored(resource, false) > amountNeeded)) {
-					roverInv.retrieveAR(resource, amountNeeded);
+				if ((amountNeeded > 0) && (roverInv.getAmountResourceStored(resource, false) > amountNeeded)) {
+					roverInv.retrieveAmountResource(resource, amountNeeded);
 
-					targetInv.storeAR(resource, amountNeeded, true);
+					targetInv.storeAmountResource(resource, amountNeeded, true);
 
 				}
 			}
@@ -386,34 +400,33 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 
 		setPhaseEnded(true);
 
-//        String issue = ((Person)member).getPhysicalCondition().getHealthSituation();
-//        if (vehicleTarget.getMalfunctionManager().getMostSeriousMalfunction() != null)
-//        String issue = vehicleTarget.getMalfunctionManager().getMostSeriousMalfunction().getName();
-//        if (issue == null)
-//        	issue = vehicleTarget.getMalfunctionManager().getMostSeriousEmergencyMalfunction().getName();
-
 		// The member of the rescuing vehicle will turn off the target vehicle's
 		// emergency beacon.
 		if (vehicleTarget.isBeaconOn())
-			setEmergencyBeacon(member, vehicleTarget, false, "None");
+			setEmergencyBeacon(member, vehicleTarget, false, "Towing vehicles arrived");
 
 		// Set mission event.
+		HistoricalEvent newEvent = null;
 		if (rescue) {
-			HistoricalEvent newEvent = new MissionHistoricalEvent(EventType.MISSION_RENDEZVOUS, this,
+			newEvent = new MissionHistoricalEvent(EventType.MISSION_RENDEZVOUS, this,
 					"Stranded Vehicle", // cause
 					this.getName(), // during
 					member.getName(), // member
 					member.getVehicle().getName(), // loc0
-					vehicleTarget.getLocationTag().getLocale() // loc1
+					vehicleTarget.getLocationTag().getLocale(), // loc1
+					vehicleTarget.getAssociatedSettlement().getName()
 			);
-			Simulation.instance().getEventManager().registerNewEvent(newEvent);
 		} else {
-			HistoricalEvent newEvent = new MissionHistoricalEvent(EventType.MISSION_RENDEZVOUS, this,
-					"Salvaged Vehicle", this.getName(), member.getName(), member.getVehicle().getName(),
-					vehicleTarget.getLocationTag().getLocale());
-			Simulation.instance().getEventManager().registerNewEvent(newEvent);
+			newEvent = new MissionHistoricalEvent(EventType.MISSION_RENDEZVOUS, this,
+					"Salvaged Vehicle", 
+					this.getName(), 
+					member.getName(), 
+					member.getVehicle().getName(),
+					vehicleTarget.getLocationTag().getLocale(),
+					vehicleTarget.getAssociatedSettlement().getName()
+			);
 		}
-
+		eventManager.registerNewEvent(newEvent);
 	}
 
 	/**
@@ -428,6 +441,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		// Put towed vehicle and crew in settlement if necessary.
 		if (hasVehicle()) {
 			disembarkTowedVehicles(person, getRover(), disembarkSettlement);
+			super.disembark(person, getRover().getTowedVehicle(), disembarkSettlement);
 		}
 
 		super.performDisembarkToSettlementPhase(person, disembarkSettlement);
@@ -444,34 +458,25 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 
 		if (rover.getTowedVehicle() != null) {
 			Vehicle towedVehicle = rover.getTowedVehicle();
-
-			// Unhook towed vehicle.
-			rover.setTowedVehicle(null);
-			towedVehicle.setTowingVehicle(null);
-			logger.info(rover + " is being unhooked from " + towedVehicle + " at " + disembarkSettlement);
-
-			// Store towing and towed vehicle in settlement.
-			disembarkSettlement.getInventory().storeUnit(towedVehicle);		
-			//disembarkSettlement.getInventory().storeUnit(rover);
-
-			// Add towed vehicle to a garage if available.
-	        boolean	garaged = false;
-	        if (towedVehicle.getGarage() == null) 
-	        	garaged = BuildingManager.addToGarage((GroundVehicle) towedVehicle, disembarkSettlement);
-
-			// Make sure the rover chasis is not overlapping a building structure in the settlement map
-	        if (!garaged)
-	        	towedVehicle.determinedSettlementParkedLocationAndFacing();
-	        
-//			// Add towing vehicle to a garage if available.
-//	        garaged = BuildingManager.addToRandomBuilding((GroundVehicle) rover, disembarkSettlement);
+//
+//			// Place this vehicle near settlement vicinity
+////			towedVehicle.enter(LocationCodeType.SETTLEMENT_VICINITY);
+//			// Store towing and towed vehicle in settlement.
+//			disembarkSettlement.getInventory().storeUnit(towedVehicle);		
+//
+//			// Add towed vehicle to a garage if available.
+//	        boolean	garaged = false;
+//	        if (towedVehicle.getGarage() == null) 
+//	        	garaged = BuildingManager.addToGarage((GroundVehicle) towedVehicle, disembarkSettlement);
 //
 //			// Make sure the rover chasis is not overlapping a building structure in the settlement map
 //	        if (!garaged)
-//	        	rover.determinedSettlementParkedLocationAndFacing();
-	        
+//	        	towedVehicle.determinedSettlementParkedLocationAndFacing();
+	                
 			// towedVehicle.determinedSettlementParkedLocationAndFacing();
-			logger.info(towedVehicle + " has been towed to " + disembarkSettlement.getName());
+	    	LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+					"[" + towedVehicle.getLocationTag().getLocale() + "] " + towedVehicle 
+					+ " has been towed to " + disembarkSettlement.getName());
 
 			String issue = "";
 			if (vehicleTarget.getMalfunctionManager().getMostSeriousMalfunction() != null)
@@ -479,66 +484,73 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 			if (issue == null && vehicleTarget.getMalfunctionManager().getMostSeriousEmergencyMalfunction() != null)
 				issue = vehicleTarget.getMalfunctionManager().getMostSeriousEmergencyMalfunction().getName();
 
-			HistoricalEvent salvageEvent = new MissionHistoricalEvent(EventType.MISSION_SALVAGE_VEHICLE, this, issue,
-					this.getName(), towedVehicle.getName(), // person.getName(),
+			if (!issue.equals("")) {
+				HistoricalEvent salvageEvent = new MissionHistoricalEvent(
+						EventType.MISSION_SALVAGE_VEHICLE, 
+						this, 
+						issue,
+					this.getName(), 
+					towedVehicle.getName(), // person.getName(),
 					person.getLocationTag().getImmediateLocation(), // .getVehicle().getName(),
-					person.getLocationTag().getLocale());
-			Simulation.instance().getEventManager().registerNewEvent(salvageEvent);
-
-			// Unload any crew at settlement.
+					person.getLocationTag().getLocale(),
+					person.getAssociatedSettlement().getName()
+					);
+				eventManager.registerNewEvent(salvageEvent);
+			}
+			
+			// Unload crew from the towed vehicle at settlement.
 			if (towedVehicle instanceof Crewable) {
 				Crewable crewVehicle = (Crewable) towedVehicle;
 
 				for (Person p : crewVehicle.getCrew()) {
-					towedVehicle.getInventory().retrieveUnit(p);
+	
+					if (p.isDeclaredDead() || p.getPerformanceRating() < 0.1) {
+						
+						if (p.isDeclaredDead())
+							LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+								"[" + p.getLocationTag().getLocale() + "] " + p.getName() 
+								+ p.getName() + "'s body had been retrieved from the towed rover "
+										+ towedVehicle.getName() + " during an Rescue Operation.");
+						else
+							LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+									"[" + p.getLocationTag().getLocale() + "] " + p.getName() 
+									+ p.getName() + " was rescued from the towed rover "
+											+ towedVehicle.getName() + " during an Rescue Operation.");
+						
+						// Retrieve the person if he/she is dead
+						p.transfer(towedVehicle, disembarkSettlement);
+//						towedVehicle.getInventory().retrieveUnit(p);
+//						disembarkSettlement.getInventory().storeUnit(p);
+						
+						int id = disembarkSettlement.getIdentifier();
+						BuildingManager.addToMedicalBuilding(p, id);
+						p.setAssociatedSettlement(id);
 
-					if (p.isDeclaredDead()) {
-						p.setBuriedSettlement(disembarkSettlement);
-						p.getPhysicalCondition().getDeathDetails().setBodyRetrieved(true);
-						logger.info(p.getName() + "'s body has been retrieved during the rescue operation.");
-					} else {
-						disembarkSettlement.getInventory().storeUnit(p);
-						logger.info(p.getName() + " has been rescued.");
+						HistoricalEvent rescueEvent = new MissionHistoricalEvent(EventType.MISSION_RESCUE_PERSON, 
+								this,
+								p.getPhysicalCondition().getHealthSituation(), 
+								p.getTaskDescription(), 
+								p.getName(),
+								p.getVehicle().getName(), 
+								p.getLocationTag().getLocale(),
+								p.getAssociatedSettlement().getName()
+								);
+						eventManager.registerNewEvent(rescueEvent);												
 					}
-
-					BuildingManager.addToRandomBuilding(p, disembarkSettlement);
-					p.setAssociatedSettlement(disembarkSettlement);
-					p.getMind().getTaskManager().clearTask();
-
-					HistoricalEvent rescueEvent = new MissionHistoricalEvent(EventType.MISSION_RESCUE_PERSON, this,
-							p.getPhysicalCondition().getHealthSituation(), p.getTaskDescription(), p.getName(),
-							p.getVehicle().getName(), p.getLocationTag().getLocale());
-					Simulation.instance().getEventManager().registerNewEvent(rescueEvent);
+					
+					else {					
+						LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+								"[" + p.getLocationTag().getLocale() + "] " + p.getName() 
+								+ " successfully towed the rover "+ towedVehicle.getName() + " back home.");
+					}
 				}
 			}
-
-			// Retrieve the person if he/she is dead
-			for (Person p : rover.getCrew()) {
-				rover.getInventory().retrieveUnit(p);
-
-				if (p.isDeclaredDead()) {
-					p.setBuriedSettlement(disembarkSettlement);
-					p.getPhysicalCondition().getDeathDetails().setBodyRetrieved(true);
-					logger.info(p.getName() + "'s body has been retrieved during the rescue operation.");
-				} else {
-					disembarkSettlement.getInventory().storeUnit(p);
-				}
-
-				BuildingManager.addToRandomBuilding(p, disembarkSettlement);
-				p.setAssociatedSettlement(disembarkSettlement);
-				p.getMind().getTaskManager().clearTask();
-
-//				logger.info(p.getName() + " has completed the rescue operation.");
-//				 HistoricalEvent rescueEvent = new MissionHistoricalEvent(p,
-//				 this, p.getSettlement().getName(), EventType..MISSION_RESCUE_PERSON);
-//				 Simulation.instance().getEventManager().registerNewEvent(rescueEvent);
-
-			}
-
-			// Unhook the towed vehicle this vehicle is towing if any.
-//			 if (towedVehicle instanceof Rover) {
-//			 disembarkTowedVehicles(person, (Rover) towedVehicle, disembarkSettlement);
-//			 }
+			// Unhook towed vehicle.
+			rover.setTowedVehicle(null);
+			towedVehicle.setTowingVehicle(null);
+			LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+					"[" + rover.getLocationTag().getLocale() + "] " + rover 
+					+ " was being unhooked from " + towedVehicle + " at " + disembarkSettlement);
 		}
 	}
 
@@ -560,8 +572,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		int peopleNum = getRescuePeopleNum(vehicleTarget);
 
 		// Determine life support supplies needed for trip.
-		double oxygenAmount = PhysicalCondition.getOxygenConsumptionRate() * timeSols * peopleNum
-				* Mission.OXYGEN_MARGIN;
+		double oxygenAmount = PhysicalCondition.getOxygenConsumptionRate() * timeSols * peopleNum * Mission.OXYGEN_MARGIN;
 		if (useBuffer) {
 			oxygenAmount *= Vehicle.getLifeSupportRangeErrorMargin();
 		}
@@ -579,6 +590,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		}
 		result.put(foodID, foodAmount);
 
+		// Add extra EVA Suits based on how many people to be rescued
 		return result;
 	}
 
@@ -596,12 +608,10 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		Collection<Vehicle> emergencyBeaconVehicles = new ConcurrentLinkedQueue<Vehicle>();
 		Collection<Vehicle> vehiclesNeedingRescue = new ConcurrentLinkedQueue<Vehicle>();
 
-//		if (unitManager == null)
-//			unitManager = Simulation.instance().getUnitManager();
 		// Find all available vehicles.
 		// Iterator<Vehicle> iV = unitManager.getVehicles().iterator();
 		// while (iV.hasNext()) {
-		for (Vehicle vehicle : Simulation.instance().getUnitManager().getVehicles()) {// = iV.next();
+		for (Vehicle vehicle : unitManager.getVehicles()) {// = iV.next();
 			if (vehicle.isBeaconOn() && !isVehicleAlreadyMissionTarget(vehicle)) {
 				emergencyBeaconVehicles.add(vehicle);
 
@@ -617,7 +627,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		if (vehiclesNeedingRescue.size() > 0) {
 			Vehicle vehicle = findClosestVehicle(settlement.getCoordinates(), vehiclesNeedingRescue);
 			if (vehicle != null) {
-				double vehicleRange = settlement.getCoordinates().getDistance(vehicle.getCoordinates());
+				double vehicleRange = Coordinates.computeDistance(settlement.getCoordinates(), vehicle.getCoordinates());
 				if (vehicleRange <= halfRange) {
 					result = vehicle;
 				}
@@ -628,7 +638,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		if ((result == null) && (emergencyBeaconVehicles.size() > 0)) {
 			Vehicle vehicle = findClosestVehicle(settlement.getCoordinates(), emergencyBeaconVehicles);
 			if (vehicle != null) {
-				double vehicleRange = settlement.getCoordinates().getDistance(vehicle.getCoordinates());
+				double vehicleRange = Coordinates.computeDistance(settlement.getCoordinates(), vehicle.getCoordinates());
 				if (vehicleRange <= halfRange) {
 					result = vehicle;
 				}
@@ -738,25 +748,24 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		if (rescue && (getRover().getTowedVehicle() == null)) {
 			Map<Integer, Number> rescueResources = determineRescueResourcesNeeded(useBuffer);
 
-//            int cutOffID = SimulationConfig.instance().getResourceConfiguration().getNextID();
-
-			for (Integer resource : rescueResources.keySet()) {// = i.next();
-				if (resource < 1000) {
-//                if (resource instanceof AmountResource) {
-					double amount = (Double) rescueResources.get(resource);
-					if (result.containsKey(resource)) {
-						amount += (Double) result.get(resource);
+			for (Integer id : rescueResources.keySet()) {
+				if (id < ResourceUtil.FIRST_ITEM_RESOURCE_ID) {
+					double amount = (Double) rescueResources.get(id);
+					if (result.containsKey(id)) {
+						amount += (Double) result.get(id);
 					}
 					if (useBuffer) {
 						amount *= RESCUE_RESOURCE_BUFFER;
 					}
-					result.put(resource, amount);
-				} else {
-					int num = (Integer) rescueResources.get(resource);
-					if (result.containsKey(resource)) {
-						num += (Integer) result.get(resource);
+					result.put(id, amount);
+					
+				}  // Check if these resources are Parts
+				else if (id >= ResourceUtil.FIRST_ITEM_RESOURCE_ID && id < ResourceUtil.FIRST_VEHICLE_RESOURCE_ID) {
+					int num = (Integer) rescueResources.get(id);
+					if (result.containsKey(id)) {
+						num += (Integer) result.get(id);
 					}
-					result.put(resource, num);
+					result.put(id, num);
 				}
 			}
 		}
@@ -798,7 +807,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 			Person person = (Person) member;
 
 			// If person has the "Driver" job, add 1 to their qualification.
-			if (person.getMind().getJob() instanceof Driver) {
+			if (person.getMind().getJob() instanceof Pilot) {
 				result += 1D;
 			}
 		}
@@ -844,7 +853,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 
 		double distance = thisSettlement.getCoordinates().getDistance(thisVehicle.getCoordinates());
 
-		Iterator<Settlement> iS = Simulation.instance().getUnitManager().getSettlements().iterator();
+		Iterator<Settlement> iS = unitManager.getSettlements().iterator();
 		while (iS.hasNext() && result) {
 			Settlement settlement = iS.next();
 			if (settlement != thisSettlement) {
@@ -855,7 +864,7 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 						while (iV.hasNext() && result) {
 							Vehicle vehicle = iV.next();
 							if (vehicle instanceof Rover) {
-								if (vehicle.getRange() >= (settlementDistance * 2D)) {
+								if (vehicle.getRange(missionType) >= (settlementDistance * 2D)) {
 									result = false;
 								}
 							}
@@ -878,10 +887,10 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		// Override and full rover with fuel and life support resources.
 		Map<Integer, Number> result = new HashMap<Integer, Number>(4);
 		Inventory inv = getVehicle().getInventory();
-		result.put(getVehicle().getFuelType(), inv.getARCapacity(getVehicle().getFuelType(), false));
-		result.put(oxygenID, inv.getARCapacity(oxygenID, false));
-		result.put(waterID, inv.getARCapacity(waterID, false));
-		result.put(foodID, inv.getARCapacity(foodID, false));
+		result.put(getVehicle().getFuelType(), inv.getAmountResourceCapacity(getVehicle().getFuelType(), false));
+		result.put(oxygenID, inv.getAmountResourceCapacity(oxygenID, false));
+		result.put(waterID, inv.getAmountResourceCapacity(waterID, false));
+		result.put(foodID, inv.getAmountResourceCapacity(foodID, false));
 
 		// Get parts too.
 		result.putAll(getPartsNeededForTrip(getTotalRemainingDistance()));
@@ -889,6 +898,15 @@ public class RescueSalvageVehicle extends RoverMission implements Serializable {
 		return result;
 	}
 
+//	/**
+//	 * Reloads instances after loading from a saved sim
+//	 * 
+//	 * @param {{@link HistoricalEventManager}
+//	 */
+//	public static void justReloaded(HistoricalEventManager event) {
+//		eventManager = event;
+//	}
+	
 	@Override
 	public void destroy() {
 		super.destroy();

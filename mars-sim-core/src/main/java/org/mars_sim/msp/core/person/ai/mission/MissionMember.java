@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MissionMemberable.java
- * @version 3.1.0 2017-05-05
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -9,8 +9,8 @@ package org.mars_sim.msp.core.person.ai.mission;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.UnitListener;
+import org.mars_sim.msp.core.location.LocationStateType;
 import org.mars_sim.msp.core.location.LocationTag;
-import org.mars_sim.msp.core.person.LocationSituation;
 import org.mars_sim.msp.core.person.ShiftType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Indoor;
@@ -41,7 +41,7 @@ public interface MissionMember extends Indoor {
 	 * 
 	 * @param newSettlement the new associated settlement or null if none.
 	 */
-	public void setAssociatedSettlement(Settlement settlement);
+	public void setAssociatedSettlement(int settlement);
 
 	/**
 	 * Gets the member's location.
@@ -78,10 +78,17 @@ public interface MissionMember extends Indoor {
 	 */
 	public void setShiftType(ShiftType shiftType);
 
+//	/**
+//	 * @return {@link LocationSituation} the mission member's location
+//	 */
+//	public LocationSituation getLocationSituation();
+
 	/**
-	 * @return {@link LocationSituation} the mission member's location
+	 * Gets the location state type of the member
+	 * 
+	 * @return
 	 */
-	public LocationSituation getLocationSituation();
+	public LocationStateType getLocationStateType();
 
 	/**
 	 * Get settlement the member is at, null if member is not at a settlement

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * FoodProduction.java
- * @version 3.1.0 2018-10-16
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -16,7 +16,6 @@ import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.equipment.Equipment;
 import org.mars_sim.msp.core.equipment.EquipmentFactory;
@@ -26,13 +25,12 @@ import org.mars_sim.msp.core.foodProduction.FoodProductionProcessItem;
 import org.mars_sim.msp.core.foodProduction.FoodProductionUtil;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.resource.AmountResource;
-import org.mars_sim.msp.core.resource.ItemResource;
+import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.Part;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.resource.ItemType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.BuildingException;
 
 /**
@@ -53,14 +51,8 @@ public class FoodProduction extends Function implements Serializable {
 	// Data members.
 	private int techLevel;
 	private int concurrentProcesses;
-
-	private Settlement settlement;
-
-	private Inventory inv;
-
+	
 	private List<FoodProductionProcess> processes;
-
-	private static BuildingConfig config;
 
 	/**
 	 * Constructor.
@@ -72,17 +64,11 @@ public class FoodProduction extends Function implements Serializable {
 		// Use Function constructor.
 		super(FUNCTION, building);
 
-		settlement = building.getSettlement();
-
-		inv = building.getInventory();
-
-		config = SimulationConfig.instance().getBuildingConfiguration();
-
-		techLevel = config.getFoodProductionTechLevel(building.getBuildingType());
-		concurrentProcesses = config.getFoodProductionConcurrentProcesses(building.getBuildingType());
+		techLevel = buildingConfig.getFoodProductionTechLevel(building.getBuildingType());
+		concurrentProcesses = buildingConfig.getFoodProductionConcurrentProcesses(building.getBuildingType());
 
 		// Load activity spots
-		loadActivitySpots(config.getFoodProductionActivitySpots(building.getBuildingType()));
+		loadActivitySpots(buildingConfig.getFoodProductionActivitySpots(building.getBuildingType()));
 
 		processes = new ArrayList<FoodProductionProcess>();
 	}
@@ -100,14 +86,12 @@ public class FoodProduction extends Function implements Serializable {
 
 		double result = 0D;
 
-		if (config == null)
-			config = SimulationConfig.instance().getBuildingConfiguration();
-		int buildingTech = config.getFoodProductionTechLevel(buildingType);
+		int buildingTech = buildingConfig.getFoodProductionTechLevel(buildingType);
 
 		double demand = 0D;
 		Iterator<Person> i = settlement.getAllAssociatedPeople().iterator();
 		while (i.hasNext()) {
-			demand += i.next().getMind().getSkillManager().getSkillLevel(SkillType.COOKING);
+			demand += i.next().getSkillManager().getSkillLevel(SkillType.COOKING);
 		}
 
 		double supply = 0D;
@@ -133,7 +117,7 @@ public class FoodProduction extends Function implements Serializable {
 
 		double baseFoodProductionValue = demand / (supply + 1D);
 
-		double processes = config.getFoodProductionConcurrentProcesses(buildingType);
+		double processes = buildingConfig.getFoodProductionConcurrentProcesses(buildingType);
 		double foodProductionValue = (buildingTech * buildingTech) * processes;
 
 		result = foodProductionValue * baseFoodProductionValue;
@@ -246,13 +230,19 @@ public class FoodProduction extends Function implements Serializable {
 		Inventory inv = getBuilding().getSettlementInventory();
 		for (FoodProductionProcessItem item : process.getInfo().getInputList()) {
 			if (ItemType.AMOUNT_RESOURCE.equals(item.getType())) {
-				AmountResource resource = AmountResource.findAmountResource(item.getName());
-				inv.retrieveAmountResource(resource, item.getAmount());
-				inv.addAmountDemandTotalRequest(resource);
-				inv.addAmountDemand(resource, item.getAmount());
+//				AmountResource resource = ResourceUtil.findAmountResource(item.getName());
+				int id = ResourceUtil.findIDbyAmountResourceName(item.getName());
+				inv.retrieveAmountResource(id, item.getAmount());
+				// Add tracking demand
+				inv.addAmountDemandTotalRequest(id, item.getAmount());
+				inv.addAmountDemand(id, item.getAmount());
 			} else if (ItemType.PART.equals(item.getType())) {
-				Part part = (Part) ItemResource.findItemResource(item.getName());
-				inv.retrieveItemResources(part, (int) item.getAmount());
+//				Part part = (Part) ItemResourceUtil.findItemResource(item.getName());
+				int id = ItemResourceUtil.findIDbyItemResourceName(item.getName());
+				inv.retrieveItemResources(id, (int) item.getAmount());
+				// Add tracking demand
+				inv.addItemDemandTotalRequest(id, (int) item.getAmount());
+				inv.addItemDemand(id, (int) item.getAmount());
 			} else
 				throw new IllegalStateException(
 						"FoodProduction process input: " + item.getType() + " not a valid type.");
@@ -266,7 +256,7 @@ public class FoodProduction extends Function implements Serializable {
 		// Log foodProduction process starting.
 		if (logger.isLoggable(Level.FINEST)) {
 
-			logger.finest(getBuilding() + " at " + settlement + " starting food production process: "
+			logger.finest(getBuilding() + " at " + building.getSettlement() + " starting food production process: "
 					+ process.getInfo().getName());
 		}
 	}
@@ -350,7 +340,9 @@ public class FoodProduction extends Function implements Serializable {
 	 * @throws BuildingException if error ending process.
 	 */
 	public void endFoodProductionProcess(FoodProductionProcess process, boolean premature) {
-
+		Settlement settlement = building.getSettlement();
+		Inventory inv = building.getInventory();
+		
 		if (!premature) {
 			// Produce outputs.
 			Iterator<FoodProductionProcessItem> j = process.getInfo().getOutputList().iterator();
@@ -359,27 +351,39 @@ public class FoodProduction extends Function implements Serializable {
 				if (FoodProductionUtil.getFoodProductionProcessItemValue(item, settlement, true) > 0D) {
 					if (ItemType.AMOUNT_RESOURCE.equals(item.getType())) {
 						// Produce amount resources.
-						AmountResource resource = AmountResource.findAmountResource(item.getName());
+//						AmountResource resource = ResourceUtil.findAmountResource(item.getName());
+						int id = ResourceUtil.findIDbyAmountResourceName(item.getName());
 						double amount = item.getAmount();
-						double capacity = inv.getAmountResourceRemainingCapacity(resource, true, false);
+						double capacity = inv.getAmountResourceRemainingCapacity(id, true, false);
 						if (item.getAmount() > capacity) {
 							double overAmount = item.getAmount() - capacity;
 							logger.fine("Not enough storage capacity to store " + overAmount + " of " + item.getName()
 									+ " from " + process.getInfo().getName() + " at " + settlement.getName());
 							amount = capacity;
 						}
-						inv.storeAmountResource(resource, amount, true);
-						// Add addSupplyAmount()
-						inv.addAmountSupplyAmount(resource, amount);
-					} else if (ItemType.PART.equals(item.getType())) {
+						inv.storeAmountResource(id, amount, true);
+						// Add tracking supply
+						inv.addAmountSupply(id, amount);
+						// Add to the daily output
+						settlement.addOutput(id, amount, process.getTotalWorkTime());
+					} 
+					
+					else if (ItemType.PART.equals(item.getType())) {
 						// Produce parts.
-						Part part = (Part) ItemResource.findItemResource(item.getName());
-						double mass = item.getAmount() * part.getMassPerItem();
+						Part part = (Part) ItemResourceUtil.findItemResource(item.getName());
+						int id = part.getID();//ItemResourceUtil.findIDbyItemResourceName(item.getName());
+						int num = (int) item.getAmount();
+						double mass = num * part.getMassPerItem();
 						double capacity = inv.getGeneralCapacity();
 						if (mass <= capacity) {
-							inv.storeItemResources(part, (int) item.getAmount());
+							inv.storeItemResources(id, num);
+							inv.addItemSupply(id, num);
+							// Add to the daily output
+							settlement.addOutput(id, num, process.getTotalWorkTime());
 						}
-					} else if (ItemType.EQUIPMENT.equals(item.getType())) {
+					} 
+					
+					else if (ItemType.EQUIPMENT.equals(item.getType())) {
 						// Produce equipment.
 						String equipmentType = item.getName();
 						int number = (int) item.getAmount();
@@ -388,34 +392,25 @@ public class FoodProduction extends Function implements Serializable {
 									settlement.getCoordinates(), false);
 							equipment.setName(Simulation.instance().getUnitManager().getNewName(UnitType.EQUIPMENT,
 									equipmentType, null, null));
+							// Place this equipment within a settlement
 							inv.storeUnit(equipment);
+							unitManager.addUnit(equipment);
+							// Add to the daily output
+							settlement.addOutput(equipment.getIdentifier(), number, process.getTotalWorkTime());
 						}
 					}
-//                    else if (Type.VEHICLE.equals(item.getType())) {
-//                        // Produce vehicles.
-//                        String vehicleType = item.getName();
-//                        int number = (int) item.getAmount();
-//                        for (int x = 0; x < number; x++) {
-//                            if (LightUtilityVehicle.NAME.equalsIgnoreCase(vehicleType)) {
-//                                String name = manager.getNewName(UnitType.VEHICLE, "LUV", null);
-//                                manager.addUnit(new LightUtilityVehicle(name, vehicleType, settlement));
-//                            }
-//                            else {
-//                                String name = manager.getNewName(UnitType.VEHICLE, null, null);
-//                                manager.addUnit(new Rover(name, vehicleType, settlement));
-//                            }
-//                        }
-//                    }
 					else
 						throw new IllegalStateException(
 								"FoodProduction.addProcess(): output: " + item.getType() + " not a valid type.");
 
 					// Recalculate settlement good value for output item.
-					getBuilding().getBuildingManager().getSettlement().getGoodsManager()
+					getBuilding().getSettlement().getGoodsManager()
 							.updateGoodValue(FoodProductionUtil.getGood(item), false);
 				}
 			}
-		} else {
+		} 
+		
+		else {
 
 			// Premature end of process. Return all input materials.
 			// Settlement settlement = getBuilding().getBuildingManager().getSettlement();
@@ -428,24 +423,27 @@ public class FoodProduction extends Function implements Serializable {
 				if (FoodProductionUtil.getFoodProductionProcessItemValue(item, settlement, false) > 0D) {
 					if (ItemType.AMOUNT_RESOURCE.equals(item.getType())) {
 						// Produce amount resources.
-						AmountResource resource = AmountResource.findAmountResource(item.getName());
+//						AmountResource resource = ResourceUtil.findAmountResource(item.getName());
+						int id = ResourceUtil.findIDbyAmountResourceName(item.getName());
 						double amount = item.getAmount();
-						double capacity = inv.getAmountResourceRemainingCapacity(resource, true, false);
+						double capacity = inv.getAmountResourceRemainingCapacity(id, true, false);
 						if (item.getAmount() > capacity) {
 							double overAmount = item.getAmount() - capacity;
 							logger.severe("Not enough storage capacity to store " + overAmount + " of " + item.getName()
 									+ " from " + process.getInfo().getName() + " at " + settlement.getName());
 							amount = capacity;
 						}
-						inv.storeAmountResource(resource, amount, true);
-						inv.addAmountSupplyAmount(resource, amount);
+						inv.storeAmountResource(id, amount, true);
+						// Add tracking supply
+						inv.addAmountSupply(id, amount);
 					} else if (ItemType.PART.equals(item.getType())) {
 						// Produce parts.
-						Part part = (Part) ItemResource.findItemResource(item.getName());
+						Part part = (Part) ItemResourceUtil.findItemResource(item.getName());
+						int id = part.getID();
 						double mass = item.getAmount() * part.getMassPerItem();
 						double capacity = inv.getGeneralCapacity();
 						if (mass <= capacity) {
-							inv.storeItemResources(part, (int) item.getAmount());
+							inv.storeItemResources(id, (int) item.getAmount());
 						}
 					} else if (ItemType.EQUIPMENT.equals(item.getType())) {
 						// Produce equipment.
@@ -456,6 +454,8 @@ public class FoodProduction extends Function implements Serializable {
 									settlement.getCoordinates(), false);
 							equipment.setName(Simulation.instance().getUnitManager().getNewName(UnitType.EQUIPMENT,
 									equipmentType, null, null));
+							// Place this equipment within a settlement
+//							equipment.enter(LocationCodeType.SETTLEMENT);
 							inv.storeUnit(equipment);
 						}
 					}
@@ -491,7 +491,6 @@ public class FoodProduction extends Function implements Serializable {
 
 		// Log process ending.
 		if (logger.isLoggable(Level.FINEST)) {
-			Settlement settlement = getBuilding().getBuildingManager().getSettlement();
 			logger.finest(getBuilding() + " at " + settlement + " ending foodProduction process: "
 					+ process.getInfo().getName());
 		}

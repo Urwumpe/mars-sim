@@ -4,13 +4,15 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import junit.framework.TestCase;
-
 import org.apache.batik.gvt.GraphicsNode;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.resource.Part;
+import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.construction.ConstructionConfig;
 import org.mars_sim.msp.core.structure.construction.ConstructionStageInfo;
+import org.mars_sim.msp.ui.swing.tool.svg.SVGMapUtil;
+
+import junit.framework.TestCase;
 
 /**
  * Unit test suite for the SVGMapUtil class.
@@ -19,7 +21,7 @@ public class TestSVGMapUtil extends TestCase {
 
     @Override
     public void setUp() throws Exception {
-        SimulationConfig.loadConfig();
+        SimulationConfig.instance().loadConfig();
     }
 
     /**
@@ -28,8 +30,7 @@ public class TestSVGMapUtil extends TestCase {
     public void testGetBuildingSVG() {
         
         // Check that all configured building names are mapped to a SVG image.
-        Iterator<String> i = SimulationConfig.instance().getBuildingConfiguration().
-                getBuildingTypes().iterator();
+        Iterator<String> i = BuildingConfig.getBuildingTypes().iterator();
         while (i.hasNext()) {
             String buildingName = i.next();
             GraphicsNode svg = SVGMapUtil.getBuildingSVG(buildingName);

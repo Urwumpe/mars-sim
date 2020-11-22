@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SelfTreatMedicalProblemMeta.java
- * @version 3.1.0 2017-03-09
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -15,7 +15,8 @@ import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.task.SelfTreatHealthProblem;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.Treatment;
 import org.mars_sim.msp.core.robot.Robot;
@@ -33,6 +34,8 @@ public class SelfTreatHealthProblemMeta implements MetaTask, Serializable {
     /** default serial id. */
     private static final long serialVersionUID = 1L;
 
+	private static final int VALUE = 1000;
+	
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.selfTreatHealthProblem"); //$NON-NLS-1$
@@ -54,17 +57,22 @@ public class SelfTreatHealthProblemMeta implements MetaTask, Serializable {
 
         if (person.isInside()) {
 	        // Check if person has health problems that can be self-treated.
-	        boolean hasSelfTreatableProblems = (getSelfTreatableHealthProblems(person).size() > 0);
+        	int size = getSelfTreatableHealthProblems(person).size();
+        	
+	        boolean hasSelfTreatableProblems = (size > 0);
 	
 	        // Check if person has available medical aids.
 	        boolean hasAvailableMedicalAids = hasAvailableMedicalAids(person);
 	
 	
 	        if (hasSelfTreatableProblems && hasAvailableMedicalAids) {
-	            result = 300D;
+	            result = VALUE * size;
 	        }
 	
-        	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
+	        double pref = person.getPreference().getPreferenceScore(this);
+	        
+	        if (pref > 0)
+	        	result = result * 3D;
         	
 	        // Effort-driven task modifier.
 	        result *= person.getPerformanceRating();
@@ -92,7 +100,7 @@ public class SelfTreatHealthProblemMeta implements MetaTask, Serializable {
                 Treatment treatment = problem.getIllness().getRecoveryTreatment();
                 if (treatment != null) {
                     boolean selfTreatable = treatment.getSelfAdminister();
-                    int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
+                    int skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
                     int requiredSkill = treatment.getSkill();
                     if (selfTreatable && (skill >= requiredSkill)) {
                         result.add(problem);

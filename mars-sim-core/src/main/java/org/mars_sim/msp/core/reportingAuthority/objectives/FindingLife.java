@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * FindingLife.java
- * @version 3.1.0 2017-01-14
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -19,15 +19,36 @@ public class FindingLife implements MissionAgenda, Serializable  {
 	private final String name = "Finding Life Past and Present on Mars";
 	
 	private final String[] phases = new String[] {
-			"Test Rover Range",
-			"Examine regions capable hosting and sustaining organic microbial life",			
-			"Test Return Vehicle Capability"};
+			"Follow the water",
+			"Examine regions capable hosting and sustaining organic microbial life",	
+			"Core drill rock samples from selected locations"};
 
+	// Note : index for missionModifiers : 
+	//	0 : AreologyFieldStudy
+	//	1 : BiologyFieldStudy
+	//	2 : CollectIce
+	//	3 : CollectRegolith	
+	//	4 : Exploration
+	//	5 : MeteorologyFieldStudy
+	//	6 : Mining
+	//  7 : Trade
+	//  8 : TravelToSettlement
+	
+	private final int[][] missionModifiers = new int[][] {
+		{0, 3, 9, 0, 0, 0, 0, 0, 0},
+		{0, 9, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 9, 0, 3, 0, 0}
+	};
+	
+	@Override	
+	public int[][] getMissionModifiers() {
+		return missionModifiers;
+	}
+	
 	@Override
 	public String[] getPhases() {
 		return phases;
 	}
-
 
 	@Override
 	public String getObjectiveName() {
@@ -44,5 +65,8 @@ public class FindingLife implements MissionAgenda, Serializable  {
 		System.out.println("I'm analyzing the soil samples from various sites for the amount of oxygen and water contents.");
 	}
 
+//	@Override
+//	public void setMissionDirectives() {
+//	}
 
 }

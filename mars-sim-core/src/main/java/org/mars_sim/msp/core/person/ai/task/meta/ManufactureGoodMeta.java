@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ManufactureGoodMeta.java
- * @version 3.08 2015-06-08
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -10,16 +10,18 @@ import java.io.Serializable;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.FavoriteType;
-import org.mars_sim.msp.core.person.LocationSituation;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.task.ManufactureGood;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.ai.job.Makerbot;
 import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * Meta task for the ManufactureGood task.
@@ -28,6 +30,8 @@ public class ManufactureGoodMeta implements MetaTask, Serializable {
 
     /** default serial id. */
     private static final long serialVersionUID = 1L;
+    
+    private static final double CAP = 3000D; 
     
     /** Task name */
     private static final String NAME = Msg.getString(
@@ -51,10 +55,31 @@ public class ManufactureGoodMeta implements MetaTask, Serializable {
         if (person.isInSettlement() && !person.getSettlement().getManufactureOverride()) {
             // the person has to be inside the settlement to check for manufacture override
 
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double fatigue = condition.getFatigue();
+            double stress = condition.getStress();
+            double hunger = condition.getHunger();
+            
+            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            	return 0;
+            
             // See if there is an available manufacturing building.
             Building manufacturingBuilding = ManufactureGood.getAvailableManufacturingBuilding(person);
             if (manufacturingBuilding != null) {
-                result = 1D;
+
+                // If manufacturing building has process requiring work, add
+                // modifier.
+                SkillManager skillManager = person.getSkillManager();
+                int skill = skillManager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
+                if (ManufactureGood.hasProcessRequiringWork(manufacturingBuilding, skill)) {
+                    result += 10D;
+                }
+
+                // Stress modifier
+                result = result - stress * 3.5D;
+                // fatigue modifier
+                result = result - (fatigue - 100) / 2.5D;
 
                 // Crowding modifier.
                 result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(person, manufacturingBuilding);
@@ -62,19 +87,6 @@ public class ManufactureGoodMeta implements MetaTask, Serializable {
 
                 // Manufacturing good value modifier.
                 result *= ManufactureGood.getHighestManufacturingProcessValue(person, manufacturingBuilding);
-
-                // Capping the probability at 100 as manufacturing process values can be very large numbers.
-                if (result > 100D) {
-                    result = 100D;
-                }
-
-                // If manufacturing building has process requiring work, add
-                // modifier.
-                SkillManager skillManager = person.getMind().getSkillManager();
-                int skill = skillManager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
-                if (ManufactureGood.hasProcessRequiringWork(manufacturingBuilding, skill)) {
-                    result += 10D;
-                }
 
                 // Effort-driven task modifier.
                 result *= person.getPerformanceRating();
@@ -88,24 +100,21 @@ public class ManufactureGoodMeta implements MetaTask, Serializable {
 
                 // Modify if tinkering is the person's favorite activity.
                 if (person.getFavorite().getFavoriteActivity() == FavoriteType.TINKERING) {
-                    result *= 1.5D;
+                    result *= RandomUtil.getRandomDouble(2D);
                 }
 
-                // 2015-06-07 Added Preference modifier
+                // Add Preference modifier
                 if (result > 0D) {
-                    result = result + result * person.getPreference().getPreferenceScore(this)/5D;
+                    result = result + result * person.getPreference().getPreferenceScore(this)/6D;
+                }
+                
+                // Capping the probability at 100 as manufacturing process values can be very large numbers.
+                if (result > CAP) {
+                    result = CAP;
                 }
                 
                 if (result < 0) result = 0;
-
-
             }
-            
-            // Cancel any manufacturing processes that's beyond the skill of any people
-            // associated with the settlement.
-            if (result > 0)
-            	ManufactureGood.cancelDifficultManufacturingProcesses(person);
-
         }
 
         return result;
@@ -123,7 +132,7 @@ public class ManufactureGoodMeta implements MetaTask, Serializable {
 
         if (robot.getBotMind().getRobotJob() instanceof Makerbot) {
 
-	        if (robot.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
+	        if (robot.isInSettlement()) {
 	            // If settlement has manufacturing override, no new
 	            // manufacturing processes can be created.
 	            if (!robot.getSettlement().getManufactureOverride()) {
@@ -133,13 +142,8 @@ public class ManufactureGoodMeta implements MetaTask, Serializable {
 		            Building manufacturingBuilding = ManufactureGood.getAvailableManufacturingBuilding(robot);
 		            if (manufacturingBuilding != null) {
 		                result = 100D;
-
-		                // Crowding modifier.
-		                result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(robot, manufacturingBuilding);
-		                //result *= TaskProbabilityUtil.getRelationshipModifier(robot, manufacturingBuilding);
-
 		                // Manufacturing good value modifier.
-		                result *= ManufactureGood.getHighestManufacturingProcessValue(robot, manufacturingBuilding);
+//		                result *= ManufactureGood.getHighestManufacturingProcessValue(robot, manufacturingBuilding); //java.util.ConcurrentModificationException
 
 		                if (result > 100D) {
 		                    result = 100D;
@@ -147,7 +151,7 @@ public class ManufactureGoodMeta implements MetaTask, Serializable {
 
 		                // If manufacturing building has process requiring work, add
 		                // modifier.
-		                SkillManager skillManager = robot.getBotMind().getSkillManager();
+		                SkillManager skillManager = robot.getSkillManager();
 		                int skill = skillManager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
 		                if (ManufactureGood.hasProcessRequiringWork(manufacturingBuilding, skill)) {
 		                    result += 10D;
@@ -162,7 +166,7 @@ public class ManufactureGoodMeta implements MetaTask, Serializable {
 		        // Cancel any manufacturing processes that's beyond the skill of any people
 		        // associated with the settlement.
 		        if (result > 0)
-		        	ManufactureGood.cancelDifficultManufacturingProcesses(robot);
+		        	ManufactureGood.cancelDifficultManufacturingProcesses(robot.getAssociatedSettlement());
 
 	        }      
 

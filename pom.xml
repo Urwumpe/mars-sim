@@ -1,23 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<!-- ************************************************************************************************* -->
 	<!-- * General Section * -->
 	<!-- ************************************************************************************************* -->
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>net.sf</groupId>
+	<groupId>com.github</groupId>
 	<artifactId>mars-sim</artifactId>
 	<packaging>pom</packaging>
-	<version>3.1.0-b2</version>
+	<version>3.1.2</version>
 	<name>mars-sim</name>
 	<url>https://github.com/mars-sim/mars-sim</url>
 	<inceptionYear>2009</inceptionYear>
 	<properties>
-		<maven.compiler.source>9</maven.compiler.source>
-		<maven.compiler.target>9</maven.compiler.target>
-		<project.version>3.1.0-b2</project.version>
-		<junit.version>4.12</junit.version>
+		<release>11</release>
+		<project.version>3.1.2</project.version>
+		<junit.version>4.13.1</junit.version>
 		<timestamp>${maven.build.timestamp}</timestamp>
 		<maven.build.timestamp.format>yyyy-MM-dd HH:mm</maven.build.timestamp.format>
 		<!-- Set file encoding to UTF-8. See http://stackoverflow.com/questions/3017695/how-to-configure-encoding-in-maven#3018152 -->
@@ -25,121 +22,51 @@
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<!-- springboot.version>1.3.5.RELEASE</springboot.version -->
 		<!-- mapstruct.version>1.1.0.Final</mapstruct.version -->
-		<!-- lwjgl.version>3.1.2</lwjgl.version -->
-
+		<lwjgl.version>3.2.3</lwjgl.version>
+		<kotlin.version>1.4.10</kotlin.version>
 	</properties>
-
-	<!-- <profiles> <profile> <id>lwjgl-natives-linux</id> <activation> <os><family>unix</family></os> 
-		</activation> <properties> <lwjgl.natives>natives-linux</lwjgl.natives> </properties> 
-		</profile> <profile> <id>lwjgl-natives-macos</id> <activation> <os><family>mac</family></os> 
-		</activation> <properties> <lwjgl.natives>natives-macos</lwjgl.natives> </properties> 
-		</profile> <profile> <id>lwjgl-natives-windows</id> <activation> <os><family>windows</family></os> 
-		</activation> <properties> <lwjgl.natives>natives-windows</lwjgl.natives> 
-		</properties> </profile> </profiles> -->
 
 	<!-- ************************************************************************************************* -->
 	<!-- * Developers Section * -->
 	<!-- ************************************************************************************************* -->
 	<developers>
 		<developer>
-			<id>scud1</id>
 			<name>Scott Davis</name>
-			<email>scud1@users.sourceforge.net</email>
 			<roles>
 				<role>manager</role>
-				<role>developer</role>
 			</roles>
 			<timezone>-8</timezone>
 		</developer>
 		<developer>
-			<id>lechimp</id>
 			<name>Lars Næsbye Christensen</name>
-			<email>lechimp@users.sourceforge.net</email>
 			<roles>
 				<role>developer</role>
 			</roles>
 			<timezone>+1</timezone>
 		</developer>
 		<developer>
-			<id>mkung</id>
 			<name>Manny Kung</name>
-			<email>mkung@users.sourceforge.net</email>
 			<roles>
 				<role>developer</role>
 			</roles>
 			<timezone>-8</timezone>
 		</developer>
+		<developer>
+			<name>Shirish Agarwal</name>
+			<roles>
+				<role>integration and testing</role>
+			</roles>
+			<timezone>+5.5</timezone>
+		</developer>
+		<developer>
+			<name>Dennis Krenz</name>
+			<roles>
+				<role>conceptual design</role>
+			</roles>
+			<timezone>+2</timezone>
+		</developer>
 	</developers>
 	
-	<!-- ************************************************************************************************* -->
-	<!-- * Project Tools Section * -->
-	<!-- ************************************************************************************************* -->
-<!-- 
-	<scm>
-		<connection>scm:svn:https://svn.code.sf.net/p/mars-sim/code/trunk/mars-sim</connection>
-		<developerConnection>scm:svn:https://svn.code.sf.net/p/mars-sim/code/trunk/mars-sim</developerConnection>
-		<url>https://svn.code.sf.net/p/mars-sim/code/trunk/mars-sim</url>
-	</scm>
-	<issueManagement>
-		<system>GitHub</system>
-		<url>https://github.com/mars-sim/mars-sim/issues</url>
-	</issueManagement>
-	<mailingLists>
-		<mailingList>
-			<name>Mars-Sim Development Mailing list</name>
-			<subscribe>
-				http://lists.sourceforge.net/lists/listinfo/mars-sim-developers
-			</subscribe>
-			<unsubscribe>
-				http://lists.sourceforge.net/lists/listinfo/mars-sim-developers
-			</unsubscribe>
-			<archive>
-				http://sourceforge.net/mailarchive/forum.php?forum_name=mars-sim-developers
-			</archive>
-			<post>mars-sim-developers@lists.sourceforge.net</post>
-		</mailingList>
-		<mailingList>
-			<name>Mars-Sim User Mailing list</name>
-			<subscribe>
-				http://lists.sourceforge.net/lists/listinfo/mars-sim-users
-			</subscribe>
-			<unsubscribe>
-				http://lists.sourceforge.net/lists/listinfo/mars-sim-users
-			</unsubscribe>
-			<archive>
-				http://sourceforge.net/mailarchive/forum.php?forum_name=mars-sim-users
-			</archive>
-			<post>mars-sim-users@lists.sourceforge.net</post>
-		</mailingList>
-		<mailingList>
-			<name>Mars-Sim CI Mailing list</name>
-			<subscribe>
-				http://lists.sourceforge.net/lists/listinfo/mars-sim-ciserv
-			</subscribe>
-			<unsubscribe>
-				http://lists.sourceforge.net/lists/listinfo/mars-sim-ciserv
-			</unsubscribe>
-			<archive>
-				http://sourceforge.net/mailarchive/forum.php?forum_name=mars-sim-ciserv
-			</archive>
-			<post>mars-sim-ciserv@lists.sourceforge.net</post>
-		</mailingList>
-	</mailingLists>
-	<ciManagement>
-		<system>hudson</system>
-		<url>https://landrus.no-ip.info:8443/hudson/</url>
-		<notifiers>
-			<notifier>
-				<type>mail</type>
-				<address>mars-sim-ciserv@lists.sourceforge.net</address>
-				<sendOnSuccess>true</sendOnSuccess>
-				<sendOnWarning>true</sendOnWarning>
-				<sendOnError>true</sendOnError>
-				<sendOnFailure>true</sendOnFailure>
-			</notifier>
-		</notifiers>
-	</ciManagement>
--->	
 	<!-- ************************************************************************************************* -->
 	<!-- * Module Section * -->
 	<!-- ************************************************************************************************* -->
@@ -149,9 +76,13 @@
 		<module>mars-sim-headless</module>
 		<module>mars-sim-main</module>
 		<module>mars-sim-mapdata</module>
-		<module>mars-sim-network</module>
-		<!-- module>mars-sim-service</module-->
+		<!-- module>mars-sim-network</module-->
+		<!--module>mars-sim-service</module-->
 		<module>mars-sim-ui</module>
+		<!--module>mars-sim-javafx</module-->
+		<!--module>mars-sim-lwjgl</module-->
+    	<!--module>mars-sim-libgdx</module-->
+		<module>mars-sim-console</module>
 	</modules>
 	<!-- ************************************************************************************************* -->
 	<!-- * Build Section * -->
@@ -159,43 +90,148 @@
 	<build>
 		<pluginManagement>
 			<plugins>
-				<!-- <plugin> <groupId>org.jacoco</groupId> <artifactId>jacoco-maven-plugin</artifactId> 
-					<version>0.8.1</version> </plugin> <plugin> <groupId>com.teamtter.mavennatives</groupId> 
-					<artifactId>nativedependencies-maven-plugin</artifactId> <version>1.0.0</version> 
-					<executions> <execution> <id>unpacknatives</id> <phase>generate-resources</phase> 
-					<goals> <goal>copy</goal> </goals> </execution> </executions> <configuration> 
-					<skip>false</skip> <autoDetectOSNatives>false</autoDetectOSNatives> <osFilters> 
-					<osFilter> <osName>linux</osName> <suffix>linux</suffix> </osFilter> <osFilter> 
-					<osName>windows</osName> <suffix>win</suffix> </osFilter> </osFilters> </configuration> 
-					</plugin> -->
-				<!-- <plugin> http://mvnrepository.com/artifact/org.bsc.maven/maven-processor-plugin 
-					: 48 KB <groupId>org.bsc.maven</groupId> <artifactId>maven-processor-plugin</artifactId> 
-					<version>3.3.1</version> <configuration> <defaultOutputDirectory> ${project.build.directory}/generated-sources 
-					</defaultOutputDirectory> <processors> <processor>org.mapstruct.ap.MappingProcessor</processor> 
-					</processors> </configuration> <executions> <execution> <id>process</id> 
-					<phase>generate-sources</phase> <goals> <goal>process</goal> </goals> </execution> 
-					</executions> <dependencies> <dependency> <groupId>org.mapstruct</groupId> 
-					<artifactId>mapstruct-processor</artifactId> <version>${mapstruct.version}</version> 
-					</dependency> </dependencies> </plugin> -->
-				<!-- <plugin> <groupId>org.springframework.boot</groupId> <artifactId>spring-boot-maven-plugin</artifactId> 
-					<version>${springboot.version}</version> //not using <!executions> <execution> 
-					<goals> <goal>repackage</goal> </goals> </execution> </executions> </plugin> -->
+			<!-- https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-maven-plugin -->
 				<plugin>
-				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-compiler-plugin -->
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-compiler-plugin</artifactId>
-					<version>3.7.0</version>
-					<configuration>
-						<source>${maven.compiler.source}</source>
-						<target>${maven.compiler.target}</target>
-						<showWarnings>false</showWarnings>
-                        <showDeprecation>false</showDeprecation>
-						<verbose>true</verbose>
-					</configuration>
+					<groupId>org.jetbrains.kotlin</groupId>				
+					<artifactId>kotlin-maven-plugin</artifactId>
+					<version>${kotlin.version}</version>
+					<executions>
+						<execution>
+							<id>compile</id>
+							<phase>process-sources</phase>
+							<goals>
+								<goal>compile</goal>
+							</goals>
+							<configuration>
+								<sourceDirs>
+									<sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
+									<sourceDir>${project.basedir}/src/main/java</sourceDir>
+									<sourceDir>${project.basedir}/src/main/resources</sourceDir>
+								</sourceDirs>
+							</configuration>
+						</execution>
+						<execution>
+		                    <id>test-compile</id>
+		                    <phase>process-test-sources</phase>
+		                    <goals>
+		                        <goal>test-compile</goal>
+		                    </goals>
+		                    <configuration>
+		                        <sourceDirs>
+		                            <source>${project.basedir}/src/test/java</source>
+		                            <source>${project.basedir}/src/test/kotlin</source>
+		                            <source>${project.basedir}/src/test/resources</source>
+		                        </sourceDirs>
+		                    </configuration>
+		                </execution>
+					</executions>
+					<dependencies>
+						<dependency>
+							<groupId>org.jetbrains.kotlin</groupId>
+							<artifactId>kotlin-stdlib</artifactId>
+							<version>${kotlin.version}</version>
+						</dependency>
+					</dependencies>					
+					<!--dependencies>
+						<dependency>
+							<groupId>org.jetbrains.kotlin</groupId>
+							<artifactId>kotlin-maven-allopen</artifactId>
+							<version>${kotlin.version}</version>
+						</dependency>
+					</dependencies-->
 				</plugin>
 				<plugin>
+				<!--https://mvnrepository.com/artifact/com.github.spotbugs/spotbugs-maven-plugin -->
+				  <groupId>com.github.spotbugs</groupId>
+				  <artifactId>spotbugs-maven-plugin</artifactId>
+				  <version>4.0.4</version>
+				  <!--version>3.1.12.2</version-->
+				  <dependencies>
+				    <!-- https://spotbugs.github.io/ -->
+				    <dependency>
+				      <groupId>com.github.spotbugs</groupId>
+				      <artifactId>spotbugs</artifactId>
+				      <version>4.0.4</version>
+				    </dependency>
+				  </dependencies>
+				</plugin>			
+				<!--  https://mvnrepository.com/artifact/org.codehaus.mojo/versions-maven-plugin -->
+				<plugin>
+				    <groupId>org.codehaus.mojo</groupId>
+				    <artifactId>versions-maven-plugin</artifactId>
+				    <version>2.7</version>
+				    <configuration>
+				        <generateBackupPoms>false</generateBackupPoms>
+				    </configuration>
+				</plugin>
+				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-surefire-plugin -->
+				<plugin>
+				    <groupId>org.apache.maven.plugins</groupId>
+				    <artifactId>maven-surefire-plugin</artifactId>
+				    <version>3.0.0-M5</version>
+				    <configuration>
+				        <argLine>
+				            --illegal-access=permit
+				        </argLine>
+				    </configuration>
+				</plugin>
+				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-failsafe-plugin -->
+				<plugin>
+				    <groupId>org.apache.maven.plugins</groupId>
+				    <artifactId>maven-failsafe-plugin</artifactId>
+				    <version>3.0.0-M5</version>
+				    <configuration>
+				        <argLine>
+				            --illegal-access=permit
+				        </argLine>
+				    </configuration>
+				</plugin>
+				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-compiler-plugin -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<version>3.8.0</version>
+					<configuration>
+						<release>${release}</release>
+						<compilerArgs>
+			            	<arg>-Xlint:unchecked</arg>
+			            	<arg>-Xlint:deprecation</arg>
+			            	<arg>-Xlint:removal</arg>
+						</compilerArgs>
+						<showWarnings>false</showWarnings>
+                        <showDeprecation>false</showDeprecation>
+						<verbose>false</verbose>			          
+					</configuration>
+					<!-- see https://www.baeldung.com/kotlin-maven-java-project -->
+					<!-- see https://kotlinlang.org/docs/reference/using-maven.html -->
+	       			<executions>
+		                <!-- Replacing default-compile as it is treated specially by maven -->
+		                <execution>
+		                    <id>default-compile</id>
+		                    <phase>none</phase>
+		                </execution>
+		                <!-- Replacing default-testCompile as it is treated specially by maven -->
+		                <execution>
+		                    <id>default-testCompile</id>
+		                    <phase>none</phase>
+		                </execution>
+		                <execution>
+		                    <id>java-compile</id>
+		                    <phase>compile</phase>
+		                    <goals> <goal>compile</goal> </goals>
+		                </execution>
+		                <execution>
+		                    <id>java-test-compile</id>
+		                    <phase>test-compile</phase>
+		                    <goals> <goal>testCompile</goal> </goals>
+		                </execution>
+	            	</executions>				
+				</plugin>
+
+				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-deploy-plugin : 33KB-->
+				<plugin>
 					<artifactId>maven-deploy-plugin</artifactId>
-					<version>2.8.2</version>
+					<version>3.0.0-M1</version>
 					<executions>
 						<execution>
 							<id>default-deploy</id>
@@ -206,39 +242,14 @@
 						</execution>
 					</executions>
 					<dependencies>
+						<!-- https://mvnrepository.com/artifact/org.apache.maven.wagon/wagon-ssh -->
 						<dependency>
-							<groupId>org.apache.maven.wagon</groupId>
-							<artifactId>wagon-ssh</artifactId>
-							<version>3.2.0</version>
+						    <groupId>org.apache.maven.wagon</groupId>
+						    <artifactId>wagon-ssh</artifactId>
+						    <version>3.4.1</version>
 						</dependency>
 					</dependencies>
 				</plugin>
-				
-				<!--		
-				<plugin>
-					https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-site-plugin
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-site-plugin</artifactId>
-					<version>3.7.1</version>
-					<dependencies>
-						<dependency>
-							https://mvnrepository.com/artifact/org.apache.maven.wagon/wagon-ssh
-						    Add support for ssh/scp 
-							<groupId>org.apache.maven.wagon</groupId>
-							<artifactId>wagon-ssh</artifactId>
-							<version>3.1.0</version>
-						</dependency>
-					</dependencies>
-				</plugin>
-				<plugin>
-					<artifactId>maven-release-plugin</artifactId>
-					<version>2.5.3</version>
-				</plugin>
-				-->
-				<!-- <plugin> https://github.com/versioneye/versioneye_maven_plugin <groupId>com.versioneye</groupId> 
-					<artifactId>versioneye-maven-plugin</artifactId> <version>3.11.4</version> 
-					<configuration> <apiKey>9ffb7e9ead4f58524bc9</apiKey> <organisation>mars-sim</organisation> 
-					<team>Owners</team> </configuration> </plugin> -->
 
 			</plugins>
 		</pluginManagement>
@@ -248,66 +259,9 @@
 	<!-- ************************************************************************************************* -->
 	<reporting>
 		<plugins>
-			<!--  
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-project-info-reports-plugin</artifactId>
-				<version>2.9</version>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-javadoc-plugin</artifactId>
-				<version>2.10.4</version>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jxr-plugin</artifactId>
-				<version>2.5</version>
-			</plugin>
-			-->
-
-			<!--plugin> <groupId>org.apache.maven.plugins</groupId> <artifactId>maven-surefire-report-plugin</artifactId> 
-				<version>2.20.1</version> </plugin -->
-			<!--
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>cobertura-maven-plugin</artifactId>
-				<version>2.7</version>
-			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>taglist-maven-plugin</artifactId>
-				<version>2.4</version>
-			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>findbugs-maven-plugin</artifactId>
-				<version>3.0.5</version>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-changelog-plugin</artifactId>
-				<version>2.3</version>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-changes-plugin</artifactId>
-				<version>2.12.1</version>
-				<reportSets>
-					<reportSet>
-						<reports>
-							<report>changes-report</report>
-						</reports>
-					</reportSet>
-				</reportSets>
-				<configuration>
-					<issueLinkTemplatePerSystem> <default> http://sourceforge.net/tracker/?func=detail&amp;aid=%ISSUE%&amp;group_id=3286&amp;atid=103286 
-						</default> </issueLinkTemplatePerSystem >
-				</configuration>
-			</plugin>
-			-->	
 			<plugin>
 				<!-- https://maven.apache.org/plugins/maven-dependency-plugin/examples/copying-project-dependencies.html -->
+				<!-- See https://maven.apache.org/plugins/maven-dependency-plugin/usage.html -->
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
 				<version>3.1.1</version>
@@ -325,38 +279,15 @@
 	<repositories>
 		<repository>
 			<id>mars-sim</id>
-			<name>Mars Sim Project Maven Repository</name>
+			<name>Mars-sim Project Maven Repository</name>
 			<url>https://mars-sim.sourceforge.io/maven-repo/</url>
 		</repository>
 	</repositories>
-	<!-- ************************************************************************************************* -->
-	<!-- * Distribution Management Section * -->
-	<!-- ************************************************************************************************* -->
-	<!-- 
-	<distributionManagement>
-		<repository>
-			<id>sourceforge.net</id>
-			<name>Mars Sim Releases</name>
-			<uniqueVersion>false</uniqueVersion>
-			<url>scp://shell.sourceforge.net/home/project-web/mars-sim/htdocs/maven-repo</url>
-		</repository>
-		<snapshotRepository>
-			<id>sourceforge.net</id>
-			<name>Mars Sim Snapshots</name>
-			<uniqueVersion>true</uniqueVersion>
-			<url>scp://shell.sourceforge.net/home/project-web/mars-sim/htdocs/maven-repo-snapshots</url>
-		</snapshotRepository>
-		<site>
-			<id>sourceforge.net</id>
-			<name>Mars Sim Site</name>
-			<url>scp://shell.sourceforge.net/home/project-web/mars-sim/htdocs/site</url>
-		</site>
-	</distributionManagement>
-	-->
+
 	<pluginRepositories>
 		<pluginRepository>
 			<id>maven central</id>
-			<url>http://repo1.maven.org/maven/</url>
+			<url>https://repo1.maven.org/maven/</url>
 		</pluginRepository>
 		<pluginRepository>
 			<id>spring-releases</id>
@@ -369,7 +300,7 @@
 		</pluginRepository>
 		<pluginRepository>
 			<id>jcenter</id>
-			<url>http://jcenter.bintray.com/</url>
+			<url>https://jcenter.bintray.com/</url>
 		</pluginRepository>
 
 	</pluginRepositories>

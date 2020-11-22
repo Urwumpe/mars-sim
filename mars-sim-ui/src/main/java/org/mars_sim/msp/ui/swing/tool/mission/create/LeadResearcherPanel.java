@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * LeadResearcherPanel.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission.create;
@@ -44,6 +44,8 @@ extends WizardPanel {
     private JTable researcherTable;
     private JLabel errorMessageLabel;
     
+//	private static UnitManager unitManager = Simulation.instance().getUnitManager();
+	
     /**
      * Constructor
      * @param wizard the create mission wizard.
@@ -215,8 +217,8 @@ extends WizardPanel {
             if (study.getPrimaryResearcher().equals(person)) {
                 result = study.getScience();
             }
-            else if (study.getCollaborativeResearchers().keySet().contains(person)) {
-                result = study.getCollaborativeResearchers().get(person);
+            else if (study.getCollaborativeResearchers().keySet().contains(person.getIdentifier())) {
+                result = study.getCollaborativeResearchers().get(person.getIdentifier());
             }
             
             return result;
@@ -230,8 +232,8 @@ extends WizardPanel {
             ScientificStudy study = getWizard().getMissionData().getStudy();
             units.add(study.getPrimaryResearcher());
             
-            Iterator<Person> i = study.getCollaborativeResearchers().keySet().iterator();
-            while (i.hasNext()) units.add(i.next());
+            Iterator<Integer> i = study.getCollaborativeResearchers().keySet().iterator();
+            while (i.hasNext()) units.add(unitManager.getPersonByID(i.next()));
             
             fireTableDataChanged();
         }
@@ -261,32 +263,31 @@ extends WizardPanel {
             return result;
         }
 
-        /*
-         * Adds researchers to the table.
-         * @param people the collection of researchers to add.
-         *
-        void addResearchers(Collection<Person> researchers) {
-            Iterator<Person> i = researchers.iterator();
-            while (i.hasNext()) {
-                Person researcher = i.next();
-                if (!units.contains(researcher)) units.add(researcher);
-            }
-            units = CollectionUtils.sortByName(units);
-            fireTableDataChanged();
-        }
-        */
-        /*
-         * Removes researchers from the table.
-         * @param researchers the collection of researchers to remove.
-         *
-        void removeResearchers(Collection<Person> researchers) {
-            Iterator<Person> i = researchers.iterator();
-            while (i.hasNext()) {
-                Person researcher = i.next();
-                if (units.contains(researcher)) units.remove(researcher);
-            }
-            fireTableDataChanged();
-        }
-        */
+//        /*
+//         * Adds researchers to the table.
+//         * @param people the collection of researchers to add.
+//         *
+//        void addResearchers(Collection<Person> researchers) {
+//            Iterator<Person> i = researchers.iterator();
+//            while (i.hasNext()) {
+//                Person researcher = i.next();
+//                if (!units.contains(researcher)) units.add(researcher);
+//            }
+//            units = CollectionUtils.sortByName(units);
+//            fireTableDataChanged();
+//        }
+//        */
+//        /*
+//         * Removes researchers from the table.
+//         * @param researchers the collection of researchers to remove.
+//         *
+//        void removeResearchers(Collection<Person> researchers) {
+//            Iterator<Person> i = researchers.iterator();
+//            while (i.hasNext()) {
+//                Person researcher = i.next();
+//                if (units.contains(researcher)) units.remove(researcher);
+//            }
+//            fireTableDataChanged();
+//        }
     }
 }

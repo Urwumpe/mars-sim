@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * EventType.java
- * @version 3.1.0 2017-10-03
+ * @version 3.1.2 2020-09-02
  * @author stpa
  */
 
@@ -23,7 +23,8 @@ public enum EventType {
 	MEDICAL_RECOVERY	(Msg.getString("EventType.illness.recovering")), //$NON-NLS-1$
 	MEDICAL_TREATED		(Msg.getString("EventType.illness.treated")), //$NON-NLS-1$
 	MEDICAL_DEATH		(Msg.getString("EventType.illness.dead")), //$NON-NLS-1$
-
+	MEDICAL_RESCUE		(Msg.getString("EventType.medical.rescue")), //$NON-NLS-1$
+	
 	MISSION_START					(Msg.getString("EventType.mission.started")), //$NON-NLS-1$
 	MISSION_JOINING					(Msg.getString("EventType.mission.joined")), //$NON-NLS-1$
 	MISSION_FINISH					(Msg.getString("EventType.mission.finished")), //$NON-NLS-1$
@@ -31,7 +32,8 @@ public enum EventType {
 	MISSION_EMERGENCY_DESTINATION	(Msg.getString("EventType.mission.emergencyDestination")), //$NON-NLS-1$
 	MISSION_NOT_ENOUGH_RESOURCES	(Msg.getString("EventType.mission.notEnoughResource")), //$NON-NLS-1$
 	MISSION_MEDICAL_EMERGENCY		(Msg.getString("EventType.mission.medicalEmergency")), //$NON-NLS-1$
-	MISSION_EMERGENCY_BEACON_ON		(Msg.getString("EventType.mission.emergencyBeacon")), //$NON-NLS-1$
+	MISSION_EMERGENCY_BEACON_ON		(Msg.getString("EventType.mission.emergencyBeaconOn")), //$NON-NLS-1$
+	MISSION_EMERGENCY_BEACON_OFF	(Msg.getString("EventType.mission.emergencyBeaconOff")), //$NON-NLS-1$
 	MISSION_RENDEZVOUS				(Msg.getString("EventType.mission.rendezvous")), //$NON-NLS-1$
 	MISSION_SALVAGE_VEHICLE			(Msg.getString("EventType.mission.salvageVehicle")), //$NON-NLS-1$
 	MISSION_RESCUE_PERSON			(Msg.getString("EventType.mission.rescuePerson")), //$NON-NLS-1$

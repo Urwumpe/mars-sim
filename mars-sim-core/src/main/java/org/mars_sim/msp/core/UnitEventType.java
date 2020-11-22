@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * UnitEventType.java
- * @version 3.1.0 2017-11-06
+ * @version 3.1.2 2020-09-02
  * @author stpa
  */
 
@@ -23,14 +23,19 @@ public enum UnitEventType {
 	MASS_EVENT						("mass"),
 	LOCATION_EVENT					("location"),
 	CONTAINER_UNIT_EVENT			("container unit"),
-
+	NOTES_EVENT						("notes"),
+	
 	// For Settlement
 	ADD_ASSOCIATED_PERSON_EVENT		("add associated person"),
 	REMOVE_ASSOCIATED_PERSON_EVENT	("remove associated person"),
 
 	ADD_ASSOCIATED_ROBOT_EVENT		("add associated robot"),
 	REMOVE_ASSOCIATED_ROBOT_EVENT	("remove associated robot"),
-
+	
+	ADD_ASSOCIATED_EQUIPMENT_EVENT		("add associated equipment"),
+	REMOVE_ASSOCIATED_EQUIPMENT_EVENT	("remove associated equipment"),
+	
+//	ASSOCIATED_SETTLEMENT_EVENT		("associated settlement"),
 
 	// For PhysicalCondition
 	FATIGUE_EVENT					("fatigue event"),
@@ -44,8 +49,6 @@ public enum UnitEventType {
 	BURIAL_EVENT					("burial event"),
 	RADIATION_EVENT					("radiation event"),
 
-	// For Person
-	ASSOCIATED_SETTLEMENT_EVENT		("associated settlement"),
 
 	// For MalfunctionManager
 	MALFUNCTION_EVENT				("malfunction"),
@@ -81,7 +84,11 @@ public enum UnitEventType {
 
 	// For Farming
 	CROP_EVENT						("crop event"),
+	
+	// For Role change
 	ROLE_EVENT						("role event"),
+	
+	// For work shift change
 	SHIFT_EVENT						("shift event"),
 
 	// For Mind
@@ -115,7 +122,7 @@ public enum UnitEventType {
 	HEAT_VALUE_EVENT				("heat value"),
 	
 	// For settlement sensor detection grid
-	LOW_DOSE_EVENT					("radiation event"),
+	BASELINE_EVENT					("baseline radiation event"),
 	SEP_EVENT						("SEP event"),	
 	GCR_EVENT						("GCR event"),
 	;

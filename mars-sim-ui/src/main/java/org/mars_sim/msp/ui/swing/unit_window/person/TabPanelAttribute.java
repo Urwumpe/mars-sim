@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TabPanelAttribute.java
- * @version 3.1.0 2017-03-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.person;
@@ -9,23 +9,23 @@ package org.mars_sim.msp.ui.swing.unit_window.person;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
+import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.RoboticAttributeType;
 import org.mars_sim.msp.core.robot.RoboticAttributeManager;
+import org.mars_sim.msp.core.robot.RoboticAttributeType;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
@@ -33,20 +33,23 @@ import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
-
 
 /**
  * The TabPanelAttribute is a tab panel for the natural attributes of a person.
  */
+@SuppressWarnings("serial")
 public class TabPanelAttribute
 extends TabPanel {
 
-	private AttributeTableModel attributeTableModel;
-	private WebTable attributeTable;
+	/** Is UI constructed. */
+	private boolean uiDone = false;
 
-	//private Person person;
-	//private Robot robot;
+	/** The Person instance. */
+	private Person person;
+	private Robot robot;
+	
+	private AttributeTableModel attributeTableModel;
+	private JTable attributeTable;
 
 	/**
 	 * Constructor 1.
@@ -62,12 +65,7 @@ extends TabPanel {
 			person,
 			desktop
 		);
-		//this.person = person;
-
-		// Create attribute table model
-		attributeTableModel = new AttributeTableModel(person);
-
-		init();
+		this.person = person;
 	}
 
 	/**
@@ -84,16 +82,15 @@ extends TabPanel {
 			robot,
 			desktop
 		);
-
-		//this.robot = robot;
-
-		// Create attribute table model
-		attributeTableModel = new AttributeTableModel(robot);
-
-		init();
+		this.robot = robot;
 	}
 
-	public void init() {
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
 
 		// Create attribute label panel.
 		WebPanel attributeLabelPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
@@ -101,39 +98,42 @@ extends TabPanel {
 
 		// Create attribute label
 		WebLabel attributeLabel = new WebLabel(Msg.getString("TabPanelAttribute.label"), WebLabel.CENTER); //$NON-NLS-1$
-		attributeLabel.setFont(new Font("Serif", Font.BOLD, 16));
+		attributeLabel.setFont(new Font("Serif", Font.BOLD, 14));
 		attributeLabelPanel.add(attributeLabel);
 
 		// Create attribute scroll panel
 		WebScrollPane attributeScrollPanel = new WebScrollPane();
-		attributeScrollPanel.setBorder(new MarsPanelBorder());
+//		attributeScrollPanel.setBorder(new MarsPanelBorder());
 		centerContentPanel.add(attributeScrollPanel);
 
+		// Create attribute table model
+		if (person != null)
+			attributeTableModel = new AttributeTableModel(person);
+		else
+			attributeTableModel = new AttributeTableModel(robot);
+		
 		// Create attribute table
 		attributeTable = new ZebraJTable(attributeTableModel); //new JTable(attributeTableModel);//
 		attributeTable.setPreferredScrollableViewportSize(new Dimension(225, 100));
 		attributeTable.getColumnModel().getColumn(0).setPreferredWidth(100);
 		attributeTable.getColumnModel().getColumn(1).setPreferredWidth(70);
-		attributeTable.setCellSelectionEnabled(false);
-		// attributeTable.setDefaultRenderer(Integer.class, new NumberCellRenderer());
-
+		attributeTable.setRowSelectionAllowed(true);
+//		attributeTable.setDefaultRenderer(Integer.class, new NumberCellRenderer());
+		
 		attributeScrollPanel.setViewportView(attributeTable);
 
-		// 2015-06-08 Added sorting
 		attributeTable.setAutoCreateRowSorter(true);
-        //if (!MainScene.OS.equals("linux")) {
-        //	attributeTable.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
-		//}
-		// 2015-09-24 Align the content to the center of the cell
+ 
+		// Align the content to the center of the cell
         // Note: DefaultTableCellRenderer does NOT work well with nimrod
 		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
-		renderer.setHorizontalAlignment(SwingConstants.CENTER);
+		renderer.setHorizontalAlignment(SwingConstants.LEFT);
 		attributeTable.getColumnModel().getColumn(0).setCellRenderer(renderer);
 		attributeTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
 
-		// 2015-06-08 Added setTableStyle()
         TableStyle.setTableStyle(attributeTable);
         update();
+        
         //attributeTableModel.update();
 	}
 
@@ -142,23 +142,28 @@ extends TabPanel {
 	 */
 	@Override
 	public void update() {
+		if (!uiDone)
+			initializeUI();
+		
 		TableStyle.setTableStyle(attributeTable);
 		attributeTableModel.update();
 	}
 
+	public void destroy() {
+		attributeTableModel = null;
+		attributeTable = null;
+	}
 }
 
 /**
  * Internal class used as model for the attribute table.
  */
-class AttributeTableModel
-extends AbstractTableModel {
+@SuppressWarnings("serial")
+class AttributeTableModel extends AbstractTableModel {
 
-	private List<Map<String, NaturalAttributeType>> n_attributes;
-	private List<Map<String, RoboticAttributeType>> r_attributes;
+	private List<NaturalAttributeType> n_attributes;
+	private List<RoboticAttributeType> r_attributes;
 
-	/** default serial id. */
-	private static final long serialVersionUID = 1L;
 	private NaturalAttributeManager n_manager;
 	private RoboticAttributeManager r_manager;
 
@@ -175,17 +180,15 @@ extends AbstractTableModel {
          	person = (Person) unit;
          	n_manager = person.getNaturalAttributeManager();
 
-    		n_attributes = n_manager.getAttributes();
+    		n_attributes = Arrays.asList(NaturalAttributeType.values());
         }
 
         else if (unit instanceof Robot) {
         	robot = (Robot) unit;
         	r_manager = robot.getRoboticAttributeManager();
 
-    		r_attributes = r_manager.getAttributes();
+    		r_attributes =  Arrays.asList(RoboticAttributeType.values());
         }
-
-
 	}
 
 	@Override
@@ -223,40 +226,47 @@ extends AbstractTableModel {
 	public Object getValueAt(int row, int column) {
 		if (column == 0) {
 			if (person != null)
-				return n_attributes.get(row).keySet().iterator().next();
-
+				return n_attributes.get(row).getName();
 			else if (robot != null)
-				return r_attributes.get(row).keySet().iterator().next();
+				return r_attributes.get(row).getName();
 			else
 				return null;
 
 		}
 
 		else if (column == 1) {
-			if (person != null)
-				return getLevelString(n_manager.getAttribute(n_attributes.get(row).values().iterator().next()));
-
-			else if (robot != null)
-				return getLevelString(r_manager.getAttribute(r_attributes.get(row).values().iterator().next()));
+			if (person != null) {
+				int level = n_manager.getAttribute(n_attributes.get(row));
+				return " " + level + " - " + getLevelString(level);
+			}
+			else if (robot != null) {
+				int level = r_manager.getAttribute(r_attributes.get(row));
+				return " " + level + " - " + getLevelString(level);
+			}
 			else
 				return null;
 		}
 
 		else return null;
 	}
-	/*
-	public void update() {}
+
+	/**
+	 * Converts the numeric attribute points to a description of level
+	 * 
+	 * @param level
+	 * @return
 	 */
 	public String getLevelString(int level) {
 		String result = null;
-		if (level < 5) result = Msg.getString("TabPanelAttribute.level.0"); //$NON-NLS-1$
+		if (level < 10) result = Msg.getString("TabPanelAttribute.level.0"); //$NON-NLS-1$
 		else if (level < 20) result = Msg.getString("TabPanelAttribute.level.1"); //$NON-NLS-1$
-		else if (level < 35) result = Msg.getString("TabPanelAttribute.level.2"); //$NON-NLS-1$
-		else if (level < 45) result = Msg.getString("TabPanelAttribute.level.3"); //$NON-NLS-1$
-		else if (level < 55) result = Msg.getString("TabPanelAttribute.level.4"); //$NON-NLS-1$
-		else if (level < 65) result = Msg.getString("TabPanelAttribute.level.5"); //$NON-NLS-1$
-		else if (level < 80) result = Msg.getString("TabPanelAttribute.level.6"); //$NON-NLS-1$
-		else if (level < 95) result = Msg.getString("TabPanelAttribute.level.7"); //$NON-NLS-1$
+		else if (level < 30) result = Msg.getString("TabPanelAttribute.level.2"); //$NON-NLS-1$
+		else if (level < 40) result = Msg.getString("TabPanelAttribute.level.3"); //$NON-NLS-1$
+		else if (level < 50) result = Msg.getString("TabPanelAttribute.level.4"); //$NON-NLS-1$
+		else if (level < 60) result = Msg.getString("TabPanelAttribute.level.5"); //$NON-NLS-1$
+		else if (level < 70) result = Msg.getString("TabPanelAttribute.level.6"); //$NON-NLS-1$
+		else if (level < 80) result = Msg.getString("TabPanelAttribute.level.7"); //$NON-NLS-1$
+		else if (level < 90) result = Msg.getString("TabPanelAttribute.level.7"); //$NON-NLS-1$		
 		else result = Msg.getString("TabPanelAttribute.level.8"); //$NON-NLS-1$
 		return result;
 	}
@@ -267,6 +277,20 @@ extends AbstractTableModel {
 	 * @param
 	 */
 	void update() {
-    	fireTableDataChanged();
+//    	fireTableDataChanged();
+	}
+	
+	public void destroy() {
+		n_attributes.clear();
+		r_attributes.clear();
+		
+		n_attributes = null;
+		r_attributes = null;
+		
+		n_manager = null;
+		r_manager = null;
+
+	    person = null;
+	    robot = null;
 	}
 }

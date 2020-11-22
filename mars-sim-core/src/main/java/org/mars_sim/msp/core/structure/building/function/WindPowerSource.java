@@ -1,15 +1,13 @@
 /**
  * Mars Simulation Project
  * WindPowerSource.java
- * @version 3.1.0 2017-08-30
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
 import java.io.Serializable;
 
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.Weather;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 
@@ -43,9 +41,7 @@ implements Serializable {
 	private static final double HEIGHT_FACTOR = 1.2D;
 	// Note : for the height of 0.5–10 m from the surface of Mars the wind speed vary from 15–26.5 m/s.
 	private int numModules = 0;
-	
-	private Weather weather;
-	
+
 	/**
 	 * Constructor.
 	 * @param maxPower the maximum generated power.
@@ -53,7 +49,7 @@ implements Serializable {
 	public WindPowerSource(double maxPower) {
 		// Call PowerSource constructor.
 		super(PowerSourceType.WIND_POWER, maxPower);
-		
+				
 		if (maxPower == 18)
 			numModules = 9;
 		else
@@ -63,14 +59,9 @@ implements Serializable {
 	@Override
 	public double getCurrentPower(Building building) {
 		// TODO: Make power generated to be based on current wind speed at location.
-		
-        if (weather == null)
-        	weather = Simulation.instance().getMars().getWeather();
-		
 		double speed = Math.min(HEIGHT_FACTOR * weather.getWindSpeed(building.getCoordinates()), WIND_SPEED_THRESHOLD); 
 
-		return Math.min(getMaxPower(), numModules * getPowerOutput(speed));
-			
+		return Math.min(getMaxPower(), numModules * getPowerOutput(speed));			
 	}
 
 	public double getPowerOutput(double velocity) {
@@ -79,7 +70,7 @@ implements Serializable {
 	
 	@Override
 	public double getAveragePower(Settlement settlement) {
-		return getMaxPower()/2D;
+		return getMaxPower() * 0.707;
 	}
 
 	@Override
@@ -102,7 +93,5 @@ implements Serializable {
 	@Override
 	public void destroy() {
 		super.destroy();
-		
-		weather = null;
 	}
 }

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * EVA.java
- * @version 3.1.0 2017-03-09
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -9,11 +9,9 @@ package org.mars_sim.msp.core.structure.building.function;
 import java.io.Serializable;
 import java.util.Iterator;
 
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.structure.Airlock;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.BuildingException;
 
 /**
@@ -28,37 +26,42 @@ implements Serializable {
 
 	private static final FunctionType FUNCTION = FunctionType.EVA;
 
+	private static final double MAINTENANCE_FACTOR = 5D; 
+	
+	private int airlockCapacity;
+	
 	private Airlock airlock;
-	
-	private static BuildingConfig config;
-	
 
 	/**
 	 * Constructor
+	 * 
 	 * @param building the building this function is for.
 	 */
 	public EVA(Building building) {
 		// Use Function constructor.
 		super(FUNCTION, building);
 
-		config = SimulationConfig.instance().getBuildingConfiguration();
-
 		String buildingType = building.getBuildingType();
 		// Add a building airlock.
-		int airlockCapacity = config.getAirlockCapacity(buildingType);
-		double airlockXLoc = config.getAirlockXLoc(buildingType);
-		double airlockYLoc = config.getAirlockYLoc(buildingType);
-		double interiorXLoc = config.getAirlockInteriorXLoc(buildingType);
-		double interiorYLoc = config.getAirlockInteriorYLoc(buildingType);
-		double exteriorXLoc = config.getAirlockExteriorXLoc(buildingType);
-		double exteriorYLoc = config.getAirlockExteriorYLoc(buildingType);
+		airlockCapacity = buildingConfig.getAirlockCapacity(buildingType);
+		double airlockXLoc = buildingConfig.getAirlockXLoc(buildingType);
+		double airlockYLoc = buildingConfig.getAirlockYLoc(buildingType);
+		double interiorXLoc = buildingConfig.getAirlockInteriorXLoc(buildingType);
+		double interiorYLoc = buildingConfig.getAirlockInteriorYLoc(buildingType);
+		double exteriorXLoc = buildingConfig.getAirlockExteriorXLoc(buildingType);
+		double exteriorYLoc = buildingConfig.getAirlockExteriorYLoc(buildingType);
 
 		airlock = new BuildingAirlock(building, airlockCapacity, airlockXLoc, airlockYLoc,
 				interiorXLoc, interiorYLoc, exteriorXLoc, exteriorYLoc);
+		
+		// Load activity spots
+		loadActivitySpots(buildingConfig.getEVAActivitySpots(building.getBuildingType()));
+
 	}
 
 	/**
-	 * Constructor with airlock parameter.
+	 * Constructor with airlock parameter for testing
+	 * 
 	 * @param building the building this function is for.
 	 * @param airlock the building airlock.
 	 */
@@ -100,11 +103,16 @@ implements Serializable {
 
 		double airlockCapacityValue = demand / (supply + 1D);
 
-		double airlockCapacity = config.getAirlockCapacity(buildingName);
+		// Note: building.getEVA().airlock.getCapacity() is the same as the airlockCapacity below
+		double airlockCapacity = buildingConfig.getAirlockCapacity(buildingName);
 
 		return airlockCapacity * airlockCapacityValue;
 	}
 
+	public int getAirlockCapacity() {
+		return airlockCapacity;
+	}
+	
 	/**
 	 * Gets the building's airlock.
 	 * @return airlock
@@ -113,6 +121,26 @@ implements Serializable {
 		return airlock;
 	}
 
+	public int getNumAwaitingInnerDoor() {
+		return airlock.getNumAwaitingInnerDoor();
+	}
+	
+	public int getNumAwaitingOuterDoor() {
+		return airlock.getNumAwaitingOuterDoor();
+	}
+	
+	public int getNumEmptied() {
+		return airlockCapacity - airlock.getNumOccupants();
+	}
+	
+	public int getNumOccupied() {
+		return airlock.getNumOccupants();
+	}
+	
+	public String getOperatorName() {
+		return airlock.getOperatorName();
+	}
+	
 	/**
 	 * Time passing for the building.
 	 * @param time amount of time passing (in millisols)
@@ -127,7 +155,7 @@ implements Serializable {
 	 * @return power (kW)
 	 */
 	public double getFullPowerRequired() {
-		return 0D;
+		return 0.5;
 	}
 
 	/**
@@ -135,19 +163,12 @@ implements Serializable {
 	 * @return power (kW)
 	 */
 	public double getPoweredDownPowerRequired() {
-		return 0D;
+		return 0.05;
 	}
 
 	@Override
 	public double getMaintenanceTime() {
-		return airlock.getCapacity() * 5D;
-	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
-
-		airlock = null;
+		return airlock.getCapacity() * MAINTENANCE_FACTOR;
 	}
 
 	@Override
@@ -160,5 +181,12 @@ implements Serializable {
 	public double getPoweredDownHeatRequired() {
 		// TODO Auto-generated method stub
 		return 0;
+	}
+	
+	@Override
+	public void destroy() {
+		super.destroy();
+
+		airlock = null;
 	}
 }

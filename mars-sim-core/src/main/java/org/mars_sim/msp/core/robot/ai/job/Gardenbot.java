@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Gardenbot.java
- * @version 3.07 2015-02-02
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.robot.ai.job;
@@ -53,7 +53,7 @@ implements Serializable {
 
 		double result = 10D;
 
-		int botanySkill = robot.getBotMind().getSkillManager().getSkillLevel(SkillType.BOTANY);
+		int botanySkill = robot.getSkillManager().getSkillLevel(SkillType.BOTANY);
 		result += botanySkill;
 
 		RoboticAttributeManager attributes = robot.getRoboticAttributeManager();

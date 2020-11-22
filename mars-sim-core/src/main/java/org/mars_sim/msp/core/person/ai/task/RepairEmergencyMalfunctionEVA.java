@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RepairEmergencyMalfunctionEVA.java
- * @version 3.1.0 2017-08-30
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -11,28 +11,30 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.LocalAreaUtil;
 import org.mars_sim.msp.core.LocalBoundedObject;
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.malfunction.Malfunction;
 import org.mars_sim.msp.core.malfunction.MalfunctionFactory;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.person.EventType;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.task.meta.RepairEVAMalfunctionMeta;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskEvent;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.structure.Airlock;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
-import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
@@ -46,9 +48,12 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(RepairEVAMalfunction.class.getName());
 
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			logger.getName().length());
+
 	// Static members
 	/** The stress modified per millisol. */
-	private static final double STRESS_MODIFIER = 1.2D;
+	private static final double STRESS_MODIFIER = .5D;
 
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.repairEmergencyMalfunctionEVA"); //$NON-NLS-1$
@@ -68,15 +73,23 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 	 * @param person the person to perform the task
 	 */
 	public RepairEmergencyMalfunctionEVA(Person person) {
-		super(NAME, person, false, 5D);
-
+		super(NAME, person, false, 25);
+		
 		// Factor in a person's preference for the new stress modifier
 		int score = person.getPreference().getPreferenceScore(new RepairEVAMalfunctionMeta());
 		// Override the stress modifier of EVAOperation since it's a very
 		// serious EVA op
 		super.setStressModifier(score / 10D + STRESS_MODIFIER);
 
-		init();
+		// Get the malfunctioning entity.
+		claimMalfunction();
+		if (entity == null) {
+        	if (person.isOutside())
+        		setPhase(WALK_BACK_INSIDE);
+        	else
+        		endTask();
+			return;
+		}
 
 		// Create starting task event if needed.
 		if (getCreateEvents() && !isDone()) {
@@ -85,24 +98,6 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 			Simulation.instance().getEventManager().registerNewEvent(startingEvent);
 		}
 
-		init2();
-
-		logger.fine(person.getName() + " has started the RepairEmergencyMalfunctionEVA task.");
-	}
-
-	public void init() {
-
-		// Get the malfunctioning entity.
-		claimMalfunction();
-		if (entity == null) {
-			endTask();
-			return;
-		}
-
-	}
-
-	public void init2() {
-
 		// Determine location for repairing malfunction.
 		Point2D malfunctionLoc = determineMalfunctionLocation();
 		setOutsideSiteLocation(malfunctionLoc.getX(), malfunctionLoc.getY());
@@ -110,6 +105,7 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 		// Initialize phase
 		addPhase(REPAIRING);
 
+		logger.fine(person.getName() + " has started the RepairEmergencyMalfunctionEVA task.");
 	}
 
 	/**
@@ -125,15 +121,24 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 		Malfunction malfunction = null;
 		Malfunctionable entity = null;
 		Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(person).iterator();
+//		while (i.hasNext() && (malfunction == null)) {
+//			Malfunctionable e = i.next();
+//			MalfunctionManager manager = e.getMalfunctionManager();
+//			if (manager.hasEmergencyMalfunction()) {
+//				malfunction = manager.getMostSeriousEmergencyMalfunction();
+//				entity = e;
+//			}
+//		}
+		
 		while (i.hasNext() && (malfunction == null)) {
 			Malfunctionable e = i.next();
 			MalfunctionManager manager = e.getMalfunctionManager();
-			if (manager.hasEmergencyMalfunction()) {
-				malfunction = manager.getMostSeriousEmergencyMalfunction();
+			if (manager.hasEVAMalfunction()) {
+				malfunction = manager.getMostSeriousEVAMalfunction();
 				entity = e;
 			}
 		}
-
+		
 		if (entity != null) {
 			if (entity instanceof Vehicle) {
 				// Perform EVA emergency repair on outside vehicles that the person isn't
@@ -145,11 +150,13 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 					result = true;
 				}
 			} else if (entity instanceof Building) {
-				// Perform EVA emergency repair on uninhabitable buildings.
-				Building building = (Building) entity;
-				if (!building.hasFunction(FunctionType.LIFE_SUPPORT)) {
-					result = true;
-				}
+				// Note: a building always has external structures that need EVA repair
+				result = true;			
+//				// Requires EVA repair on uninhabitable buildings.
+//				Building building = (Building) entity;
+//				if (!building.hasFunction(FunctionType.LIFE_SUPPORT)) {
+//					result = true;
+//				}
 			}
 		}
 
@@ -170,15 +177,12 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 		}
 
 		// Check if it is night time.
-		SurfaceFeatures surface = Simulation.instance().getMars().getSurfaceFeatures();
-		if (surface.getSolarIrradiance(person.getCoordinates()) == 0D) {
-			if (!surface.inDarkPolarRegion(person.getCoordinates())) {
-				return false;
-			}
+		if (EVAOperation.isGettingDark(person)) {
+			return false;
 		}
 
 		// Check if person is inside
-		if (person.isInSettlement() || person.isInVehicleInGarage()) {
+		if (person.isInside()) {//.isInSettlement() || person.isInVehicleInGarage()) {
 
 			// Check if an airlock is available
 			Airlock airlock = EVAOperation.getWalkableAvailableAirlock(person);
@@ -186,7 +190,7 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 				return false;
 			}
 			// Check if EVA suit is available.
-			else if (!ExitAirlock.goodEVASuitAvailable(airlock.getEntityInventory())) {
+			else if (!ExitAirlock.goodEVASuitAvailable(airlock.getEntityInventory(), person)) {
 				return false;
 			}
 
@@ -202,11 +206,21 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 		malfunction = null;
 
 		Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(person).iterator();
+//		while (i.hasNext() && (malfunction == null)) {
+//			Malfunctionable e = i.next();
+//			MalfunctionManager manager = e.getMalfunctionManager();
+//			if (manager.hasEmergencyMalfunction()) {
+//				malfunction = manager.getMostSeriousEmergencyMalfunction();
+//				entity = e;
+//				setDescription(Msg.getString("Task.description.repairEmergencyMalfunctionEVA.detail",
+//						malfunction.getName(), entity.getNickName())); // $NON-NLS-1$
+//			}
+//		}
 		while (i.hasNext() && (malfunction == null)) {
 			Malfunctionable e = i.next();
 			MalfunctionManager manager = e.getMalfunctionManager();
-			if (manager.hasEmergencyMalfunction()) {
-				malfunction = manager.getMostSeriousEmergencyMalfunction();
+			if (manager.hasEVAMalfunction()) {
+				malfunction = manager.getMostSeriousEVAMalfunction();
 				entity = e;
 				setDescription(Msg.getString("Task.description.repairEmergencyMalfunctionEVA.detail",
 						malfunction.getName(), entity.getNickName())); // $NON-NLS-1$
@@ -232,7 +246,7 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 						bounds);
 
 				if (person != null) {
-					goodLocation = LocalAreaUtil.checkLocationCollision(newLocation.getX(), newLocation.getY(),
+					goodLocation = LocalAreaUtil.isLocationCollisionFree(newLocation.getX(), newLocation.getY(),
 							person.getCoordinates());
 				} else if (robot != null) {
 					System.out.println(
@@ -270,22 +284,21 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 		String name = null;
 
 		// Check for radiation exposure during the EVA operation.
-		if (isRadiationDetected(time)) {
+		if (person.isOutside() && isRadiationDetected(time)) {
 			setPhase(WALK_BACK_INSIDE);
-			return time;
+			return 0;
 		}
 
-		if (shouldEndEVAOperation() || addTimeOnSite(time)) {
+		if (person.isOutside() && (shouldEndEVAOperation() || addTimeOnSite(time))) {
 			setPhase(WALK_BACK_INSIDE);
-			return time;
+			return 0;
 		}
 
 		// Check if there emergency malfunction work is fixed.
-		double workTimeLeft = malfunction.getEmergencyWorkTime() - malfunction.getCompletedEmergencyWorkTime();
-		if (workTimeLeft == 0) {
-			setPhase(WALK_BACK_INSIDE);
-			return time;
-		}
+//		if (malfunction.needEmergencyRepair() && malfunction.isEmergencyRepairDone()) {	
+//			setPhase(WALK_BACK_INSIDE);
+//			return time;
+//		}
 
 		double workTime = 0;
 
@@ -300,7 +313,7 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 		int mechanicSkill = 0;
 //        if (person != null) {
 		name = person.getName();
-		mechanicSkill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
+		mechanicSkill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
 //        }
 //        else if (robot != null)
 //            ;//mechanicSkill = robot.getBotMind().getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
@@ -321,6 +334,24 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 		// Check if an accident happens during maintenance.
 		checkForAccident(time);
 
+		// Check if the emergency malfunction work is fixed.
+		if (malfunction.needEmergencyRepair() && malfunction.isEmergencyRepairDone()) {	
+			if (person != null) {
+				LogConsolidated.flog(Level.INFO, 0, sourceName,
+					"[" + person.getLocationTag().getLocale() + "] " + person.getName() 
+					+ " wrapped up the emergency repair of " + malfunction.getName() 
+					+ " in "+ entity + " (" + Math.round(malfunction.getCompletedEmergencyWorkTime()*10.0)/10.0 + " millisols spent).");
+			}
+			else {
+				LogConsolidated.flog(Level.INFO, 0, sourceName,
+						"[" + robot.getLocationTag().getLocale() + "] " + robot.getName() 
+						+ " wrapped up the emergency repair of " + malfunction.getName() 
+						+ " in "+ entity + " (" + Math.round(malfunction.getCompletedEmergencyWorkTime()*10.0)/10.0 + " millisols spent).");
+			}
+			setPhase(WALK_BACK_INSIDE);
+			return 0;
+		}
+		
 		return remainingWorkTime;
 	}
 
@@ -334,7 +365,7 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 
 		SkillManager manager = null;
 //		if (person != null)
-			manager = person.getMind().getSkillManager();
+			manager = person.getSkillManager();
 //		else if (robot != null)
 //			manager = robot.getBotMind().getSkillManager();
 
@@ -365,7 +396,7 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 		double experienceAptitudeModifier = (((double) experienceAptitude) - 50D) / 100D;
 		evaExperience += evaExperience * experienceAptitudeModifier;
 		evaExperience *= getTeachingExperienceModifier();
-		person.getMind().getSkillManager().addExperience(SkillType.EVA_OPERATIONS, evaExperience);
+		person.getSkillManager().addExperience(SkillType.EVA_OPERATIONS, evaExperience, time);
 
 		// If phase is repair malfunction, add experience to mechanics skill.
 		if (REPAIRING.equals(getPhase())) {
@@ -373,7 +404,7 @@ public class RepairEmergencyMalfunctionEVA extends EVAOperation implements Repai
 			// Experience points adjusted by person's "Experience Aptitude" attribute.
 			double mechanicsExperience = time / 20D;
 			mechanicsExperience += mechanicsExperience * experienceAptitudeModifier;
-			person.getMind().getSkillManager().addExperience(SkillType.MECHANICS, mechanicsExperience);
+			person.getSkillManager().addExperience(SkillType.MECHANICS, mechanicsExperience, time);
 		}
 //        }
 //        else if (robot != null) {

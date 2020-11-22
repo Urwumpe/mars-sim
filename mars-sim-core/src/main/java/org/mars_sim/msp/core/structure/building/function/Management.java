@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Management.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -9,10 +9,8 @@ package org.mars_sim.msp.core.structure.building.function;
 import java.io.Serializable;
 import java.util.Iterator;
 
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 
 /**
  * A management building function.  The building facilitates management
@@ -37,17 +35,15 @@ implements Serializable {
     public Management(Building building) {
         // Use Function constructor.
         super(FUNCTION, building);
-
         // Populate data members.
-        BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
-        populationSupport = config.getManagementPopulationSupport(building.getBuildingType());
-
+        populationSupport = buildingConfig.getManagementPopulationSupport(building.getBuildingType());
         // Load activity spots
-        loadActivitySpots(config.getManagementActivitySpots(building.getBuildingType()));
+        loadActivitySpots(buildingConfig.getManagementActivitySpots(building.getBuildingType()));
     }
 
     /**
      * Gets the value of the function for a named building.
+     * 
      * @param buildingName the building name.
      * @param newBuilding true if adding a new building.
      * @param settlement the settlement.
@@ -64,15 +60,15 @@ implements Serializable {
         Iterator<Building> i = settlement.getBuildingManager().getBuildings(FUNCTION).iterator();
         while (i.hasNext()) {
             Building managementBuilding = i.next();
-            Management management = (Management) managementBuilding.getFunction(FUNCTION);
+            Management management = managementBuilding.getManagement();
             double populationSupport = management.getPopulationSupport();
             double wearFactor = ((managementBuilding.getMalfunctionManager().getWearCondition() / 100D) * .75D) + .25D;
             supply += populationSupport * wearFactor;
         }
 
         if (!newBuilding) {
-            BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
-            supply -= config.getManagementPopulationSupport(buildingName);
+//            BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
+            supply -= buildingConfig.getManagementPopulationSupport(buildingName);
             if (supply < 0D) supply = 0D;
         }
 

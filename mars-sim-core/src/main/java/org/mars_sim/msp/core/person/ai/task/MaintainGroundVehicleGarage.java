@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MaintainGroundVehicleGarage.java
- * @version 3.1.0 2017-09-13
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -22,10 +22,12 @@ import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.RoboticAttributeType;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -36,6 +38,7 @@ import org.mars_sim.msp.core.structure.building.function.VehicleMaintenance;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Crewable;
 import org.mars_sim.msp.core.vehicle.GroundVehicle;
+import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
@@ -85,7 +88,10 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 			vehicle = getNeedyGroundVehicle(person);
 			if (vehicle != null) {
 				vehicle.setReservedForMaintenance(true);
+	            vehicle.addStatus(StatusType.MAINTENANCE);
 			}
+			else
+				endTask();
 		}
 
 		else {
@@ -95,7 +101,10 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 			vehicle = getNeedyGroundVehicle(robot);
 			if (vehicle != null) {
 				vehicle.setReservedForMaintenance(true);
+	            vehicle.addStatus(StatusType.MAINTENANCE);
 			}
+			else
+				endTask();
 		}
 
 		// Determine the garage it's in.
@@ -105,7 +114,7 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 				try {
 					garage = building.getVehicleMaintenance();
 					// Walk to garage.
-					walkToActivitySpotInBuilding(building, false);
+					walkToTaskSpecificActivitySpotInBuilding(building, false);
 				} catch (Exception e) {
 					e.printStackTrace(System.err);
 					logger.log(Level.SEVERE, "MaintainGroundVehicleGarage.constructor: " + e.getMessage(), e);
@@ -130,7 +139,7 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 							garage.addVehicle(vehicle);
 
 							// Walk to garage.
-							walkToActivitySpotInBuilding(garageBuilding, false);
+							walkToTaskSpecificActivitySpotInBuilding(garageBuilding, false);
 						}
 					} catch (Exception e) {
 						e.printStackTrace(System.err);
@@ -156,7 +165,7 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 	}
 
 	@Override
-	protected FunctionType getLivingFunction() {
+	public FunctionType getLivingFunction() {
 		return FunctionType.GROUND_VEHICLE_MAINTENANCE;
 	}
 
@@ -179,13 +188,20 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 	 */
 	private double maintainVehiclePhase(double time) {
 		MalfunctionManager manager = vehicle.getMalfunctionManager();
-
+		
+		if (!vehicle.isInSettlementVicinity() || !BuildingManager.isInAGarage(vehicle)) {
+        	endTask();
+			return 0;
+		}
+		
 		if (person != null) {
 			// If person is incapacitated, end task.
 			if (person.getPerformanceRating() == 0D) {
 				endTask();
 			}
-		} else {
+		} 
+		
+		else {
 			// If robot is disable, end task.
 			if (robot.getPerformanceRating() == 0D) {
 				endTask();
@@ -225,6 +241,8 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 			}
 		} else {
 			vehicle.setReservedForMaintenance(false);
+	        vehicle.removeStatus(StatusType.MAINTENANCE);
+	        
 			if (vehicle instanceof Crewable) {
 				Crewable crewableVehicle = (Crewable) vehicle;
 				if (crewableVehicle.getCrewNum() == 0 && crewableVehicle.getRobotCrewNum() == 0) {
@@ -242,9 +260,9 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 		int mechanicSkill = 0;
 
 		if (person != null) {
-			mechanicSkill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
+			mechanicSkill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
 		} else {
-			mechanicSkill = robot.getBotMind().getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
+			mechanicSkill = robot.getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
 		}
 
 		if (mechanicSkill == 0) {
@@ -264,6 +282,7 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 		if (manager.getEffectiveTimeSinceLastMaintenance() == 0D) {
 			// logger.info(person.getName() + " finished " + description);
 			vehicle.setReservedForMaintenance(false);
+			vehicle.removeStatus(StatusType.MAINTENANCE);
 			if (vehicle instanceof Crewable) {
 				Crewable crewableVehicle = (Crewable) vehicle;
 				if (crewableVehicle.getCrewNum() == 0) {
@@ -296,12 +315,12 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 			experienceAptitude = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
 			newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
 			newPoints *= getTeachingExperienceModifier();
-			person.getMind().getSkillManager().addExperience(SkillType.MECHANICS, newPoints);
+			person.getSkillManager().addExperience(SkillType.MECHANICS, newPoints, time);
 		} else {
 			experienceAptitude = robot.getRoboticAttributeManager().getAttribute(RoboticAttributeType.EXPERIENCE_APTITUDE);
 			newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
 			newPoints *= getTeachingExperienceModifier();
-			robot.getBotMind().getSkillManager().addExperience(SkillType.MECHANICS, newPoints);
+			robot.getSkillManager().addExperience(SkillType.MECHANICS, newPoints, time);
 		}
 	}
 
@@ -317,9 +336,9 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 		// Mechanic skill modification.
 		int skill = 0;
 		if (person != null) {
-			skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
+			skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
 		} else {
-			skill = robot.getBotMind().getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
+			skill = robot.getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
 		}
 		if (skill <= 3)
 			chance *= (4 - skill);
@@ -367,7 +386,7 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 			Iterator<Vehicle> vI = person.getSettlement().getParkedVehicles().iterator();
 			while (vI.hasNext()) {
 				Vehicle vehicle = vI.next();
-				if ((vehicle instanceof GroundVehicle) && !vehicle.isReservedForMission()) {
+				if (vehicle instanceof GroundVehicle && !vehicle.isReservedForMission()) {
 					result.add(vehicle);
 				}
 			}
@@ -385,11 +404,12 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 	public static Collection<Vehicle> getAllVehicleCandidates(Robot robot) {
 		Collection<Vehicle> result = new ConcurrentLinkedQueue<Vehicle>();
 
-		if (robot.isInSettlement()) {
-			Iterator<Vehicle> vI = robot.getSettlement().getParkedVehicles().iterator();
+		Settlement settlement = robot.getSettlement();
+        if (settlement != null) {
+            Iterator<Vehicle> vI = settlement.getParkedVehicles().iterator();
 			while (vI.hasNext()) {
 				Vehicle vehicle = vI.next();
-				if ((vehicle instanceof GroundVehicle) && !vehicle.isReservedForMission()) {
+				if (vehicle instanceof GroundVehicle && !vehicle.isReservedForMission()) {
 					result.add(vehicle);
 				}
 			}
@@ -414,9 +434,7 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 
 		// Populate vehicles and probabilities.
 		Map<Vehicle, Double> vehicleProb = new HashMap<Vehicle, Double>(availableVehicles.size());
-		// Iterator<Vehicle> i = availableVehicles.iterator();
-		// while (i.hasNext()) {
-		for (Vehicle vehicle : availableVehicles) {// = i.next();
+		for (Vehicle vehicle : availableVehicles) {
 			double prob = getProbabilityWeight(vehicle);
 			if (prob > 0D) {
 				vehicleProb.put(vehicle, prob);
@@ -429,7 +447,13 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 		}
 
 		if (result != null) {
-			setDescription(Msg.getString("Task.description.maintainGroundVehicleGarage.detail", result.getName())); // $NON-NLS-1$
+            if (BuildingManager.isInAGarage((GroundVehicle)result)) {
+            	result = null;
+            }
+            else {
+                setDescription(Msg.getString("Task.description.maintainGroundVehicleGarage.detail",
+                        result.getName())); //$NON-NLS-1$
+            }
 		}
 
 		return result;
@@ -451,20 +475,29 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 
 		// Populate vehicles and probabilities.
 		Map<Vehicle, Double> vehicleProb = new HashMap<Vehicle, Double>(availableVehicles.size());
-		for (Vehicle vehicle : availableVehicles) {
-			double prob = getProbabilityWeight(vehicle);
-			if (prob > 0D) {
-				vehicleProb.put(vehicle, prob);
-			}
+		for (Vehicle vehicle : availableVehicles) {		
+//            if (BuildingManager.add2Garage((GroundVehicle)vehicle)) {
+	            double prob = getProbabilityWeight(vehicle);
+	            if (prob > 0D) {
+	                vehicleProb.put(vehicle, prob);
+	            }
+//			}
 		}
 
 		// Randomly determine needy vehicle.
 		if (!vehicleProb.isEmpty()) {
 			result = (GroundVehicle) RandomUtil.getWeightedRandomObject(vehicleProb);
-		}
-
-		if (result != null) {
-			setDescription(Msg.getString("Task.description.maintainGroundVehicleGarage.detail", result.getName())); // $NON-NLS-1$
+	        
+            if (result != null) {
+            	
+	            if (BuildingManager.isInAGarage((GroundVehicle)result)) {
+	            	result = null;
+	            }
+	            else {
+	                setDescription(Msg.getString("Task.description.maintainGroundVehicleGarage.detail",
+	                        result.getName())); //$NON-NLS-1$
+	            }
+	        }
 		}
 
 		return result;
@@ -480,16 +513,26 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 		double result = 0D;
 		MalfunctionManager manager = vehicle.getMalfunctionManager();
 		boolean tethered = vehicle.isBeingTowed() || (vehicle.getTowingVehicle() != null);
+		if (tethered)
+			return 0;
+		
 		boolean hasMalfunction = manager.hasMalfunction();
+		if (hasMalfunction)
+			return 0;
+
+		boolean hasParts = false;
+		if (person != null) {
+			hasParts = Maintenance.hasMaintenanceParts(person, vehicle);
+		} else {
+			hasParts = Maintenance.hasMaintenanceParts(robot, vehicle);
+		}
+		if (!hasParts)
+			return 0;
+		
 		double effectiveTime = manager.getEffectiveTimeSinceLastMaintenance();
 		boolean minTime = (effectiveTime >= 1000D);
-		boolean enoughParts = false;
-		if (person != null) {
-			enoughParts = Maintenance.hasMaintenanceParts(person, vehicle);
-		} else {
-			enoughParts = Maintenance.hasMaintenanceParts(robot, vehicle);
-		}
-		if (!tethered && !hasMalfunction && minTime && enoughParts) {
+
+		if (minTime) {
 			result = effectiveTime;
 		}
 		return result;
@@ -499,9 +542,9 @@ public class MaintainGroundVehicleGarage extends Task implements Serializable {
 	public int getEffectiveSkillLevel() {
 		SkillManager manager = null;
 		if (person != null) {
-			manager = person.getMind().getSkillManager();
+			manager = person.getSkillManager();
 		} else {
-			manager = robot.getBotMind().getSkillManager();
+			manager = robot.getSkillManager();
 		}
 
 		return manager.getEffectiveSkillLevel(SkillType.MECHANICS);

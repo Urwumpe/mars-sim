@@ -7,7 +7,7 @@ public class MockVehicle extends Vehicle {
 
 	public MockVehicle(Settlement settlement) throws Exception {
 		// Use Vehicle constructor
-		super("Mock Vehicle", "Mock Vehicle", settlement, 10D, 100D, 57D, 100D);
+		super("Mock Vehicle", "Mock Vehicle", settlement, 10D, 5000D, 57D, 100D);
 	}
 
 	public boolean isAppropriateOperator(VehicleOperator operator) {
@@ -19,7 +19,7 @@ public class MockVehicle extends Vehicle {
 	}
 
     @Override
-    public void determinedSettlementParkedLocationAndFacing() {
+    public void findNewParkingLoc() {
     	// Do nothing
     }
 
@@ -31,12 +31,6 @@ public class MockVehicle extends Vehicle {
 	@Override
 	public String getImmediateLocation() {
 		return getLocationTag().getSettlementName();
-	}
-
-	@Override
-	public Settlement getBuriedSettlement() {
-		// TODO Auto-generated method stub
-		return null;
 	}
 
 }

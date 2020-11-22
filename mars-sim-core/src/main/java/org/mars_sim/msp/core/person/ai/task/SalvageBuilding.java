@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SalvageBuilding.java
- * @version 3.08 2015-06-17
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -17,17 +17,16 @@ import java.util.logging.Logger;
 import org.mars_sim.msp.core.LocalAreaUtil;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.Mars;
 import org.mars_sim.msp.core.mars.SurfaceFeatures;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
-
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.structure.Airlock;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.construction.ConstructionSite;
@@ -187,13 +186,11 @@ implements Serializable {
         }
 
 		// Check if it is night time.
-		SurfaceFeatures surface = Simulation.instance().getMars().getSurfaceFeatures();
-		if (surface.getSolarIrradiance(person.getCoordinates()) == 0D) {
-			if (!surface.inDarkPolarRegion(person.getCoordinates())) {
-				return false;
-			}
+		if (EVAOperation.isGettingDark(person)) {
+            logger.fine(person.getName() + " end salvaging building : night time");
+            return false;
 		}
-
+		
         // Check if person's medical condition will not allow task.
         if (person.getPerformanceRating() < .5D)
         	return false;
@@ -288,7 +285,7 @@ implements Serializable {
     protected void addExperience(double time) {
     	SkillManager manager = null;
 //    	if (person != null)
-    		manager = person.getMind().getSkillManager();
+    		manager = person.getSkillManager();
 //		else if (robot != null)
 //			manager = robot.getBotMind().getSkillManager();
 
@@ -312,7 +309,7 @@ implements Serializable {
         double experienceAptitudeModifier = (((double) experienceAptitude) - 50D) / 100D;
         evaExperience += evaExperience * experienceAptitudeModifier;
         evaExperience *= getTeachingExperienceModifier();
-        manager.addExperience(SkillType.EVA_OPERATIONS, evaExperience);
+        manager.addExperience(SkillType.EVA_OPERATIONS, evaExperience, time);
 
         // If phase is salvage, add experience to construction skill.
         if (SALVAGE.equals(getPhase())) {
@@ -320,7 +317,7 @@ implements Serializable {
             // Experience points adjusted by person's "Experience Aptitude" attribute.
             double constructionExperience = time / 10D;
             constructionExperience += constructionExperience * experienceAptitudeModifier;
-            manager.addExperience(SkillType.CONSTRUCTION, constructionExperience);
+            manager.addExperience(SkillType.CONSTRUCTION, constructionExperience, time);
 
             // If person is driving the light utility vehicle, add experience to driving skill.
             // 1 base experience point per 10 millisols of mining time spent.
@@ -328,7 +325,7 @@ implements Serializable {
             if (operatingLUV) {
                 double drivingExperience = time / 10D;
                 drivingExperience += drivingExperience * experienceAptitudeModifier;
-                manager.addExperience(SkillType.DRIVING, drivingExperience);
+                manager.addExperience(SkillType.PILOTING, drivingExperience, time);
             }
         }
     }
@@ -346,7 +343,7 @@ implements Serializable {
 
         SkillManager manager = null;
 //        if (person != null)
-        	manager = person.getMind().getSkillManager();
+        	manager = person.getSkillManager();
 //		else if (robot != null)
 //			manager = robot.getBotMind().getSkillManager();
 
@@ -387,7 +384,7 @@ implements Serializable {
             // Driving skill modification.
             int skill = 0;
 //            if (person != null)
-            	skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.EVA_OPERATIONS);
+            	skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.EVA_OPERATIONS);
 //    		else if (robot != null)
 //    			skill = robot.getBotMind().getSkillManager().getEffectiveSkillLevel(SkillType.EVA_OPERATIONS);
 

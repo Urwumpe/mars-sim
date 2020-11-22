@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MedicalStation.java
- * @version 3.1.0 2017-09-01
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  * Based on Barry Evan's SickBay class
  */
@@ -57,6 +57,8 @@ public class MedicalStation implements MedicalAid, Serializable {
 
 	private Building building;
 
+	private static MedicalManager medManager;
+	
 //    private Map<Person, Point2D> bedMap = new HashMap<>();
 
 	/**
@@ -74,7 +76,13 @@ public class MedicalStation implements MedicalAid, Serializable {
 		restingRecoveryPeople = new ArrayList<Person>();
 
 		// Get all supported treatments.
-		MedicalManager medManager = Simulation.instance().getMedicalManager();
+		if (medManager == null) {
+//			System.out.println("medManager is null");
+			medManager = Simulation.instance().getMedicalManager();
+		}
+//		else {
+//			System.out.println("medManager is NOT null");
+//		}
 		supportedTreatments = medManager.getSupportedTreatments(level);
 	}
 
@@ -119,6 +127,18 @@ public class MedicalStation implements MedicalAid, Serializable {
 		return getPatients().size();
 	}
 
+	/**
+	 * Checks if there are any empty beds for new patients
+	 * 
+	 * @return true or false
+	 */
+	public boolean hasEmptyBeds() {
+		if (getPatientNum() < getSickBedNum())
+			return true;
+		else
+			return false;
+	}
+	
 	/**
 	 * Gets the patients at this medical station.
 	 * 

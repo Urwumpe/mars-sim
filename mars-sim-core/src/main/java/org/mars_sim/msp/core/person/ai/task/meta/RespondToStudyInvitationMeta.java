@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RespondToStudyInvitationMeta.java
- * @version 3.08 2015-06-08
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -10,17 +10,18 @@ import java.io.Serializable;
 import java.util.List;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
-import org.mars_sim.msp.core.person.ai.task.PerformLaboratoryExperiment;
 import org.mars_sim.msp.core.person.ai.task.RespondToStudyInvitation;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.tool.RandomUtil;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * Meta task for the RespondToStudyInvitation task.
@@ -48,25 +49,36 @@ public class RespondToStudyInvitationMeta implements MetaTask, Serializable {
     public double getProbability(Person person) {
 
         double result = 0D;
-        if (person.isInVehicle()) {	
-	        // Check if person is in a moving rover.
-	        if (PerformLaboratoryExperiment.inMovingRover(person)) {
-	            result = 0D;
-	            return 0;
-	        }
-	        else
-	        // the penalty for performing experiment inside a vehicle
-	        	result = -20D;
-        }
+        
+        // Probability affected by the person's stress and fatigue.
+        PhysicalCondition condition = person.getPhysicalCondition();
+        double fatigue = condition.getFatigue();
+        double stress = condition.getStress();
+        double hunger = condition.getHunger();
+        
+        if (fatigue > 1000 || stress > 50 || hunger > 500)
+        	return 0;
         
         if (person.isInside()) {
 
             // Check if person has been invited to collaborate on any scientific studies.
-	        ScientificStudyManager manager = Simulation.instance().getScientificStudyManager();
-	        List<ScientificStudy> invitedStudies = manager.getOpenInvitationStudies(person);
+	        List<ScientificStudy> invitedStudies = scientificStudyManager.getOpenInvitationStudies(person);
 	        if (invitedStudies.size() > 0) {
-	            result = 50D;
+	            result += invitedStudies.size() * 100D;
+	            
+	            if (person.isInVehicle()) {	
+	    	        // Check if person is in a moving rover.
+	    	        if (Vehicle.inMovingRover(person)) {
+	    		        // the bonus inside a vehicle 
+	    	        	result += 30;
+	    	        } 	       
+	    	        else
+	    		        // the bonus inside a vehicle
+	    	        	result += 10;
+	            }
 	        }
+	        
+	        if (result <= 0) return 0;
 
 	        // Crowding modifier
             Building adminBuilding = RespondToStudyInvitation.getAvailableAdministrationBuilding(person);
@@ -84,16 +96,16 @@ public class RespondToStudyInvitationMeta implements MetaTask, Serializable {
 
 	        // Modify if research is the person's favorite activity.
 	        if (person.getFavorite().getFavoriteActivity() == FavoriteType.RESEARCH) {
-	            result *= 2D;
+	            result += RandomUtil.getRandomInt(1, 20);
 	        }
 
-	        // 2015-06-07 Added Preference modifier
-	           if (result > 0)
-	            	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
+	        // Add Preference modifier
+	        if (result > 0)
+	           	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
 
         }
 
-        if (result < 0) result = 0;
+        if (result <= 0) result = 0;
         
         return result;
     }

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MarsProjectHeadlessStarter.java
-* @version 3.1.0 2018-06-14
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  * $LastChangedDate$
  * $LastChangedRevision$
@@ -11,35 +11,121 @@ package org.mars_sim.headless;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
+
 /**
- * MarsProjectHeadlessStarter is the main class for running the main executable
- * JAR in purely headless mode. It creates a new virtual machine with 1GB memory
- * and logging properties. It isn't used in the webstart release.
+ * MarsProjectHeadlessStarter is the main class for running the executable
+ * JAR in pure console mode. It creates a new virtual machine with logging properties. 
+ * It isn't used in the webstart release.
  */
 public class MarsProjectHeadlessStarter {
 
 //	private final static String ERROR_PREFIX = "? ";
 
+	private static final String JAVA = "java";
+	private static final String JAVA_HOME = "JAVA_HOME";
+	private static final String BIN = "bin";
+	private static final String ONE_WHITESPACE = " ";
+	
+	private static String OS = System.getProperty("os.name").toLowerCase();
+	
+	private static List<String> templates = new ArrayList<>();
+	
+	static {
+		templates.add("template:1");
+		templates.add("template:1A");
+		templates.add("template:1B");
+		templates.add("template:1C");
+		templates.add("template:1D");
+		templates.add("template:2");
+		templates.add("template:2A");
+		templates.add("template:2B");
+		templates.add("template:2C");
+		templates.add("template:2D");
+		templates.add("template:3");
+		templates.add("template:3A");
+		templates.add("template:3B");
+		templates.add("template:3C");
+		templates.add("template:3D");
+		templates.add("template:4");
+	}
+	
+	public static List<String> getTemplates() {
+		return templates;
+	}
+	
 	public static void main(String[] args) {
 
 		StringBuilder command = new StringBuilder();
 
-		String javaHome = System.getenv("JAVA_HOME");
+		String javaHome = System.getenv(JAVA_HOME);
 		
-		if (javaHome != null) {
-			if (javaHome.contains(" "))
-				javaHome = "\"" + javaHome;
+	    System.out.println("      JAVA_HOME : " + javaHome);
+        
+        System.out.println(" File.separator : " + File.separator);
+        
+ 		if (javaHome != null) {
+ 			if (javaHome.contains(ONE_WHITESPACE))
+ 				javaHome = "\"" + javaHome;
 
-			command.append(javaHome).append(File.separator).append("bin").append(File.separator).append("java");
+ 			String lastChar = javaHome.substring(javaHome.length() - 1);
+ 			
+ 			if (lastChar.equalsIgnoreCase(File.separator)) {
+ 				if (javaHome.contains(BIN)) {
+ 					command
+ 					.append(javaHome)
+ 					.append(JAVA);
+ 				}
+ 				else {
+ 					command
+ 					.append(javaHome)
+ 					.append(BIN)
+ 					.append(File.separator)
+ 					.append(JAVA);
+ 				}	
+ 			}
+ 			else {
+ 				if (javaHome.contains(BIN)) {
+ 					command
+ 					.append(javaHome)
+ 					.append(File.separator)
+ 					.append(JAVA);
+ 				}
+ 				else {
+ 					command
+ 					.append(javaHome)
+ 					.append(File.separator)
+ 					.append(BIN)
+ 					.append(File.separator)
+ 					.append(JAVA);
+ 				}		
+ 			}
+ 			
+ 			if (javaHome.contains(ONE_WHITESPACE))
+ 				command.append("\"");
 
-			if (javaHome.contains(" "))
-				command.append("\"");
-		} else
-			command.append("java");
-
+ 		    System.out.println("      JAVA_HOME : " + javaHome);
+ 	        System.out.println("   Java Command : " + command.toString());
+ 	        
+ 		}
+		else {
+			command.append(JAVA);
+		}
+		
+		command.append(" --illegal-access=deny");
+        
+        // Check OS
+        if (OS.indexOf("win") >= 0)
+        	command.append(" --add-opens java.desktop/com.sun.java.swing.plaf.windows=ALL-UNNAMED");
+        else if (OS.indexOf("mac") >= 0)
+        	command.append(" --add-opens java.desktop/com.apple.laf=ALL-UNNAMED");
+        else if (OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0 || OS.indexOf("sunos") >= 0)
+            command.append(" --add-opens java.desktop/com.sun.java.swing.plaf.gtk=ALL-UNNAMED");
+		
 		// command.append(" -Dswing.aatext=true");
 		// command.append(" -Dswing.plaf.metal.controlFont=Tahoma"); // the compiled jar
 		// won't run
@@ -48,44 +134,62 @@ public class MarsProjectHeadlessStarter {
 		// command.append(" -generateHelp");
 		// command.append(" -new");
 
+        // Use new Shenandoah Garbage Collector from Java 12 
+//        command.append(" -XX:+UnlockExperimentalVMOptions")
+//        	.append(" -XX:+UseShenandoahGC");
+//        	.append(" -Xlog:gc*");
+        
+        // Set up logging
 		command.append(" -Djava.util.logging.config.file=logging.properties").append(" -cp .")
-				.append(File.pathSeparator).append("*").append(File.pathSeparator).append("jars").append(File.separator)
-				.append("*").append(" org.mars_sim.headless.MarsProjectHeadless");
+				.append(File.pathSeparator)
+				.append("*")
+				.append(File.pathSeparator)
+				.append("jars")
+				.append(File.separator)
+				.append("*")
+				.append(" org.mars_sim.headless.MarsProjectHeadless");
 
 		// Add checking for input args
 		List<String> argList = Arrays.asList(args);
 
+		boolean isNew = false;
+		
 		if (argList.isEmpty()) {
-			// by default, use gui and 1GB
+			// by default, use gui and 1.5 GB
 			command.append(" -Xms256m");
-			command.append(" -Xmx1024m");
+            command.append(" -Xmx1536m");
 			command.append(" -new");
 		}
 
 		else {
 			// Check for the memory switch
-			if (argList.contains("5") || argList.contains("-5")) {// || argList.contains("5 ")) {
-				command.append(" -Xms256m");
-				command.append(" -Xmx2048m");
-			} else if (argList.contains("4") || argList.contains("-4")) {
-				command.append(" -Xms256m");
-				command.append(" -Xmx1536m");
-			} else if (argList.contains("3") || argList.contains("-3")) {
-				command.append(" -Xms256m");
-				command.append(" -Xmx1024m");
-			} else if (argList.contains("2") || argList.contains("-2")) {
-				command.append(" -Xms256m");
-				command.append(" -Xmx768m");
-			} else if (argList.contains("1") || argList.contains("-1")) {
-				command.append(" -Xms256m");
-				command.append(" -Xmx512m");
-			} else if (argList.contains("0") || argList.contains("-0")) {
-				command.append(" -Xms256m");
-				command.append(" -Xmx1024m");
+	        if (argList.contains("5") || argList.contains("-5")) {
+	            command.append(" -Xms256m");
+	            command.append(" -Xmx3072m");
+	        }
+	        else if (argList.contains("4") || argList.contains("-4")) {
+	            command.append(" -Xms256m");
+	            command.append(" -Xmx2560m");
+	        }
+	        else if (argList.contains("3") || argList.contains("-3")) {
+	            command.append(" -Xms256m");
+	            command.append(" -Xmx2048m");
+	        }
+	        else if (argList.contains("2") || argList.contains("-2")) {
+	            command.append(" -Xms256m");
+	            command.append(" -Xmx1536m");
+	        }
+	        else if (argList.contains("1") || argList.contains("-1")) {
+	            command.append(" -Xms256m");
+	            command.append(" -Xmx1024m");
+	        }
+	        else if (argList.contains("0") || argList.contains("-0")) {
+	            command.append(" -Xms256m");
+	            command.append(" -Xmx1536m");
 			} else {
-				// Use 1GB by default
+				// Use 1.5 GB by default
 				command.append(" -Xms256m");
-				command.append(" -Xmx1024m");
+	            command.append(" -Xmx1536m");
 			}
 
 			// Check for the help switch
@@ -101,15 +205,15 @@ public class MarsProjectHeadlessStarter {
 			}
 
 			else {
-
 				// Check for the headless switch
 //				if (argList.contains("headless") || argList.contains("-headless"))
 //					command.append(" -headless");
 
 				// Check for the new switch
-				if (argList.contains("new") || argList.contains("-new"))
-					command.append(" -new");
-
+				if (argList.contains("new") || argList.contains("-new")) {
+					isNew = true;	
+				}
+				
 				// Check for the load switch
 				else if (argList.contains("load") || argList.contains("-load")) {
 					command.append(" -load");
@@ -129,13 +233,30 @@ public class MarsProjectHeadlessStarter {
 				else {
 					// System.out.println("Note: it's missing 'new' or 'load'. Assume you want to
 					// start a new sim now.");
-					command.append(" -new");
+					
+					isNew = true;	
 				}
-
 			}
-
 		}
 
+		if (isNew) {
+			command.append(" -new");
+			
+			for (String s: argList) {
+				if (StringUtils.containsIgnoreCase(s, "-country:")) {
+					command.append(" " + s);
+				}
+				
+				if (StringUtils.containsIgnoreCase(s, "-sponsor:")) {
+					command.append(" " + s);
+				}
+						
+				if (StringUtils.containsIgnoreCase(s, "-template:")) {
+					command.append(" " + s);
+				}
+			}		
+		}
+		
 		// Check for noaudio switch
 		if (argList.contains("noaudio") || argList.contains("-noaudio"))
 			command.append(" -noaudio");
@@ -182,10 +303,12 @@ public class MarsProjectHeadlessStarter {
 			errorConsumer.join();
 			outputConsumer.join();
 
-		} catch (IOException e) {
-			throw new IllegalStateException(e);
-		} catch (InterruptedException e) {
-			throw new IllegalStateException(e);
-		}
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e1) {
+        	e1.printStackTrace();
+        } catch (Exception e2) {
+        	e2.printStackTrace();        	
+        }
 	}
 }

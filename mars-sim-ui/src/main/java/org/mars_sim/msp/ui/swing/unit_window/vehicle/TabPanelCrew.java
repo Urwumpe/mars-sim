@@ -1,8 +1,7 @@
 /**
  * Mars Simulation Project
  * CrewTabPanel.java
- * @version 3.07 2014-12-06
-
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.vehicle;
@@ -21,7 +20,6 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import javax.swing.DefaultListModel;
-
 import javax.swing.JList;
 
 import org.mars_sim.msp.core.Msg;
@@ -30,7 +28,6 @@ import org.mars_sim.msp.core.vehicle.Crewable;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.monitor.PersonTableModel;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
@@ -61,6 +58,12 @@ implements MouseListener, ActionListener {
 	private int crewNumCache;
 	private int crewCapacityCache;
 
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
+	/** The Crewable instance. */
+	private Crewable crewable;
+	
 	/**
 	 * Constructor.
 	 * @param vehicle the vehicle.
@@ -75,8 +78,17 @@ implements MouseListener, ActionListener {
 			vehicle, desktop
 		);
 
-		Crewable crewable = (Crewable) vehicle;
+		crewable = (Crewable) vehicle;
 
+	}
+
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
 		// Prepare title label.
 		WebPanel titlePanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
 		WebLabel titleLabel = new WebLabel(Msg.getString("TabPanelCrew.title"), WebLabel.CENTER); //$NON-NLS-1$
@@ -86,7 +98,7 @@ implements MouseListener, ActionListener {
 
 		// Create crew count panel
 		WebPanel crewCountPanel = new WebPanel(new GridLayout(2, 1, 0, 0));
-		crewCountPanel.setBorder(new MarsPanelBorder());
+//		crewCountPanel.setBorder(new MarsPanelBorder());
 		topContentPanel.add(crewCountPanel);
 
 		// Create crew num label
@@ -101,12 +113,12 @@ implements MouseListener, ActionListener {
 
 		// Create crew display panel
 		WebPanel crewDisplayPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
-		crewDisplayPanel.setBorder(new MarsPanelBorder());
+//		crewDisplayPanel.setBorder(new MarsPanelBorder());
 		topContentPanel.add(crewDisplayPanel);
 
 		// Create scroll panel for crew list.
 		WebScrollPane crewScrollPanel = new WebScrollPane();
-		crewScrollPanel.setPreferredSize(new Dimension(175, 100));
+		crewScrollPanel.setPreferredSize(new Dimension(175, 200));
 		crewDisplayPanel.add(crewScrollPanel);
 
 		// Create crew list model
@@ -136,6 +148,9 @@ implements MouseListener, ActionListener {
 	 * Updates the info on this panel.
 	 */
 	public void update() {
+		if (!uiDone)
+			initializeUI();
+		
 		Vehicle vehicle = (Vehicle) unit;
 		Crewable crewable = (Crewable) vehicle;
 

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MonitorWindow.java
- * @version 3.1.0 2017-01-19
+ * @version 3.1.2 2020-09-02
  * @author Barry Evans
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -16,14 +16,17 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 import javax.swing.BorderFactory;
+import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 
+import org.mars_sim.msp.core.GameManager;
+import org.mars_sim.msp.core.GameManager.GameMode;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.ui.javafx.MainScene;
+import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MainWindow;
@@ -38,22 +41,21 @@ import com.alee.laf.button.WebButton;
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.tabbedpane.WebTabbedPane;
-import com.alee.laf.table.WebTable;
 import com.alee.managers.tooltip.TooltipManager;
 import com.alee.managers.tooltip.TooltipWay;
-import com.jidesoft.swing.Searchable;
-import com.jidesoft.swing.SearchableBar;
-import com.jidesoft.swing.SearchableUtils;
-import com.jidesoft.swing.TableSearchable;
+
 
 /**
  * The MonitorWindow is a tool window that displays a selection of tables each
  * of which monitor a set of Units.
  */
+@SuppressWarnings("serial")
 public class MonitorWindow extends ToolWindow implements TableModelListener, ActionListener {
 
-	final private static int STATUSHEIGHT = 25;
-
+	private static final int STATUSHEIGHT = 25;
+	private static final int WIDTH = 1300;//1280;
+	private static final int HEIGHT = 512;
+	
 	public static final String NAME = Msg.getString("MonitorWindow.title"); //$NON-NLS-1$
 
 	// Added an custom icon for each tab
@@ -79,11 +81,16 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	// Data members
 	private WebTabbedPane tabsSection;
 	// private JideTabbedPane tabsSection;
+	
 	private WebLabel rowCount;
+	
 	private ArrayList<MonitorTab> tabs = new ArrayList<MonitorTab>();
+	
 	/** Tab showing historical events. */
 	private EventTab eventsTab;
+	
 	private MonitorTab oldTab = null;
+	
 	private WebButton buttonPie;
 	private WebButton buttonBar;
 	private WebButton buttonRemoveTab;
@@ -94,14 +101,16 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	private WebButton buttonProps;
 
 	private MainDesktopPane desktop;
-	private MainScene mainScene;
+
 	private MainWindow mainWindow;
 
 	private WebPanel statusPanel;
-	private WebTable table;
-	private WebTable rowTable;
-	private Searchable searchable;
-	private SearchableBar searchBar;
+	
+	private JTable table;
+	private JTable rowTable;
+	
+//	private Searchable searchable;
+//	private SearchableBar searchBar;
 
 	/**
 	 * Constructor.
@@ -113,10 +122,7 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		super(NAME, desktop);
 		this.desktop = desktop;
 
-		if (desktop.getMainScene() != null)
-			mainScene = desktop.getMainScene();
-		else if (desktop.getMainWindow() != null)
-			mainWindow = desktop.getMainWindow();
+		mainWindow = desktop.getMainWindow();
 
 		// Get content pane
 		WebPanel mainPane = new WebPanel(new BorderLayout());
@@ -190,7 +196,8 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		statusPanel.add(buttonFilter);
 
 		// Create tabbed pane for the table
-		tabsSection = new WebTabbedPane();
+		tabsSection = new WebTabbedPane(WebTabbedPane.TOP, WebTabbedPane.SCROLL_TAB_LAYOUT); // WRAP_TAB_LAYOUT);//
+		
 		tabsSection.setForeground(Color.DARK_GRAY);
 		mainPane.add(tabsSection, BorderLayout.CENTER);
 		
@@ -203,8 +210,6 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		rowCount.setPreferredSize(dims);
 
 		// Add the default table tabs
-		// UnitManager unitManager = Simulation.instance().getUnitManager();
-
 		// Added notifyBox
 		NotificationWindow notifyBox = new NotificationWindow(desktop);
 
@@ -222,12 +227,20 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 
 		addTab(new MissionTab(this));
 
-		addTab(new UnitTab(this, new PersonTableModel(desktop), true, PEOPLE_ICON));
-
 		addTab(new UnitTab(this, new SettlementTableModel(), true, BASE_ICON));
 
 		addTab(new UnitTab(this, new VehicleTableModel(), true, VEHICLE_ICON));
 
+		addTab(new UnitTab(this, new PersonTableModel(desktop), true, PEOPLE_ICON));
+
+		if (GameManager.mode != GameMode.COMMAND) {
+			// Add a tab for each settlement
+			for (Settlement s : unitManager.getSettlements()) {
+	//			addTab(new UnitTab(this, new SettlementTableModel(s), true, BASE_ICON));
+				addTab(new UnitTab(this, new PersonTableModel(s, true), true, PEOPLE_ICON));
+			}
+		}
+		
 		// Add a listener for the tab changes
 		tabsSection.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
@@ -236,12 +249,12 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		});
 
 		// Note: must use setSize() to define a starting size
-		setSize(new Dimension(1280, 512));
-		setMinimumSize(new Dimension(768, 200));
+		setSize(new Dimension(WIDTH, HEIGHT));
+//		setMinimumSize(new Dimension(768, 200));
 		// Need to verify why setPreferredSize() prevents Monitor Window from being
 		// resizable
 		// and create spurious error message in linux in some cases
-		// setPreferredSize(new Dimension(1280, 512));
+		setPreferredSize(new Dimension(WIDTH, HEIGHT));
 		setResizable(true);
 		setMaximizable(true);
 		setVisible(true);
@@ -251,13 +264,13 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		int width = (desktopSize.width - jInternalFrameSize.width) / 2;
 		int height = (desktopSize.height - jInternalFrameSize.height) / 2;
 		setLocation(width, height);
-
+				
 		// Open the people tab at the start of the sim
 		tabsSection.setSelectedIndex(2);
 		table.repaint();
 
 	}
-
+	
 	/**
 	 * This method add the specified Unit table as a new tab in the Monitor. The
 	 * model is displayed as a table by default. The name of the tab is that of the
@@ -357,7 +370,7 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	public void tabChanged(boolean reloadSearch) {
 		// SwingUtilities.updateComponentTreeUI(this);
 		MonitorTab newTab = getSelected();
-		WebTable table = null;
+		JTable table = null;
 
 		if (newTab != oldTab) {
 			newTab.getModel().addTableModelListener(this);
@@ -408,8 +421,8 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 				rowTable = new RowNumberTable(table);
 				TableStyle.setTableStyle(rowTable);
 				// statusPanel.remove(_tableSearchableBar);
-				if (reloadSearch)
-					createSearchableBar(table);
+//				if (reloadSearch)
+//					createSearchableBar(table);
 			}
 
 			// String status = newTab.getCountString();
@@ -429,58 +442,107 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	}
 
 	
-	public void createSearchableBar(WebTable table) {
-		// Searchable searchable = null;
-		// SearchableBar _tableSearchableBar = null;
+//	public void createSearchableBar(JTable table) {
+//		// Searchable searchable = null;
+//		// SearchableBar _tableSearchableBar = null;
+//
+//		if (searchable != null)
+//			SearchableUtils.uninstallSearchable(searchable);
+//
+//		if (table != null) {
+//			// SearchableUtils.uninstallSearchable(searchable);
+//			searchable = SearchableUtils.installSearchable(table);
+//			// searchable.setRepeats(true);
+//			searchable.setPopupTimeout(5000);
+//			searchable.setCaseSensitive(false);
+//			searchable.setHideSearchPopupOnEvent(false);
+//			searchable.setWildcardEnabled(true);
+//			searchable.setHeavyweightComponentEnabled(true);
+//			// searchable.setSearchableProvider(searchableProvider)
+//			searchable.setMismatchForeground(Color.PINK);
+//			// WildcardSupport WildcardSupport = new WildcardSupport();
+//			// searchable.setWildcardSupport(new WildcardSupport());
+//
+//			if (searchBar != null) {
+//				searchBar.setSearchingText("");
+//				statusPanel.remove(searchBar);
+//				searchBar = null;
+//			}
+//
+//			searchBar = new SearchableBar(searchable);
+//			searchBar.setSearchingText("");
+//			searchBar.setCompact(true);
+//			// _tableSearchableBar.setSearchingText("*" +
+//			// _tableSearchableBar.getSearchingText());
+//
+//			// _tableSearchableBar.setVisibleButtons(1);
+//			TooltipManager.setTooltip(searchBar, "Use wildcards (*, +, ?) for searching. e.g. '*DaVinci' ");
+//			
+//			((TableSearchable) searchable).setMainIndex(-1); // -1 = search for all columns
+//			searchBar.setVisibleButtons(SearchableBar.SHOW_NAVIGATION | SearchableBar.SHOW_MATCHCASE
+//					| SearchableBar.SHOW_WHOLE_WORDS | SearchableBar.SHOW_STATUS);
+//			searchBar.setName(table.getName());
+//			searchBar.setShowMatchCount(true);
+//			searchBar.setVisible(true);
+//
+//			statusPanel.add(searchBar); // , BorderLayout.AFTER_LAST_LINE);
+//
+//			// pack();
+//
+//			// statusPanel.add(_tableSearchableBar); // , BorderLayout.AFTER_LAST_LINE);
+//			statusPanel.invalidate();
+//			statusPanel.revalidate();
+//		}
+//	}
 
-		if (searchable != null)
-			SearchableUtils.uninstallSearchable(searchable);
-
-		if (table != null) {
-			// SearchableUtils.uninstallSearchable(searchable);
-			searchable = SearchableUtils.installSearchable(table);
-			// searchable.setRepeats(true);
-			searchable.setPopupTimeout(5000);
-			searchable.setCaseSensitive(false);
-			searchable.setHideSearchPopupOnEvent(false);
-			searchable.setWildcardEnabled(true);
-			searchable.setHeavyweightComponentEnabled(true);
-			// searchable.setSearchableProvider(searchableProvider)
-			searchable.setMismatchForeground(Color.PINK);
-			// WildcardSupport WildcardSupport = new WildcardSupport();
-			// searchable.setWildcardSupport(new WildcardSupport());
-
-			if (searchBar != null) {
-				searchBar.setSearchingText("");
-				statusPanel.remove(searchBar);
-				searchBar = null;
-			}
-
-			searchBar = new SearchableBar(searchable);
-			searchBar.setSearchingText("");
-			searchBar.setCompact(true);
-			// _tableSearchableBar.setSearchingText("*" +
-			// _tableSearchableBar.getSearchingText());
-
-			// _tableSearchableBar.setVisibleButtons(1);
-			TooltipManager.setTooltip(searchBar, "Use wildcards (*, +, ?) for searching. e.g. '*DaVinci' ");
-			
-			((TableSearchable) searchable).setMainIndex(-1); // -1 = search for all columns
-			searchBar.setVisibleButtons(SearchableBar.SHOW_NAVIGATION | SearchableBar.SHOW_MATCHCASE
-					| SearchableBar.SHOW_WHOLE_WORDS | SearchableBar.SHOW_STATUS);
-			searchBar.setName(table.getName());
-			searchBar.setShowMatchCount(true);
-			searchBar.setVisible(true);
-
-			statusPanel.add(searchBar); // , BorderLayout.AFTER_LAST_LINE);
-
-			// pack();
-
-			// statusPanel.add(_tableSearchableBar); // , BorderLayout.AFTER_LAST_LINE);
-			statusPanel.invalidate();
-			statusPanel.revalidate();
-		}
-	}
+//	public void createRadioButton() {
+//		
+//		label1 = new JLabel(new ImageIcon("Grapes1.png"));
+//		radio1 = new JRadioButton("");
+//		radio1.setName("Grapes");
+//		
+//		label2 = new JLabel(new ImageIcon("Mango.jpg"));
+//		radio2 = new JRadioButton("");
+//		radio2.setName("Mango");
+//		
+//		label3 = new JLabel(new ImageIcon("Apple.jpg"));
+//		radio3 = new JRadioButton("");
+//		radio3.setName("Apple");
+//		
+//		label4= new JLabel();
+//		
+//		jf.add(radio1);
+//		jf.add(label1);
+//		jf.add(radio2);
+//		jf.add(label2);
+//		jf.add(radio3);
+//		jf.add(label3);
+//		
+//		radio1.addActionListener(this);
+//		radio2.addActionListener(this);
+//		radio3.addActionListener(this);
+//		
+//		jf.setLayout(new FlowLayout());
+//		jf.setSize(400,200);
+//		jf.setVisible(true);
+//	}
+//
+//
+//	public void actionPerformed(ActionEvent ae) {
+//		JRadioButton rd = (JRadioButton)ae.getSource();
+//		
+//		if (rd.isSelected()) {
+//			label4.setText(rd.getName()+ " is checked");
+//			jf.add(label4);
+//			jf.setVisible(true);
+//		}
+//		else {
+//			label4.setText(rd.getName()+ " is unchecked");
+//			jf.add(label4);
+//			jf.setVisible(true);
+//		}
+//		
+//	}
 
 	@Override
 	public void tableChanged(TableModelEvent e) {
@@ -493,6 +555,11 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		}
 	}
 
+	/**
+	 * Adds a new tab to Monitor Tool
+	 * 
+	 * @param newTab
+	 */
 	private void addTab(MonitorTab newTab) {
 		tabs.add(newTab);
 		tabsSection.addTab(newTab.getName(), newTab.getIcon(), newTab); // "", newTab.getIcon(), newTab);//
@@ -500,6 +567,11 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		// tabChanged(true);
 	}
 
+	/**
+	 * Removes a tab from Monitor Tool
+	 * 
+	 * @param oldTab
+	 */
 	private void removeTab(MonitorTab oldTab) {
 		tabs.remove(oldTab);
 		tabsSection.remove(oldTab);
@@ -556,19 +628,8 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 			MonitorTab selected = getSelected();
 			if (selected == eventsTab) {
 				rowCount.setText(eventsTab.getCountString());
-			}
-			
+			}		
 		}
-	}
-
-	/**
-	 * Prepare tool window for deletion.
-	 */
-	public void destroy() {
-		Iterator<MonitorTab> i = tabs.iterator();
-		while (i.hasNext())
-			i.next().removeTab();
-		tabs.clear();
 	}
 
 	@Override
@@ -596,4 +657,39 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		}
 	}
 
+	/**
+	 * Prepare tool window for deletion.
+	 */
+	public void destroy() {
+		Iterator<MonitorTab> i = tabs.iterator();
+		while (i.hasNext())
+			i.next().removeTab();
+		tabs.clear();
+		tabs = null;
+		tabsSection = null;
+		rowCount = null;
+		eventsTab = null;
+		oldTab = null;
+		buttonPie = null;
+		buttonBar = null;
+		buttonRemoveTab = null;
+		buttonMap = null;
+		buttonDetails = null;
+		buttonMissions = null;
+		buttonFilter = null;
+		buttonProps = null;
+
+		desktop = null;
+
+		mainWindow = null;
+
+		statusPanel = null;
+		
+		table = null;
+		rowTable = null;
+		
+//		searchable = null;
+//		searchBar = null;
+
+	}
 }

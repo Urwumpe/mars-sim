@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ToggleResourceProcess.java
- * @version 3.1.0 2017-08-28
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -16,12 +16,13 @@ import java.util.logging.Logger;
 import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
@@ -29,7 +30,6 @@ import org.mars_sim.msp.core.structure.building.function.Administration;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.ResourceProcess;
 import org.mars_sim.msp.core.structure.building.function.ResourceProcessing;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
@@ -54,6 +54,9 @@ public class ToggleResourceProcess extends Task implements Serializable {
 	/** Task name */
 	private static final String NAME_ON = Msg.getString("Task.description.toggleResourceProcess.on"); //$NON-NLS-1$
 	private static final String NAME_OFF = Msg.getString("Task.description.toggleResourceProcess.off"); //$NON-NLS-1$
+	
+	private static final String C2 = "command and control"; 
+	
 	/** The stress modified per millisol. */
 	private static final double STRESS_MODIFIER = .25D;
 	
@@ -91,7 +94,7 @@ public class ToggleResourceProcess extends Task implements Serializable {
         super(NAME_ON, person, true, false, STRESS_MODIFIER, true, 5D + RandomUtil.getRandomInt(5));
 		//super(NAME_ON, person, false, 0D);
 
-        if (person.isInSettlement()) {      	  
+        if (person.isInSettlement()) {
 //			resourceProcessBuilding = getResourceProcessingBuilding(person);
 			process = selectResourceProcess(person);
 			
@@ -127,7 +130,7 @@ public class ToggleResourceProcess extends Task implements Serializable {
 				Administration admin = resourceProcessBuilding.getAdministration();
 				if (admin != null && !admin.isFull()) {
 					destination = resourceProcessBuilding;
-					walkToActivitySpotInBuilding(destination, false);
+					walkToTaskSpecificActivitySpotInBuilding(destination, false);
 				}
 				
 				else {
@@ -141,9 +144,9 @@ public class ToggleResourceProcess extends Task implements Serializable {
 						List<Building> adminsNotFull = new ArrayList<>();
 						
 						for (Building b : admins) {
-							if (b.getBuildingType().toLowerCase().equals("command and control")) {
+							if (b.getBuildingType().toLowerCase().equals(C2)) {
 								destination = b;
-								walkToActivitySpotInBuilding(b, false);
+								walkToTaskSpecificActivitySpotInBuilding(b, false);
 								done = true;
 								break;
 							}
@@ -156,7 +159,7 @@ public class ToggleResourceProcess extends Task implements Serializable {
 						if (!done && !adminsNotFull.isEmpty()) {
 							int rand = RandomUtil.getRandomInt(admins.size()-1);
 							destination = admins.get(rand);
-							walkToActivitySpotInBuilding(destination, false);
+							walkToTaskSpecificActivitySpotInBuilding(destination, false);
 						}
 
 						else
@@ -201,7 +204,7 @@ public class ToggleResourceProcess extends Task implements Serializable {
 	}
 
 	@Override
-	protected FunctionType getLivingFunction() {
+	public FunctionType getLivingFunction() {
 		return FunctionType.RESOURCE_PROCESSING;
 	}
 
@@ -267,7 +270,7 @@ public class ToggleResourceProcess extends Task implements Serializable {
 	public static ResourceProcess getResourceProcess(Building building) {
 		ResourceProcess result = null;
 
-		Settlement settlement = building.getBuildingManager().getSettlement();
+		Settlement settlement = building.getSettlement();
 		if (building.hasFunction(FunctionType.RESOURCE_PROCESSING)) {
 			double bestDiff = 0D;
 			ResourceProcessing processing = building.getResourceProcessing();
@@ -334,8 +337,8 @@ public class ToggleResourceProcess extends Task implements Serializable {
 		double diff = outputValue - inputValue;
 
 		// Subtract power required per millisol.
-		double hoursInMillisol = MarsClock.convertMillisolsToSeconds(1D) / 60D / 60D;
-		double powerHrsRequiredPerMillisol = process.getPowerRequired() * hoursInMillisol;
+//		double hoursInMillisol = MarsClock.convertMillisolsToSeconds(1D) / 60D / 60D;
+		double powerHrsRequiredPerMillisol = process.getPowerRequired() * MarsClock.HOURS_PER_MILLISOL;
 		double powerValue = powerHrsRequiredPerMillisol * settlement.getPowerGrid().getPowerValue();
 		diff -= powerValue;
 
@@ -382,8 +385,7 @@ public class ToggleResourceProcess extends Task implements Serializable {
 				useResource = false;
 			}
 			if (useResource) {
-				double value = settlement.getGoodsManager()
-						.getGoodValuePerItem(GoodsUtil.getResourceGood(ResourceUtil.findAmountResource(resource)));
+				double value = settlement.getGoodsManager().getGoodsDemandValue(resource);
 				double rate = 0D;
 				if (input) {
 					rate = process.getMaxInputResourceRate(resource);
@@ -436,11 +438,11 @@ public class ToggleResourceProcess extends Task implements Serializable {
 
 //		if (resourceProcessBuilding != null) {
 //			process = getResourceProcess(resourceProcessBuilding);
-
+		double perf = person.getPerformanceRating();
 		// If person is incapacitated, enter airlock.
-		if (person.getPerformanceRating() == 0D) {
-			// reset it to 3% so that he can walk inside
-			person.getPhysicalCondition().setPerformanceFactor(3);
+		if (perf == 0D) {
+			// reset it to 10% so that he can walk inside
+			person.getPhysicalCondition().setPerformanceFactor(.1);
 //			if (needEVA) {
 //				setPhase(WALK_BACK_INSIDE);
 //			} else {
@@ -503,6 +505,10 @@ public class ToggleResourceProcess extends Task implements Serializable {
 			String toggle = OFF;
 			if (toBeToggledOn) {
 				toggle = ON;
+				process.setProcessRunning(true);
+			}
+			else {
+				process.setProcessRunning(false);
 			}
 	
 			if (destination == resourceProcessBuilding) {
@@ -539,7 +545,7 @@ public class ToggleResourceProcess extends Task implements Serializable {
 //			double evaExperience = time / 100D;
 //			evaExperience += evaExperience * experienceAptitudeModifier;
 //			evaExperience *= getTeachingExperienceModifier();
-//			person.getMind().getSkillManager().addExperience(SkillType.EVA_OPERATIONS, evaExperience);
+//			person.getSkillManager().addExperience(SkillType.EVA_OPERATIONS, evaExperience);
 //		}
 
 		// If phase is toggle process, add experience to mechanics skill.
@@ -548,7 +554,7 @@ public class ToggleResourceProcess extends Task implements Serializable {
 			// Experience points adjusted by person's "Experience Aptitude" attribute.
 			double mechanicsExperience = time / 100D;
 			mechanicsExperience += mechanicsExperience * experienceAptitudeModifier;
-			person.getMind().getSkillManager().addExperience(SkillType.MECHANICS, mechanicsExperience);
+			person.getSkillManager().addExperience(SkillType.MECHANICS, mechanicsExperience, time);
 		}
 	}
 
@@ -564,7 +570,7 @@ public class ToggleResourceProcess extends Task implements Serializable {
 
 	@Override
 	public int getEffectiveSkillLevel() {
-		SkillManager manager = person.getMind().getSkillManager();
+		SkillManager manager = person.getSkillManager();
 //		int EVAOperationsSkill = manager.getEffectiveSkillLevel(SkillType.EVA_OPERATIONS);
 		int mechanicsSkill = manager.getEffectiveSkillLevel(SkillType.MECHANICS);
 //		if (needEVA) {
@@ -608,7 +614,7 @@ public class ToggleResourceProcess extends Task implements Serializable {
 		double chance = .005D;
 
 		// Mechanic skill modification.
-		int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
+		int skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
 		if (skill <= 3) {
 			chance *= (4 - skill);
 		} else {

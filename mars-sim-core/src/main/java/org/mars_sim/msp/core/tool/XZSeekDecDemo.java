@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * XZSeekDecDemo.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 package org.mars_sim.msp.core.tool;
 
 /*
@@ -9,7 +16,6 @@ package org.mars_sim.msp.core.tool;
  * You can do whatever you want with this file.
  */
 
-import java.io.*;
 import org.tukaani.xz.*;
 
 /**
@@ -52,6 +58,8 @@ class XZSeekDecDemo {
             int size;
             while ((size = in.read(buf)) != -1)
                 System.out.write(buf, 0, size);
+            
+            in.close();
         } else {
             for (int i = 1; i < args.length; i += 2) {
                 int pos = Integer.parseInt(args[i]);

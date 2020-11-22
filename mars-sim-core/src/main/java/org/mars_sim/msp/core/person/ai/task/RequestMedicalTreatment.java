@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RequestMedicalTreatment.java
- * @version 3.1.0 2017-03-09
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -15,6 +15,8 @@ import java.util.logging.Logger;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -59,11 +61,15 @@ public class RequestMedicalTreatment extends Task implements Serializable {
 
     /**
      * Constructor.
+     * 
      * @param person the person to perform the task
      */
     public RequestMedicalTreatment(Person person) {
-        super(NAME, person, false, false, STRESS_MODIFIER, false, 0D);
-	
+        super(NAME, person, false, false, STRESS_MODIFIER, false, 10D);
+	     
+        if (person.getPhysicalCondition().getProblems().size() == 0)
+        	endTask();
+        		
         // Choose available medical aid for treatment.
         medicalAid = determineMedicalAid();
 
@@ -91,6 +97,7 @@ public class RequestMedicalTreatment extends Task implements Serializable {
                 }
             }
         }
+        
         else {
             //logger.severe("Medical aid could not be determined.");
             endTask();
@@ -185,6 +192,18 @@ public class RequestMedicalTreatment extends Task implements Serializable {
         return result;
     }
 
+    public int getNumHealthProblem() {
+        int numProblem = 0;
+        Iterator<HealthProblem> i = person.getPhysicalCondition().getProblems().iterator();
+        while (i.hasNext()) {
+            HealthProblem problem = i.next();
+            if (problem.getRecovering() && problem.requiresBedRest()) {
+            	numProblem++;
+            }
+        }
+        return numProblem;
+    }
+    
     /**
      * Determines a medical aid in a vehicle.
      * @return medical aid.
@@ -312,8 +331,17 @@ public class RequestMedicalTreatment extends Task implements Serializable {
         return remainingTime;
     }
 
+	/**
+	 * Gets the medical aid the person is using for this task.
+	 * 
+	 * @return medical aid or null.
+	 */
+	public MedicalAid getMedicalAid() {
+		return medicalAid;
+	}
+	
     @Override
-    protected FunctionType getLivingFunction() {
+    public FunctionType getLivingFunction() {
         return FunctionType.MEDICAL_CARE;
     }
 

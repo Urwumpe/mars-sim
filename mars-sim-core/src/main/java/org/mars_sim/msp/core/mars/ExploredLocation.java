@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ExploredLocation.java
- * @version 3.1.0 2017-08-08
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * AnxietyMedication.java
- * @version 3.1.0 2016-10-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.health;

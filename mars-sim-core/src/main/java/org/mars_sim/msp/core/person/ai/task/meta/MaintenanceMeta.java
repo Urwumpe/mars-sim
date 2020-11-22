@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MaintenanceMeta.java
- * @version 3.1.0 2018-09-29
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -19,11 +19,15 @@ import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.task.Maintenance;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.robot.RobotType;
 import org.mars_sim.msp.core.robot.ai.job.Repairbot;
+import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
+import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
@@ -34,11 +38,14 @@ public class MaintenanceMeta implements MetaTask, Serializable {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
+	/** default logger. */
+	private static Logger logger = Logger.getLogger(MaintenanceMeta.class.getName());
+
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.maintenance"); //$NON-NLS-1$
 
-	/** default logger. */
-	private static Logger logger = Logger.getLogger(MaintenanceMeta.class.getName());
+	private static final double FACTOR = 1D;
+	
 
 	@Override
 	public String getName() {
@@ -53,32 +60,49 @@ public class MaintenanceMeta implements MetaTask, Serializable {
 	@Override
 	public double getProbability(Person person) {
 		double result = 0D;
-
+        
 		if (person.isInSettlement()) {
-
+            
 			try {
 				// Total probabilities for all malfunctionable entities in person's local.
 				Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(person).iterator();
 				while (i.hasNext()) {
 					Malfunctionable entity = i.next();
+					
 					boolean isVehicle = (entity instanceof Vehicle);
+					if (isVehicle)
+						return 0;
+					
 					boolean uninhabitableBuilding = false;
 					if (entity instanceof Building) {
 						uninhabitableBuilding = !((Building) entity).hasFunction(FunctionType.LIFE_SUPPORT);
 					}
+					if (uninhabitableBuilding)
+						return 0;
+					
 					MalfunctionManager manager = entity.getMalfunctionManager();
 					boolean hasMalfunction = manager.hasMalfunction();
+					if (hasMalfunction) {
+						return 0;
+					}
+					
 					boolean hasParts = Maintenance.hasMaintenanceParts(person, entity);
+					if (!hasParts) {
+						return 0;
+					}
+					
 					double effectiveTime = manager.getEffectiveTimeSinceLastMaintenance();
 					boolean minTime = (effectiveTime >= 1000D);
-					if (!hasMalfunction && !isVehicle && !uninhabitableBuilding && hasParts && minTime) {
+					
+					if (minTime) {
 						double entityProb = effectiveTime / 1000D;
 						if (entityProb > 100D) {
 							entityProb = 100D;
 						}
-						result += entityProb;
+						result += entityProb * FACTOR;
 					}
-				}
+				}        
+		        
 			} catch (Exception e) {
 				logger.log(Level.SEVERE, "getProbability()", e);
 			}
@@ -94,7 +118,7 @@ public class MaintenanceMeta implements MetaTask, Serializable {
 
 			// Modify if tinkering is the person's favorite activity.
 			if (person.getFavorite().getFavoriteActivity() == FavoriteType.TINKERING) {
-				result *= 2D;
+				result += RandomUtil.getRandomInt(1, 20);
 			}
 
 			// AddPreference modifier
@@ -110,6 +134,41 @@ public class MaintenanceMeta implements MetaTask, Serializable {
 		return result;
 	}
 
+
+	public double getSettlementProbability(Settlement settlement) {
+		double result = 0D;
+
+		try {
+			// Total probabilities for all malfunctionable entities in person's local.
+			Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(settlement).iterator();
+			while (i.hasNext()) {
+				Malfunctionable entity = i.next();
+				boolean isVehicle = (entity instanceof Vehicle);
+				boolean uninhabitableBuilding = false;
+				if (entity instanceof Building) {
+					uninhabitableBuilding = !((Building) entity).hasFunction(FunctionType.LIFE_SUPPORT);
+				}
+				MalfunctionManager manager = entity.getMalfunctionManager();
+				boolean hasMalfunction = manager.hasMalfunction();
+				boolean hasParts = Maintenance.hasMaintenanceParts(settlement, entity);
+				double effectiveTime = manager.getEffectiveTimeSinceLastMaintenance();
+				boolean minTime = (effectiveTime >= 1000D);
+				if (!hasMalfunction && !isVehicle && !uninhabitableBuilding && hasParts && minTime) {
+					double entityProb = effectiveTime / 1000D;
+					if (entityProb > 100D) {
+						entityProb = 100D;
+					}
+					result += entityProb * FACTOR;
+				}
+			}
+		} catch (Exception e) {
+			logger.log(Level.SEVERE, "getProbability()", e);
+		}
+
+
+		return result;
+	}
+	
 	@Override
 	public Task constructInstance(Robot robot) {
 		return new Maintenance(robot);
@@ -119,7 +178,8 @@ public class MaintenanceMeta implements MetaTask, Serializable {
 	public double getProbability(Robot robot) {
 		double result = 0D;
 
-		if (robot.getBotMind().getRobotJob() instanceof Repairbot) {
+		if (robot.isInSettlement() && robot.getRobotType() == RobotType.REPAIRBOT) {
+//		if (robot.getBotMind().getRobotJob() instanceof Repairbot && robot.isInside()) {
 
 			try {
 				// Total probabilities for all malfunctionable entities in robot's local.
@@ -127,21 +187,32 @@ public class MaintenanceMeta implements MetaTask, Serializable {
 				while (i.hasNext()) {
 					Malfunctionable entity = i.next();
 					boolean isVehicle = (entity instanceof Vehicle);
+					if (isVehicle)
+						return 0;
 					boolean uninhabitableBuilding = false;
 					if (entity instanceof Building) {
 						uninhabitableBuilding = !((Building) entity).hasFunction(FunctionType.LIFE_SUPPORT);
 					}
+					if (uninhabitableBuilding)
+						return 0;
+					
 					MalfunctionManager manager = entity.getMalfunctionManager();
 					boolean hasMalfunction = manager.hasMalfunction();
+					if (hasMalfunction)
+						return 0;
+					
 					boolean hasParts = Maintenance.hasMaintenanceParts(robot, entity);
+					if (!hasParts)
+						return 0;
+					
 					double effectiveTime = manager.getEffectiveTimeSinceLastMaintenance();
 					boolean minTime = (effectiveTime >= 1000D);
-					if (!hasMalfunction && !isVehicle && !uninhabitableBuilding && hasParts && minTime) {
+					if (minTime) {
 						double entityProb = effectiveTime / 1000D;
 						if (entityProb > 100D) {
 							entityProb = 100D;
 						}
-						result += entityProb;
+						result += entityProb * FACTOR;
 					}
 				}
 			} catch (Exception e) {

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * AstronomicalObservation.java
- * @version 3.1.0 2018-10-26
+ * @version 3.1.2 2020-09-02
  * @author Sebastien Venot
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -10,13 +10,11 @@ import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.BuildingException;
 import org.mars_sim.msp.core.time.MarsClock;
 
@@ -33,8 +31,6 @@ public class AstronomicalObservation extends Function {
 
 	private static final FunctionType FUNCTION = FunctionType.ASTRONOMICAL_OBSERVATIONS;
 
-	private static BuildingConfig buildingConfig;
-
 	// Data members
 	private double powerRequired;
 	private int techLevel;
@@ -50,8 +46,6 @@ public class AstronomicalObservation extends Function {
 	public AstronomicalObservation(Building building) {
 		// Use function constructor.
 		super(FUNCTION, building);
-
-		buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
 
 		powerRequired = buildingConfig.getAstronomicalObservationPowerRequirement(building.getBuildingType());
 		techLevel = buildingConfig.getAstronomicalObservationTechLevel(building.getBuildingType());
@@ -162,7 +156,7 @@ public class AstronomicalObservation extends Function {
 		SkillType astronomySkill = astronomyScience.getSkill();
 		Iterator<Person> j = settlement.getAllAssociatedPeople().iterator();
 		while (j.hasNext()) {
-			observatoryDemand += j.next().getMind().getSkillManager().getSkillLevel(astronomySkill);
+			observatoryDemand += j.next().getSkillManager().getSkillLevel(astronomySkill);
 		}
 
 		// Determine existing settlement supply of astronomical observatories.
@@ -187,8 +181,7 @@ public class AstronomicalObservation extends Function {
 
 		// Determine settlement value for this building's astronomical observatory
 		// function.
-		// BuildingConfig config =
-		// SimulationConfig.instance().getBuildingConfiguration();
+
 		int techLevel = buildingConfig.getAstronomicalObservationTechLevel(buildingName);
 		int observatorySize = buildingConfig.getAstronomicalObservationCapacity(buildingName);
 		double buildingObservatorySupply = techLevel * observatorySize;
@@ -197,8 +190,8 @@ public class AstronomicalObservation extends Function {
 
 		// Subtract power usage cost per sol.
 		double power = buildingConfig.getAstronomicalObservationPowerRequirement(buildingName);
-		double hoursInSol = MarsClock.convertMillisolsToSeconds(1000D) / 60D / 60D;
-		double powerPerSol = power * hoursInSol;
+//		double hoursInSol = MarsClock.convertMillisolsToSeconds(1000D) / 60D / 60D;
+		double powerPerSol = power * MarsClock.HOURS_PER_MILLISOL * 1000D;
 		double powerValue = powerPerSol * settlement.getPowerGrid().getPowerValue();
 		result -= powerValue;
 

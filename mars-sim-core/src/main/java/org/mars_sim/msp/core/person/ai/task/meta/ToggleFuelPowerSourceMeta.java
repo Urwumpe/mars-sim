@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ToggleFuelPowerSourceMeta.java
- * @version 3.1.0 2017-08-30
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -11,10 +11,12 @@ import java.io.Serializable;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.task.EVAOperation;
-import org.mars_sim.msp.core.person.ai.task.Task;
 import org.mars_sim.msp.core.person.ai.task.ToggleFuelPowerSource;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -49,6 +51,15 @@ public class ToggleFuelPowerSourceMeta implements MetaTask, Serializable {
         
         if (person.isInSettlement()) {
         	
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double fatigue = condition.getFatigue();
+            double stress = condition.getStress();
+            double hunger = condition.getHunger();
+            
+            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            	return 0;
+            
 	    	Settlement settlement = person.getSettlement();
 	        
 	        // TODO: need to consider if a person is out there on Mars somewhere, out of the settlement
@@ -123,7 +134,7 @@ public class ToggleFuelPowerSourceMeta implements MetaTask, Serializable {
 	            result *= 2D;
 	        }
 	
-	        // 2015-06-07 Added Preference modifier
+	        // Add Preference modifier
 	        if (result > 0)
 	         	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
 	

@@ -21,16 +21,16 @@ public class TestItemResource extends TestCase {
 
     @Override
     public void setUp() throws Exception {
-        SimulationConfig.loadConfig();
+        SimulationConfig.instance().loadConfig();
         
         // initialize 
         //new ItemResource();
        	ResourceUtil.getInstance();
         resources = ItemResourceUtil.getItemResources();
         
-        hammer = ItemResource.createBrandNewItemResource("hammer", 1, "a tool", 1.4D, 1);
-        socketWrench = ItemResource.createBrandNewItemResource("socket wrench", 2, "another tool", .5D, 1);
-        pipeWrench = ItemResource.createBrandNewItemResource("pipe wrench", 3, "and another tool", 2.5D, 1);
+        hammer = ItemResourceUtil.createItemResource("hammer", 1, "a tool", 1.4D, 1);
+        socketWrench = ItemResourceUtil.createItemResource("socket wrench", 2, "another tool", .5D, 1);
+        pipeWrench = ItemResourceUtil.createItemResource("pipe wrench", 3, "and another tool", 2.5D, 1);
  
         resources = Arrays.asList(hammer, socketWrench, pipeWrench);
         
@@ -48,7 +48,7 @@ public class TestItemResource extends TestCase {
 
     public void testFindItemResourceNegative() {
         try {
-            ItemResource.findItemResource("test");
+        	ItemResourceUtil.findItemResource("test");
             //fail("Should have thrown an exception");
         }
         catch (Exception e) {

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * VehicleMapLayer.java
- * @version 3.1.0 2017-08-30
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.settlement;
@@ -18,25 +18,23 @@ import java.util.Map;
 
 import org.apache.batik.gvt.GraphicsNode;
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.person.ai.mission.MissionPhase;
 import org.mars_sim.msp.core.person.ai.mission.RoverMission;
 import org.mars_sim.msp.core.person.ai.mission.Trade;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
 import org.mars_sim.msp.core.person.ai.task.LoadVehicleEVA;
 import org.mars_sim.msp.core.person.ai.task.LoadVehicleGarage;
-import org.mars_sim.msp.core.person.ai.task.Task;
 import org.mars_sim.msp.core.person.ai.task.UnloadVehicleEVA;
 import org.mars_sim.msp.core.person.ai.task.UnloadVehicleGarage;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 import org.mars_sim.msp.core.vehicle.Vehicle;
+import org.mars_sim.msp.ui.swing.tool.svg.SVGMapUtil;
 
 /**
  * A settlement map layer for displaying vehicles.
@@ -51,17 +49,11 @@ public class VehicleMapLayer implements SettlementMapLayer {
 	private Map<Double, Map<GraphicsNode, BufferedImage>> svgImageCache;
 	private double scale;
 
-	private static MissionManager missionManager;
-	private static UnitManager unitMgr;
-	
 	/**
 	 * Constructor
 	 * @param mapPanel the settlement map panel.
 	 */
 	public VehicleMapLayer(SettlementMapPanel mapPanel) {
-		missionManager = Simulation.instance().getMissionManager();
-		unitMgr = Simulation.instance().getUnitManager();
-		
 		// Initialize data members.
 		this.mapPanel = mapPanel;
 		svgImageCache = new HashMap<Double, Map<GraphicsNode, BufferedImage>>(21);
@@ -109,7 +101,7 @@ public class VehicleMapLayer implements SettlementMapLayer {
 		if (settlement != null) {
 
 			// Draw all vehicles that are at the settlement location.
-			Iterator<Vehicle> i = unitMgr.getVehicles().iterator();
+			Iterator<Vehicle> i = unitManager.getVehicles().iterator();
 			while (i.hasNext()) {
 				Vehicle vehicle = i.next();
 				// Draw vehicles that are at the settlement location.
@@ -220,7 +212,7 @@ public class VehicleMapLayer implements SettlementMapLayer {
 
 		// Otherwise, check if someone is actively loading or unloading the vehicle at a settlement.
 		if (!result) {
-			Iterator<Person> i = unitMgr.getPeople().iterator();
+			Iterator<Person> i = unitManager.getPeople().iterator();
 			while (i.hasNext()) {
 				Person person = i.next();
 				if (!person.getPhysicalCondition().isDead()) {

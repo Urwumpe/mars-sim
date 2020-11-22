@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TabPanelBots.java
- * @version 3.1.0 2017-10-18
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -29,7 +29,6 @@ import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
 //import org.mars_sim.msp.ui.swing.tool.monitor.personTableModel;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
@@ -42,17 +41,25 @@ import com.alee.laf.scroll.WebScrollPane;
 /**
  * This is a tab panel for robots.
  */
+@SuppressWarnings("serial")
 public class TabPanelBots extends TabPanel implements MouseListener, ActionListener {
 
-	private WebLabel robotNumLabel;
-	private WebLabel robotCapLabel;
-	private WebLabel robotIndoorLabel;
-	private RobotListModel robotListModel;
-	private JList<Robot> robotList;
-	private WebScrollPane robotScrollPanel;
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
 	private int robotNumCache;
 	private int robotCapacityCache;
 	private int robotIndoorCache;
+	
+	private Settlement settlement;
+	
+	private WebLabel robotNumLabel;
+	private WebLabel robotCapLabel;
+	private WebLabel robotIndoorLabel;
+	
+	private RobotListModel robotListModel;
+	private JList<Robot> robotList;
+	private WebScrollPane robotScrollPanel;
 
 	/**
 	 * Constructor.
@@ -66,8 +73,17 @@ public class TabPanelBots extends TabPanel implements MouseListener, ActionListe
 				null, Msg.getString("TabPanelBots.tooltip"), //$NON-NLS-1$
 				unit, desktop);
 
-		Settlement settlement = (Settlement) unit;
+		settlement = (Settlement) unit;
 
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
 		WebPanel titlePane = new WebPanel(new FlowLayout(FlowLayout.CENTER));
 		topContentPanel.add(titlePane);
 
@@ -76,30 +92,43 @@ public class TabPanelBots extends TabPanel implements MouseListener, ActionListe
 		// titleLabel.setForeground(new Color(102, 51, 0)); // dark brown
 		titlePane.add(titleLabel);
 
-		// Create robot count panel
-		WebPanel countPanel = new WebPanel(new GridLayout(3, 1, 0, 0));
-		countPanel.setBorder(new MarsPanelBorder());
+		// Prepare count spring layout panel.
+		WebPanel countPanel = new WebPanel(new SpringLayout());//GridLayout(3, 1, 0, 0));
+//		countPanel.setBorder(new MarsPanelBorder());
 		topContentPanel.add(countPanel);
-
+		
 		// Create robot num label
+		WebLabel robotNumHeader = new WebLabel(Msg.getString("TabPanelBots.associated"), WebLabel.RIGHT); // $NON-NLS-1$
+		countPanel.add(robotNumHeader);
+		
 		robotNumCache = settlement.getNumBots();
-		robotNumLabel = new WebLabel(Msg.getString("TabPanelBots.associated", robotNumCache), WebLabel.CENTER); // $NON-NLS-1$
+		robotNumLabel = new WebLabel("" + robotNumCache, WebLabel.LEFT); // $NON-NLS-1$
 		countPanel.add(robotNumLabel);
 
 		// Create robot indoor label
+		WebLabel robotIndoorHeader = new WebLabel(Msg.getString("TabPanelBots.indoor"), WebLabel.RIGHT); // $NON-NLS-1$
+		countPanel.add(robotIndoorHeader);
+		
 		robotIndoorCache = settlement.getNumBots();
-		robotIndoorLabel = new WebLabel(Msg.getString("TabPanelBots.indoor", robotIndoorCache),
-				WebLabel.CENTER); // $NON-NLS-1$
+		robotIndoorLabel = new WebLabel("" + robotIndoorCache, WebLabel.LEFT);
 		countPanel.add(robotIndoorLabel);
 		
 		// Create robot capacity label
+		WebLabel robotCapHeader = new WebLabel(Msg.getString("TabPanelBots.capacity"), WebLabel.RIGHT); // $NON-NLS-1$
+		countPanel.add(robotCapHeader);
+		
 		robotCapacityCache = settlement.getRobotCapacity();
-		robotCapLabel = new WebLabel(Msg.getString("TabPanelBots.capacity", robotCapacityCache), WebLabel.CENTER); // $NON-NLS-1$
+		robotCapLabel = new WebLabel("" + robotCapacityCache, WebLabel.LEFT); // $NON-NLS-1$
 		countPanel.add(robotCapLabel);
 
+		// Set up the spring layout.
+		SpringUtilities.makeCompactGrid(countPanel, 3, 2, // rows, cols
+				5, 10, // initX, initY
+				5, 2); // xPad, yPad
+		
 		// Create spring layout robot display panel
 		WebPanel robotDisplayPanel = new WebPanel(new SpringLayout());// FlowLayout(FlowLayout.LEFT));
-		robotDisplayPanel.setBorder(new MarsPanelBorder());
+//		robotDisplayPanel.setBorder(new MarsPanelBorder());
 		topContentPanel.add(robotDisplayPanel);
 
 		// Create scroll panel for robot list.
@@ -137,18 +166,19 @@ public class TabPanelBots extends TabPanel implements MouseListener, ActionListe
 	 * Updates the info on this panel.
 	 */
 	public void update() {
-		Settlement settlement = (Settlement) unit;
-
+		if (!uiDone)
+			this.initializeUI();
+		
 		// Update robot num
 		if (robotNumCache != settlement.getNumBots()) {
 			robotNumCache = settlement.getNumBots();
-			robotNumLabel.setText(Msg.getString("TabPanelBots.robot", robotNumCache)); // $NON-NLS-1$
+			robotNumLabel.setText("" + robotNumCache);
 		}
 
 		// Update robot capacity
 		if (robotCapacityCache != settlement.getRobotCapacity()) {
 			robotCapacityCache = settlement.getRobotCapacity();
-			robotCapLabel.setText(Msg.getString("TabPanelBots.robotCapacity", robotCapacityCache)); // $NON-NLS-1$
+			robotCapLabel.setText("" + robotCapacityCache);
 		}
 
 		// Update robot list

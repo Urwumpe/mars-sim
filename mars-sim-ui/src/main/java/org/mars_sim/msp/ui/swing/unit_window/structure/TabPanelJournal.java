@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TabPanelJournal.java
- * @version 3.1.0 2017-10-18
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -17,6 +17,7 @@ import java.net.URL;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
+
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.ImageLoader;
@@ -31,19 +32,17 @@ import org.mars_sim.msp.ui.swing.unit_window.vehicle.TabPanelMission;
  * {@link TabPanelMission}, which displays a vehicle's
  * single mission's details.
  */
+@SuppressWarnings("serial")
 public class TabPanelJournal
 extends TabPanel {
 	
 	// Data members
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
 	private Settlement settlement;
-/*
-	private List<Mission> missionsCache;
-	private DefaultListModel<Mission> missionListModel;
-	private JList<Mission> missionList;
-	private JButton missionButton;
-	private JButton monitorButton;
-	private JCheckBox overrideCheckbox;
-*/
+
+
 	/**
 	 * Constructor.
 	 * @param settlement {@link Settlement} the settlement this tab panel is for.
@@ -58,9 +57,17 @@ extends TabPanel {
 			settlement, desktop
 		);
 
-		// Initialize data members.
 		this.settlement = settlement;
 
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
 		// Create label panel.
 		JPanel labelPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		topContentPanel.add(labelPanel);
@@ -122,13 +129,14 @@ extends TabPanel {
 		 
 	@Override
 	public void update() {
-
+		if (!uiDone)
+			initializeUI();
 	}
 
 	/**
 	 * Prepare object for garbage collection.
 	 */
 	public void destroy() {
-		settlement = null;
+//		settlement = null;
 	}
 }

@@ -1,21 +1,32 @@
 /**
  * Mars Simulation Project
  * Simulation.java
- * @version 3.1.0 2017-02-03
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InvalidObjectException;
+import java.io.NotActiveException;
+import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
+import java.io.OptionalDataException;
 import java.io.Serializable;
+import java.io.StreamCorruptedException;
+import java.io.WriteAbortedException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -25,33 +36,85 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.equipment.Equipment;
 import org.mars_sim.msp.core.events.HistoricalEventManager;
 import org.mars_sim.msp.core.interplanetary.transport.TransportManager;
+import org.mars_sim.msp.core.interplanetary.transport.resupply.Resupply;
+import org.mars_sim.msp.core.malfunction.Malfunction;
 import org.mars_sim.msp.core.malfunction.MalfunctionFactory;
+import org.mars_sim.msp.core.malfunction.MalfunctionManager;
+import org.mars_sim.msp.core.manufacture.ManufactureUtil;
+import org.mars_sim.msp.core.mars.DustStorm;
 import org.mars_sim.msp.core.mars.Mars;
+import org.mars_sim.msp.core.mars.MarsSurface;
+import org.mars_sim.msp.core.mars.OrbitInfo;
+import org.mars_sim.msp.core.mars.SurfaceFeatures;
+import org.mars_sim.msp.core.mars.Weather;
+import org.mars_sim.msp.core.person.CircadianClock;
+import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PersonConfig;
+import org.mars_sim.msp.core.person.PhysicalCondition;
+import org.mars_sim.msp.core.person.ai.Mind;
+import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
+import org.mars_sim.msp.core.person.ai.mission.MissionPlanning;
+import org.mars_sim.msp.core.person.ai.role.Role;
 import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
+import org.mars_sim.msp.core.person.ai.task.Walk;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTaskUtil;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskManager;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule;
+import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.MedicalManager;
+import org.mars_sim.msp.core.person.health.RadiationExposure;
 import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.robot.ai.BotMind;
+import org.mars_sim.msp.core.robot.ai.job.RobotJob;
+import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.core.science.ScientificStudyManager;
+import org.mars_sim.msp.core.science.ScientificStudyUtil;
+import org.mars_sim.msp.core.structure.Airlock;
+import org.mars_sim.msp.core.structure.ChainOfCommand;
+import org.mars_sim.msp.core.structure.CompositionOfAir;
+import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.structure.building.BuildingConfig;
+import org.mars_sim.msp.core.structure.building.BuildingManager;
+import org.mars_sim.msp.core.structure.building.function.Function;
+import org.mars_sim.msp.core.structure.building.function.HeatSource;
+import org.mars_sim.msp.core.structure.building.function.PowerSource;
+import org.mars_sim.msp.core.structure.building.function.ResourceProcess;
+import org.mars_sim.msp.core.structure.building.function.cooking.Cooking;
+import org.mars_sim.msp.core.structure.building.function.farming.Crop;
+import org.mars_sim.msp.core.structure.building.function.farming.Farming;
+import org.mars_sim.msp.core.structure.construction.ConstructionSite;
+import org.mars_sim.msp.core.structure.construction.SalvageValues;
 import org.mars_sim.msp.core.structure.goods.CreditManager;
-import org.mars_sim.msp.core.terminal.InteractiveTerm;
+import org.mars_sim.msp.core.structure.goods.GoodsManager;
+import org.mars_sim.msp.core.time.AutosaveScheduler;
 import org.mars_sim.msp.core.time.ClockListener;
+import org.mars_sim.msp.core.time.EarthClock;
+import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.time.SystemDateTime;
 import org.mars_sim.msp.core.time.UpTimer;
-import org.mars_sim.msp.core.tool.AutosaveScheduler;
 import org.mars_sim.msp.core.tool.CheckSerializedSize;
+import org.mars_sim.msp.core.vehicle.Vehicle;
+
 import org.tukaani.xz.FilterOptions;
 import org.tukaani.xz.LZMA2Options;
+import org.tukaani.xz.XZFormatException;
 import org.tukaani.xz.XZInputStream;
 import org.tukaani.xz.XZOutputStream;
 
-//import mikera.gui.Frames;
-//import mikera.gui.JConsole;
+import com.google.common.io.ByteStreams;
 
 /**
  * The Simulation class is the primary singleton class in the MSP simulation.
@@ -63,51 +126,87 @@ public class Simulation implements ClockListener, Serializable {
 	private static final long serialVersionUID = -631308653510974249L;
 
 	private static Logger logger = Logger.getLogger(Simulation.class.getName());
+//	private static String loggerName = logger.getName();
+//	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	public enum SaveType {
+		/** Do not save */
+		NONE, 
+		/** Save as default.sim. */
+		SAVE_DEFAULT, 
+		/** Save as other name. */
+		SAVE_AS, 
+		/** Autosave as default.sim. */
+		AUTOSAVE_AS_DEFAULT, 
+		/** Autosave with build info and timestamp. */
+		AUTOSAVE;
+	};
 
-	// Categories of loading and saving simulation
-	public static final int OTHER = 0; // load other file
-	public static final int SAVE_DEFAULT = 1; // save as default.sim
-	public static final int SAVE_AS = 2; // save with other name
-	public static final int AUTOSAVE_AS_DEFAULT = 3; // save as default.sim
-	public static final int AUTOSAVE = 4; // save with build info/date/time stamp
 	/** # of thread(s). */
 	public static final int NUM_THREADS = Runtime.getRuntime().availableProcessors();
-	/** Version string. */
+	/** User's home directory string. */
+	public static final String USER_HOME = System.getProperty("user.home");
+	/** User's mars-sim directory string. */
+	public static final String MARS_SIM_DIR = ".mars-sim";
+	/** User's logs directory string. */
+	public static final String LOGS_DIR = "logs";
+	/** OS string. */
 	public static final String OS = System.getProperty("os.name"); // e.g. 'linux', 'mac os x'
 	/** Version string. */
 	public final static String VERSION = Msg.getString("Simulation.version"); //$NON-NLS-1$
 	/** Build string. */
-	public final static String BUILD = Msg.getString("Simulation.build"); //$NON-NLS-1$
+	public final static String BUILD = Msg.getString("Simulation.build").trim(); //$NON-NLS-1$
 	/** Java version string. */
-	private final static String JAVA_TAG = System.getProperty("java.version");// VersionInfo.getRuntimeVersion(); //e.g.
-																				// "8.0.121-b13 (abcdefg)";																			// System.getProperty("java.version");/
+	private final static String JAVA_TAG = System.getProperty("java.version");
+	// VersionInfo.getRuntimeVersion() e.g. "8.0.121-b13 (abcdefg)";																			
 	/** Java version string. */
-	public final static String JAVA_VERSION = (JAVA_TAG.contains("(") ? JAVA_TAG.substring(0, JAVA_TAG.indexOf("(") - 1)
-			: JAVA_TAG);
+	public final static String JAVA_VERSION = "Java " + (JAVA_TAG.contains("(") ? 
+			JAVA_TAG.substring(0, JAVA_TAG.indexOf("(") - 1) : JAVA_TAG);
 	/** Vendor string. */
 	// public final static String VENDOR = System.getProperty("java.vendor");
-	/** Vendor string. */
+	/** OS architecture string. */
 	private final static String OS_ARCH = (System.getProperty("os.arch").contains("64") ? "64-bit" : "32-bit");
 	/** Default save filename. */
-	private final static String DEFAULT_FILE = Msg.getString("Simulation.defaultFile"); //$NON-NLS-1$
+	public final static String SAVE_FILE = Msg.getString("Simulation.saveFile"); //$NON-NLS-1$
 	/** Default temp filename. */
-	private final static String TEMP_FILE = Msg.getString("Simulation.tempFile"); //$NON-NLS-1$
+//	private final static String TEMP_FILE = Msg.getString("Simulation.tempFile"); //$NON-NLS-1$
 	/** Default save filename extension. */
-	private final static String DEFAULT_EXTENSION = Msg.getString("Simulation.defaultFile.extension"); //$NON-NLS-1$
-
+	public final static String SAVE_FILE_EXTENSION = Msg.getString("Simulation.saveFile.extension"); //$NON-NLS-1$
+	/** JSON save filename extension. */
+//	private final static String JSON_EXTENSION = Msg.getString("Simulation.jsonFile.extension"); //$NON-NLS-1$
+	/** local time string */
 	private final static String LOCAL_TIME = Msg.getString("Simulation.localTime"); //$NON-NLS-1$ " (Local Time) ";
-
+	/** 2 whitespaces. */
 	private final static String WHITESPACES = "  ";
+	/** Console directory for saving/loading console related files. */
+	public final static String CONSOLE_DIR = "/console";
+	
 
+	/** Home directory. */
+	public final static String HOME_DIR = System.getProperty("user.home") + //$NON-NLS-1$
+			File.separator + Msg.getString("Simulation.homeFolder");
+	/** Backup directory. */
+	public final static String BACKUP_DIR = System.getProperty("user.home") + //$NON-NLS-1$
+			File.separator + Msg.getString("Simulation.homeFolder") + //$NON-NLS-1$
+			File.separator + Msg.getString("Simulation.backupFolder"); //$NON-NLS-1$
 	/** Save directory. */
-	public final static String DEFAULT_DIR = System.getProperty("user.home") + //$NON-NLS-1$
-			File.separator + Msg.getString("Simulation.defaultFolder") + //$NON-NLS-1$
-			File.separator + Msg.getString("Simulation.defaultDir"); //$NON-NLS-1$
-
+	public final static String SAVE_DIR = HOME_DIR + //$NON-NLS-1$
+			File.separator + Msg.getString("Simulation.saveDir"); //$NON-NLS-1$
+	/** xml files directory. */
+	public final static String XML_DIR = System.getProperty("user.home") + //$NON-NLS-1$
+			File.separator + Msg.getString("Simulation.homeFolder") + //$NON-NLS-1$
+			File.separator + Msg.getString("Simulation.xmlFolder"); //$NON-NLS-1$
+	/** music files directory. */
+	public final static String MUSIC_DIR = System.getProperty("user.home") + //$NON-NLS-1$
+			File.separator + Msg.getString("Simulation.homeFolder") + //$NON-NLS-1$
+			File.separator + Msg.getString("Simulation.musicFolder"); //$NON-NLS-1$
+	/** The version.txt denotes the xml build version. */	
+	public final static String VERSION_FILE = Msg.getString("Simulation.versionFile"); //$NON-NLS-1$
+	/** The exception.txt denotes any user modified xml to be included to bypass the checksum. */	
+	public final static String EXCEPTION_FILE = Msg.getString("Simulation.exceptionFile"); //$NON-NLS-1$
 	/** autosave directory. */
 	public final static String AUTOSAVE_DIR = System.getProperty("user.home") + //$NON-NLS-1$
-			File.separator + Msg.getString("Simulation.defaultFolder") + //$NON-NLS-1$
-			File.separator + Msg.getString("Simulation.defaultDir.autosave"); //$NON-NLS-1$
+			File.separator + Msg.getString("Simulation.homeFolder") + //$NON-NLS-1$
+			File.separator + Msg.getString("Simulation.saveDir.autosave"); //$NON-NLS-1$
 
 	public final static String MARS_SIM_DIRECTORY = ".mars-sim";
 
@@ -116,17 +215,24 @@ public class Simulation implements ClockListener, Serializable {
 			+ " - " + OS_ARCH + " " + JAVA_VERSION + " - " + NUM_THREADS
 			+ ((NUM_THREADS == 1) ? " CPU thread" : " CPU threads")); // $NON-NLS-1$
 
-	private static final boolean debug = logger.isLoggable(Level.FINE);
+	/** The minimum size of heap space in bytes */
+	public final static int MIN_HEAP_SPACE = 64*1024*1024;
+	
+//	private static final boolean debug = false; // logger.isLoggable(Level.FINE);
 	/** true if displaying graphic user interface. */
-	private static boolean useGUI = true;
+	private transient boolean useGUI = true;
 	/** Flag to indicate that a new simulation is being created or loaded. */
-	private static boolean isUpdating = false;
+	private transient boolean isUpdating = false;
+	/** Flag to keep track of whether the initial state of simulation has been initialized. */
+	private transient boolean doneInitializing = false;
+	
+//	private transient boolean defaultLoad = false;
 
-	private static boolean defaultLoad = false;
+	private transient boolean justSaved = true;
 
-	private static boolean justSaved = true;
-
-	private static boolean autosaveDefault;
+	private transient boolean autosaveDefault;
+	
+	private transient boolean clockOnPause = false;
 	
 	private boolean initialSimulationCreated = false;
 
@@ -134,18 +240,15 @@ public class Simulation implements ClockListener, Serializable {
 
 	private boolean isFXGL = false;
 
-	private double fileSize;
-	
 	/** The modified time stamp of the last saved sim */	
 	private String lastSaveTimeStampMod;
 	/** The time stamp of the last saved sim. */
 	private String lastSaveTimeStamp = null;
-	/** The build version of the SimulationConfig of the loading .sim */
-	private String loadBuild;// = "unknown";
-	
-	// Note: Transient data members aren't stored in save file
-	private transient ExecutorService clockExecutor;
 
+	// Note: Transient data members aren't stored in save file
+	/** The clock thread executor service. */
+	private transient ExecutorService clockThreadExecutor;
+	/** The simulation thread executor service. */
 	private transient ExecutorService simExecutor;
 
 	// Intransient data members (stored in save file)
@@ -171,12 +274,13 @@ public class Simulation implements ClockListener, Serializable {
 	private static ScientificStudyManager scientificStudyManager;
 	/** Manages transportation of settlements and resupplies from Earth. */
 	private static TransportManager transportManager;
+	/** The SimulationConfig instance. */
+	private static SimulationConfig simulationConfig;
 	/** The GameWorld instance for FXGL frameworld */
 	// private GameWorld gameWorld;
 
 	private UpTimer ut;
-	
-	private static InteractiveTerm interactiveTerm = new InteractiveTerm();
+//	private ObjectMapper objectMapper;
 	
 	/**
 	 * Private constructor for the Singleton Simulation. This prevents instantiation
@@ -184,11 +288,20 @@ public class Simulation implements ClockListener, Serializable {
 	 */
 	private Simulation() {
 		// INFO Simulation's constructor is on both JavaFX-Launcher Thread
-//        initializeTransientData();
+
+//		// Create ObjectMapper instance
+//		objectMapper = new ObjectMapper();
+//		// Configure Object mapper for pretty print
+//		objectMapper.configure(SerializationFeature.INDENT_OUTPUT, true);
+//		// to allow serialization of "empty" POJOs (no properties to serialize)
+//		// (without this setting, an exception is thrown in those cases)
+//		objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+		
 	}
 
-	/** (NOT USED) Eager Initialization Singleton instance. */
-	// private static final Simulation instance = new Simulation();
+//	/** (NOT USED) Eager Initialization Singleton instance. */
+//	private static final Simulation instance = new Simulation();
+	
 //	/**
 //	 * Gets a Eager Initialization Singleton instance of the simulation.
 //	 * 
@@ -232,7 +345,7 @@ public class Simulation implements ClockListener, Serializable {
 	}
 
 	public void startSimExecutor() {
-		// INFO: Simulation's startSimExecutor() is on JavaFX-Launcher Thread
+//		logger.config("startSimExecutor() is on " + Thread.currentThread().getName());
 		simExecutor = Executors.newSingleThreadExecutor();
 	}
 
@@ -240,20 +353,38 @@ public class Simulation implements ClockListener, Serializable {
 		return simExecutor;
 	}
 
+	public void runCreateNewSimTask(int userTimeRatio) {
+		startSimExecutor();
+		simExecutor.submit(new CreateNewSimTask(userTimeRatio));
+	}
+	
+	public class CreateNewSimTask implements Runnable {
+
+		int userTimeRatio = -1;
+		
+		CreateNewSimTask(int userTimeRatio) {
+			this.userTimeRatio = userTimeRatio;
+		}
+		
+		public void run() {
+			createNewSimulation(userTimeRatio, false);
+		}
+	}
+	
 	/**
 	 * Checks if the simulation is in a state of creating a new simulation or
 	 * loading a saved simulation.
 	 * 
 	 * @return true is simulation is in updating state.
 	 */
-	public static boolean isUpdating() {
+	public boolean isUpdating() {
 		return isUpdating;
 	}
 
 	/**
 	 * Creates a new simulation instance.
 	 */
-	public static void createNewSimulation(int timeRatio) {
+	public void createNewSimulation(int timeRatio, boolean loadSaveSim) {
 		isUpdating = true;
 
 		logger.config(Msg.getString("Simulation.log.createNewSim")); //$NON-NLS-1$
@@ -268,7 +399,7 @@ public class Simulation implements ClockListener, Serializable {
 		sim.initialSimulationCreated = true;
 
 		// Initialize intransient data members.
-		sim.initializeIntransientData(timeRatio);
+		sim.initializeIntransientData(timeRatio, loadSaveSim);
 
 		// Initialize transient data members.
 //        sim.initializeTransientData(); // done in the constructor already (MultiplayerClient needs HistoricalEnventManager)
@@ -283,8 +414,13 @@ public class Simulation implements ClockListener, Serializable {
 
 		isUpdating = false;
 
-		// Copy build version. Usable for comparison when loading a saved sim
-		SimulationConfig.instance().build = Simulation.BUILD;
+		// Preserve the build version tag for future build 
+		// comparison when loading a saved sim
+		unitManager.originalBuild = Simulation.BUILD;
+
+//		masterClock.start();
+		
+//		logger.config("Done with createNewSimulation()");
 	}
 
 //	/**
@@ -295,270 +431,363 @@ public class Simulation implements ClockListener, Serializable {
 //       eventManager = new HistoricalEventManager();
 //    }
 
+	public void testRun() {
+//		PersonConfig pc = SimulationConfig.instance().getPersonConfig();
+		
+		Simulation sim = Simulation.instance();
+		ResourceUtil.getInstance();
+		mars = Mars.createTest();
+		masterClock = new MasterClock(false, 256);
+		unitManager = new UnitManager();
+		
+		// Gets the SurfaceFeatures instance
+		SurfaceFeatures surfaceFeatures = mars.getSurfaceFeatures();
+		// Re-initialize the MarsSurface instance
+		MarsSurface marsSurface = unitManager.getMarsSurface();
+		
+		Inventory.initializeInstances(unitManager, marsSurface);
+		
+		unitManager.constructInitialUnits(true);
+		
+		medicalManager = new MedicalManager();
+		
+		// Create marsClock instance
+		MarsClock marsClock = masterClock.getMarsClock();
+		EarthClock earthClock = masterClock.getEarthClock();
+		
+		// Set instances for logging
+		LogConsolidated.initializeInstances(marsClock, earthClock);
+		
+		// Set instance for Inventory
+//		Inventory.initializeInstances(mars.getMarsSurface());
+		
+		Unit.setUnitManager(unitManager);
+		Unit.initializeInstances(masterClock, marsClock, earthClock, sim, mars, 
+				marsSurface, mars.getWeather(), surfaceFeatures, new MissionManager());
+
+	}
+	
 	/**
 	 * Initialize intransient data in the simulation.
 	 */
-	private void initializeIntransientData(int timeRatio) {		
-		malfunctionFactory = new MalfunctionFactory(SimulationConfig.instance().getMalfunctionConfiguration());
+	private void initializeIntransientData(int timeRatio, boolean loadSaveSim) {
+//		logger.config("initializeIntransientData() is on " + Thread.currentThread().getName());
+		// Initialize resources
+		ResourceUtil.getInstance();
+		
+		// Initialize serializable objects
+		malfunctionFactory = new MalfunctionFactory();
 		mars = new Mars();
+		mars.createInstances();
+	
+//		logger.config("Done with Mars");
+		
 		missionManager = new MissionManager();
 		relationshipManager = new RelationshipManager();
 		medicalManager = new MedicalManager();
 		masterClock = new MasterClock(isFXGL, timeRatio);
-		unitManager = new UnitManager();
-		unitManager.constructInitialUnits(); // unitManager needs to be on the same thread as masterClock
+		
+//		logger.config("Done with MasterClock");
+		
+		// Note : marsSurface is needed before creating Inventory and Unit
+		// When loading from saved sim, it's at unitManager
+		// Gets the MarsSurface instance 
+		MarsSurface marsSurface = mars.getMarsSurface();
+		
+		// Gets the SurfaceFeatures instance
+		SurfaceFeatures surfaceFeatures = mars.getSurfaceFeatures();
+		surfaceFeatures.initializeTransientData();
+		
+//		logger.config("Done with SurfaceFeatures");
+		
+		// Create clock instances
+		MarsClock marsClock = masterClock.getMarsClock();
+		EarthClock earthClock = masterClock.getEarthClock();
+		
+		OrbitInfo.initializeInstances(marsClock, earthClock);
+		
+		// Initialize Mars environmental objects
+//		mars.initializeTransientData(); // requires terrain, weather, orbit
+		mars.getWeather().initializeTransientData();
+		
+		// Initialize units prior to starting the unit manager
+		Unit.initializeInstances(masterClock, marsClock, earthClock, this, mars, null, 
+				mars.getWeather(), surfaceFeatures, missionManager);
+		
+//		logger.config("Done with Unit");
+
+		// Initialize serializable managers
+		unitManager = new UnitManager(); 
+		
+//		logger.config("Done with UnitManager");
+		
+		Inventory.initializeInstances(unitManager, marsSurface);
+		Airlock.initializeInstances(unitManager, marsSurface);
+		
+//		logger.config("Done with Airlock.initializeInstances()");
+		
+		// Gets the MarsSurface instance
+//		MarsSurface marsSurface = unitManager.getMarsSurface();//mars.getMarsSurface();
+		Unit.setMarsSurface(marsSurface);
+		Unit.setUnitManager(unitManager);
+		
+//		logger.config("Done with Unit.setUnitManager()");
+		
+		unitManager.constructInitialUnits(loadSaveSim); // unitManager needs to be on the same thread as masterClock
+		
+//		logger.config("Done with unitManager.constructInitialUnits()");
+		
 		eventManager = new HistoricalEventManager();
 		creditManager = new CreditManager();
 		scientificStudyManager = new ScientificStudyManager();
 		transportManager = new TransportManager();
 
-		// ResourceUtil.getInstance().initializeNewSim();
-		// ResourceUtil.printID();
+//		logger.config("Done with TransportManager()");
+
+		// Initialize meta tasks
+		new MetaTaskUtil();
+        // Initialize ManufactureUtil
+        new ManufactureUtil();
+		
+		// Gets config file instances
+		simulationConfig = SimulationConfig.instance();
+//		BuildingConfig bc = simulationConfig.getBuildingConfiguration();
+		PersonConfig pc = simulationConfig.getPersonConfig();
+	
+		// Set instances for logging
+		LogConsolidated.initializeInstances(marsClock, earthClock);
+
+		// Initialize instances prior to UnitManager initiatiation		
+		MalfunctionFactory.initializeInstances(this, marsClock, unitManager);
+		MissionManager.initializeInstances(marsClock);
+		MalfunctionManager.initializeInstances(masterClock, marsClock, malfunctionFactory, medicalManager, eventManager);
+		RelationshipManager.initializeInstances(unitManager);
+//		MedicalManager.initializeInstances();		
+		
+		//  Re-initialize the GameManager
+		GameManager.initializeInstances(unitManager);
+					
+//		logger.config("Done with GameManager()");
+		
+		// Set instances for classes that extend Unit and Task and Mission
+		Mission.initializeInstances(this, marsClock, eventManager, unitManager, scientificStudyManager, 
+				surfaceFeatures, missionManager, relationshipManager, pc, creditManager);
+		Task.initializeInstances(marsClock, eventManager, relationshipManager, unitManager, 
+				scientificStudyManager, surfaceFeatures, missionManager, pc);
 		
 		ut = masterClock.getUpTimer();
+
+		doneInitializing = true;
+//		logger.config("Done initializing intransient data.");
 	}
 
-	public void runLoadConfigTask() {
-		startSimExecutor();
-		simExecutor.execute(new LoadConfigTask());
-
-	}
-
-	public class LoadConfigTask implements Runnable {
-		LoadConfigTask() {
-		}
-
-		public void run() {
-			// logger.config("SimConfigTask's run() is on " +
-			// Thread.currentThread().getName());
-			SimulationConfig.loadConfig();
-		}
-	}
-
-	public void runStartTask(boolean autosaveDefault) {
-		simExecutor.execute(new StartTask(autosaveDefault));
-	}
-
-	public class StartTask implements Runnable {
-		boolean autosaveDefault;
-
-		StartTask(boolean autosaveDefault) {
-			this.autosaveDefault = autosaveDefault;
-		}
-
-		public void run() {
-			// logger.config("StartTask's run() is on " + Thread.currentThread().getName());
-			start(autosaveDefault);
-		}
-	}
 
 	/**
-	 * Start the simulation.
+	 * Start the simulation instance.
+	 */
+	public void startSimThread(boolean useDefaultName) {
+		// Start the simulation.
+		ExecutorService e = getSimExecutor();
+		if (e == null || (e != null && (e.isTerminated() || e.isShutdown())))
+			startSimExecutor();
+		e.submit(new StartTask(useDefaultName));
+	}
+	
+	class StartTask implements Runnable {
+		boolean autosaveDefault;
+
+		StartTask(boolean useDefaultName) {
+			this.autosaveDefault = useDefaultName;
+		}
+
+		public void run() {
+//			logger.config("StartTask's run() is on " + Thread.currentThread().getName());
+			startClock(autosaveDefault);
+		}
+	}
+	
+	/**
+	 * Starts the simulation.
+	 * 
 	 * @param autosaveDefault. True if default is used for autosave
 	 */
-	public void start(boolean autosaveDefault) {
+	public void startClock(boolean autosaveDefault) {
+//		logger.config("Simulation's startClock() is on " + Thread.currentThread().getName());
 		// SwingUtilities.invokeLater(() -> testConsole());
 		
 		masterClock.addClockListener(this);
 		masterClock.startClockListenerExecutor();
 
-		if (clockExecutor == null || clockExecutor.isShutdown() || clockExecutor.isTerminated()) {
-
-			clockExecutor = Executors.newSingleThreadExecutor();
-
-			// if (NUM_THREADS <= 3)
-			// clockScheduler = (ThreadPoolExecutor) Executors.newFixedThreadPool(1);
-			// clockScheduler = (ThreadPoolExecutor) Executors.newSingleThreadExecutor();
-			// else if (NUM_THREADS <= 8)
-			// clockScheduler = (ThreadPoolExecutor) Executors.newFixedThreadPool(2);//
-			// newSingleThreadExecutor();// newCachedThreadPool(); //
-			// else if (NUM_THREADS <= 16)
-			// clockScheduler = (ThreadPoolExecutor) Executors.newFixedThreadPool(3);//
-			// newSingleThreadExecutor();// newCachedThreadPool(); //
-			// else
-			// clockScheduler = (ThreadPoolExecutor) Executors.newFixedThreadPool(4);//
-			// newSingleThreadExecutor();// newCachedThreadPool(); //
-
-			if (masterClock.getClockThreadTask() != null)
-				clockExecutor.execute(masterClock.getClockThreadTask());
-		}
+		restartClockExecutor();
 
 		this.autosaveDefault = autosaveDefault;
-//		startAutosaveTimer();
-		AutosaveScheduler.start();
+		AutosaveScheduler.defaultStart();
 		ut = masterClock.getUpTimer();
+		
+		masterClock.start();
 	}
-
 
 	/**
-	 * Get the interactive terminal instance
-	 * 
-	 * @return {@link InteractiveTerm}
+	 * Starts or restarts the executive service thread that the MasterClock's ClockThreadTask runs on.
 	 */
-	public InteractiveTerm getITerm() {
-		return interactiveTerm;
+	public void restartClockExecutor() {
+		clockThreadExecutor = Executors.newSingleThreadExecutor();
+
+		if (masterClock.getClockThreadTask() != null)
+			clockThreadExecutor.execute(masterClock.getClockThreadTask());
 	}
 	
-	/*
-	 * Obtains the size of the file
-	 * 
-	 * @return fileSize in megabytes
-	 */
-	public double getFileSize() {
-		return fileSize;
-	}
-
 	/**
 	 * Loads a simulation instance from a save file.
 	 * 
 	 * @param file the file to be loaded from.
 	 */
 	public void loadSimulation(final File file) {
-		// logger.config("Simulation's loadSimulation() is on " +
-		// Thread.currentThread().getName());
+//		logger.config("Simulation's loadSimulation() is on " + Thread.currentThread().getName());
 		isUpdating = true;
 
 		File f = file;
-
+		
 		Simulation sim = instance();
-		sim.stop();
+//		if (file != null)
+//			sim.stop();
 
-		// Use default file path if file is null.
-		if (f == null) {
-			// logger.config("Yes file is null");
-			// [landrus, 27.11.09]: use the home dir instead of unknown relative paths.
-			f = new File(DEFAULT_DIR, DEFAULT_FILE + DEFAULT_EXTENSION);
-			// logger.config("file is " + f);
-			sim.defaultLoad = true;
-		} else {
-			sim.defaultLoad = false;
-		}
+//		try {
+//			sim.readJSON();
+//		} catch (JsonParseException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		} catch (JsonMappingException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
 
+		if (f == null) {		
+			// Try the default file path if file is null.
+			f = new File(SAVE_DIR, SAVE_FILE + SAVE_FILE_EXTENSION);
+		} 
+		
+		logger.config("The file to be loaded is " + f);
+		
 		if (f.exists() && f.canRead()) {
 //			logger.config(" - - - - - - - - - - - - - -");
 //			logger.config(Msg.getString("Simulation.log.loadSimFrom", f)); //$NON-NLS-1$
 
 			try {
-
 				sim.readFromFile(f);
 
-			} catch (ClassNotFoundException e2) {
-				logger.log(Level.SEVERE,
-						"Quitting mars-sim with Class Not Found Exception when loading the simulation! " + " : "
-								+ e2.getMessage());
+//				logger.config("Done readFromFile()");
+				
+			} catch (ClassNotFoundException e) {
+				e.printStackTrace();
+//				logger.log(Level.SEVERE,
+//						"Quitting mars-sim with ClassNotFoundException when loading the simulation : "
+//								+ e.getMessage());
 //    	        Platform.exit();
 				System.exit(1);
 
-			} catch (IOException e1) {
-				logger.log(Level.SEVERE,
-						"Quitting mars-sim with I/O error when loading the simulation! " + " : " + e1.getMessage());
+			} catch (IOException e) {
+				e.printStackTrace();
+//				logger.log(Level.SEVERE,
+//						"Quitting mars-sim with IOException when loading the simulation : " + e.getMessage());
 //    	        Platform.exit();
 				System.exit(1);
 
-			} catch (Exception e0) {
-				logger.log(Level.SEVERE,
-						"Quitting mars-sim. Could not create a new simulation " + " : " + e0.getMessage());
+			} catch (NullPointerException e) {
+				e.printStackTrace();
+//				logger.log(Level.SEVERE,
+//						"Quitting mars-sim with NullPointerException when loading the simulation : " + e.getMessage());
+//    	        Platform.exit();
+//				System.exit(1);
+			
+			} catch (Exception e) {
+				e.printStackTrace();
+//				logger.log(Level.SEVERE,
+//						"Quitting mars-sim. Could not load the simulation : " + e.getMessage());
 //    	        Platform.exit();
 				System.exit(1);
 			}
 		}
 
 		else {
-			logger.log(Level.SEVERE, "Quitting mars-sim. The saved sim cannot be read or found. ");
+			logger.log(Level.SEVERE, "Quitting mars-sim. The saved sim cannot be read/found.");
 			System.exit(1);
 		}
+		
+		System.gc();
 	}
 
-	/**
-	 * Reads a serialized simulation from a file.
-	 * 
-	 * @param file the saved serialized simulation.
-	 * @throws ClassNotFoundException if error reading serialized classes.
-	 * @throws IOException            if error reading from file.
-	 */
-	private synchronized void readFromFile(File file) throws ClassNotFoundException, IOException {
-		// logger.config("Simulation : running readFromFile()");
-		logger.config("Loading and processing the saved sim. Please wait...");
+//	private synchronized void readJSON() throws JsonParseException, JsonMappingException, IOException {
+//
+//		String name = mars.getClass().getSimpleName();
+//		File file = new File(DEFAULT_DIR, name + JSON_EXTENSION);
+//			
+//		if (file.exists() && file.canRead()) {
+//			// Use Jackson json to read json file data to String
+//			byte[] jsonData = Files.readAllBytes(file.toPath());//Paths.get("Mars.json"));
+//			System.out.println(new String(jsonData));
+//			
+////	        mars = objectMapper.readValue(FileUtils.readFileToByteArray(file, Mars.class);
+////	        System.out.println(mars);
+//	        
+//			// Use Jackson json to read
+////			mars = objectMapper.readValue(file, Mars.class);
+////			System.out.println(mars);
+//		}
+//	}
+	
+    /**
+     * Deserialize to Object from given file.
+     */
+    public void deserialize(File file) throws IOException, ClassNotFoundException {
+//		logger.config("deserialize() is on " + Thread.currentThread().getName());
 		
-		byte[] buf = new byte[8192];
-		ObjectInputStream ois = null;
+//		byte[] buf = new byte[8192];
 		FileInputStream in = null;
+	    XZInputStream xzin = null;
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	    InputStream is = null;
+	    ObjectInputStream ois = null;
+
 		try {
-			// in = new FileInputStream(file);
 			in = new FileInputStream(file);
-
 			// Replace gzip with xz compression (based on LZMA2)
-
 			// Since XZInputStream does some buffering internally
 			// anyway, BufferedInputStream doesn't seem to be
 			// needed here to improve performance.
 			// in = new BufferedInputStream(in);
-			// Limit memory usage to 256 MB
-			XZInputStream xzin = new XZInputStream(in, 256 * 1024);
-			// Define a temporary uncompressed file
-			File uncompressed = new File(DEFAULT_DIR, TEMP_FILE);
-			// Decompress a xz compressed file
-			FileOutputStream fos = new FileOutputStream(uncompressed);
+			
+			try {
+				// Limit memory usage to 256 MB
+				xzin = new XZInputStream(new BufferedInputStream(in), 256 * 1024);
+			} catch (XZFormatException e) {
+				e.printStackTrace();
+				// Thrown when reading a stream terminated by an exception that occurred while the stream was being written.
+				logger.log(Level.SEVERE, "Quitting mars-sim with XZFormatException when loading " + file + " : " + e.getMessage());
+				System.exit(1);	
+			}
+			
+//			int size;
+//			while ((size = xzin.read(buf)) != -1)
+//				baos.write(buf, 0, size);			
+			ByteStreams.copy(xzin, baos);
+			
+			//see https://stackoverflow.com/questions/26960997/convert-outputstream-to-bytearrayoutputstream
+//			byte[] bytes = new byte[8];
+//			baos.write(bytes);
+//			baos.writeTo(os);
 
-			int size;
-			while ((size = xzin.read(buf)) != -1)
-				fos.write(buf, 0, size);
-
-			ois = new ObjectInputStream(new FileInputStream(uncompressed));
-//            InputStream is;
-//
-//            try {
-//                File simConfig = new File(DEFAULT_DIR, "simulationConfig.json");
-//                is = new FileInputStream(simConfig);
-//                //String sconfig = fileSimConfig.to"c:\\simulationConfig.json"; // some JSON content
-//                SimulationConfig.setInstance((SimulationConfig) JsonReader.jsonToJava(is, null));//.jsonToJava(is, true));
-////                is.close(); 
-//            } catch (FileNotFoundException e) {
-//                // TODO Auto-generated catch block
-//                e.printStackTrace();
-//            } catch (IOException e) {
-//                // TODO Auto-generated catch block
-//                e.printStackTrace();
-//            }
-
-//            String simConfig = "c:\\simulationConfig.json";
-//            SimulationConfig.setInstance((SimulationConfig) JsonReader.jsonToJava(simConfig));
-//            
-//            String resourceUtil = "c:\\resourceUtil.json"; // some JSON content
-//            ResourceUtil.setInstance((ResourceUtil) JsonReader.jsonToJava(resourceUtil));
-//            
-//            String malfunction = "c:\\malfunction.json"; // some JSON content
-//            malfunctionFactory = (MalfunctionFactory) JsonReader.jsonToJava(malfunction);
+//			is = new ByteArrayInputStream(baos.toByteArray());
+//			ois = new ObjectInputStream(is);
+			ois = new ObjectInputStream(new ByteArrayInputStream(baos.toByteArray()));
 
 			// Load intransient objects.
-			SimulationConfig.setInstance((SimulationConfig) ois.readObject());
-			ResourceUtil.setInstance((ResourceUtil) ois.readObject());
+//			SimulationConfig.setInstance((SimulationConfig) ois.readObject());	
+//			ResourceUtil.setInstance((ResourceUtil) ois.readObject());
 
-			// Compute the size of the saved sim
-			fileSize = (file.length() / 1000D);
-			String fileStr = "";
-
-			if (fileSize < 1000)
-				fileStr = Math.round(fileSize / 10.0) * 10.0 + " KB";
-			else
-				fileStr = Math.round(fileSize / 10_000.0 ) * 10.0  + " MB";
-
-			loadBuild = SimulationConfig.instance().build;
-			if (loadBuild == null)
-				loadBuild = "unknown";
-			
-//			logger.config("Proceed to loading the saved sim.");
-			String filename = file.getName();
-			String path = file.getPath().replace(filename, "");
-			logger.config(" --------------------------------------------------------------------");
-			logger.config("                      Saved Simulation                               ");
-			logger.config(" --------------------------------------------------------------------");
-			logger.config("                   Filename : " + filename);
-			logger.config("                       Path : " + path);
-			logger.config("                       Size : " + fileStr);
-			logger.config("              Made in Build : " + loadBuild);
-			logger.config("  Current Core Engine Build : " + Simulation.BUILD);
-			
 			// Load remaining serialized objects
 			malfunctionFactory = (MalfunctionFactory) ois.readObject();
 			mars = (Mars) ois.readObject();
@@ -569,30 +798,89 @@ public class Simulation implements ClockListener, Serializable {
 			transportManager = (TransportManager) ois.readObject();
 			creditManager = (CreditManager) ois.readObject();
 			eventManager = (HistoricalEventManager) ois.readObject();
-			relationshipManager = (RelationshipManager) ois.readObject();
-			unitManager = (UnitManager) ois.readObject();
-			masterClock = (MasterClock) ois.readObject();
-
-			
-			logger.config("    Martian Date/Time Stamp : " + masterClock.getMarsClock().getDateTimeStamp());
-			logger.config(" --------------------------------------------------------------------");			
-			if (Simulation.BUILD.equals(loadBuild)) {
-				logger.config(" Note : Both Builds are matched.");
-			} else {
-				logger.config(" Note : The Builds are NOT matched.");
-				logger.warning("Attempting to load the saved sim made in build " + loadBuild
-					+ " while running mars-sim build " + Simulation.BUILD);
-			}		
-			logger.config("  - - - - - - - - - Sol " + masterClock.getMarsClock().getMissionSol() 
-					+ " (Cont') - - - - - - - - - - - ");
+			relationshipManager = (RelationshipManager) ois.readObject();		
+			unitManager = (UnitManager) ois.readObject();		
+			masterClock = (MasterClock) ois.readObject();	
 	
+		// Note: see https://docs.oracle.com/javase/7/docs/platform/serialization/spec/exceptions.html
+		} catch (WriteAbortedException e) {
+			e.printStackTrace();
+			// Thrown when reading a stream terminated by an exception that occurred while the stream was being written.
+			logger.log(Level.SEVERE, "Quitting mars-sim with WriteAbortedException when loading " + file + " : " + e.getMessage());
+			System.exit(1);		
+
+		} catch (OptionalDataException e) {
+			e.printStackTrace();
+			// Thrown by readObject when there is primitive data in the stream and an object is expected. The length field of the exception indicates the number of bytes that are available in the current block.
+			logger.log(Level.SEVERE, "Quitting mars-sim with OptionalDataException when loading " + file + " : " + e.getMessage());
+			System.exit(1);		
+		
+		} catch (InvalidObjectException e) {
+			e.printStackTrace();
+			// Thrown when a restored object cannot be made valid.
+			logger.log(Level.SEVERE, "Quitting mars-sim with InvalidObjectException when loading " + file + " : " + e.getMessage());
+			System.exit(1);		
+
+		} catch (NotActiveException e) {
+			e.printStackTrace();
+			logger.log(Level.SEVERE, "Quitting mars-sim with NotActiveException when loading " + file + " : " + e.getMessage());
+			System.exit(1);		
+
+		} catch (StreamCorruptedException e) {
+			e.printStackTrace();
+			logger.log(Level.SEVERE, "Quitting mars-sim with StreamCorruptedException when loading " + file + " : " + e.getMessage());
+			System.exit(1);		
+		
+		} catch (NotSerializableException e) {
+			e.printStackTrace();
+			logger.log(Level.SEVERE, "Quitting mars-sim with NotSerializableException when loading " + file + " : " + e.getMessage());
+			System.exit(1);		
+			
+		} catch (ObjectStreamException e) {
+			e.printStackTrace();
+			logger.log(Level.SEVERE, "Quitting mars-sim with ObjectStreamException when loading " + file + " : " + e.getMessage());
+			System.exit(1);
+			
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+			logger.log(Level.SEVERE, "Quitting mars-sim with FileNotFoundException since " + file + " cannot be found : ", e.getMessage());
+			System.exit(1);
+
+		} catch (EOFException e) {
+			e.printStackTrace();
+			logger.log(Level.SEVERE,
+					"Quitting mars-sim. Unexpected End of File error on " + file + " : " + e.getMessage());
+			System.exit(1);
+
+		} catch (IOException e) {
+			e.printStackTrace();
+			logger.log(Level.SEVERE,
+					"Quitting mars-sim. IOException when decompressing " + file + " : " + e.getMessage());
+			System.exit(1);
+
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+			logger.log(Level.SEVERE,
+					"Quitting mars-sim. ClassNotFoundException when decompressing " + file + " : " + e.getMessage());
+			System.exit(1);
+			
+		} catch (NullPointerException e) {
+			e.printStackTrace();
+			logger.log(Level.SEVERE,
+					"Quitting mars-sim. NullPointerException when loading " + file + " : " + e.getMessage());
+			System.exit(1);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			logger.log(Level.SEVERE, "Quitting mars-sim with errors when loading " + file + " : " + e.getMessage());
+			System.exit(1);
+		
+		} finally {
+			
 			if (ois != null) {
 				ois.close();
 			}
-			
-			// Close FileInputStream (directly or indirectly via XZInputStream, it doesn't
-			// matter).
-			
+
 			if (in != null) {
 				in.close();
 			}
@@ -601,80 +889,353 @@ public class Simulation implements ClockListener, Serializable {
 				xzin.close();
 			}
 
-			if (fos != null) {
-				fos.close();
+			if (is != null) {
+				is.close();
 			}
 
-			uncompressed.delete();
-			uncompressed = null;
-			
-		} catch (FileNotFoundException e) {
-			logger.log(Level.SEVERE, "Quitting mars-sim since " + file + " cannot be found : ", e.getMessage());
-			System.exit(1);
-
-		} catch (EOFException e) {
-			logger.log(Level.SEVERE,
-					"Quitting mars-sim. Unexpected End of File error on " + file + " : " + e.getMessage());
-			System.exit(1);
-
-		} catch (IOException e) {
-			logger.log(Level.SEVERE,
-					"Quitting mars-sim. I/O error when decompressing " + file + " : " + e.getMessage());
-			System.exit(1);
-
-		} catch (NullPointerException e) {
-			logger.log(Level.SEVERE,
-					"Quitting mars-sim. Null pointer error when loading " + file + " : " + e.getMessage());
-			System.exit(1);
-
-		} catch (Exception e) {
-			logger.log(Level.SEVERE, "Quitting mars-sim with errors when loading " + file + " : " + e.getMessage());
-			System.exit(1);
+			if (baos != null) {
+				baos.close();
+			}
+		}
+    }
+    
+    /**
+     * Computes the size of the file
+     * 
+     * @param file
+     * @return the file size with unit in a string
+     */
+    private String computeFileSize(File file) {
+		// Convert from Bytes to KB
+		double fileSize = file.length() / 1000D;
+		String s = "";
+		
+		if (fileSize > 1000D) {
+			fileSize = fileSize / 1_000.0;
+			s = " MB";
+		}
+		else {
+			s = " KB";
 		}
 
-		// Initialize transient data.
-//	        instance().initializeTransientData();
-		instance().initialSimulationCreated = true;
-		isUpdating = false;
+		return Math.round(fileSize * 100.0) / 100.0 + s;
+    }
+ 
+	/**
+	 * Reads a serialized simulation from a file.
+	 * 
+	 * @param file the saved serialized simulation.
+	 * @throws ClassNotFoundException if error reading serialized classes.
+	 * @throws IOException            if error reading from file.
+	 */
+	private void readFromFile(File file) throws ClassNotFoundException, IOException {
+//		logger.config("readFromFile() is on " + Thread.currentThread().getName());
+		logger.config("Loading and processing the saved sim. Please wait...");
 		
-		// Call to initialize the resources for the saved sim
-		ResourceUtil.getInstance().prep4ResourcesSavedSim();
-	}
+//		System.out.println(file.length() / 1000D);
+//		// Compute the size of the saved sim
+//		String sizeStr = computeFileSize(file);
 
+		
+//		logger.config("Proceed to loading the saved sim.");
+		String filename = file.getName();
+		String path = file.getPath().replace(filename, "");
+		
+		// Deserialize the file
+		deserialize(file);
+		
+		String loadBuild = unitManager.originalBuild;
+		if (loadBuild == null)
+			loadBuild = "unknown";
+		
+		logger.config(" --------------------------------------------------------------------");
+		logger.config("                   Info on The Saved Simulation                      ");
+		logger.config(" --------------------------------------------------------------------");
+		logger.config("                   Filename : " + filename);
+		logger.config("                       Path : " + path);
+		logger.config("                       Size : " + computeFileSize(file));
+		logger.config("              Made in Build : " + loadBuild);
+		logger.config("  Current Core Engine Build : " + Simulation.BUILD);
+		
+		logger.config("    Martian Date/Time Stamp : " + masterClock.getMarsClock().getDateTimeStamp());
+		logger.config(" --------------------------------------------------------------------");			
+		if (Simulation.BUILD.equals(loadBuild)) {
+			logger.config(" Note : The two builds are identical.");
+		} else {
+			logger.config(" Note : The two builds are NOT identical.");
+			logger.warning("Attempting to load a simulation made in build " + loadBuild
+				+ " (older) under core engine build " + Simulation.BUILD + " (newer).");
+		}		
+		logger.config("  - - - - - - - - - Sol " + masterClock.getMarsClock().getMissionSol() 
+				+ " (Cont') - - - - - - - - - - - ");
+		
+		// Initialize transient data.
+//	    instance().initializeTransientData();
+		instance().initialSimulationCreated = true;
+		
+        try {
+    		// Re-initialize instances
+    		reinitializeInstances();
+    		// Set this flag to false
+    		isUpdating = false;
+    		
+//    		logger.config("Done reinitializeInstances");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+	}
+	
+	/**
+	 *  Re-initialize instances after loading from a saved sim
+	 */
+	private void reinitializeInstances() {
+		// Re-initialize the utility class for getting lists of meta tasks.
+		new MetaTaskUtil();		
+		// Restart the autosave scheduler
+		AutosaveScheduler.defaultStart();
+		// Set save type to NONE
+		masterClock.setSaveType();	
+		// Re-initialize the resources for the saved sim
+		ResourceUtil.getInstance().initializeInstances();
+		// Re-initialize the MarsSurface instance
+		MarsSurface marsSurface = unitManager.getMarsSurface();
+//		mars.setMarsSurface(marsSurface);
+		Airlock.initializeInstances(unitManager, marsSurface);
+		
+		Inventory.initializeInstances(unitManager, marsSurface);
+
+//		for (Unit u: inv.getContainedUnits()) {
+//			String s = String.format("Simulation : %20s (%4d)", u.getName(), u.getIdentifier());
+//			System.out.println(s);
+//		}
+				
+//		logger.config("Done marsSurface");
+		
+		//  Re-initialize the GameManager
+		GameManager.initializeInstances(unitManager);
+		// Re-initialize the SurfaceFeatures instance
+		SurfaceFeatures surfaceFeatures = mars.getSurfaceFeatures();
+		// Gets the Weather instance
+		Weather weather = mars.getWeather();
+		// Gets the orbitInfo instance
+		OrbitInfo orbit = mars.getOrbitInfo();
+	
+//		logger.config("Done orbit");
+		
+		// Re-initialize the Simulation instance
+		MasterClock.initializeInstances(this);					
+		// Re-initialize the Mars instance
+		MarsClock.initializeInstances(this, orbit);	
+		
+		// Gets he MarsClock instance
+		MarsClock marsClock = masterClock.getMarsClock();
+		// Gets he MarsClock instance
+		EarthClock earthClock = masterClock.getEarthClock();
+		
+		// Re-initialize the instances in LogConsolidated
+		LogConsolidated.initializeInstances(marsClock, earthClock);
+		
+//		logger.config("Done LogConsolidated");
+		
+		// Re-initialize Mars environmental instances
+		Weather.initializeInstances(masterClock, marsClock, mars, surfaceFeatures, orbit, unitManager); // terrain
+
+		OrbitInfo.initializeInstances(marsClock, earthClock);	
+		
+		SurfaceFeatures.initializeInstances(masterClock, mars, this, weather, orbit, missionManager);  // sunDirection, landmarks
+
+		DustStorm.initializeInstances(weather);
+			
+//		logger.config("Done DustStorm");
+		
+		// Gets config file instances
+		simulationConfig = SimulationConfig.instance();
+		BuildingConfig bc = simulationConfig.getBuildingConfiguration();
+		PersonConfig pc = simulationConfig.getPersonConfig();
+		
+//		logger.config("Done pc");
+		
+		// Re-initialize static class
+		MalfunctionFactory.initializeInstances(this, marsClock, unitManager);
+		MissionManager.initializeInstances(marsClock);
+//		MedicalManager.justReloaded();
+		
+		// Re-initialize units prior to starting the unit manager
+		Unit.initializeInstances(masterClock, marsClock, earthClock, this, mars, marsSurface, weather, surfaceFeatures, missionManager);	
+		Unit.setUnitManager(unitManager);
+		
+//		logger.config("Done Unit");
+		
+		// Update/reset the identifier count for each type of units 
+		Person.reinitializeIdentifierCount();
+		Robot.reinitializeIdentifierCount();
+		Vehicle.reinitializeIdentifierCount();
+		Building.reinitializeIdentifierCount();
+		Equipment.reinitializeIdentifierCount();
+		Settlement.reinitializeIdentifierCount();
+		ConstructionSite.reinitializeIdentifierCount();
+
+		RelationshipManager.initializeInstances(unitManager);
+		MalfunctionManager.initializeInstances(masterClock, marsClock, malfunctionFactory, medicalManager, eventManager);
+		TransportManager.initializeInstances(marsClock, eventManager);
+		ScientificStudyManager.initializeInstances(marsClock, unitManager);
+		ScientificStudy.initializeInstances(marsClock, unitManager);
+		ScientificStudyUtil.initializeInstances(relationshipManager, unitManager);
+				
+		Resupply.initializeInstances(bc, unitManager);
+		
+//		logger.config("Done Resupply");
+		
+		// Re-initialize Unit related class
+//		Vehicle.initializeInstances();
+		SalvageValues.initializeInstances(unitManager);
+			
+		// Re-initialize Person/Robot related class
+		BotMind.initializeInstances(marsClock);
+		CircadianClock.initializeInstances(marsClock);
+		Mind.initializeInstances(marsClock, missionManager, relationshipManager);		
+		PhysicalCondition.initializeInstances(this, masterClock, marsClock, medicalManager);
+		RadiationExposure.initializeInstances(masterClock, marsClock);
+		Role.initializeInstances(marsClock);
+		TaskManager.initializeInstances(marsClock, missionManager);
+		TaskSchedule.initializeInstances(marsClock);
+		HealthProblem.initializeInstances(medicalManager, eventManager);
+		
+//		logger.config("Done HealthProblem");
+
+		// Re-initialize Structure related class
+		Building.initializeInstances(bc, unitManager);
+		BuildingManager.initializeInstances(this, masterClock, marsClock, bc, eventManager, relationshipManager, unitManager);
+		Settlement.initializeInstances(unitManager);		// loadDefaultValues()
+		ChainOfCommand.initializeInstances(marsClock, unitManager);
+		GoodsManager.initializeInstances(this, marsClock, missionManager, unitManager, pc);
+			
+		// Re-initialize Building function related class
+		Function.initializeInstances(bc, masterClock, marsClock, pc, mars, surfaceFeatures, weather, unitManager);
+		Cooking.initializeInstances(); // prepareOilMenu()
+		Farming.initializeInstances();  // cropConfig
+
+//		logger.config("Done Farming");
+		
+		// Miscs.
+		CompositionOfAir.initializeInstances(masterClock, marsClock, pc, unitManager);
+		Crop.initializeInstances(masterClock, marsClock, surfaceFeatures, unitManager);
+		HeatSource.initializeInstances(mars, surfaceFeatures, orbit, weather);
+		Malfunction.initializeInstances();
+		PowerSource.initializeInstances(mars, surfaceFeatures, orbit, weather);
+		ResourceProcess.initializeInstances(marsClock);
+		Job.initializeInstances(unitManager, missionManager);
+		RobotJob.initializeInstances(unitManager, missionManager);
+//		CreditEvent.initializeInstances(unitManager, missionManager);
+		
+//		logger.config("Done RobotJob");
+				
+		// Re-initialize Task related class 
+//		LoadVehicleGarage.initializeInstances(pc); 
+//		ObserveAstronomicalObjects.initializeInstances(surface);
+//		PerformLaboratoryExperiment.initializeInstances(scientificStudyManager);
+//		PlayHoloGame.initializeInstances(masterClock, marsClock);
+//		ProposeScientificStudy.initializeInstances(scientificStudyManager);
+		Walk.initializeInstances(unitManager);	
+		Task.initializeInstances(marsClock, eventManager, relationshipManager, unitManager, 
+				scientificStudyManager, surfaceFeatures, missionManager, pc);
+
+//		logger.config("Done Task");
+		
+		// Re-initialize MetaMission class
+//		BuildingConstructionMissionMeta.setInstances(marsClock);
+//		CollectRegolithMeta.setInstances(missionManager);
+//		CollectIceMeta.setInstances(missionManager);
+//		MetaMission.setInstances(marsClock, missionManager);
+		
+		// Re-initialize Mission related class
+		Mission.initializeInstances(this, marsClock, eventManager, unitManager, scientificStudyManager, 
+				surfaceFeatures, missionManager, relationshipManager, pc, creditManager);
+//		RoverMission.justReloaded(eventManager);  // eventManager
+//		VehicleMission.justReloaded(missionManager); // missionmgr
+//		RescueSalvageVehicle.justReloaded(eventManager);  // eventManager
+		MissionPlanning.initializeInstances(marsClock);
+
+		// Start a chain of calls to set instances
+		unitManager.reinit(marsClock);
+		
+		doneInitializing = true;
+		
+//		logger.config("Done MissionPlanning");
+	}
+	
+	public boolean isDoneInitializing() {
+		return doneInitializing;
+	}
+	
+	/**
+	 * Writes the JSON file
+	 * 
+	 * @throws JsonGenerationException
+	 * @throws JsonMappingException
+	 * @throws IOException
+	 */
+//	public void writeJSON() throws JsonGenerationException, JsonMappingException, IOException {	
+		// Write to console, can write to any output stream such as file
+//		StringWriter stringEmp = new StringWriter();
+		
+//		Simulation sim = instance();
+//		SurfaceFeatures surface = sim.getMars().getSurfaceFeatures();
+//		String name = surface.getClass().getSimpleName();	
+//		objectMapper.writeValue(stringEmp, surface);
+//		System.out.println(name + " JSON representation :\n" + stringEmp);	
+//		// Write to the file
+//		objectMapper.writeValue(new File(name + "." + JSON_EXTENSION), surface);
+		
+//		String name = mars.getClass().getSimpleName();
+//		objectMapper.writeValue(stringEmp, mars);
+//		System.out.println("JSON representation of the Class '" + name + "' :\n" + stringEmp);
+//		// Write to the file
+//		objectMapper.writeValue(new File(DEFAULT_DIR, name + JSON_EXTENSION), mars);
+		
+//		Object o = mars;
+//		String name = o.getClass().getSimpleName();
+		
+//		objectMapper.writeValue(stringEmp, o);
+//		System.out.println("JSON representation of the Class '" + name + "' :\n" + stringEmp);
+//		// Write to the file
+//		objectMapper.writeValue(new File(SAVE_DIR, name + JSON_EXTENSION), o);
+//		
+//		String json = objectMapper.writeValueAsString(o) ; 
+//		System.out.println("JSON representation of the Class '" + name + "' :\n" + json);	
+//	}
+	
 	
 	/**
 	 * Saves a simulation instance to a save file.
 	 * 
 	 * @param file the file to be saved to.
 	 */
-	public synchronized void saveSimulation(int type, File file) throws IOException {
-//        logger.config("Simulation's saveSimulation() is on " + Thread.currentThread().getName() + " Thread");
-		logger.config(Msg.getString("Simulation.log.saveSimTo") + file); //$NON-NLS-1$
-
-		// Check if it was previously on pause
-//		boolean previous = masterClock.isPaused();
-		// Pause simulation.
-//		if (!previous) {
-			masterClock.setPaused(true, false);
-//		}
-
+	public synchronized void saveSimulation(SaveType type, File file) throws IOException {
+//		logger.config("saveSimulation(" + type + ", " + file + ")");
+		// Checks to see if the simulation is on pause
+		boolean isPause = masterClock.isPaused();
+		
 		Simulation sim = instance();
-		sim.halt();
+		// Stops the master clock and removes the Simulation clock listener
+		sim.halt(isPause);
 
+		// Experiment with saving in JSON format
+//		writeJSON();
+		
 		lastSaveTimeStamp = new SystemDateTime().getDateTimeStr();
 		changed = true;
 
-		File backupFile = new File(DEFAULT_DIR, "previous" + DEFAULT_EXTENSION);
+		File backupFile = new File(SAVE_DIR, "previous" + SAVE_FILE_EXTENSION);
 		FileSystem fileSys = null;
 		Path destPath = null;
 		Path srcPath = null;
 
-		int missionSol = masterClock.getMarsClock().getMissionSol();
-		
 		// Use type to differentiate in what name/dir it is saved
-		if (type == SAVE_DEFAULT) {
+		if (type == SaveType.SAVE_DEFAULT) {
 
-			file = new File(DEFAULT_DIR, DEFAULT_FILE + DEFAULT_EXTENSION);
+			file = new File(SAVE_DIR, SAVE_FILE + SAVE_FILE_EXTENSION);
 
 			if (file.exists() && !file.isDirectory()) {
 				fileSys = FileSystems.getDefault();
@@ -684,24 +1245,24 @@ public class Simulation implements ClockListener, Serializable {
 				Files.move(srcPath, destPath, StandardCopyOption.REPLACE_EXISTING);
 			}
 
-			logger.config("Saving as " + DEFAULT_FILE + DEFAULT_EXTENSION + ".");
+			logger.config("Saving the simulation as " + SAVE_FILE + SAVE_FILE_EXTENSION + ".");
 
 		}
 
-		else if (type == SAVE_AS) {
+		else if (type == SaveType.SAVE_AS) {
 			String f = file.getName();
 			String dir = file.getParentFile().getAbsolutePath();
 			if (!f.contains(".sim"))
-				file = new File(dir, f + DEFAULT_EXTENSION);
-			logger.config("Saving as " + file + "...");
+				file = new File(dir, f + SAVE_FILE_EXTENSION);
+			logger.config("Saving the simulation as " + file + "...");
 		}
 
-		else if (type == AUTOSAVE_AS_DEFAULT) {
+		else if (type == SaveType.AUTOSAVE_AS_DEFAULT) {
 
 //            file = new File(DEFAULT_DIR, DEFAULT_FILE + DEFAULT_EXTENSION);
 //            logger.config("Autosaving as " + DEFAULT_FILE + DEFAULT_EXTENSION);
 
-			file = new File(DEFAULT_DIR, DEFAULT_FILE + DEFAULT_EXTENSION);
+			file = new File(SAVE_DIR, SAVE_FILE + SAVE_FILE_EXTENSION);
 
 			if (file.exists() && !file.isDirectory()) {
 				fileSys = FileSystems.getDefault();
@@ -711,15 +1272,17 @@ public class Simulation implements ClockListener, Serializable {
 				Files.move(srcPath, destPath, StandardCopyOption.REPLACE_EXISTING);
 			}
 
-			logger.config("Autosaving as " + DEFAULT_FILE + DEFAULT_EXTENSION + ".");
+			logger.config("Autosaving the simulation as " + SAVE_FILE + SAVE_FILE_EXTENSION + ".");
 
 		}
 
-		else if (type == AUTOSAVE) {
-			String autosaveFilename = lastSaveTimeStamp + "_Sol" + missionSol + "_r" + BUILD
-					+ DEFAULT_EXTENSION;
+		else if (type == SaveType.AUTOSAVE) {
+			int missionSol = masterClock.getMarsClock().getMissionSol();
+			
+			String autosaveFilename = lastSaveTimeStamp + "_sol" + missionSol + "_r" + BUILD
+					+ SAVE_FILE_EXTENSION;
 			file = new File(AUTOSAVE_DIR, autosaveFilename);
-			logger.config("Autosaving as " + autosaveFilename + "...");
+			logger.config("Autosaving the simulation as " + autosaveFilename + ".");
 
 		}
 
@@ -727,73 +1290,111 @@ public class Simulation implements ClockListener, Serializable {
 		if (!file.getParentFile().exists()) {
 			file.getParentFile().mkdirs();
 		}
+		
+		// Get current size of heap in bytes
+		long heapSize = Runtime.getRuntime().totalMemory();
+		// Get maximum size of heap in bytes. The heap cannot grow beyond this size.// Any attempt will result in an OutOfMemoryException.
+		long heapMaxSize = Runtime.getRuntime().maxMemory();
+		 // Get amount of free memory within the heap in bytes. This size will increase // after garbage collection and decrease as new objects are created.
+		long heapFreeSize = Runtime.getRuntime().freeMemory(); 
+		
+		logger.config(
+		"heapSize: " + formatSize(heapSize) 
+		+ "    heapMaxSize: " + formatSize(heapMaxSize)
+		+ "    heapFreeSize: " + formatSize(heapFreeSize) + "");
+		
+//		int counts = 0;
 
-		ObjectOutputStream oos = null;
-		FileInputStream fis = null;
-		FileOutputStream fos = new FileOutputStream(file);
+//		while (heapFreeSize < MIN_HEAP_SPACE) { // && counts <= 2) {
+////			counts++;
+//			logger.config("Not enough free memory in heap space. Wait for 10 seconds and retry...");
+//			// Restarts the master clock and removes the Simulation clock listener
+//			sim.proceed(isPause);
+//			// delay for 20 seconds
+//			delay(20000);
+//			// Stops the master clock and removes the Simulation clock listener
+//			sim.halt(isPause);
+//			// Get current size of heap in bytes
+//			heapSize = Runtime.getRuntime().totalMemory();
+//			// Get maximum size of heap in bytes. The heap cannot grow beyond this size.// Any attempt will result in an OutOfMemoryException.
+//			heapMaxSize = Runtime.getRuntime().maxMemory();
+//			 // Get amount of free memory within the heap in bytes. This size will increase // after garbage collection and decrease as new objects are created.
+//			heapFreeSize = Runtime.getRuntime().freeMemory(); 
+//			
+//			logger.config("heapSize: " + formatSize(heapSize) 
+//			+ "    heapMaxSize: " + formatSize(heapMaxSize) 
+//			+ "    heapFreeSize: " + formatSize(heapFreeSize) + "");
+//		}
+
+//		if (counts <= 2) {
+			// Serialize the file
+//			serialize(type, file, srcPath, destPath);
+//		}
+//		else {
+//			logger.config("Please try saving the sim later.");
+//		}
+
+		if (heapFreeSize > MIN_HEAP_SPACE){
+			// Serialize the file
+			serialize(type, file, srcPath, destPath);
+		}
+		else {
+			// Call up garbage collector. But it's up to the gc what to do
+			System.gc();
+			logger.config("Not enough free memory in Heap Space. Please try saving the sim later.");
+		}
+		
+		// Restarts the master clock and adds back the Simulation clock listener
+		sim.proceed(isPause);
+	}
+
+	/**
+	 * Delays for a period of time in millis
+	 * 
+	 * @param millis
+	 */
+    public static void delay(long millis) {
+        try {
+			TimeUnit.MILLISECONDS.sleep(millis);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    public static String formatSize(long v) {
+        if (v < 1024) return v + " B";
+        int z = (63 - Long.numberOfLeadingZeros(v)) / 10;
+        return String.format("%.2f %sB", (double)v / (1L << (z*10)), " KMGTPE".charAt(z));
+    }
+    
+    /**
+     * Serialize the given object and save it to a given file.
+     */
+    public void serialize(SaveType type, File file, Path srcPath, Path destPath)
+            throws IOException {
+
+		// Replace gzip with xz compression (based on LZMA2)
+		// (1) http://stackoverflow.com/questions/5481487/how-to-use-lzma-sdk-to-compress-decompress-in-java
+		// (2) http://tukaani.org/xz/xz-javadoc/
+
+		// STEP 1: combine all objects into one single uncompressed file, namely
+		// "default"
+		
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	    ObjectOutputStream oos = new ObjectOutputStream(baos);
+	    InputStream is = null;
 		XZOutputStream xzout = null;
-		File uncompressed = null;
-
+		
 		try {
-
-			// Replace gzip with xz compression (based on LZMA2)
-			// See (1)
-			// http://stackoverflow.com/questions/5481487/how-to-use-lzma-sdk-to-compress-decompress-in-java
-			// (2) http://tukaani.org/xz/xz-javadoc/
-
-			// STEP 1: combine all objects into one single uncompressed file, namely
-			// "default"
-			uncompressed = new File(DEFAULT_DIR, TEMP_FILE);
-
-			// Delete temp file when program exits.
-			//uncompressed.deleteOnExit();
-		    
-			// if the default save directory does not exist, create one now
-			if (!uncompressed.getParentFile().exists()) {
-				uncompressed.getParentFile().mkdirs();
-			}
-
-			oos = new ObjectOutputStream(new FileOutputStream(uncompressed));
-
-//            File fileSimConfig = new File(DEFAULT_DIR, "simulationConfig.json");
-//            String sconfig = fileSimConfig.getPath();
-
-			// String simConfig = "c:\\simulationConfig.json";
-			// SimulationConfig.setInstance((SimulationConfig)
-			// JsonReader.jsonToJava(simConfig));
-
-//            String simConfig = JsonWriter.objectToJson(SimulationConfig.instance()); 
-
-//        	String malString = JsonWriter.objectToJson(malfunctionFactory);
-//            
-//            OutputStream os0 = new ObjectStream(new FileStream(uncompressed));
-//            JsonWriter jw = new JsonWriter(os0);       // optional 2nd 'options' argument (see below)
-//            jw.write(emp);
-//            jw.close();
-//            
-//        	String marsString = JsonWriter.objectToJson(mars);
-//            
-//        	String masterClockString = JsonWriter.objectToJson(masterClock);
-//            
-//            try{
-//                FileWriter file = new FileWriter("c:\\simulationConfig.json", false);
-//                file.close();
-//            }
-//            catch(Exception e){
-//                e.getMessage();
-//            }
-
-//            String resourceUtil = "c:\\resourceUtil.json"; // some JSON content
-//            ResourceUtil.setInstance((ResourceUtil) JsonReader.jsonToJava(resourceUtil));
-//
-//            String malfunction = "c:\\malfunction.json"; // some JSON content
-//            malfunctionFactory = (MalfunctionFactory) JsonReader.jsonToJava(malfunction);
-
+	
+			// Set a delay for 200 millis to avoid java.util.ConcurrentModificationException
+			delay(500L);
+			
 			// Store the in-transient objects.
-			oos.writeObject(SimulationConfig.instance());
-			oos.writeObject(ResourceUtil.getInstance());
+//			oos.writeObject(SimulationConfig.instance());
+//			oos.writeObject(ResourceUtil.getInstance());
 			oos.writeObject(malfunctionFactory);
-			oos.writeObject(mars);
+			oos.writeObject(mars); // java.util.ConcurrentModificationException, infinite ObjectOutputStream.java:1510)
 			oos.writeObject(missionManager);
 			oos.writeObject(medicalManager);
 			oos.writeObject(scientificStudyManager);
@@ -803,23 +1404,18 @@ public class Simulation implements ClockListener, Serializable {
 			oos.writeObject(relationshipManager);
 			oos.writeObject(unitManager);
 			oos.writeObject(masterClock);
-
-			oos.flush();
-			// oos.close();
-
-			// Print the size of each serializable object
-			printObjectSize();
 			
-			// STEP 2: convert the uncompressed file into a fis
-			fis = new FileInputStream(uncompressed);
+			oos.flush();
+			oos.close();
+
+		    is = new ByteArrayInputStream(baos.toByteArray());
+		    
+			// Print the size of each serializable object
+//			System.out.println(printObjectSize(0).toString());
 			
 			// Using the default settings and the default integrity check type (CRC64)
-			// If set to level 9, at start of the sim, 406 KB
-			// If set to level 8, at start of the sim, 407 KB
-			// If set to level 7, at start of the sim, 405 KB
-			// If set to level 6, at start of the sim, 415 KB
-			LZMA2Options lzma2 = new LZMA2Options(7);
-			// Set to 6. For mid sized archives (>8mb), 7 works better.
+			LZMA2Options lzma2 = new LZMA2Options(4);
+			// Set to 4. For mid sized archives (>8mb), 7 works better.
 			//lzma2.setPreset(8);
 			FilterOptions[] options = {lzma2};
 			
@@ -827,50 +1423,58 @@ public class Simulation implements ClockListener, Serializable {
 //			X86Options x86 = new X86Options();
 //			LZMA2Options lzma2 = new LZMA2Options();
 //			FilterOptions[] options = { x86, lzma2 };
-			System.out.println("Encoder memory usage: "
-			                    + FilterOptions.getEncoderMemoryUsage(options)
-			                    + " KiB");
-			System.out.println("Decoder memory usage: "
-			                    + FilterOptions.getDecoderMemoryUsage(options)
-			                    + " KiB");
-			 
-			xzout = new XZOutputStream(fos, options);
-
-			// STEP 3: set up buffer and create outxz and save as a .sim file
-			byte[] buf = new byte[8192];
-			int size;
-			while ((size = fis.read(buf)) != -1)
-				xzout.write(buf, 0, size);
-
-			xzout.finish();
-			
-			if (oos != null)
-				oos.close();
-
-			if (fos != null)
-				fos.close();
-			
-			if (fis != null)
-				fis.close();
-			
-			if (xzout != null)
-				xzout.close();
+			logger.config("Encoder memory usage : "
+		              + Math.round(FilterOptions.getEncoderMemoryUsage(options)/1_024*100.00)/100.00 + " MB");
+			logger.config("Decoder memory usage : "
+		              + Math.round(FilterOptions.getDecoderMemoryUsage(options)/1_024*100.00)/100.00 + " MB");
 	
-			uncompressed.delete();
-			//uncompressed = null;
 			
+			xzout = new XZOutputStream(new BufferedOutputStream(new FileOutputStream(file)), options);
+			
+			ByteStreams.copy(is, xzout);
+			
+			xzout.finish();
+			// Print the size of the saved sim
+			logger.config("           File size : " + computeFileSize(file));
 			logger.config("Done saving. The simulation resumes.");
 
-		} catch (NullPointerException e0) {
-			logger.log(Level.SEVERE, Msg.getString("Simulation.log.saveError"), e0); //$NON-NLS-1$
+		// Note: see https://docs.oracle.com/javase/7/docs/platform/serialization/spec/exceptions.html
+		} catch (WriteAbortedException e) {
+			// Thrown when reading a stream terminated by an exception that occurred while the stream was being written.
+			logger.log(Level.SEVERE, oos.getClass().getSimpleName() + ": Quitting mars-sim with WriteAbortedException when saving " + file + " : " + e.getMessage());
+			e.printStackTrace();		
+
+		} catch (OptionalDataException e) {
+			// Thrown by readObject when there is primitive data in the stream and an object is expected. The length field of the exception indicates the number of bytes that are available in the current block.
+			logger.log(Level.SEVERE, oos.getClass().getSimpleName() + ": Quitting mars-sim with OptionalDataException when saving " + file + " : " + e.getMessage());
+			e.printStackTrace();	
+		
+		} catch (InvalidObjectException e) {
+			// Thrown when a restored object cannot be made valid.
+			logger.log(Level.SEVERE, oos.getClass().getSimpleName() + ": Quitting mars-sim with InvalidObjectException when saving " + file + " : " + e.getMessage());
+			e.printStackTrace();	
+
+		} catch (NotActiveException e) {
+			logger.log(Level.SEVERE, oos.getClass().getSimpleName() + ": Quitting mars-sim with NotActiveException when saving " + file + " : " + e.getMessage());
+			e.printStackTrace();	
+
+		} catch (StreamCorruptedException e) {
+			logger.log(Level.SEVERE, oos.getClass().getSimpleName() + ": Quitting mars-sim with StreamCorruptedException when saving " + file + " : " + e.getMessage());
+			e.printStackTrace();	
+		
+		} catch (NotSerializableException e) {
+			logger.log(Level.SEVERE, oos.getClass().getSimpleName() + ": Quitting mars-sim with NotSerializableException when saving " + file + " : " + e.getMessage());
+			e.printStackTrace();	
+			
+		} catch (ObjectStreamException e) {
+			logger.log(Level.SEVERE, oos.getClass().getSimpleName() + ": Quitting mars-sim with ObjectStreamException when saving " + file + " : " + e.getMessage());
+			e.printStackTrace();
+
+		} catch (IOException e0) {
+			logger.log(Level.SEVERE, oos.getClass().getSimpleName() + ": " + Msg.getString("Simulation.log.saveError"), e0); //$NON-NLS-1$
 			e0.printStackTrace();
 
-			if (fos != null)
-				fos.close();
-			if (xzout != null)
-				xzout.close();
-
-			if (type == AUTOSAVE_AS_DEFAULT || type == SAVE_DEFAULT) {
+			if (type == SaveType.AUTOSAVE_AS_DEFAULT || type == SaveType.SAVE_DEFAULT) {
 //	            backupFile = new File(DEFAULT_DIR, DEFAULT_FILE + DEFAULT_EXTENSION);
 //	            backupFile.renameTo(file);
 
@@ -881,15 +1485,10 @@ public class Simulation implements ClockListener, Serializable {
 			}
 
 		} catch (Exception e) {
-			logger.log(Level.SEVERE, Msg.getString("Simulation.log.saveError"), e); //$NON-NLS-1$
+			logger.log(Level.SEVERE, oos.getClass().getSimpleName() + ": " + Msg.getString("Simulation.log.saveError"), e); //$NON-NLS-1$
 			e.printStackTrace();
 
-			if (fos != null)
-				fos.close();
-			if (xzout != null)
-				xzout.close();
-
-			if (type == AUTOSAVE_AS_DEFAULT || type == SAVE_DEFAULT) {
+			if (type == SaveType.AUTOSAVE_AS_DEFAULT || type == SaveType.SAVE_DEFAULT) {
 //	            backupFile = new File(DEFAULT_DIR, DEFAULT_FILE + DEFAULT_EXTENSION);
 //	            backupFile.renameTo(file);
 
@@ -902,9 +1501,7 @@ public class Simulation implements ClockListener, Serializable {
 		}
 
 		finally {
-			// fis.close(); // fis closed automatically
-			// fos.close(); // fos closed automatically
-			
+		
 			if (xzout != null) {
 				xzout.close();
 				xzout.finish();
@@ -912,42 +1509,27 @@ public class Simulation implements ClockListener, Serializable {
 			
 			if (oos != null)
 				oos.close();
-
-			if (fos != null)
-				fos.close();
 			
-			if (fis != null)
-				fis.close();
+			if (is != null)
+				is.close();
 			
-			if (xzout != null)
-				xzout.close();
-	
-			uncompressed.delete();
+			if (baos != null)
+				baos.close();
 			
-			sim.proceed();
-
 			justSaved = true;
 
-			// Check if it was previously on pause
-//			boolean now = masterClock.isPaused();
-//			if (!previous) {
-//				if (now) {
-//					masterClock.setPaused(false, false);
-//				}
-//			} else {
-//				if (!now) {
-//					masterClock.setPaused(false, false);
-//				}
-//			}
 		}
-	}
-
+    }
+    
 	/**
 	 * Prints the object and its size
+	 * @throws IOException 
 	 */
-	public StringBuilder printObjectSize() {
+	public StringBuilder printObjectSize(int type) {
       	StringBuilder sb = new StringBuilder();
 		
+//      	System.out.println("# of collection sites : " + mars.getSurfaceFeatures().getSites().size());
+      	
 		List<Serializable> list = Arrays.asList( 
 				SimulationConfig.instance(),
 				ResourceUtil.getInstance(),
@@ -966,16 +1548,24 @@ public class Simulation implements ClockListener, Serializable {
 			
 		list.sort((Serializable d1, Serializable d2) -> d1.getClass().getSimpleName().compareTo(d2.getClass().getSimpleName())); 
 		
-		sb.append("      Serializable object :     Size  (before compression)"
-				+ System.lineSeparator());
+		sb.append("      Serializable object | Serialized Size");
+		sb.append("  | Object Size");
+		sb.append(System.lineSeparator());
 		sb.append(" ---------------------------------------------------------"
 				+ System.lineSeparator());		
 		int max0 = 25;
 		int max1 = 10;
+		
 		String SPACE = " ";
 		
-		double sumSize = 0;
+		double sumFileSize = 0;
+//		double sumSize1 = 0;
+		
 		String unit = "";
+//		String unit1 = "";
+		
+//		halt();
+		masterClock.setPaused(true, false);
 		
 		for (Serializable o : list) {
 			String name = o.getClass().getSimpleName();
@@ -987,49 +1577,84 @@ public class Simulation implements ClockListener, Serializable {
 			sb.append(SPACE + ":" + SPACE);
 
 			// Get size
-			double size = CheckSerializedSize.getSerializedSize(o);
-			sumSize += size;
+			double fileSize = 0;
 			
-			if (size < 1_000D) {
+//			long objectSize = 0;
+					
+//			MemoryMeter meter = new MemoryMeter();
+		    
+			if (type == 0) {
+				fileSize = CheckSerializedSize.getSerializedSize(o);
+//				objectSize = meter.countChildren(o);
+//				System.out.println("Object Size : " + objectSize);
+			}
+			else if (type == 1) {
+				fileSize = CheckSerializedSize.getSerializedSizeByteArray(o);
+//				objectSize = meter.countChildren(o);
+//				System.out.println("Object Size : " + objectSize);
+			}
+			
+			sumFileSize += fileSize;
+		
+			if (fileSize < 1_000) {
 				unit = SPACE + "B" + SPACE;
 			}
-			else if (size < 1_000_000D) {
-				size = size/1_000D;
+			else if (fileSize < 1_000_000) {
+				fileSize = fileSize/1_000D;
 				unit = SPACE + "KB";
 			}
-			else if (size < 1_000_000_000) {
-				size = size/1_000_000D;
+			else if (fileSize < 1_000_000_000) {
+				fileSize = fileSize/1_000_000D;
 				unit = SPACE + "MB";
 			}
 			
-			size = Math.round(size*10.0)/10.0;
-			
-			String sizeStr = size + unit;
-			int size1 = max1 - sizeStr.length();
-			for (int i=0; i<size1; i++) {
+			String sizeStr = String.format("%.2f", fileSize) + unit;
+			int size = max1 - sizeStr.length();
+			for (int i=0; i<size; i++) {
 				sb.append(SPACE);
 			}
+						
+//			sumSize1 += objectSize;
+//			
+//			if (objectSize < 1_000) {
+//				unit1 = SPACE + "B" + SPACE;
+//			}
+//			else if (objectSize < 1_000_000) {
+//				objectSize = objectSize/1_000;
+//				unit1 = SPACE + "KB";
+//			}
+//			else if (objectSize < 1_000_000_000) {
+//				objectSize = objectSize/1_000_000;
+//				unit1 = SPACE + "MB";
+//			}
+//			
+//			String objectSizeStr1 = objectSize + unit1;
+//			int objectSize1 = max1 - objectSizeStr1.length();
+//			for (int i=0; i<objectSize1; i++) {
+//				sb.append(SPACE);
+//			}
 			
-			sb.append(size + unit
-					+ System.lineSeparator());
+			
+			sb.append(sizeStr);
+			
+//			sb.append("        " + objectSize + unit1);
+			
+			sb.append(System.lineSeparator());
 		}
 		
 		// Get the total size
-		if (sumSize < 1_000D) {
+		if (sumFileSize < 1_000D) {
 			unit = SPACE + "B" + SPACE;
 		}
-		else if (sumSize < 1_000_000D) {
-			sumSize = sumSize/1_000D;
+		else if (sumFileSize < 1_000_000D) {
+			sumFileSize = sumFileSize/1_000D;
 			unit = SPACE + "KB";
 		}
-		else if (sumSize < 1_000_000_000) {
-			sumSize = sumSize/1_000_000D;
+		else if (sumFileSize < 1_000_000_000) {
+			sumFileSize = sumFileSize/1_000_000D;
 			unit = SPACE + "MB";
 		}
-		
-		sumSize = Math.round(sumSize*10.0)/10.0;
-		
-		
+					
 		sb.append(" ---------------------------------------------------------"
 				+ System.lineSeparator());	
 		
@@ -1041,14 +1666,18 @@ public class Simulation implements ClockListener, Serializable {
 		sb.append(name);
 		sb.append(SPACE + ":" + SPACE);
 
-		String sizeStr = sumSize + unit;
+//		sumFileSize = Math.round(sumFileSize*100.0)/100.0;
+
+		String sizeStr = String.format("%.2f", sumFileSize) + unit;
 		int size2 = max1 - sizeStr.length();
 		for (int i=0; i<size2; i++) {
 			sb.append(SPACE);
 		}
 		
-		sb.append(sumSize + unit
-				+ System.lineSeparator());
+		sb.append(sizeStr + System.lineSeparator());
+		
+//		proceed();
+		masterClock.setPaused(false, false);
 		
 		return sb;
 	}
@@ -1058,13 +1687,13 @@ public class Simulation implements ClockListener, Serializable {
 	 * Ends the current simulation
 	 */
 	public void endSimulation() {
-		interactiveTerm.setKeepRunning(false);
-		interactiveTerm.disposeTerminal();
-		instance().defaultLoad = false;
+		logger.log(Level.CONFIG, "Exiting the simulation. Good Bye !");
+//		defaultLoad = false;
 		instance().stop();
-		masterClock.endClockListenerExecutor();
-		if (clockExecutor != null)
-			clockExecutor.shutdownNow();
+		if (masterClock != null)
+			masterClock.endClockListenerExecutor();
+		if (clockThreadExecutor != null)
+			clockThreadExecutor.shutdownNow();
 	}
 
 	public void endMasterClock() {
@@ -1078,34 +1707,37 @@ public class Simulation implements ClockListener, Serializable {
 		if (masterClock != null) {
 			// simExecutor.shutdown();
 			masterClock.stop();
+//			 logger.config("just called stop()");
 			masterClock.removeClockListener(this);
+//			 logger.config("just called removeClockListener()");
 		}
 	}
 
 	/*
-	 * Stops and removes the master clock and pauses the simulation
+	 * Stops the master clock and removes the Simulation clock listener 
+	 * 
+	 * @param isPause has it been on pause ?
 	 */
-	private void halt() {
+	public void halt(boolean isPause) {
 		if (masterClock != null) {
 			masterClock.stop();
-			masterClock.setPaused(true, false);
+			if (!isPause) masterClock.setPaused(true, false);
 			masterClock.removeClockListener(this);
-			AutosaveScheduler.cancel();
-//			if (autosaveService != null && !autosaveService.isShutdown() && !autosaveService.isTerminated())
-//				autosaveService.shutdown();
 		}
+		// Call up gc
+		System.gc();
 	}
 
 	/*
-	 * Adds and starts the master clock and unpauses the simulation
+	 * Restarts the master clock and adds back the Simulation clock listener
+	 * 
+	 * @param isPause has it been on pause ?
 	 */
-	public void proceed() {
+	public void proceed(boolean isPause) {
 		if (masterClock != null) {
 			masterClock.addClockListener(this);
-			masterClock.setPaused(false, false);
+			if (!isPause) masterClock.setPaused(false, false);
 			masterClock.restart();
-			AutosaveScheduler.start();
-//			startAutosaveTimer();
 		}
 	}
 
@@ -1135,138 +1767,6 @@ public class Simulation implements ClockListener, Serializable {
 			return lastSaveTimeStampMod;
 		}
 	}
-
-//	public class AutosaveService {
-//
-//		private ExecutorService autosaveService = Executors.newSingleThreadScheduledExecutor();
-//		
-//		public  Future<Integer> start(Integer input) { 
-//			
-//			autosaveService.scheduleAtFixedRate(start(0), SimulationConfig.instance().getAutosaveInterval(),
-//					SimulationConfig.instance().getAutosaveInterval(), TimeUnit.MINUTES);
-//			
-//			if (autosaveDefault) {
-//		        return autosaveService.submit(() -> {
-//					masterClock.setSaveSim(AUTOSAVE_AS_DEFAULT, null);
-//		            return 0;
-//		        });
-//			}
-//			else {
-//		        return autosaveService.submit(() -> {			
-//					masterClock.setAutosave(true);
-//		            return 0;
-//		        });
-//			}
-//		}
-//	}
-		
-	/*
-	 * Set up a timer for periodically saving the sim
-	 */
-//	public void startAutosaveTimer() {
-		
-//		autosaveScheduler = new AutosaveScheduler();
-//		AutosaveScheduler.start();
-		
-//		// autosave_minute = SimulationConfig.instance().getAutosaveInterval();
-//		// Note: should call masterClock's saveSimulation() to first properly interrupt
-//		// the masterClock,
-//		// instead of directly call saveSimulation() here in Simulation
-//
-//		if (autosaveService != null) {
-//			// boolean java.util.concurrent.Future.cancel(boolean mayInterruptIfRunning)
-//			autosaveService.shutdown();
-//			autosaveService = null;
-//		}
-//
-//		autosaveService = Executors.newSingleThreadScheduledExecutor();
-//		
-//		if (autosaveDefault) {
-//			// For headless
-////			autosaveTimer = new Timeline(
-////				new KeyFrame(Duration.seconds(60 * autosave_minute),
-////						ae -> masterClock.setSaveSim(AUTOSAVE_AS_DEFAULT, null)));
-////			autosaveTimer = FxTimer.runLater(
-////    				java.time.Duration.ofMinutes(60 * autosave_minute),
-////    		        () -> masterClock.setSaveSim(AUTOSAVE_AS_DEFAULT, null));
-////			EventStreams.ticks(java.time.Duration.ofMinutes(60 * autosave_minute))
-////	        .subscribe(tick -> masterClock.setSaveSim(AUTOSAVE_AS_DEFAULT, null));
-//			setAutosaveDefault();
-//			
-//		} else {
-//			// for GUI
-////			autosaveTimer = new Timeline(
-////				new KeyFrame(Duration.seconds(60 * autosave_minute),
-////						ae -> masterClock.setAutosave(true)));
-////			autosaveTimer = FxTimer.runLater(
-////    				java.time.Duration.ofMinutes(60 * autosave_minute),
-////    		        () -> masterClock.setAutosave(true));
-////			EventStreams.ticks(java.time.Duration.ofMinutes(60 * autosave_minute))
-////	        .subscribe(tick -> masterClock.setAutosave(true));
-//			setAutosave();
-//			// Note1: Infinite Timeline might result in a memory leak if not stopped
-//			// properly.
-//			// Note2: All the objects with animated properties would NOT be garbage
-//			// collected.
-//
-////		autosaveTimer.setCycleCount(javafx.animation.Animation.INDEFINITE);
-////		autosaveTimer.play();
-//		}
-//	}
-
-//	public void setAutosaveDefault() {
-//		Runnable autosaveRunnable = new Runnable() {
-//			public void run() {
-//				masterClock.setSaveSim(AUTOSAVE_AS_DEFAULT, null);
-//			}
-//		};
-//		autosaveService.scheduleAtFixedRate(autosaveRunnable, SimulationConfig.instance().getAutosaveInterval(),
-//				SimulationConfig.instance().getAutosaveInterval(), TimeUnit.MINUTES);
-//
-//	}
-//
-//	public void setAutosave() {
-//		Runnable autosaveRunnable = new Runnable() {
-//			public void run() {
-//				masterClock.setAutosave(true);
-//			}
-//		};
-//		autosaveService.scheduleAtFixedRate(autosaveRunnable, SimulationConfig.instance().getAutosaveInterval(),
-//				SimulationConfig.instance().getAutosaveInterval(), TimeUnit.MINUTES);
-//	}
-
-	// Add testConsole() for outputting text messages to mars-simmers
-//    public void testConsole() {
-//    	if (jc == null) {
-//    		jc = new JConsole(60,30);
-//	    	jc.setCursorVisible(true);
-//	    	jc.setCursorBlink(true);
-//	    	jc.write("Welcome to Mars Simulation Project!\n\n");
-//	    	jc.write("Dear Mars-simmer,\n\nSee hidden logs below. Have fun!\n\n",Color.GREEN,Color.BLACK);
-//	    	//System.out.println("Normal output");
-//	    	//jc.setCursorPos(0, 0);
-//
-//	    	//jc.captureStdOut();
-//	    	//System.out.println("Captured output");
-//
-//	    	Frames.display(jc,"MSP Output Console");
-//
-//	    	//jc.write("after the fact\n");
-//    	}
-//    }
-//
-//    public JConsole getJConsole() {
-//    	return jc;
-//    }
-
-//	/**
-//	 * Gets the Timer instance of the autosave timer.
-//	 * 
-//	 * @return autosaveTimeline
-//	 */
-//	public ScheduledExecutorService getAutosaveTimer() {
-//		return autosaveService;
-//	}
 
 	/**
 	 * Get the planet Mars.
@@ -1367,21 +1867,21 @@ public class Simulation implements ClockListener, Serializable {
 		return masterClock;
 	}
 
-	/**
-	 * Checks if simulation was loaded from default save file.
-	 * 
-	 * @return true if default load.
-	 */
-	public boolean isDefaultLoad() {
-		return defaultLoad;
-	}
+//	/**
+//	 * Checks if simulation was loaded from default save file.
+//	 * 
+//	 * @return true if default load.
+//	 */
+//	public boolean isDefaultLoad() {
+//		return defaultLoad;
+//	}
 
 	/**
 	 * Sets if simulation was loaded with GUI.
 	 * 
 	 * @param value is true if GUI is in use.
 	 */
-	public static void setUseGUI(boolean value) {
+	public void setUseGUI(boolean value) {
 		useGUI = value;
 	}
 
@@ -1390,16 +1890,13 @@ public class Simulation implements ClockListener, Serializable {
 	 * 
 	 * @return true if GUI is in use.
 	 */
-	public static boolean getUseGUI() {
+	public boolean getUseGUI() {
 		return useGUI;
 	}
 
-	// public ThreadPoolExecutor getClockScheduler() {
-	// return clockScheduler;
-	// }
 
-	public ExecutorService getClockScheduler() {
-		return clockExecutor;
+	public ExecutorService getClockThreadExecutor() {
+		return clockThreadExecutor;
 	}
 
 	// public PausableThreadPoolExecutor getClockScheduler() {
@@ -1430,9 +1927,14 @@ public class Simulation implements ClockListener, Serializable {
 			masterClock.onUpdate(tpf);
 	}
 
-	public InteractiveTerm getTerm() {
-		return interactiveTerm;
-	}
+//	/**
+//	 * Get the interactive terminal instance
+//	 * 
+//	 * @return {@link InteractiveTerm}
+//	 */
+//	public InteractiveTerm getTerm() {
+//		return interactiveTerm;
+//	}
 	
 	/**
 	 * Clock pulse from master clock
@@ -1441,50 +1943,57 @@ public class Simulation implements ClockListener, Serializable {
 	 */
 	@Override
 	public void clockPulse(double time) {
-		if (ut != null && !masterClock.isPaused()) {
+		if (doneInitializing && ut != null && !clockOnPause && !masterClock.isPaused() && time > Double.MIN_VALUE) {
 
 			ut.updateTime();
 
-			if (debug) {
-				logger.fine(Msg.getString("Simulation.log.clockPulseMars", //$NON-NLS-1$
-						ut.getUptime(), mars.toString()));
-			}
+//			if (debug) {
+//				logger.fine(Msg.getString("Simulation.log.clockPulseMars", //$NON-NLS-1$
+//						ut.getUptime(), mars.toString()));
+//			}
 			mars.timePassing(time);
 			ut.updateTime();
 
-			if (debug) {
-				logger.fine(Msg.getString("Simulation.log.clockPulseMissionManager", //$NON-NLS-1$
-						masterClock.getUpTimer().getUptime(), missionManager.toString()));
-			}
+//			if (debug) {
+//				logger.fine(Msg.getString("Simulation.log.clockPulseMissionManager", //$NON-NLS-1$
+//						masterClock.getUpTimer().getUptime(), missionManager.toString()));
+//			}
 			missionManager.timePassing(time);
 			ut.updateTime();
 
-			if (debug) {
-				logger.fine(Msg.getString("Simulation.log.clockPulseUnitManager", //$NON-NLS-1$
-						masterClock.getUpTimer().getUptime(), unitManager.toString()));
-			}
+//			if (debug) {
+//				logger.fine(Msg.getString("Simulation.log.clockPulseUnitManager", //$NON-NLS-1$
+//						masterClock.getUpTimer().getUptime(), unitManager.toString()));
+//			}
 			unitManager.timePassing(time);
 			ut.updateTime();
 
-			if (debug) {
-				logger.fine(Msg.getString("Simulation.log.clockPulseScientificStudyManager", //$NON-NLS-1$
-						masterClock.getUpTimer().getUptime(), scientificStudyManager.toString()));
-			}
+//			if (debug) {
+//				logger.fine(Msg.getString("Simulation.log.clockPulseScientificStudyManager", //$NON-NLS-1$
+//						masterClock.getUpTimer().getUptime(), scientificStudyManager.toString()));
+//			}
 			scientificStudyManager.updateStudies();
 			ut.updateTime();
 
-			if (debug) {
-				logger.fine(Msg.getString("Simulation.log.clockPulseTransportManager", //$NON-NLS-1$
-						masterClock.getUpTimer().getUptime(), transportManager.toString()));
-			}
+//			if (debug) {
+//				logger.fine(Msg.getString("Simulation.log.clockPulseTransportManager", //$NON-NLS-1$
+//						masterClock.getUpTimer().getUptime(), transportManager.toString()));
+//			}
 			transportManager.timePassing(time);
-
 		}
 	}
 
 	public boolean getAutosaveDefault() {
 		return autosaveDefault;
 	}
+	
+//	/**
+//	 * Returns the ObjectMapper instance
+//	 * @return {@link ObjectMapper}
+//	 */
+//	public ObjectMapper getObjectMapper() {
+//		return objectMapper; 
+//	}
 	
 	@Override
 	public void uiPulse(double time) {
@@ -1494,7 +2003,10 @@ public class Simulation implements ClockListener, Serializable {
 
 	@Override
 	public void pauseChange(boolean isPaused, boolean showPane) {
-		// Do nothing
+		if (isPaused)
+			clockOnPause = true;
+		else
+			clockOnPause = false;
 	}
 
 	/**
@@ -1502,7 +2014,7 @@ public class Simulation implements ClockListener, Serializable {
 	 * simulation.
 	 */
 	public void destroyOldSimulation() {
-		// logger.config("starting Simulation's destroyOldSimulation()");
+		logger.config("Starting destroyOldSimulation()");
 
 //		autosaveService = null;
 		AutosaveScheduler.cancel();
@@ -1516,6 +2028,8 @@ public class Simulation implements ClockListener, Serializable {
 			mars.destroy();
 			mars = null;
 		}
+		
+		logger.config("Done with mars");
 
 		if (missionManager != null) {
 			missionManager.destroy();
@@ -1532,6 +2046,8 @@ public class Simulation implements ClockListener, Serializable {
 			medicalManager = null;
 		}
 
+		logger.config("Done with medicalManager");
+		
 		if (masterClock != null) {
 			masterClock.destroy();
 			masterClock = null;
@@ -1557,12 +2073,7 @@ public class Simulation implements ClockListener, Serializable {
 			eventManager = null;
 		}
 
-//        if (managerExecutor != null) {
-//            managerExecutor.shutdownNow();
-//            managerExecutor = null;
-//        }
-
-		// logger.config("Simulation's destroyOldSimulation() is done");
+		 logger.config("Done with Simulation's destroyOldSimulation()");
 	}
 
 }

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Mind.java
- * @version 3.1.0 2017-12-16
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai;
@@ -9,26 +9,26 @@ package org.mars_sim.msp.core.person.ai;
 import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.UnitEventType;
-import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PersonalityTraitManager;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.job.JobAssignmentType;
 import org.mars_sim.msp.core.person.ai.job.JobHistory;
-import org.mars_sim.msp.core.person.ai.job.JobManager;
+import org.mars_sim.msp.core.person.ai.job.JobUtil;
 import org.mars_sim.msp.core.person.ai.job.Politician;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
-import org.mars_sim.msp.core.person.ai.task.Task;
-import org.mars_sim.msp.core.person.ai.task.TaskManager;
-import org.mars_sim.msp.core.structure.ChainOfCommand;
-import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
+import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskManager;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.MathUtils;
 import org.mars_sim.msp.core.tool.RandomUtil;
@@ -44,20 +44,32 @@ public class Mind implements Serializable {
 
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(Mind.class.getName());
+	private static String loggerName = logger.getName();
+	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
 	
+	private static final int MAX_COUNTS = 200;
+	private static final int STRESS_UPDATE_CYCLE = 10;
+	private static final double MINIMUM_MISSION_PERFORMANCE = 0.3;
 	private static final double FACTOR = .05;
+	private static final double SMALL_AMOUNT_OF_TIME = 0.001;
 
 	// Data members
 	/** Is the job locked so another can't be chosen? */
 	private boolean jobLock;
+	
+	/** The counter for calling takeAction(). */
+	private int counts = 0;
 	/** The cache for sol. */
 	private int solCache = 1;
 	/** The cache for msol. */
-	private int msolCache = -1;
+//	private int msolCache = -1;
+	
 	/** The cache for msol1. */
 	private double msolCache1 = -1D;
+	
 	/** The person owning this mind. */
 	private Person person = null;
+	
 	/** The person's task manager. */
 	private TaskManager taskManager;
 	/** The person's current mission (if any). */
@@ -65,20 +77,32 @@ public class Mind implements Serializable {
 	/** The person's job. */
 	private Job job;
 	/** The person's personality. */
-	private PersonalityType mbti;
+	private MBTIPersonality mbti;
 	/** The person's emotional states. */	
 	private EmotionManager emotion;
-
+	/** The person's personality trait manager. */
 	private PersonalityTraitManager trait;
-	/** The person's skill manager. */
-	private SkillManager skillManager;
+	
+//	/** The person's core mind. */
+//	private CoreMind coreMind;
 
-	private MissionManager missionManager;
+	private static MissionManager missionManager;
+	private static MarsClock marsClock;
+	private static RelationshipManager relationshipManager;
+	private static SurfaceFeatures surfaceFeatures;
 
-	private static Simulation sim;
-
-	private MarsClock marsClock;
-
+	static {
+		Simulation sim = Simulation.instance();
+		// Load the marsClock
+		marsClock = sim.getMasterClock().getMarsClock();
+		// Load the mission manager
+		missionManager = sim.getMissionManager();
+		// Load the relationship manager
+		relationshipManager = sim.getRelationshipManager();
+		// Load SurfaceFeatures
+		surfaceFeatures = sim.getMars().getSurfaceFeatures();
+	}
+	
 	/**
 	 * Constructor 1.
 	 * 
@@ -92,24 +116,26 @@ public class Mind implements Serializable {
 		job = null;
 		jobLock = false;
 
-		sim = Simulation.instance();
-		if (sim.getMasterClock() != null) // for passing maven test
-			marsClock = sim.getMasterClock().getMarsClock();
-
+//		Simulation sim = Simulation.instance();
+//		// Load the marsClock
+//		marsClock = sim.getMasterClock().getMarsClock();
+//		// Load the mission manager
+//		missionManager = sim.getMissionManager();
+//		// Load the relationship manager
+//		relationshipManager = sim.getRelationshipManager();
+		
+//		// Create CoreMind
+//		coreMind = new CoreMind();
 		// Construct the Big Five personality trait.
 		trait = new PersonalityTraitManager(person);
 		// Construct the MBTI personality type.
-		mbti = new PersonalityType(person);
+		mbti = new MBTIPersonality(person);
 		// Construct the emotion states.
 		emotion = new EmotionManager(person);
 		// Construct the task manager
 		taskManager = new TaskManager(this);
-		// Load the mission manager
-		missionManager = sim.getMissionManager();
-		// Construct the skill manager.
-		skillManager = new SkillManager(person);
 	}
-
+	
 	/**
 	 * Time passing.
 	 * 
@@ -117,17 +143,22 @@ public class Mind implements Serializable {
 	 * @throws Exception if error.
 	 */
 	public void timePassing(double time) {
-		if (taskManager != null)
-			taskManager.recordTask();
-
+		if (taskManager != null) {
+			// Take action as necessary.
+			takeAction(time);
+			// Record the action (task/mission)
+//			taskManager.recordFilterTask(time);
+		}
+		
 		double msol1 = marsClock.getMillisolOneDecimal();
 
+		
 		if (msolCache1 != msol1) {
 			msolCache1 = msol1;
 
 			int msol = marsClock.getMillisolInt();
 
-			if (msol % 3 == 0) {
+			if (msol % STRESS_UPDATE_CYCLE == 0) {
 //				msolCache = msol;
 
 				// Update stress based on personality.
@@ -137,7 +168,7 @@ public class Mind implements Serializable {
 				updateEmotion();
 				
 				// Update relationships.
-				sim.getRelationshipManager().timePassing(person, time);
+				relationshipManager.timePassing(person, time);
 			}
 
 			// Note : for now a Mayor/Manager cannot switch job
@@ -150,19 +181,14 @@ public class Mind implements Serializable {
 					// the next day
 					// check for the passing of each day
 					int solElapsed = marsClock.getMissionSol();
-					if (solElapsed != solCache) {
+					if (solCache != solElapsed) {
 						solCache = solElapsed;
 						jobLock = false;
 					}
 				} else
 					checkJob();
 			}
-
-			// Take action as necessary.
-			if (taskManager != null)
-				takeAction(time);
 		}
-
 	}
 
 	/*
@@ -173,7 +199,7 @@ public class Mind implements Serializable {
 		if (job == null) { // removing !jobLock
 			// Note: getNewJob() is checking if existing job is "good enough"/ or has good
 			// prospect
-			Job newJob = JobManager.getNewJob(person);
+			Job newJob = JobUtil.getNewJob(person);
 			// Already excluded mayor/manager job from being assigned in
 			// JobManager.getNewJob()
 			String newJobStr = newJob.getName(person.getGender());
@@ -183,7 +209,7 @@ public class Mind implements Serializable {
 			if (newJob != null) {
 				if (!newJobStr.equals(jobStr)) {
 					// job = newJob;
-					setJob(newJob, false, JobManager.SETTLEMENT, JobAssignmentType.APPROVED, JobManager.SETTLEMENT);
+					setJob(newJob, false, JobUtil.SETTLEMENT, JobAssignmentType.APPROVED, JobUtil.SETTLEMENT);
 				}
 			}
 		}
@@ -195,8 +221,9 @@ public class Mind implements Serializable {
 	 * @param assignedBy the authority that assigns the job
 	 */
 	public void getInitialJob(String assignedBy) {
-		// Job newJob = JobManager.getNewJob(person);
-		setJob(JobManager.getNewJob(person), true, assignedBy, JobAssignmentType.APPROVED, assignedBy);
+		Job newJob = JobUtil.getNewJob(person);
+		if (newJob != null)
+			setJob(newJob, true, assignedBy, JobAssignmentType.APPROVED, assignedBy);
 	}
 
 	/**
@@ -207,50 +234,205 @@ public class Mind implements Serializable {
 	 */
 	public void takeAction(double time) {
 
-		boolean hasActiveTask = taskManager.hasActiveTask();
-		// Perform a task if the person has one, or determine a new task/mission.
-		if (hasActiveTask) {
-			double remainingTime = taskManager.executeTask(time, person.getPerformanceRating());
-			if (remainingTime > 0D) {
-				// Call takeAction recursively until time = 0
-				takeAction(remainingTime);
-			}
-		} else {
-			if ((mission != null) && mission.isDone()) {
-				mission = null;
-			}
-
-			boolean hasActiveMission = hasActiveMission();// (mission != null);
-			// Check if mission creation at settlement (if any) is overridden.
-			boolean overrideMission = false;
-
-			if (person.isInSettlement()) {
-				overrideMission = person.getSettlement().getMissionCreationOverride();
-			}
-
-			if (hasActiveMission) {
-				mission.performMission(person);
-			}
-
-			// A person has no active task
-			if (!taskManager.hasActiveTask()) {
-				try {
-					getNewAction(true, (!hasActiveMission && !overrideMission));
-				} catch (Exception e) {
-					logger.log(Level.WARNING, person + " could not get new action", e);
-					e.printStackTrace(System.err);
+		if (time > SMALL_AMOUNT_OF_TIME) {
+			// Perform a task if the person has one, or determine a new task/mission.
+			if (taskManager.hasActiveTask()) {
+				double remainingTime = taskManager.executeTask(time, person.getPerformanceRating());
+				if (counts < MAX_COUNTS) {
+					if (remainingTime > SMALL_AMOUNT_OF_TIME) {
+						// Allow calling takeAction recursively until 'counts' exceed the limit
+						try {
+							counts++;
+							takeAction(remainingTime);
+						} catch (Exception e) {
+	//						e.printStackTrace(System.err);
+							String taskName = taskManager.getTaskName();
+							
+							if (taskName != null) {
+								LogConsolidated.log(logger, Level.WARNING, 20_000, sourceName,
+									person.getName() + " had called takeAction() " + counts + "x doing " 
+									+ taskManager.getTaskName() + "   remainingTime : " +  Math.round(remainingTime *1000.0)/1000.0 
+									+ "   time : " + Math.round(time *1000.0)/1000.0); // 1x = 0.001126440159375963 -> 8192 = 8.950963852039651
+							} else {
+								LogConsolidated.log(logger, Level.WARNING, 20_000, sourceName,
+										person.getName() + " had called takeAction() " + counts + "x with no task in mind." 
+										+ "  - remainingTime : " +  Math.round(remainingTime *1000.0)/1000.0 
+										+ "  - time : " + Math.round(time *1000.0)/1000.0);
+							}
+							
+							return;
+						}
+					}
+					
+					else {
+//						LogConsolidated.log(Level.INFO, 20_000, sourceName,
+//								person + " had been doing " + counts + "x " 
+//								+ taskManager.getTaskName() + "   remainingTime is smaller than " + SMALL_AMOUNT_OF_TIME 
+//								+ " (" + Math.round(remainingTime *1000.0)/1000.0 
+//								+ ")   time : " + Math.round(time *1000.0)/1000.0); // 1x = 0.001126440159375963 -> 8192 = 8.950963852039651
+					}
+				}
+				
+				else if (taskManager.getTaskName() != null && taskManager.getTaskName().equals("")) {
+					LogConsolidated.log(logger, Level.WARNING, 20_000, sourceName,
+							person + " had been doing " + counts + "x '" 
+							+ taskManager.getTaskName() + "' (Remaining Time: " + Math.round(remainingTime *1000.0)/1000.0 
+							+ "; Time: " + Math.round(time *1000.0)/1000.0 + ")."); // 1x = 0.001126440159375963 -> 8192 = 8.950963852039651
 				}
 			}
-
-//			 if (hasActiveTask || hasActiveMission) {
-//				 takeAction(time);
-//			 Recursive calling causing Exception in thread "pool-4-thread-217"
-//			 java.lang.StackOverflowError
-//			 org.mars_sim.msp.core.person.ai.Mind.takeAction(Mind.java:242)
-//			 }
+			
+			else { 
+				// don't have an active task
+				lookForATask();
+			}
 		}
 	}
 
+	/**
+	 * Looks for a new task
+	 */
+	public void lookForATask() {
+		
+//		LogConsolidated.log(Level.INFO, 20_000, sourceName,
+//				person + " had no active task.");
+
+		if ((mission != null) && mission.isDone()) {
+			// Set the mission to null since it is done
+			mission = null;
+		}
+
+		boolean hasActiveMission = hasActiveMission();
+
+		if (hasActiveMission) {
+
+			// If the mission vehicle has embarked but the person is not on board, 
+			// then release the person from the mission
+			if (!(mission.getCurrentMissionLocation().equals(person.getCoordinates()))) {
+				mission.removeMember(person);
+				mission = null;
+				selectNewTask();
+			}
+				
+			else {
+		        boolean inDarkPolarRegion = surfaceFeatures.inDarkPolarRegion(mission.getCurrentMissionLocation());
+				double sunlight = surfaceFeatures.getSolarIrradiance(mission.getCurrentMissionLocation());
+				if ((sunlight == 0) && !inDarkPolarRegion) {
+					if (mission.getPhase() != null)
+						resumeMission(-2);
+					else
+						selectNewTask();
+				}
+				
+				// Checks if a person is tired, too stressful or hungry and need 
+				// to take break, eat and/or sleep
+				else if (!person.getPhysicalCondition().isFit()
+		        	&& !mission.hasDangerousMedicalProblemsAllCrew()) {
+		        	// Cannot perform the mission if a person is not well
+		        	// Note: If everyone has dangerous medical condition during a mission, 
+		        	// then it won't matter and someone needs to drive the rover home.
+					// Add penalty in resuming the mission
+					if (mission.getPhase() != null)
+						resumeMission(-1);
+					else
+						selectNewTask();
+				}
+				
+		        else if (VehicleMission.REVIEWING.equals(mission.getPhase())) {
+		        	if (!mission.getStartingMember().equals(person)) {
+			        	// If the mission is still pending upon approving, then only the mission lead
+			        	// needs to perform the mission and rest of the crew can do something else to 
+			        	// get themselves ready.
+						selectNewTask();
+		        	}
+		        	else
+		        		resumeMission(0);		
+				}
+				
+				else if (mission.getPhase() != null) {
+					resumeMission(0);
+				}
+				else
+					selectNewTask();
+			}
+		}
+		
+		else {  // don't have an active mission
+			selectNewTask();
+		}
+	}
+	
+	public void resumeMission(int modifier) {
+		if (VehicleMission.TRAVELLING.equals(mission.getPhase())) {
+			if (taskManager.getPhase() != null && mission.getVehicle().getOperator() == null) {
+				// if no one is driving the vehicle and nobody is NOT doing field work, 
+				// need to elect a driver right away
+				checkMissionFitness(modifier);
+			}
+			else 
+				selectNewTask();
+		}
+		else if (taskManager.getPhase() != null) {
+//				&& mission.getPhase().equals(VehicleMission.REVIEWING)
+//				) {
+			checkMissionFitness(modifier);
+		}
+		else
+			selectNewTask();
+	}
+	
+	
+	public void checkMissionFitness(int modifier) {
+		int fitness = person.getPhysicalCondition().computeFitnessLevel();
+		int priority = mission.getPriority();
+		int rand = RandomUtil.getRandomInt(6);
+		if (rand - (fitness)/1.5D <= priority + modifier) {
+//					// See if this person can ask for a mission
+//					boolean newMission = !hasActiveMission && !hasAMission && !overrideMission && isInMissionWindow;							
+			mission.performMission(person);
+//					logger.info(person + " was to perform the " + mission + " mission");
+		}
+		
+		else {
+			selectNewTask();
+		}
+	}
+	
+	public void selectNewTask() {
+		try {
+			// A person has no active task 
+			getNewTask();
+		} catch (Exception e) {
+			LogConsolidated.log(logger, Level.SEVERE, 5_000, sourceName,
+					person.getName() + " could not get new action", e);
+			e.printStackTrace(System.err);
+		}
+	}
+	
+	/**
+	 * Checks if a person can start a new mission
+	 * 
+	 * @return
+	 */
+	public boolean canStartNewMission() {
+		boolean hasAMission = hasAMission();
+//		if (hasAMission)
+//			logger.info(person + " had the " + mission + " mission");;
+		
+		boolean hasActiveMission = hasActiveMission();
+
+		boolean overrideMission = false;
+
+		// Check if mission creation at settlement (if any) is overridden.
+		overrideMission = person.getAssociatedSettlement().getMissionCreationOverride();
+
+		// Check if it's within the mission request window 
+		// Within 100 millisols at the start of the work shift
+		boolean isInMissionWindow = taskManager.getTaskSchedule().isPersonAtStartOfWorkShift(TaskSchedule.MISSION_WINDOW);
+
+		// See if this person can ask for a mission
+		return !hasActiveMission && !hasAMission && !overrideMission && isInMissionWindow;
+	}
+	
 	/**
 	 * Reassign the person's job.
 	 * 
@@ -264,7 +446,7 @@ public class Mind implements Serializable {
 		// (1) ReviewJobReassignment's constructor or
 		// (2) TabPanelCareer's actionPerformed() [for a pop <= 4 settlement]
 		Job newJob = null;
-		Iterator<Job> i = JobManager.getJobs().iterator();
+		Iterator<Job> i = JobUtil.getJobs().iterator();
 		while (i.hasNext()) {
 			Job job = i.next();
 			String n = job.getName(person.getGender());
@@ -292,6 +474,7 @@ public class Mind implements Serializable {
 		// (2) checkJob() in Mind.java
 		// (3) getInitialJob() in Mind.java
 		// TODO : if jobLock is true, will it allow the job to be changed?
+//		System.out.println("Mind's setJob(). newJob is " + newJob);
 		String newJobStr = newJob.getName(person.getGender());
 		assignJob(newJob, newJobStr, bypassingJobLock, assignedBy, status, approvedBy);
 	}
@@ -309,7 +492,7 @@ public class Mind implements Serializable {
 			JobAssignmentType status, String approvedBy) {
 		String jobStr = null;
 		JobHistory jh = person.getJobHistory();
-		Settlement s = person.getSettlement();
+//		Settlement s = person.getSettlement();
 
 		if (job == null)
 			jobStr = null;
@@ -320,58 +503,78 @@ public class Mind implements Serializable {
 		if (!newJobStr.equals(jobStr)) {
 
 			if (bypassingJobLock || !jobLock) {
+//				System.out.println("1 " + person + " " + person.getJobName() + " " + jobStr);
 				job = newJob;
+//				logger.info("2 " + person + " " + person.getJobName() + " " + newJobStr);
 				// Set up 4 approvedBy conditions
-				if (approvedBy.equals(JobManager.SETTLEMENT)) { // automatically approved if pop <= 4
+				if (approvedBy.equals(JobUtil.SETTLEMENT)) { // automatically approved if pop <= 4
 					jh.saveJob(newJob, assignedBy, status, approvedBy, true);
-				} else if (approvedBy.equals(JobManager.USER)) {
+				} else if (approvedBy.equals(JobUtil.USER)) {
 					jh.saveJob(newJob, assignedBy, status, approvedBy, true);
-				} else if (approvedBy.equals(JobManager.MISSION_CONTROL)) { // at the start of sim
+				} else if (approvedBy.equals(JobUtil.MISSION_CONTROL)) { // at the start of sim
 					jh.saveJob(newJob, assignedBy, status, approvedBy, false);
 				} else { // Call JobHistory's saveJob(),
 						// approved by a Senior Official");
 					jh.saveJob(newJob, assignedBy, status, approvedBy, false);
 				}
+				
+				String s = String.format("[%s] %25s (Job) -> %s",
+						person.getLocationTag().getLocale(), 
+						person.getName(), 
+						newJobStr);
+				
+				LogConsolidated.log(logger, Level.CONFIG, 0, sourceName, s);
 
 				person.fireUnitUpdate(UnitEventType.JOB_EVENT, newJob);
 
-				// Assign a new role type to the person and others in a settlement
-				// immediately after the change of one's job type
-				if (s != null) {
-					ChainOfCommand cc = s.getChainOfCommand();
-
-					// Assign a role associate with
-					if (s.getNumCitizens() >= UnitManager.POPULATION_WITH_MAYOR) {
-						cc.set7Divisions(true);
-						cc.assignSpecialiststo7Divisions(person);
-					}
-					else {
-						cc.set3Divisions(true);
-						cc.assignSpecialiststo3Divisions(person);
-					}
-				}
+				// Assign a new role type after the change of job
+//				if (s != null 
+//						// Exclude the person if he's a head
+//						&& person.getRole().getType() != RoleType.COMMANDER
+//						&& person.getRole().getType() != RoleType.SUB_COMMANDER
+//						&& person.getRole().getType() != RoleType.MAYOR
+//						&& person.getRole().getType() != RoleType.PRESIDENT) {
+//					person.getRole().obtainRole(s);
+//				}
+				
 				// the new job will be Locked in until the beginning of the next day
 				jobLock = true;
 			}
 		}
 	}
-
+		
 	/**
 	 * Returns true if person has an active mission.
 	 * 
 	 * @return true for active mission
 	 */
 	public boolean hasActiveMission() {
-		return (mission != null) && !mission.isDone();
+        return (mission != null) && !mission.isDone();
 	}
 
+	/**
+	 * Returns true if person has a mission.
+	 * 
+	 * @return true for active mission
+	 */
+	public boolean hasAMission() {
+		if (mission != null) {
+//			// has a mission but need to determine if this mission is active or not
+//			if (mission.isApproved()
+//				|| (mission.getPlan() != null 
+//					&& mission.getPlan().getStatus() != PlanType.NOT_APPROVED))
+				return true;
+		}
+		return false;
+	}
+	
 	/**
 	 * Set this mind as inactive. Needs move work on this; has to abort the Task can
 	 * not just close it. This abort action would then allow the Mission to be also
 	 * aborted.
 	 */
 	public void setInactive() {
-		taskManager.clearTask();
+		taskManager.clearAllTasks();
 		if (hasActiveMission()) {
 			mission.removeMember(person);
 			mission = null;
@@ -385,16 +588,16 @@ public class Mind implements Serializable {
 	 */
 	public void setMission(Mission newMission) {
 		if (newMission != mission) {
-				if (mission != null) {
-					mission.removeMember(person);
-				}
-				mission = newMission;
+			if (mission != null) {
+				mission.removeMember(person);
+			}
+			mission = newMission;
 
-				if (newMission != null) {
-					newMission.addMember(person);
-				}
+			if (newMission != null) {
+				newMission.addMember(person);
+			}
 
-				person.fireUnitUpdate(UnitEventType.MISSION_EVENT, newMission);
+			person.fireUnitUpdate(UnitEventType.MISSION_EVENT, newMission);
 		}
 	}
 
@@ -407,87 +610,149 @@ public class Mind implements Serializable {
 	}
 
 	/**
-	 * Determines a new action for the person based on available tasks, missions and
-	 * active missions.
-	 * 
-	 * @param tasks    can the action be a new task?
-	 * @param missions can the action be a new mission?
+	 * Determines a new task for the person.
 	 */
-	public void getNewAction(boolean tasks, boolean missions) {
+	public void getNewTask() {
+//		logger.info(person + " was calling getNewTask()");
+		// Get probability weights from tasks.
+		double taskWeights = 0D;
 
+		// Determine sum of weights based on given parameters
+		double weightSum = 0D;
+
+		// Check if there are any assigned tasks that are pending
+		if (taskManager.hasPendingTask()) {
+			Task newTask = taskManager.getAPendingMetaTask().constructInstance(person);
+			counts = 0;
+			LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+					person.getName() + " had been given a task order of " + newTask.getName());
+			taskManager.addTask(newTask, false);
+			return;
+		}
+		
+		else {
+			taskWeights = taskManager.getTotalTaskProbability(false);
+			weightSum += taskWeights;
+		}
+
+
+		if (weightSum <= 0D || Double.isNaN(weightSum) || Double.isInfinite(weightSum)) {
+//			try {
+//				TimeUnit.MILLISECONDS.sleep(100L);
+//			} catch (InterruptedException e) {
+//				e.printStackTrace();
+//			}
+//			String s = "zero";
+//			if (Double.isNaN(weightSum) || Double.isInfinite(weightSum))
+//				s = "infinite";
+//			
+//			LogConsolidated.log(Level.SEVERE, 20_000, sourceName,
+//					person.getName() + " has " + s + " weight sum" 
+//					+ " and cannot pick a new task.");
+			
+//			taskManager.clearTask();
+//			throw new IllegalStateException("Mind.getNewAction(): " + person + " weight sum: " + weightSum);
+			
+//			Task newTask = taskManager.getNewTask();
+//			if (newTask != null)
+//				taskManager.addTask(newTask);
+//			else
+//				logger.severe(person + "'s newTask is null ");
+			
+			// Return to takeAction() in Mind
+			return;
+	
+		}
+		
+		// Select randomly across the total weight sum.
+		double rand = RandomUtil.getRandomDouble(weightSum);
+
+		// Determine which task should be selected.
+		if (rand < taskWeights) {
+			Task newTask = taskManager.getNewTask();
+			if (newTask != null) {
+				counts = 0;
+				taskManager.addTask(newTask, false);
+			}
+			else
+				logger.severe(person + "'s newTask is null ");
+
+			return;
+		} 
+		
+		else {
+			rand -= taskWeights;
+		}
+	
+		// If reached this point, no task or mission has been found.
+		LogConsolidated.log(logger, Level.SEVERE, 20_000, sourceName,
+					person.getName() + " could not determine a new task (taskWeights: " 
+					+ taskWeights + ").");	
+	}
+
+	/**
+	 * Determines a new mission for the person.
+	 */
+	public void getNewMission() {
 		// If this Person is too weak then they can not do Missions
-		if (person.getPerformanceRating() < 0.5D) {
-			missions = false;
+		if (person.getPerformanceRating() < MINIMUM_MISSION_PERFORMANCE) {
+			return;
 		}
 
 		// Get probability weights from tasks, missions and active missions.
-		double taskWeights = 0D;
 		double missionWeights = 0D;
 
 		// Determine sum of weights based on given parameters
 		double weightSum = 0D;
 
-		if (tasks) {
-			taskWeights = taskManager.getTotalTaskProbability(false);
-			weightSum += taskWeights;
+		// Check if there are any assigned tasks
+		missionWeights = missionManager.getTotalMissionProbability(person);
+		weightSum += missionWeights;
+
+		if (weightSum <= 0D || Double.isNaN(weightSum) || Double.isInfinite(weightSum)) {
+//			try {
+//				TimeUnit.MILLISECONDS.sleep(100L);
+//			} catch (InterruptedException e) {
+//				e.printStackTrace();
+//			}
+//			String s = "zero";
+//			if (Double.isNaN(weightSum) || Double.isInfinite(weightSum))
+//				s = "infinite";
+////			
+//			LogConsolidated.log(Level.SEVERE, 20_000, sourceName,
+//					person.getName() + " has " + s + " weight sum"
+//					+ " and cannot pick a new mission.");
+			
+			return;
 		}
-
-		if (missions) {
-			missionWeights = missionManager.getTotalMissionProbability(person);
-			weightSum += missionWeights;
-		}
-
-		if ((weightSum <= 0D) || (Double.isNaN(weightSum)) || (Double.isInfinite(weightSum))) {
-			try {
-				TimeUnit.MILLISECONDS.sleep(100L);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			throw new IllegalStateException("Mind.getNewAction(): " + person + " weight sum: " + weightSum);
-		}
-
-		// Select randomly across the total weight sum.
-		double rand = RandomUtil.getRandomDouble(weightSum);
-
-		// Determine which type of action was selected and set new action accordingly.
-		if (tasks) {
-			if (rand < taskWeights) {
-				Task newTask = taskManager.getNewTask();
-				if (newTask != null)
-					taskManager.addTask(newTask);
-				else
-					logger.severe(person + " : newTask is null ");
-
-				return;
-			} else {
-				rand -= taskWeights;
-			}
-		}
-
-		if (missions) {
+		
+		else {
+			// Select randomly across the total weight sum.
+			double rand = RandomUtil.getRandomDouble(weightSum);
+	
+			// Determine which type of action was selected and set new action accordingly.	
 			if (rand < missionWeights) {
-				Mission newMission = null;
-//				logger.info(person.getName() + " is looking at what mission to take on.");
-				newMission = missionManager.getNewMission(person);
-
+				Mission newMission = missionManager.getNewMission(person);
 				if (newMission != null) {
 					missionManager.addMission(newMission);
 					setMission(newMission);
 				}
-
+				// Return to selectingPhase() in PlanMission
 				return;
 			} else {
 				rand -= missionWeights;
 			}
 		}
-
-		// If reached this point, no task or mission has been found.
-		logger.severe(person.getName() + " couldn't determine new action - taskWeights: " + taskWeights
-				+ ", missionWeights: " + missionWeights);
+		
+		// If reached this point, no mission has been found.
+		LogConsolidated.log(logger, Level.SEVERE, 20_000, sourceName,
+					person.getName() + " could not determine a new mission (missionWeights: " + missionWeights + ").");	
 	}
 
+	
 	/**
 	 * Calls the psi function
+	 * 
 	 * @param av
 	 * @param pv
 	 * @return
@@ -624,17 +889,8 @@ public class Mind implements Serializable {
 	 * 
 	 * @return personality type.
 	 */
-	public PersonalityType getMBTI() {
+	public MBTIPersonality getMBTI() {
 		return mbti;
-	}
-
-	/**
-	 * Returns a reference to the Person's skill manager
-	 * 
-	 * @return the person's skill manager
-	 */
-	public SkillManager getSkillManager() {
-		return skillManager;
 	}
 
 	/**
@@ -694,6 +950,28 @@ public class Mind implements Serializable {
 		return trait;
 	}
 
+//	public void setCoreMind(String career) {
+//		coreMind.create(career);	
+//	}
+
+	/**
+	 * Reloads instances after loading from a saved sim
+	 * 
+	 * @param clock
+	 */
+	public static void initializeInstances(MarsClock clock, MissionManager m, RelationshipManager r) {
+		marsClock = clock;
+		relationshipManager = r;
+		missionManager = m;
+	}
+	
+	public void reinit() {
+//		trait.reinit();
+//		mbti.reinit();
+//		emotion.reinit();
+		taskManager.reinit();
+	}
+	
 	/**
 	 * Prepare object for garbage collection.
 	 */
@@ -707,7 +985,7 @@ public class Mind implements Serializable {
 		if (mbti != null)
 			mbti.destroy();
 		mbti = null;
-		skillManager.destroy();
-		skillManager = null;
+//		skillManager.destroy();
+//		skillManager = null;
 	}
 }

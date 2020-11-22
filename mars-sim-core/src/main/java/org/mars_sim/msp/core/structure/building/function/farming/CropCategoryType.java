@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * CropCategoryType.java
- * @version 3.1.0 2016-07-01
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 

@@ -1,8 +1,7 @@
 /**
  * Mars Simulation Project 
  * SimplicioIconProvider.java
- * @version 3.07 2014-12-10
-
+ * @version 3.1.2 2020-09-02
  * @author Modified by Manny Kung
  */
 
@@ -61,7 +60,7 @@ import org.mars_sim.msp.ui.swing.notification.IconProvider;
  * member allows to get the associated icon...
  * 
  * @author Antoine Neveux
- * @version 2.1
+ * @version 3.1.2 2020-09-02
  * @since 2.1
  */
 public enum SimplicioIconProvider implements IconProvider {

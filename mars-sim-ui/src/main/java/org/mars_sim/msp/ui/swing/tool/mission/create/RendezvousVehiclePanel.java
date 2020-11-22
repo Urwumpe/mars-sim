@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RendezvousVehiclePanel.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -27,13 +27,15 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LifeSupportType;
+import org.mars_sim.msp.core.LifeSupportInterface;
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
 import org.mars_sim.msp.core.resource.AmountResource;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.Vehicle;
@@ -54,6 +56,7 @@ class RendezvousVehiclePanel extends WizardPanel {
 	private JLabel errorMessageLabel;
 	
 	private static MissionManager missionManager;
+	private static UnitManager unitManager = Simulation.instance().getUnitManager();
 	
 	/**
 	 * Constructor.
@@ -215,19 +218,19 @@ class RendezvousVehiclePanel extends WizardPanel {
             		else if (column == 2) 
             			result = vehicle.getCrewNum();
             		else if (column == 3) {
-            			AmountResource oxygen = AmountResource.findAmountResource(LifeSupportType.OXYGEN);
+            			AmountResource oxygen = ResourceUtil.findAmountResource(LifeSupportInterface.OXYGEN);
             			result = (int) inv.getAmountResourceStored(oxygen, false);
             		}
                 	else if (column == 4) {
-                		AmountResource water = AmountResource.findAmountResource(LifeSupportType.WATER);
+                		AmountResource water = ResourceUtil.findAmountResource(LifeSupportInterface.WATER);
                 		result = (int) inv.getAmountResourceStored(water, false);
                 	}
                 	else if (column == 5) { 
-                		AmountResource food = AmountResource.findAmountResource(LifeSupportType.FOOD);
+                		AmountResource food = ResourceUtil.findAmountResource(LifeSupportInterface.FOOD);
                 		result = (int) inv.getAmountResourceStored(food, false);
                 	}
                 	else if (column == 6) { 
-                		AmountResource dessert = AmountResource.findAmountResource("Soymilk");
+                		AmountResource dessert = ResourceUtil.findAmountResource("Soymilk");
                 		result = (int) inv.getAmountResourceStored(dessert, false);
                 	}
                 	else if (column == 7) {
@@ -277,7 +280,7 @@ class RendezvousVehiclePanel extends WizardPanel {
     	 */
     	private Collection<Vehicle> getEmergencyBeaconVehicles() {
     		Collection<Vehicle> result = new ConcurrentLinkedQueue<Vehicle>();
-        	Iterator<Vehicle> i = Simulation.instance().getUnitManager().getVehicles().iterator();
+        	Iterator<Vehicle> i = unitManager.getVehicles().iterator();
         	while (i.hasNext()) {
         		Vehicle vehicle = i.next();
         		if (vehicle.isBeaconOn()) result.add(vehicle);
@@ -321,7 +324,7 @@ class RendezvousVehiclePanel extends WizardPanel {
     				Vehicle missionVehicle = getWizard().getMissionData().getRover();
     				Settlement startingSettlement = getWizard().getMissionData().getStartingSettlement();
     				double distance = startingSettlement.getCoordinates().getDistance(vehicle.getCoordinates()) * 2D;
-    				if (distance > missionVehicle.getRange()) result = true;
+    				if (distance > missionVehicle.getRange(wizard.getMissionBean().getMissionType())) result = true;
     			}
     			catch (Exception e) {}
     		}

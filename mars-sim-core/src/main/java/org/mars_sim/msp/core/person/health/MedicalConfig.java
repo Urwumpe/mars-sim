@@ -1,13 +1,13 @@
 /**
  * Mars Simulation Project
  * MedicalConfig.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.health;
 
-import org.jdom.Document;
-import org.jdom.Element;
+import org.jdom2.Document;
+import org.jdom2.Element;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -168,7 +168,6 @@ public class MedicalConfig implements Serializable {
 		return complaintList;
 	}
 
-    @SuppressWarnings("unchecked")
 	public List<Treatment> getTreatmentList() {
 		
 		if (treatmentList == null) {

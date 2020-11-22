@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ReadMeta.java
- * @version 3.1.0 2017-02-20
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -13,9 +13,10 @@ import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.task.Read;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.tool.RandomUtil;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * Meta task for the Read task.
@@ -25,6 +26,8 @@ public class ReadMeta implements MetaTask, Serializable {
     /** default serial id. */
     private static final long serialVersionUID = 1L;
 
+    private static final double VALUE = 2.5D;
+    
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.read"); //$NON-NLS-1$
@@ -43,12 +46,30 @@ public class ReadMeta implements MetaTask, Serializable {
 
         double result = 0D;
 
+        // Probability affected by the person's stress and fatigue.
+        PhysicalCondition condition = person.getPhysicalCondition();
+        double fatigue = condition.getFatigue();
+        double stress = condition.getStress();
+        double hunger = condition.getHunger();
+        
+        if (fatigue > 1000 || stress > 75 || hunger > 750)
+        	return 0;
+        
         if (person.isInside()) {
-        	result += 10D;
+        	result += VALUE;
 
-        	if (person.isInVehicle())
-        		result *= RandomUtil.getRandomDouble(2); // more likely than not if on a vehicle
-
+            if (person.isInVehicle()) {	
+    	        // Check if person is in a moving rover.
+    	        if (Vehicle.inMovingRover(person)) {
+    		        // the penalty inside a vehicle
+    	        	result += -20;
+    	        } 	       
+    	        else
+    		        // the bonus inside a vehicle, 
+    	        	// rather than having nothing to do if a person is not driving
+    	        	result += 20;
+            }
+            
 	        // Effort-driven task modifier.
 	        //result *= person.getPerformanceRating();
 
@@ -58,41 +79,38 @@ public class ReadMeta implements MetaTask, Serializable {
                 result *= 1.2D;
             }
             else if (fav == FavoriteType.TINKERING) {
-                result *= 1.2D;
+                result *= 0.8D;
             }
             else if (fav == FavoriteType.LAB_EXPERIMENTATION) {
-                result *= 1.2D;
+                result *= 0.9D;
             }
-
-
-            // Probability affected by the person's stress and fatigue.
-            PhysicalCondition condition = person.getPhysicalCondition();
-            double fatigue = condition.getFatigue();
-            double stress = condition.getStress();
+          
+//         	if (fatigue > 750D)
+//         		result/=1.5;
+//         	else if (fatigue > 1500D)
+//         		result/=2D;
+//         	else if (fatigue > 2000D)
+//         		result/=3D;
+//         	else
+//         		result/=4D;
+         	
+            result -= fatigue/5;           
             
-         	if (fatigue > 750D)
-         		result/=1.5;
-         	else if (fatigue > 1500D)
-         		result/=2D;
-         	else if (fatigue > 2000D)
-         		result/=3D;
-         	else
-         		result/=4D;
-         	
-         	if (stress > 45D)
-         		result/=1.5;
-         	else if (stress > 65D)
-         		result/=2D;
-         	else if (stress > 85D)
-         		result/=3D;
-         	else
-         		result/=4D;
-         	
-            // 2015-06-07 Added Preference modifier
-            if (result > 0D) {
-                result = result + result * person.getPreference().getPreferenceScore(this)/2D;
+            double pref = person.getPreference().getPreferenceScore(this);
+            
+        	result = pref * 2.5D;
+	        if (result < 0) result = 0;
+	        
+            if (pref > 0) {
+             	if (stress > 45D)
+             		result*=1.5;
+             	else if (stress > 65D)
+             		result*=2D;
+             	else if (stress > 85D)
+             		result*=3D;
+             	else
+             		result*=4D;
             }
-            
             
 	        if (result < 0) result = 0;
 

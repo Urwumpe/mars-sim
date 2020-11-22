@@ -1,21 +1,10 @@
 /**
  * Mars Simulation Project
  * AstronomicalObservationBuildingPanel.java
- * @version 3.1.0 2017-09-15
+ * @version 3.1.2 2020-09-02
  * @author Sebastien Venot
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
-
-import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.structure.building.function.AstronomicalObservation;
-import org.mars_sim.msp.ui.astroarts.OrbitViewer;
-import org.mars_sim.msp.ui.javafx.MainScene;
-import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MainWindow;
-
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -24,6 +13,15 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+
+import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.structure.building.function.AstronomicalObservation;
+import org.mars_sim.msp.ui.astroarts.OrbitViewer;
+import org.mars_sim.msp.ui.swing.MainDesktopPane;
+
+import com.alee.laf.button.WebButton;
+import com.alee.laf.label.WebLabel;
+import com.alee.laf.panel.WebPanel;
 
 /**
  * A panel for the astronomical observation building function.
@@ -101,7 +99,7 @@ extends BuildingFunctionPanel {
 		button.addActionListener(
 			new ActionListener() {
 				public void actionPerformed(ActionEvent e) {
-					openOrbitViewer();
+//					openOrbitViewer();
 				}
 			});
 		buttonPane.add(button);
@@ -125,25 +123,25 @@ extends BuildingFunctionPanel {
     	this.orbitViewer = orbitViewer;
     }
     
-	/**
-	 * Open orbit viewer
-	 */
-    // 2015-11-04 Added openOrbitViewer()
-	private void openOrbitViewer() {
-
-		MainWindow mw = desktop.getMainWindow();
-		if (mw != null)  {
-			if (orbitViewer == null && !desktop.isOrbitViewerOn())
-				orbitViewer = new OrbitViewer(desktop, this);
-		}
-
-		MainScene ms = desktop.getMainScene();
-		
-		if (ms != null)  {
-			if (orbitViewer == null && !desktop.isOrbitViewerOn()) {
-				orbitViewer = new OrbitViewer(desktop, this);
-			}
-		}
-	}
+//	/**
+//	 * Open orbit viewer
+//	 */
+//    // 2015-11-04 Added openOrbitViewer()
+//	private void openOrbitViewer() {
+//
+//		MainWindow mw = desktop.getMainWindow();
+//		if (mw != null)  {
+//			if (orbitViewer == null && !desktop.isOrbitViewerOn())
+//				orbitViewer = new OrbitViewer(desktop, this);
+//		}
+//
+//		MainScene ms = desktop.getMainScene();
+//		
+//		if (ms != null)  {
+//			if (orbitViewer == null && !desktop.isOrbitViewerOn()) {
+//				orbitViewer = new OrbitViewer(desktop, this);
+//			}
+//		}
+//	}
 
 }

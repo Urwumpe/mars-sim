@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ArrivingSettlementDetailPanel.java
- * @version 3.1.0 2017-10-16
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.resupply;
@@ -25,7 +25,6 @@ import org.mars_sim.msp.core.person.EventType;
 import org.mars_sim.msp.core.time.ClockListener;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.MasterClock;
-import org.mars_sim.msp.ui.javafx.MainScene;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
@@ -54,7 +53,7 @@ implements ClockListener, HistoricalEventListener {
 	private ArrivingSettlement arrivingSettlement;
 	
 	private MainDesktopPane desktop;
-	private MainScene mainScene;
+//	private MainScene mainScene;
 	
 	private static MarsClock currentTime;
 	private static MasterClock masterClock;
@@ -70,10 +69,10 @@ implements ClockListener, HistoricalEventListener {
 		// Use WebPanel constructor.
 		super();
 		this.desktop = desktop;
-		this.mainScene = desktop.getMainScene();
+//		this.mainScene = desktop.getMainScene();
 		
-		currentTime = Simulation.instance().getMasterClock().getMarsClock();
 		masterClock = Simulation.instance().getMasterClock();
+		currentTime = masterClock.getMarsClock();
 		
 		setLayout(new BorderLayout(0, 10));
 		setBorder(new MarsPanelBorder());
@@ -180,7 +179,7 @@ implements ClockListener, HistoricalEventListener {
 		locationPane.add(locationValueLabel);
 
 		// Set as clock listener.
-		Simulation.instance().getMasterClock().addClockListener(this);
+		masterClock.addClockListener(this);
 
 		// Set as historical event listener.
 		Simulation.instance().getEventManager().addListener(this);
@@ -303,23 +302,9 @@ implements ClockListener, HistoricalEventListener {
 	
 	@Override
 	public void uiPulse(double time) {
-		if (mainScene != null) {
-			if (!mainScene.isMinimized() && mainScene.isMainTabOpen() && desktop.isToolWindowOpen(MissionWindow.NAME)) {
-//				timeCache += time;
-//				if (timeCache > PERIOD_IN_MILLISOLS * time) {
-					updateArrival();
-//					timeCache = 0;
-//				}
-			}
-		}
-		else if (desktop.isToolWindowOpen(MissionWindow.NAME)) {
-//			timeCache += time;
-//			if (timeCache > PERIOD_IN_MILLISOLS * time) {
-				updateArrival();
-//				timeCache = 0;
-//			}
-		}			
-		
+		if (desktop.isToolWindowOpen(MissionWindow.NAME)) {
+			updateArrival();
+		}				
 	}
 	
 	@Override
@@ -332,8 +317,10 @@ implements ClockListener, HistoricalEventListener {
 	 * Prepares the panel for deletion.
 	 */
 	public void destroy() {
-		Simulation.instance().getEventManager().removeListener(this);
-		Simulation.instance().getMasterClock().removeClockListener(this);
+		if (Simulation.instance().getEventManager() != null)
+			Simulation.instance().getEventManager().removeListener(this);
+		if (masterClock != null)
+			masterClock.removeClockListener(this);
 		
 		nameValueLabel = null;
 		stateValueLabel = null;
@@ -344,8 +331,7 @@ implements ClockListener, HistoricalEventListener {
 		populationValueLabel = null;
 		arrivingSettlement = null;		
 		desktop = null;
-		mainScene = null;
-		
+
 		currentTime = null;
 		masterClock = null;
 	}

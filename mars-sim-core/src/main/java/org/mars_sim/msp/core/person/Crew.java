@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Crew.java
- * @version 3.1.0 2017-01-24
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person;
@@ -18,17 +18,24 @@ public class Crew implements Serializable {
     //private static Logger logger = Logger.getLogger(Crew.class.getName());
 
 	private String name;
+    private String crewName;
 	private String destination;
 	
-	//Set<Member> team = new HashSet<>();
-	List<Member> team = new ArrayList<>();
-	
+	private List<Member> team = new ArrayList<>();
 	
 	public Crew(String name) {
 		this.name = name;	
 	}
 
-	public void add(Member m) {
+	public void setCrewName(String value) {
+		crewName = value;
+	}
+	
+	public String getCrewName() {
+		return crewName;
+	} 
+	
+	public void addMember(Member m) {
 		team.add(m);
 	}
 

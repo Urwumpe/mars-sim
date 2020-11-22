@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * WalkMeta.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -10,8 +10,9 @@ import java.io.Serializable;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.task.Task;
 import org.mars_sim.msp.core.person.ai.task.Walk;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 
 /**
@@ -32,42 +33,38 @@ public class WalkMeta implements MetaTask, Serializable {
 
 	@Override
 	public Task constructInstance(Person person) {
-//      Walk walk = person.getWalk();
-//    	if (walk == null) {
-//    		walk = new Walk(person);
-//    		person.setWalk(walk);
-//    	}
-//    	else {
-//    		walk.taskCompute();
-//    		walk.compute();
-//    	}
-//    	
-//    	return walk;
-
 		return new Walk(person);
 	}
 
 	@Override
 	public double getProbability(Person person) {
-
-		double result = 0D;
+		// WalkMeta should be a subtask only 
+		// or else it causes a person to go outside improperly	
+		double result = 0;
 
 		// If person is outside, give high probability to walk to emergency airlock
 		// location.
-		if (person.isOutside()) {
-			result = 500D;
-		} else if (person.isInVehicle()) {
-			// If person is inside a rover, may walk to random location within rover.
-			result = .05D;
-		} else if (person.isInSettlement()) {
-			// If person is inside a settlement building, may walk to a random location
-			// within settlement.
-			result = .5D;
-		}
-
-		if (result < 0)
-			result = 0;
-
+//		if (person.isOutside()) {
+//			result = .01;
+//		} 
+//		
+//		else if (person.isInVehicle()) {
+//			// If person is inside a rover, may walk to random location within rover.
+//			result = 0;
+//		} 
+//		
+//		else if (person.isInSettlement()) {
+//			// If person is inside a settlement building, may walk to a random location
+//			// within settlement.
+//			result = 0;
+//		}
+//		
+////        double pref = person.getPreference().getPreferenceScore(this);  
+////        result = result + result * pref/12D;
+//
+//		if (result < 0)
+//			result = 0;
+//
 		return result;
 	}
 

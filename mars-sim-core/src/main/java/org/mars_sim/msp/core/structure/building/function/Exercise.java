@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Exercise.java
- * @version 3.1.0 2018-10-01
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -39,12 +39,10 @@ public class Exercise extends Function implements Serializable {
 		// Use Function constructor.
 		super(FUNCTION, building);
 
-		BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
-
-		this.exerciserCapacity = config.getExerciseCapacity(building.getBuildingType());
+		this.exerciserCapacity = buildingConfig.getExerciseCapacity(building.getBuildingType());
 
 		// Load activity spots
-		loadActivitySpots(config.getExerciseActivitySpots(building.getBuildingType()));
+		loadActivitySpots(buildingConfig.getExerciseActivitySpots(building.getBuildingType()));
 	}
 
 	/**

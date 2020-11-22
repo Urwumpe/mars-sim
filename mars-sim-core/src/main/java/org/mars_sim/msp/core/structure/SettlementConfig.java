@@ -1,23 +1,34 @@
 /**
  * Mars Simulation Project
  * SettlementConfig.java
- * @version 3.1.0 2017-01-21
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure;
 
-import org.jdom.Document;
-import org.jdom.Element;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
+
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.interplanetary.transport.resupply.ResupplyMissionTemplate;
 import org.mars_sim.msp.core.resource.AmountResource;
+import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.resource.PartPackageConfig;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.BuildingTemplate.BuildingConnectionTemplate;
-
-import java.io.Serializable;
-import java.util.*;
-import java.util.logging.Logger;
 
 /**
  * Provides configuration information about settlements. Uses a DOM document to
@@ -30,6 +41,8 @@ public class SettlementConfig implements Serializable {
 
 	private static Logger logger = Logger.getLogger(SettlementConfig.class.getName());
 
+	private static int templateID = 0;
+	
 	// Element names
 	private static final String ROVER_LIFE_SUPPORT_RANGE_ERROR_MARGIN = "rover-life-support-range-error-margin";
 	private static final String ROVER_FUEL_RANGE_ERROR_MARGIN = "rover-fuel-range-error-margin";
@@ -84,6 +97,8 @@ public class SettlementConfig implements Serializable {
 	private static final String NEW_ARRIVING_SETTLEMENT_LIST = "new-arriving-settlement-list";
 	private static final String ARRIVING_SETTLEMENT = "arriving-settlement";
 
+	private static final String DEFAULT_SPONSOR = "Mars Society (MS)";
+	
 	// Random value indicator.
 	public static final String RANDOM = "random";
 
@@ -95,15 +110,17 @@ public class SettlementConfig implements Serializable {
 	private Collection<SettlementTemplate> settlementTemplates;
 	private List<InitialSettlement> initialSettlements;
 	private List<NewArrivingSettlement> newArrivingSettlements;
-	// private List<ExistingSettlement> existingSettlements;
-	// private List<String> settlementNames;
-	private Map<String, List<String>> settlementNamesMap = new HashMap<>();
-	private Map<Integer, String> scenarioMap = new HashMap<>();
-	private Map<Integer, String> settlementMap = new HashMap<>();
+	private Map<Integer, String> templateMap = new HashMap<>();
+	
+	// A map of settlement id and its name
+	private Map<Integer, String> settlementMap = new ConcurrentHashMap<>();
+	// A map of sponsor and its list of settlement names
+	private Map<String, List<String>> settlementNamesMap = new ConcurrentHashMap<>();
 
 	private Document settlementDoc;
 
 	// private MultiplayerClient multiplayerClient;
+	
 	/**
 	 * Constructor.
 	 * 
@@ -124,9 +141,9 @@ public class SettlementConfig implements Serializable {
 
 	}
 
-	// public void setMultiplayerClient(MultiplayerClient multiplayerClient) {
-	// return multiplayerClient;
-	// }
+//	 public void setMultiplayerClient(MultiplayerClient multiplayerClient) {
+//		 return multiplayerClient;
+//	 }
 
 	public Collection<SettlementTemplate> GetSettlementTemplates() {
 		return settlementTemplates;
@@ -240,30 +257,33 @@ public class SettlementConfig implements Serializable {
 	 * @param partPackageConfig the part package configuration.
 	 * @throws Exception if error reading XML document.
 	 */
-	@SuppressWarnings("unchecked")
 	private void loadSettlementTemplates(Document settlementDoc, PartPackageConfig partPackageConfig) {
 
 		Element root = settlementDoc.getRootElement();
 		Element templateList = root.getChild(SETTLEMENT_TEMPLATE_LIST);
-		// Add settlement id to Settlement.xml and loaded settlement id here
-		// Set<Integer> existingSIDs = new HashSet<Integer>();
+
 		List<Element> templateNodes = templateList.getChildren(TEMPLATE);
+		
 		for (Element templateElement : templateNodes) {
-			int scenarioID = Integer.parseInt(templateElement.getAttributeValue(ID));
+//			int scenarioID = Integer.parseInt(templateElement.getAttributeValue(ID));
 			String settlementTemplateName = templateElement.getAttributeValue(NAME);
 
-			if (scenarioMap.containsKey(scenarioID)) {
-				throw new IllegalStateException("Error in SettlementConfig.xml: scenarioID in settlement template "
+			if (templateMap.containsKey(templateID)) {
+				throw new IllegalStateException("Error in SettlementConfig.xml: templateID in settlement template "
 						+ settlementTemplateName + " is not unique.");
 			} else
-				scenarioMap.put(scenarioID, settlementTemplateName);
+				templateMap.put(templateID, settlementTemplateName);
 
 			int defaultPopulation = Integer.parseInt(templateElement.getAttributeValue(DEFAULT_POPULATION));
 			int defaultNumOfRobots = Integer.parseInt(templateElement.getAttributeValue(DEFAULT_NUM_ROBOTS));
 
 			// Add scenarioID
-			SettlementTemplate template = new SettlementTemplate(settlementTemplateName, scenarioID, defaultPopulation,
+			SettlementTemplate template = new SettlementTemplate(
+					settlementTemplateName, 
+					templateID, 
+					defaultPopulation,
 					defaultNumOfRobots);
+			
 			settlementTemplates.add(template);
 
 			Set<Integer> existingIDs = new HashSet<Integer>();
@@ -287,12 +307,11 @@ public class SettlementConfig implements Serializable {
 				double xLoc = Double.parseDouble(buildingElement.getAttributeValue(X_LOCATION));
 				double yLoc = Double.parseDouble(buildingElement.getAttributeValue(Y_LOCATION));
 				double facing = Double.parseDouble(buildingElement.getAttributeValue(FACING));
-
-				// Change id to bid
+		
 				int bid = Integer.parseInt(buildingElement.getAttributeValue(ID));
 				if (existingIDs.contains(bid)) {
 					throw new IllegalStateException(
-							"Error in SettlementConfig.xml : building ID in settlement template "
+							"Error in SettlementConfig : building ID " + bid + " in settlement template "
 									+ settlementTemplateName + " is not unique.");
 				} else
 					existingIDs.add(bid);
@@ -307,16 +326,14 @@ public class SettlementConfig implements Serializable {
 
 				// Create a building nickname for every building
 				// by appending the settlement id and building id to that building's type.
-				String scenario = getCharForNumber(scenarioID + 1);
+				String templateString = getCharForNumber(templateID + 1);
 				// NOTE: i = sid + 1 since i must be > 1, if i = 0, s = null
-				// String buildingID = bid + "";
-				// Add buildingTypeID
+	
 				int buildingTypeID = buildingTypeIDMap.get(buildingType);
-				// String buildingNickName = buildingType + " " + scenario + buildingID;
+
 				String buildingNickName = buildingType + " " + buildingTypeID;
 
-				// Add buildingNickName, Changed id to bid
-				BuildingTemplate buildingTemplate = new BuildingTemplate(settlementTemplateName, bid, scenario,
+				BuildingTemplate buildingTemplate = new BuildingTemplate(settlementTemplateName, bid, templateString,
 						buildingType, buildingNickName, width, length, xLoc, yLoc, facing);
 
 				template.addBuildingTemplate(buildingTemplate);
@@ -377,7 +394,7 @@ public class SettlementConfig implements Serializable {
 			List<Element> resourceNodes = templateElement.getChildren(RESOURCE);
 			for (Element resourceElement : resourceNodes) {
 				String resourceType = resourceElement.getAttributeValue(TYPE);
-				AmountResource resource = AmountResource.findAmountResource(resourceType);
+				AmountResource resource = ResourceUtil.findAmountResource(resourceType);
 				if (resource == null)
 					logger.severe(resourceType + " shows up in settlements.xml but doesn't exist in resources.xml.");
 				else {
@@ -391,7 +408,7 @@ public class SettlementConfig implements Serializable {
 			List<Element> partNodes = templateElement.getChildren(PART);
 			for (Element partElement : partNodes) {
 				String partType = partElement.getAttributeValue(TYPE);
-				Part part = (Part) Part.findItemResource(partType);
+				Part part = (Part) ItemResourceUtil.findItemResource(partType);
 				if (part == null)
 					logger.severe(partType + " shows up in settlements.xml but doesn't exist in parts.xml.");
 				else {
@@ -430,6 +447,8 @@ public class SettlementConfig implements Serializable {
 					template.addResupplyMissionTemplate(resupplyMissionTemplate);
 				}
 			}
+			// Increments the templateID to be used for the next template
+			templateID++;
 		}
 	}
 
@@ -578,7 +597,6 @@ public class SettlementConfig implements Serializable {
 	 * @param settlementDoc DOM document with settlement configuration.
 	 * @throws Exception if XML error.
 	 */
-	@SuppressWarnings("unchecked")
 	private void loadSettlementNames(Document settlementDoc) {
 		Element root = settlementDoc.getRootElement();
 		Element settlementNameList = root.getChild(SETTLEMENT_NAME_LIST);
@@ -591,13 +609,19 @@ public class SettlementConfig implements Serializable {
 			// load names list
 			List<String> oldlist = settlementNamesMap.get(sponsor);
 			// add the settlement name
-			if (oldlist == null) { // oldlist.isEmpty() ||
+			if (oldlist == null) { // oldlist.isEmpty()
+				// This sponsor does not exist yet
 				List<String> newlist = new ArrayList<>();
 				newlist.add(name);
 				settlementNamesMap.put(sponsor, newlist);
 			} else {
-				oldlist.add(name);
-				settlementNamesMap.put(sponsor, oldlist);
+				if (oldlist.contains(name)) {
+					throw new IllegalStateException("Duplicated settlement name : " + name);
+				}
+				else {
+					oldlist.add(name);
+					settlementNamesMap.put(sponsor, oldlist);
+				}
 			}
 
 			int newID = settlementMap.size() + 1;
@@ -636,6 +660,18 @@ public class SettlementConfig implements Serializable {
 	 */
 	public void changeSettlementName(String oldName, String newName) {
 		if (settlementMap.containsValue(oldName)) {
+			
+			Settlement s = CollectionUtils.findSettlement(oldName);
+			
+			// Change the name in settlementNamesMap
+			String sponsor = s.getSponsor();
+			List<String> names = settlementNamesMap.get(sponsor);
+//			int index = names.indexOf(oldName);
+			names.remove(oldName);
+			names.add(newName);
+			settlementNamesMap.put(sponsor, names);
+			
+			// Change the name in settlementMap
 			for (Map.Entry<Integer, String> e : settlementMap.entrySet()) {
 				Integer key = e.getKey();
 				Object value = e.getValue();
@@ -644,6 +680,8 @@ public class SettlementConfig implements Serializable {
 					settlementMap.put(key, newName);
 				}
 			}
+			
+			logger.config("The settlement '" + oldName + "' has changed its name to '" + newName + "'");
 		}
 	}
 
@@ -728,7 +766,7 @@ public class SettlementConfig implements Serializable {
 	public int getNewArrivingSettlementScenarioID(int index) {
 		if ((index >= 0) && (index < newArrivingSettlements.size()))
 			// return scenarioMap.get(newArrivingSettlements.get(index).template);
-			return getMapKey(scenarioMap, newArrivingSettlements.get(index).template);
+			return getMapKey(templateMap, newArrivingSettlements.get(index).template);
 		else
 			throw new IllegalArgumentException("index: " + index + "is out of bounds");
 	}
@@ -846,7 +884,7 @@ public class SettlementConfig implements Serializable {
 	 */
 	public int getInitialSettlementScenarioID(int index) {
 		if ((index >= 0) && (index < initialSettlements.size()))
-			return getMapKey(scenarioMap, initialSettlements.get(index).template);
+			return getMapKey(templateMap, initialSettlements.get(index).template);
 		else
 			throw new IllegalArgumentException("index: " + index + "is out of bounds");
 	}
@@ -934,52 +972,36 @@ public class SettlementConfig implements Serializable {
 	 * @param index the index of the initial settlement.
 	 * @return the name of the sponsoring agency
 	 */
-	// 2016-07-18 Added getInitialSettlementSponsor()
 	public String getInitialSettlementSponsor(int index) {
 		if ((index >= 0) && (index < initialSettlements.size())) {
 			InitialSettlement settlement = initialSettlements.get(index);
-			// if (settlement.randomName) return RANDOM;
-			// else
-			// System.out.println("settlement : sponsor is " + settlement.sponsor);
 			return settlement.sponsor;
 		} else
 			throw new IllegalArgumentException("index: " + index + "is out of bounds");
 	}
 
-//	/**
-//	 * Gets the maximum number of Mars Society delegates for an initial settlement.
-//	 * 
-//	 * @param index the index of the initial settlement.
-//	 * @return number of delegates.
-//	 */
-//	public int getInitialSettlementMaxMSD(int index) {
-//		if ((index >= 0) && (index < initialSettlements.size())) {
-//			InitialSettlement settlement = initialSettlements.get(index);
-//			//System.out.println("settlement.maxMSD is "+ settlement.maxMSD + "   index is " + index + "  initialSettlements.size() is " + initialSettlements.size());
-//			return settlement.maxMSD;
-//		}
-//		else throw new IllegalArgumentException("index: " + index + "is out of bounds");
-//	}
-
 	/**
-	 * Gets a list of possible settlement names.
+	 * Gets a list of default settlement names.
 	 * 
 	 * @return list of settlement names as strings
 	 */
-	public List<String> getSettlementNameList() {
-		// return new ArrayList<String>(settlementNames);
-		return new ArrayList<String>(settlementNamesMap.get("Mars Society (MS)"));
+	public List<String> getDefaultSettlementNameList() {
+		return new ArrayList<String>(settlementNamesMap.get(DEFAULT_SPONSOR));
 	}
 
 	/**
 	 * Gets a list of possible settlement names.
 	 * 
+	 * @param sponsor the string name of the sponsor
 	 * @return list of settlement names as strings
 	 */
 	public List<String> getSettlementNameList(String sponsor) {
-		return new ArrayList<String>(settlementNamesMap.get(sponsor));
+		if (settlementNamesMap.containsKey(sponsor))
+			return new ArrayList<String>(settlementNamesMap.get(sponsor));
+		
+		return new ArrayList<String>();
 	}
-
+	
 	/**
 	 * Clears the list of initial settlements.
 	 */
@@ -1003,9 +1025,8 @@ public class SettlementConfig implements Serializable {
 		settlement.populationNumber = populationNum;
 		settlement.numOfRobots = numOfRobots;
 		settlement.sponsor = sponsor;
-		// System.out.println("SettmaxMSDg : numOfRobots is " + numOfRobots);
-		// settlement.scenarioID = scenarioMap.get(template);
-		settlement.scenarioID = getMapKey(scenarioMap, template);
+
+		settlement.scenarioID = getMapKey(templateMap, template);
 
 		// take care to internationalize the coordinates
 		latitude = latitude.replace("N", Msg.getString("direction.northShort")); //$NON-NLS-1$ //$NON-NLS-2$
@@ -1015,11 +1036,15 @@ public class SettlementConfig implements Serializable {
 
 		settlement.latitude = latitude;
 		settlement.longitude = longitude;
-		// settlement.maxMSD = maxMSD;
+
 		initialSettlements.add(settlement);
 
 	}
 
+	public Map<Integer, String> getTemplateMap() {
+		return templateMap;
+	}
+	
 	/**
 	 * Prepare object for garbage collection.
 	 */
@@ -1034,8 +1059,10 @@ public class SettlementConfig implements Serializable {
 		initialSettlements = null;
 		settlementNamesMap.clear();
 		settlementNamesMap = null;
-		// settlementNames.clear();
-		// settlementNames = null;
+		settlementMap.clear();
+		settlementMap = null;
+		templateMap.clear();
+		templateMap = null;
 	}
 
 	/**
@@ -1054,10 +1081,7 @@ public class SettlementConfig implements Serializable {
 		private String latitude;
 		private int populationNumber;
 		private int numOfRobots;
-		private String sponsor = Msg.getString("ReportingAuthorityType.MarsSociety"); //$NON-NLS-1$ //"Mars Society
-																						// (MS)";
-
-		// private int maxMSD;
+		private String sponsor = Msg.getString("ReportingAuthorityType.MarsSociety"); //$NON-NLS-1$
 		private int scenarioID;
 	}
 
@@ -1078,10 +1102,7 @@ public class SettlementConfig implements Serializable {
 		private String latitude;
 		private int populationNumber;
 		private int numOfRobots;
-		private String sponsor = Msg.getString("ReportingAuthorityType.MarsSociety"); //$NON-NLS-1$ //"Mars Society
-																						// (MS)";
-
-		// private int maxMSD;
+		private String sponsor = Msg.getString("ReportingAuthorityType.MarsSociety"); //$NON-NLS-1$
 		private int scenarioID;
 	}
 }

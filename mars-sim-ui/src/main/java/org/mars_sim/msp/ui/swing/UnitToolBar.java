@@ -1,18 +1,18 @@
 /**
  * Mars Simulation Project
  * UnitToolbar.java
- * @version 3.1.0 2017-10-11
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing;
 
-import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.ui.javafx.MainScene;
-
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
@@ -22,22 +22,31 @@ import java.util.List;
 import javax.swing.Action;
 import javax.swing.JButton;
 import javax.swing.JToolBar;
-import javax.swing.border.BevelBorder;
+
+import org.mars_sim.msp.core.Unit;
 
 /**
  * The UnitToolBar class is a UI toolbar for holding unit buttons. There should
  * only be one instance and it is contained in the MainWindow instance.
  */
-// public class UnitToolBar extends TransparentToolBar implements ActionListener
-// {
+@SuppressWarnings("serial")
 public class UnitToolBar extends JToolBar implements ActionListener {
 
-	private static final long serialVersionUID = 1L;
+	public static final int HEIGHT = 57;
+	
+	private static final Color antiqueBronze = new Color(102,93,30,128);
+	private static final Color almond = new Color(239,222,205,0);
+	
+	private static final Color cafeNoir = new Color(75,54,33,128);
+	// maroon : 128,21,0; 
+	// almond : 239,222,205;
+	// Antique Bronze : 102,93,30
+	// cafeNoir : 75,54,33
+	
 	// Data members
 	private List<UnitButton> unitButtons; // List of unit buttons
 
 	private MainWindow parentMainWindow; // Main window that contains this toolbar.
-	private MainScene mainScene;
 
 	/**
 	 * Constructs a UnitToolBar object
@@ -50,9 +59,9 @@ public class UnitToolBar extends JToolBar implements ActionListener {
 		// Use JToolBar constructor
 		super();
 
+		setBackground(cafeNoir);
 		setOpaque(false);
-		setBackground(new Color(0, 0, 0, 128));
-
+		
 		// Initialize data members
 		unitButtons = new ArrayList<UnitButton>();
 		this.parentMainWindow = parentMainWindow;
@@ -64,44 +73,14 @@ public class UnitToolBar extends JToolBar implements ActionListener {
 		setFloatable(false);
 
 		// Set preferred height to 57 pixels.
-		setPreferredSize(new Dimension(0, 57));
+		setPreferredSize(new Dimension(0, HEIGHT));
 
 		// Set border around toolbar
-		setBorder(new BevelBorder(BevelBorder.RAISED));
+//		setBorder(new BevelBorder(BevelBorder.RAISED));
+//		setBorder(new LineBorder(Color.BLACK, 2));
 
 	}
 
-	/**
-	 * Constructs a UnitToolBar object
-	 * 
-	 * @param parentMainWindow
-	 *            the main window pane
-	 */
-	public UnitToolBar(MainScene scene) {
-
-		// Use JToolBar constructor
-		super();
-
-		setOpaque(false);
-		setBackground(new Color(0, 0, 0, 128));
-
-		// Initialize data members
-		unitButtons = new ArrayList<UnitButton>();
-		this.mainScene = scene;
-
-		// Set name
-		setName("Unit Toolbar");
-
-		// Fix tool bar
-		setFloatable(false);
-
-		// Set preferred height to 57 pixels.
-		setPreferredSize(new Dimension(0, 57));
-
-		// Set border around toolbar
-		setBorder(new BevelBorder(BevelBorder.RAISED));
-
-	}
 
 	/**
 	 * Create a new unit button in the toolbar.
@@ -186,4 +165,21 @@ public class UnitToolBar extends JToolBar implements ActionListener {
 		return jb;
 	}
 
+	@Override
+	protected void paintComponent(Graphics g){
+		super.paintComponent(g);
+	    // Create the 2D copy
+	    Graphics2D g2 = (Graphics2D)g.create();
+	    
+//	    Graphics2D bgr = bimage.createGraphics();
+//	    bgr.setComposite(AlphaComposite.SRC);
+	    
+	    // Apply vertical gradient
+	    g2.setPaint(new GradientPaint(0, 0, almond, 0, getHeight(), antiqueBronze, true));
+	    g2.fillRect(0, 0, getWidth(), getHeight());
+
+	    // Dipose of copy
+	    g2.dispose();
+	}
+	
 }

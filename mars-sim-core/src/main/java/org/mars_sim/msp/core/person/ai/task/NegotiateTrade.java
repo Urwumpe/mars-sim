@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * NegotiateTrade.java
- * @version 3.1.0 2017-09-13
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -11,18 +11,22 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.mission.TradeUtil;
 import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.RoboticAttributeType;
 import org.mars_sim.msp.core.robot.RoboticAttributeManager;
@@ -43,6 +47,9 @@ public class NegotiateTrade extends Task implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	private static Logger logger = Logger.getLogger(NegotiateTrade.class.getName());
+
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			 logger.getName().length());
 
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.negotiateTrade"); //$NON-NLS-1$
@@ -160,8 +167,11 @@ public class NegotiateTrade extends Task implements Serializable {
 			double credit = creditManager.getCredit(buyingSettlement, sellingSettlement);
 			credit += soldLoadValue;
 			creditManager.setCredit(buyingSettlement, sellingSettlement, credit);
-			logger.fine("Credit at " + buyingSettlement.getName() + " for " + sellingSettlement.getName() + " is "
-					+ credit);
+			LogConsolidated.flog(Level.INFO, 0, sourceName, "[" + person.getLocationTag().getLocale() + "] "
+					+ person.getName() + " completed a trade negotiation as follows : "
+					+ "   Credit : " + credit 
+					+ "    Buyer : " + buyingSettlement.getName() 
+					+ "   Seller : " + sellingSettlement.getName());
 
 			// Check if buying settlement owes the selling settlement too much for them to
 			// sell.
@@ -176,8 +186,11 @@ public class NegotiateTrade extends Task implements Serializable {
 				// Update the credit value between the starting and destination settlements.
 				credit -= buyLoadValue;
 				creditManager.setCredit(buyingSettlement, sellingSettlement, credit);
-				logger.fine("Credit at " + buyingSettlement.getName() + " for " + sellingSettlement.getName() + " is "
-						+ credit);
+				
+				LogConsolidated.flog(Level.INFO, 1000, sourceName, "[" + person.getLocationTag().getLocale() + "] "
+						+ person.getName() + " updated the credit/debit as follows : "
+						+ "   Credit/Debit : " + credit);
+//				logger.fine("Credit at " + buyingSettlement.getName() + " for " + sellingSettlement.getName() + " is " + credit);
 			} else {
 				buyLoad = new HashMap<Good, Integer>(0);
 			}
@@ -268,18 +281,18 @@ public class NegotiateTrade extends Task implements Serializable {
 		// Modify by 10% for each skill level in trading for buyer and seller.
 		if (buyingTrader instanceof Person) {
 			person = (Person) buyingTrader;
-			modifier += person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.TRADING) / 10D;
+			modifier += person.getSkillManager().getEffectiveSkillLevel(SkillType.TRADING) / 10D;
 		} else if (buyingTrader instanceof Robot) {
 			robot = (Robot) sellingTrader;
-			modifier += robot.getBotMind().getSkillManager().getEffectiveSkillLevel(SkillType.TRADING) / 10D;
+			modifier += robot.getSkillManager().getEffectiveSkillLevel(SkillType.TRADING) / 10D;
 		}
 
 		if (sellingTrader instanceof Person) {
 			person = (Person) buyingTrader;
-			modifier += person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.TRADING) / 10D;
+			modifier += person.getSkillManager().getEffectiveSkillLevel(SkillType.TRADING) / 10D;
 		} else if (sellingTrader instanceof Robot) {
 			robot = (Robot) sellingTrader;
-			modifier += robot.getBotMind().getSkillManager().getEffectiveSkillLevel(SkillType.TRADING) / 10D;
+			modifier += robot.getSkillManager().getEffectiveSkillLevel(SkillType.TRADING) / 10D;
 		}
 
 		// Modify by 10% for the relationship between the buyer and seller.
@@ -329,7 +342,7 @@ public class NegotiateTrade extends Task implements Serializable {
 					.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
 			newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
 			newPoints *= getTeachingExperienceModifier();
-			person.getMind().getSkillManager().addExperience(SkillType.TRADING, newPoints);
+			person.getSkillManager().addExperience(SkillType.TRADING, newPoints, time);
 
 		} else if (trader instanceof Robot) {
 			robot = (Robot) trader;
@@ -337,7 +350,7 @@ public class NegotiateTrade extends Task implements Serializable {
 					.getAttribute(RoboticAttributeType.EXPERIENCE_APTITUDE);
 			newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
 			newPoints *= getTeachingExperienceModifier();
-			robot.getBotMind().getSkillManager().addExperience(SkillType.TRADING, newPoints);
+			robot.getSkillManager().addExperience(SkillType.TRADING, newPoints, time);
 		}
 	}
 
@@ -352,9 +365,9 @@ public class NegotiateTrade extends Task implements Serializable {
 	public int getEffectiveSkillLevel() {
 		SkillManager manager = null;
 		if (person != null)
-			manager = person.getMind().getSkillManager();
+			manager = person.getSkillManager();
 		else if (robot != null)
-			manager = robot.getBotMind().getSkillManager();
+			manager = robot.getSkillManager();
 		return manager.getEffectiveSkillLevel(SkillType.TRADING);
 	}
 

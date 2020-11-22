@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TradeGoodsPanel.java
- * @version 3.1.0 2017-09-16
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission.create;
@@ -43,6 +43,7 @@ import org.mars_sim.msp.core.equipment.GasCanister;
 import org.mars_sim.msp.core.person.ai.mission.TradeUtil;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.PhaseType;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.goods.Good;
 import org.mars_sim.msp.core.structure.goods.GoodType;
@@ -50,8 +51,8 @@ import org.mars_sim.msp.core.structure.goods.GoodsUtil;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
-class TradeGoodsPanel
-extends WizardPanel {
+@SuppressWarnings("serial")
+class TradeGoodsPanel extends WizardPanel {
 
 	private boolean buyGoods;
 	private JLabel errorMessageLabel;
@@ -293,7 +294,7 @@ extends WizardPanel {
 		while (i.hasNext()) {
 			Good good = i.next();
 			if (good.getCategory() == GoodType.AMOUNT_RESOURCE) {
-				AmountResource resource = (AmountResource) good.getObject();
+				AmountResource resource = ResourceUtil.findAmountResource(good.getID());
 				PhaseType phase = resource.getPhase();
 				Class containerType = ContainerUtil.getContainerTypeNeeded(phase);
 				int containerNum = containerMap.get(containerType);
@@ -326,8 +327,7 @@ extends WizardPanel {
 	 * @param containerType the container class.
 	 * @return number of containers.
 	 */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	private int getNumberOfTradedContainers(Class containerType) {
+	private <T extends Unit> int getNumberOfTradedContainers(Class<T> containerType) {
 		int result = 0;
 		Good containerGood = GoodsUtil.getEquipmentGood(containerType);
 		Map<Good, Integer> tradeGoods = tradeTableModel.getTradeGoods();

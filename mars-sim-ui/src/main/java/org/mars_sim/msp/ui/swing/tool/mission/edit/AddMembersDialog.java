@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * AddMembersDialog.java
- * @version 3.08 2015-07-02
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -17,8 +17,8 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import javax.swing.DefaultListModel;
-
 import javax.swing.JComponent;
+import javax.swing.JInternalFrame;
 import javax.swing.JList;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
@@ -30,7 +30,6 @@ import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.ModalInternalFrame;
 
 import com.alee.laf.button.WebButton;
-import com.alee.laf.desktoppane.WebInternalFrame;
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
@@ -58,7 +57,7 @@ class AddMembersDialog extends ModalInternalFrame {
 	 * @param memberListModel {@link DefaultListModel}<{@link MissionMember}> the member list model in the edit mission dialog.
 	 * @param availableMembers {@link Collection}<{@link MissionMember}> the available members to add.
 	 */
-	public AddMembersDialog(WebInternalFrame owner, MainDesktopPane desktop, Mission mission, 
+	public AddMembersDialog(JInternalFrame owner, MainDesktopPane desktop, Mission mission, 
 	        DefaultListModel<MissionMember> memberListModel, Collection<MissionMember> availableMembers) {
 		// Use JDialog constructor
 		//super(owner, "Add Members", true);
@@ -100,7 +99,7 @@ class AddMembersDialog extends ModalInternalFrame {
         		new ListSelectionListener() {
         			public void valueChanged(ListSelectionEvent e) {
         				// Enable the add button if there are available members.
-        				addButton.setEnabled(availableList.getSelectedValues().length > 0);
+        				addButton.setEnabled(availableList.getSelectedValuesList().size() > 0);
         			}
         		}
         	);
@@ -112,7 +111,7 @@ class AddMembersDialog extends ModalInternalFrame {
 		
 		// Create add button.
 		addButton = new WebButton("Add");
-		addButton.setEnabled(availableList.getSelectedValues().length > 0);
+		addButton.setEnabled(availableList.getSelectedValuesList().size() > 0);
 		addButton.addActionListener(
 				new ActionListener() {
         			public void actionPerformed(ActionEvent e) {

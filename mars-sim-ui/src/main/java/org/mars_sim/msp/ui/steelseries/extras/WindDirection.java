@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * WindDirection.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 /*
  * Copyright (c) 2012, Gerrit Grunwald
  * All rights reserved.
@@ -65,6 +72,7 @@ import org.pushingpixels.trident.ease.Spline;
  *
  * @author hansolo
  */
+@SuppressWarnings("serial")
 public class WindDirection extends AbstractRadial {
     // <editor-fold defaultstate="collapsed" desc="Variable declaration">
     private double visibleValue = 0;

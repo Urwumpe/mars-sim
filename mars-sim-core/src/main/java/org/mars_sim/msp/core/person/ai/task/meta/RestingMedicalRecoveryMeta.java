@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RestingMedicalRecoveryMeta.java
- * @version 3.1.0 2017-10-21
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -12,7 +12,8 @@ import java.util.Iterator;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.task.RestingMedicalRecovery;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -62,23 +63,23 @@ public class RestingMedicalRecoveryMeta implements MetaTask, Serializable {
         }
 
         if (bedRestNeeded) {
-
             result = 200D;
 
+            int hunger = (int) person.getPhysicalCondition().getHunger();
+            result = result - (hunger - 333) / 3;
+            
             // Determine if any available medical aids can be used for bed rest.
             if (hasUsefulMedicalAids(person)) {
-
                 result+= 100D;
-
-                // 2015-06-07 Added Preference modifier
-                if (result > 0)
-	            	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
-
-                if (result < 0) result = 0;
             }
+            
+	        double pref = person.getPreference().getPreferenceScore(this);
+	        
+	        if (pref > 0)
+	        	result = result + pref * 10;
+	        
+            if (result < 0) result = 0;
         }
-
-
 
         return result;
     }

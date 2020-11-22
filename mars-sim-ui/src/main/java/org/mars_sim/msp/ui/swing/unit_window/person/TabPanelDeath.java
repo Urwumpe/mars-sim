@@ -1,42 +1,65 @@
 /**
  * Mars Simulation Project
  * TabPanelDeath.java
- * @version 3.1.0 2017-02-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.unit_window.person;
 
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Insets;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SpringLayout;
+import javax.swing.SwingConstants;
+
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.mars.MarsSurface;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.health.DeathInfo;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
-import com.alee.managers.tooltip.TooltipWay;
+import com.alee.laf.button.WebButton;
+import com.alee.managers.icon.LazyIcon;
+import com.alee.managers.style.StyleId;
 //import com.alee.managers.language.data.TooltipWay;
 import com.alee.managers.tooltip.TooltipManager;
-
-import javax.swing.*;
-
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import com.alee.managers.tooltip.TooltipWay;
 
 
 /**
  * The TabPanelDeath is a tab panel with info about a person's death.
  */
+@SuppressWarnings("serial")
 public class TabPanelDeath
 extends TabPanel
 implements ActionListener {
 
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
+	/** The Person instance. */
+	private Person person = null;
+	
 	private JTextField causeTF, timeTF, malTF;
 
 	/**
@@ -53,7 +76,17 @@ implements ActionListener {
 			unit, desktop
 		);
 
-		Person person = (Person) unit;
+		person = (Person) unit;		
+
+	}
+
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+			
 		PhysicalCondition condition = person.getPhysicalCondition();
 		DeathInfo death = condition.getDeathDetails();
 
@@ -63,12 +96,12 @@ implements ActionListener {
 
 		// Prepare death info label
 		JLabel deathInfoLabel = new JLabel(Msg.getString("TabPanelDeath.label"), JLabel.LEFT); //$NON-NLS-1$
-		deathInfoLabel.setFont(new Font("Serif", Font.BOLD, 16));
+		deathInfoLabel.setFont(new Font("Serif", Font.BOLD, 14));
 		deathInfoLabelPanel.add(deathInfoLabel);
 
 		// Prepare death label panel
 		JPanel deathLabelPanel = new JPanel(new SpringLayout());//GridLayout(3, 2, 0, 0));
-		deathLabelPanel.setBorder(new MarsPanelBorder());
+//		deathLabelPanel.setBorder(new MarsPanelBorder());
 		centerContentPanel.add(deathLabelPanel, BorderLayout.NORTH);
 
 		// Prepare cause label
@@ -110,7 +143,7 @@ implements ActionListener {
         wrapper3.add(malTF);//, BorderLayout.CENTER);
         deathLabelPanel.add(wrapper3);
 
-		// 2017-03-31 Prepare SpringLayout
+		// Prepare SpringLayout
 		SpringUtilities.makeCompactGrid(deathLabelPanel,
 		                                3, 2, //rows, cols
 		                                50, 5,        //initX, initY
@@ -122,7 +155,7 @@ implements ActionListener {
 
 		JPanel innerPanel = new JPanel();//new FlowLayout(FlowLayout.CENTER));
 		innerPanel.setLayout(new BoxLayout(innerPanel, BoxLayout.Y_AXIS));
-		innerPanel.setBorder(new MarsPanelBorder());
+//		innerPanel.setBorder(new MarsPanelBorder());
 		bottomContentPanel.add(innerPanel, BorderLayout.CENTER);
 
 		// Prepare location label panel
@@ -134,7 +167,9 @@ implements ActionListener {
 		innerPanel.add(locationLabelPanel);
 
 		// Prepare center map button
-		JButton centerMapButton = new JButton(ImageLoader.getIcon(Msg.getString("img.centerMap"))); //$NON-NLS-1$
+		final ImageIcon centerIcon = new LazyIcon("center").getIcon();
+		WebButton centerMapButton = new WebButton(StyleId.buttonUndecorated, centerIcon);
+//		JButton centerMapButton = new JButton(ImageLoader.getIcon(Msg.getString("img.centerMap"))); //$NON-NLS-1$
 		centerMapButton.setMargin(new Insets(1, 1, 1, 1));
 		centerMapButton.addActionListener(this);
 		TooltipManager.setTooltip (centerMapButton, Msg.getString("TabPanelDeath.tooltip.centerMap"), TooltipWay.down);
@@ -153,14 +188,13 @@ implements ActionListener {
 			topContainerButton.addActionListener(new ActionListener() {
 				public void actionPerformed(ActionEvent event) {
 					DeathInfo death = ((Person) getUnit()).getPhysicalCondition().getDeathDetails();
-					getDesktop().openUnitWindow(death.getContainerUnit(), false);
+					if (!(death.getContainerUnit() instanceof MarsSurface))
+						getDesktop().openUnitWindow(death.getContainerUnit(), false);
 				}
 			});
 			locationLabelPanel.add(topContainerButton);
 		}
 		else {
-			//JLabel locationLabel2 = new JLabel(death.getPlaceOfDeath(), JLabel.CENTER);
-			//locationLabelPanel.add(locationLabel2);
 			JPanel wrapper4 = new JPanel(new FlowLayout(0, 0, FlowLayout.LEADING));
 			JTextField TF4 = new JTextField();
 	        TF4.setText(death.getPlaceOfDeath());
@@ -170,10 +204,6 @@ implements ActionListener {
 	        wrapper4.add(TF4);//, BorderLayout.CENTER);
 	        locationLabelPanel.add(wrapper4);
 		}
-
-		// Prepare location coordinates panel
-		//JPanel locationCoordsPanel = new JPanel(new GridLayout(2, 1, 0, 0));
-		//locationPanel.add(locationCoordsPanel, BorderLayout.CENTER);
 
 		// Prepare location panel
 		JPanel springPanel = new JPanel(new SpringLayout());//BorderLayout());
@@ -199,7 +229,7 @@ implements ActionListener {
 		JLabel longitudeLabel = new JLabel(deathLocation.getFormattedLongitudeString(), JLabel.LEFT); //$NON-NLS-1$
 		springPanel.add(longitudeLabel);
 
-		// 2017-03-31 Prepare SpringLayout
+		// Prepare SpringLayout
 		SpringUtilities.makeCompactGrid(springPanel,
 		                                2, 2, //rows, cols
 		                                0, 0,        //initX, initY
@@ -217,7 +247,7 @@ implements ActionListener {
 		// Prepare longitude label
 		JTextArea lastWordTA = new JTextArea(5, 25);
 		//lastWordTA.setSize(300, 150);
-		lastWordTA.append(person.getLastWord());
+		lastWordTA.append(death.getLastWord());
 		lastWordTA.setEditable(false);
 		lastWordTA.setWrapStyleWord(true);
 		lastWordTA.setLineWrap(true);
@@ -230,7 +260,11 @@ implements ActionListener {
 	/**
 	 * Updates the info on this panel.
 	 */
-	public void update() {}
+	@Override
+	public void update() {
+		if (!uiDone)
+			initializeUI();
+	}
 
 	/**
 	 * Action event occurs.

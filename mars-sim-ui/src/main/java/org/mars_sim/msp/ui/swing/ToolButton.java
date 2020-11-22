@@ -1,8 +1,7 @@
 /**
  * Mars Simulation Project
  * ToolButton.java
- * @version 3.07 2014-12-06
-
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -36,13 +35,22 @@ extends JButton {
 	 * @param imageName the name of the tool button image
 	 */
 	public ToolButton(String toolName, String imageName) {
-
 		// Use JButton constructor
 		super(ImageLoader.getIcon(imageName));
-
+		setOpaque(false);
+		setBackground(new Color(0,0,0,128));
+		setContentAreaFilled(false);
+		setBorderPainted(false);
 		// Initialize toolName
 		this.toolName = toolName;
-
+		
+		init();
+	}
+	
+	/**
+	 * Initialize the button
+	 */
+	public void init() {
 		// Initialize tool tip for button
 		toolButtonTip = new JToolTip();
 		toolButtonTip.setBackground(Color.white);

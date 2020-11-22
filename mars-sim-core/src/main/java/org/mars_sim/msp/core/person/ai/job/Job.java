@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Job.java
- * @version 3.1.0 2017-08-30
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.job;
@@ -11,16 +11,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.person.GenderType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
+import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
+import org.mars_sim.msp.core.person.ai.mission.CollectIce;
+import org.mars_sim.msp.core.person.ai.mission.CollectRegolith;
+import org.mars_sim.msp.core.person.ai.mission.EmergencySupply;
+import org.mars_sim.msp.core.person.ai.mission.MissionManager;
+import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
+import org.mars_sim.msp.core.person.ai.mission.Trade;
+import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
 import org.mars_sim.msp.core.person.ai.task.DigLocalIce;
 import org.mars_sim.msp.core.person.ai.task.DigLocalRegolith;
-import org.mars_sim.msp.core.person.ai.task.ListenToMusic;
-import org.mars_sim.msp.core.person.ai.task.PlayHoloGame;
-import org.mars_sim.msp.core.person.ai.task.Read;
+import org.mars_sim.msp.core.person.ai.task.PlanMission;
 import org.mars_sim.msp.core.person.ai.task.ReviewJobReassignment;
 import org.mars_sim.msp.core.person.ai.task.ReviewMissionPlan;
 import org.mars_sim.msp.core.person.ai.task.WriteReport;
-import org.mars_sim.msp.core.person.GenderType;
 import org.mars_sim.msp.core.structure.Settlement;
 
 /**
@@ -32,7 +41,7 @@ public abstract class Job implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** Probability penalty for starting a non-job-related task. */
-	private static final double NON_JOB_TASK_PENALTY = .025D;
+	private static final double NON_JOB_TASK_PENALTY = .25D;
 	/** Probability penalty for starting a non-job-related mission. */
 	private static final double NON_JOB_MISSION_START_PENALTY = .25D;
 	/** Probability penalty for joining a non-job-related mission. */
@@ -52,6 +61,10 @@ public abstract class Job implements Serializable {
 	/** List of missions to be joined by a person with this job. */
 	protected List<Class<?>> jobMissionJoins;
 
+	private static Simulation sim = Simulation.instance();
+	protected static MissionManager missionManager = sim.getMissionManager();
+	protected static UnitManager unitManager = sim.getUnitManager();
+	
 	/**
 	 * Constructor.
 	 * 
@@ -59,6 +72,7 @@ public abstract class Job implements Serializable {
 	 */
 	public Job(Class<? extends Job> jobClass) {
 		this.jobClass = jobClass;
+		
 		jobTasks = new ArrayList<Class<?>>();
 		jobMissionStarts = new ArrayList<Class<?>>();
 		jobMissionJoins = new ArrayList<Class<?>>();
@@ -66,12 +80,29 @@ public abstract class Job implements Serializable {
 		// Every settler will need to tasks
 		jobTasks.add(DigLocalIce.class);
 		jobTasks.add(DigLocalRegolith.class);
-		jobTasks.add(ListenToMusic.class);
-		jobTasks.add(PlayHoloGame.class);
-		jobTasks.add(Read.class);
+		jobTasks.add(PlanMission.class);
 		jobTasks.add(ReviewJobReassignment.class);
 		jobTasks.add(ReviewMissionPlan.class);
 		jobTasks.add(WriteReport.class);
+		
+		jobMissionStarts.add(TravelToSettlement.class);
+		jobMissionJoins.add(TravelToSettlement.class);
+		
+		jobMissionStarts.add(RescueSalvageVehicle.class);
+		jobMissionJoins.add(RescueSalvageVehicle.class);
+		
+		jobMissionStarts.add(EmergencySupply.class);
+		jobMissionJoins.add(EmergencySupply.class);
+		
+		jobMissionJoins.add(BuildingConstructionMission.class);
+		
+		jobMissionJoins.add(BuildingSalvageMission.class);
+		
+		jobMissionJoins.add(CollectIce.class);
+
+		jobMissionJoins.add(CollectRegolith.class);
+		
+		jobMissionJoins.add(Trade.class);
 	}
 
 	/**
@@ -176,4 +207,22 @@ public abstract class Job implements Serializable {
 	public boolean isJobRelatedTask(Class<?> taskClass) {
 		return jobTasks.contains(taskClass);
 	}
+	
+	/**
+	 * Reloads instances after loading from a saved sim
+	 * 
+	 * @param u {@link UnitManager}
+	 * @param m {@link MissionManager}
+	 */
+	public static void initializeInstances(UnitManager u, MissionManager m) {
+		unitManager = u;
+		missionManager = m;
+	}
+	
+	public abstract double[] getRoleProspects();
+	
+	public abstract void setRoleProspects(int index, int weight);
+	
+	public abstract int getJobID();
+	
 }

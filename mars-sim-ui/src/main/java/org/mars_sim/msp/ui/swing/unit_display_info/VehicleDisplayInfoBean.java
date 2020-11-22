@@ -1,13 +1,15 @@
 /**
  * Mars Simulation Project
  * VehicleDisplayInfoBean.java
- * @version 3.1.0 2017-10-20
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.unit_display_info;
 
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.mars.MarsSurface;
+import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ImageLoader;
@@ -26,6 +28,7 @@ abstract class VehicleDisplayInfoBean implements UnitDisplayInfo {
     // Data members
     private Icon surfMapIcon;
     private Icon topoMapIcon;
+    private Icon geoMapIcon;
     private Font mapLabelFont;
     
     /**
@@ -34,7 +37,8 @@ abstract class VehicleDisplayInfoBean implements UnitDisplayInfo {
     VehicleDisplayInfoBean() {
         surfMapIcon = ImageLoader.getIcon("VehicleSymbol");
         topoMapIcon = ImageLoader.getIcon("VehicleSymbolBlack");
-        mapLabelFont = new Font("SansSerif", Font.PLAIN, 9);
+        geoMapIcon = ImageLoader.getIcon("VehicleSymbolBlack");
+        mapLabelFont = new Font("Helvetica", Font.PLAIN, 10);
     }
     
     /** 
@@ -46,13 +50,14 @@ abstract class VehicleDisplayInfoBean implements UnitDisplayInfo {
         boolean result = true;
         
         Unit container = unit.getContainerUnit();
-        if (container != null) result = false;
+		if (!(container instanceof MarsSurface))
+        	result = false;
         
         Vehicle vehicle = (Vehicle) unit;
         if (vehicle.isSalvaged()) result = false;
         
         // Do not display towed vehicle on map.
-        if (vehicle.getStatus() == StatusType.TOWED) {
+        if (vehicle.haveStatusType(StatusType.TOWED)) {
             result = false;
         }
         
@@ -75,6 +80,15 @@ abstract class VehicleDisplayInfoBean implements UnitDisplayInfo {
      */
     public Icon getTopoMapIcon(Unit unit) {
     	return topoMapIcon;
+    }
+
+    /** 
+     * Gets display icon for geo navigator map. 
+     * @param unit the unit to display 
+     * @return icon
+     */
+    public Icon getGeologyMapIcon(Unit unit) {
+    	return geoMapIcon;
     }
     
     /**
@@ -99,6 +113,14 @@ abstract class VehicleDisplayInfoBean implements UnitDisplayInfo {
      * @return color
      */
     public Color getTopoMapLabelColor() {
+        return Color.black;
+    }
+
+    /** 
+     * Gets the label color for geo navigator map. 
+     * @return color
+     */
+    public Color getGeologyMapLabelColor() {
         return Color.black;
     }
     
@@ -126,11 +148,18 @@ abstract class VehicleDisplayInfoBean implements UnitDisplayInfo {
     public boolean isGlobeDisplayed(Unit unit) {
         boolean result = true;
         
-        Unit container = unit.getContainerUnit();
-        if (container != null) result = false;
-        
         Vehicle vehicle = (Vehicle) unit;
-        if (vehicle.isSalvaged()) result = false;
+        
+        // Show the vehicle only if it's on a mission outside
+        int containerID = vehicle.getContainerID();
+		if (containerID == Unit.MARS_SURFACE_UNIT_ID
+				&& vehicle instanceof Rover)
+        	result = true;
+		else
+			result = false;
+		
+        if (vehicle.isSalvaged()) 
+        	result = false;
         
         return result;
     }
@@ -150,4 +179,21 @@ abstract class VehicleDisplayInfoBean implements UnitDisplayInfo {
     public Color getTopoGlobeColor() {
         return Color.black;
     }
+
+    /** 
+     * Gets display color for geo globe.
+     * @return color
+     */
+    public Color getGeologyGlobeColor() {
+        return Color.black;
+    }
+    
+    /** 
+     * Gets icon for unit button.
+     * @return icon
+     */
+    public Icon getButtonIcon() {
+        return null;
+    }
+    
 }

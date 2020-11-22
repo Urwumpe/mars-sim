@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ConstructionMissionCustomInfoPanel.java
- * @version 3.1.0 2017-11-01
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -21,16 +21,13 @@ import java.util.List;
 import java.util.Map;
 
 import javax.swing.BoundedRangeModel;
-
 import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
-import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
-import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.construction.ConstructionEvent;

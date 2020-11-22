@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ResourceProcessing.java
- * @version 3.1.0 2017-05-03
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -11,10 +11,9 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.BuildingException;
 import org.mars_sim.msp.core.structure.goods.Good;
 import org.mars_sim.msp.core.structure.goods.GoodsUtil;
@@ -37,8 +36,6 @@ public class ResourceProcessing extends Function implements Serializable {
 	
 	private List<ResourceProcess> resourceProcesses;
 
-	private static BuildingConfig config;
-
 	/**
 	 * Constructor.
 	 * 
@@ -49,13 +46,11 @@ public class ResourceProcessing extends Function implements Serializable {
 		// Use Function constructor
 		super(FUNCTION, building);
 
-		config = SimulationConfig.instance().getBuildingConfiguration();
-
-		powerDownProcessingLevel = config.getResourceProcessingPowerDown(building.getBuildingType());
-		resourceProcesses = config.getResourceProcesses(building.getBuildingType());
+		powerDownProcessingLevel = buildingConfig.getResourceProcessingPowerDown(building.getBuildingType());
+		resourceProcesses = buildingConfig.getResourceProcesses(building.getBuildingType());
 
 		// Load activity spots
-		loadActivitySpots(config.getResourceProcessingActivitySpots(building.getBuildingType()));
+		loadActivitySpots(buildingConfig.getResourceProcessingActivitySpots(building.getBuildingType()));
 	}
 
 	/**
@@ -72,10 +67,10 @@ public class ResourceProcessing extends Function implements Serializable {
 		Inventory inv = settlement.getInventory();
 
 		double result = 0D;
-		List<ResourceProcess> processes = config.getResourceProcesses(buildingName);
+		List<ResourceProcess> processes = buildingConfig.getResourceProcesses(buildingName);
 		for (ResourceProcess process : processes) {
 			double processValue = 0D;
-			for (Integer resource : process.getOutputResources()) {
+			for (int resource : process.getOutputResources()) {
 				if (!process.isWasteOutputResource(resource)) {
 					Good resourceGood = GoodsUtil.getResourceGood(resource);
 					double rate = process.getMaxOutputResourceRate(resource);// * 1000D;
@@ -84,9 +79,10 @@ public class ResourceProcessing extends Function implements Serializable {
 			}
 
 			double inputInventoryLimit = 1D;
-			for (Integer resource : process.getInputResources()) {
+			for (int resource : process.getInputResources()) {
 				if (!process.isAmbientInputResource(resource)) {
 					Good resourceGood = GoodsUtil.getResourceGood(resource);
+					if (resource == ResourceUtil.greyWaterID); 
 					double rate = process.getMaxInputResourceRate(resource);// * 1000D;
 					processValue -= settlement.getGoodsManager().getGoodValuePerItem(resourceGood) * rate;
 
@@ -102,8 +98,8 @@ public class ResourceProcessing extends Function implements Serializable {
 			}
 
 			// Subtract value of require power.
-			double hoursInSol = MarsClock.convertMillisolsToSeconds(1000D) / 60D / 60D;
-			double powerHrsRequiredPerSol = process.getPowerRequired() * hoursInSol;
+//			double hoursInSol = MarsClock.convertMillisolsToSeconds(1000D) / 60D / 60D;
+			double powerHrsRequiredPerSol = process.getPowerRequired() * MarsClock.HOURS_PER_MILLISOL * 1000D;
 			double powerValue = powerHrsRequiredPerSol * settlement.getPowerGrid().getPowerValue();
 			processValue -= powerValue;
 
@@ -141,7 +137,7 @@ public class ResourceProcessing extends Function implements Serializable {
 	public double getPowerDownResourceProcessingLevel() {
 		return powerDownProcessingLevel;
 	}
-
+	
 	/**
 	 * Time passing for the building.
 	 * 

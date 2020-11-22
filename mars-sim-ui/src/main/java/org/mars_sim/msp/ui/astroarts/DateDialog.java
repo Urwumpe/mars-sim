@@ -1,6 +1,6 @@
 /* Mars Simulation Project
  * DateDialog.java
- * @version 3.1.0 2017-10-18
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  * Original work by Osamu Ajiki and Ron Baalke (NASA/JPL)
  * http://www.astroarts.com/products/orbitviewer/
@@ -21,6 +21,7 @@ import javax.swing.JTextField;
 import javax.swing.WindowConstants;
 
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.astroarts.ATime;
 import org.mars_sim.msp.core.time.EarthClock;
 import org.mars_sim.msp.ui.swing.ModalInternalFrame;
 
@@ -32,7 +33,7 @@ public class DateDialog extends ModalInternalFrame {
 			
 	protected JTextField		tfYear;
 	protected JTextField		tfDate;
-	protected JComboBox		monthCB;
+	protected JComboBox<String>		monthCB;
 	
 	protected JButton		buttonOk;
 	protected JButton		buttonCancel;
@@ -60,18 +61,18 @@ public class DateDialog extends ModalInternalFrame {
 		//setFont(new Font("Dialog", Font.PLAIN, 14));
 		
 		// Controls
-		monthCB = new JComboBox();
+		monthCB = new JComboBox<>();
 		for (int i = 0; i < 12; i++) {
 			monthCB.addItem(ATime.getMonthAbbr(i + 1));
 		}
 		monthCB.setSelectedIndex(atime.getMonth()-1);
 		add(monthCB);
 		
-		Integer iDate = new Integer(atime.getDay());
+		Integer iDate = Integer.valueOf(atime.getDay());
 		tfDate = new JTextField(iDate.toString(), 2);
 		add(tfDate);
 		
-		Integer iYear = new Integer(atime.getYear());
+		Integer iYear = Integer.valueOf(atime.getYear());
 		tfYear = new JTextField(iYear.toString(), 4);
 		add(tfYear);
 		
@@ -149,8 +150,7 @@ public class DateDialog extends ModalInternalFrame {
 		};
 		
 		buttonCancel.addActionListener(listener2);
-		
-		
+			
 		viewer.getDesktop().add(this);
 		
 		Dimension desktopSize = viewer.getDesktop().getParent().getSize();
@@ -171,36 +171,36 @@ public class DateDialog extends ModalInternalFrame {
 
 	}
 		
-	/**
-	 * Event Handler
-	 
-    public boolean handleEvent(Event evt) {
-		if (evt.id == Event.ACTION_EVENT) {
-			ATime atime = null;
-			if (evt.target == buttonOk) {
-				int nYear = Integer.valueOf(tfYear.getText()).intValue();
-				int nMonth = monthCB.getSelectedIndex() + 1;
-				int nDate  = Integer.valueOf(tfDate.getText()).intValue();
-				if (1600 <= nYear && nYear <= 2199 &&
-							1 <= nMonth && nMonth <= 12 &&
-							1 <= nDate  && nDate  <= 31) {
-					atime = new ATime(nYear, nMonth, (double)nDate, 0.0);
-				}
-			} else if (evt.target == buttonToday) {
-				EarthClock clock = Simulation.instance().getMasterClock().getEarthClock();
-				monthCB.setSelectedIndex(clock.getMonth()-1);
-				tfDate.setText(Integer.toString(clock.getDayOfMonth()));
-				tfYear.setText(Integer.toString(clock.getYear()));// + 1900));
-				
-				return false;
-			} else if (evt.target != buttonCancel) {
-				return false;
-			}
-			dispose();
-			viewer.endDateDialog(atime);
-			return true;
-		}
-		return false;	// super.handleEvent(evt);
-	}
-*/
+//	/**
+//	 * Event Handler
+//	 */
+//    public boolean handleEvent(Event evt) {
+//		if (evt.id == Event.ACTION_EVENT) {
+//			ATime atime = null;
+//			if (evt.target == buttonOk) {
+//				int nYear = Integer.valueOf(tfYear.getText()).intValue();
+//				int nMonth = monthCB.getSelectedIndex() + 1;
+//				int nDate  = Integer.valueOf(tfDate.getText()).intValue();
+//				if (1600 <= nYear && nYear <= 2199 &&
+//							1 <= nMonth && nMonth <= 12 &&
+//							1 <= nDate  && nDate  <= 31) {
+//					atime = new ATime(nYear, nMonth, (double)nDate, 0.0);
+//				}
+//			} else if (evt.target == buttonToday) {
+//				EarthClock clock = Simulation.instance().getMasterClock().getEarthClock();
+//				monthCB.setSelectedIndex(clock.getMonth()-1);
+//				tfDate.setText(Integer.toString(clock.getDayOfMonth()));
+//				tfYear.setText(Integer.toString(clock.getYear()));// + 1900));
+//				
+//				return false;
+//			} else if (evt.target != buttonCancel) {
+//				return false;
+//			}
+//			dispose();
+//			viewer.endDateDialog(atime);
+//			return true;
+//		}
+//		return false;	// super.handleEvent(evt);
+//	}
+
 	}

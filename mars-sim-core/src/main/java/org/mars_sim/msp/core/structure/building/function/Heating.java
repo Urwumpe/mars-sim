@@ -1,26 +1,21 @@
 /**
  * Mars Simulation Project
  * Heating.java
- * @version 3.1.0 2017-09-14
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
-import org.mars_sim.msp.core.mars.Weather;
-import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingManager;
-import org.mars_sim.msp.core.structure.building.function.farming.Crop;
-import org.mars_sim.msp.core.structure.building.function.farming.Farming;
-import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.time.MasterClock;
-
 import java.io.Serializable;
 import java.util.List;
 import java.util.logging.Logger;
+
+import org.mars_sim.msp.core.Coordinates;
+import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.structure.building.function.farming.Crop;
+import org.mars_sim.msp.core.structure.building.function.farming.Farming;
+import org.mars_sim.msp.core.time.MarsClock;
 
 /**
  * The Heating class is a building function for regulating temperature in a settlement..
@@ -68,10 +63,9 @@ implements Serializable {
 
     private static final double HEAT_DISSIPATED_PER_PERSON = .1; //[in kW]
     
-    //private static final double MSOL_LIMIT = 1.5;
-    
-     //private static final double kPASCAL_PER_ATM = 1D/0.00986923267 ; // 1 kilopascal = 0.00986923267 atm
-    //private static final double R_GAS_CONSTANT = 8.31441; //R = 8.31441 m3 Pa K−1 mol−1
+//    private static final double MSOL_LIMIT = 1.5;
+//    private static final double kPASCAL_PER_ATM = 1D/0.00986923267 ; // 1 kilopascal = 0.00986923267 atm
+//    private static final double R_GAS_CONSTANT = 8.31441; //R = 8.31441 m3 Pa K−1 mol−1
 	// 1 kilopascal = 0.00986923267 atm
 	// 1 cubic ft = L * 0.035315
     // A full scale pressurized Mars rover prototype may have an airlock volume of 5.7 m^3
@@ -84,12 +78,11 @@ implements Serializable {
 	/** The average volume of a airlock [m^3] */	
     private static double AIRLOCK_VOLUME_IN_CM = Building.AIRLOCK_VOLUME_IN_CM; // = 12 [in m^3]
     /**  convert meters to feet  */
-	//private static final double M_TO_FT = 3.2808399;//10.764;
+//	private static final double M_TO_FT = 3.2808399;//10.764;
 	/**  Specific Heat Capacity = 4.0 for a typical U.S. house */
-	//private static final double SHC = 6.0; // [in BTU / sq ft / °F]
-
-	// Building Loss Coefficient (BLC) is 1.0 for a typical U.S. house 
-	//private static double BLC = 0.2;
+//	private static final double SHC = 6.0; // [in BTU / sq ft / °F]
+	/** Building Loss Coefficient (BLC) is 1.0 for a typical U.S. house  */
+//	private static double BLC = 0.2;
 
 	/** 
 	 * Cooling Load Factor accounts for the fact that building thermal mass creates a time lag between 
@@ -118,13 +111,13 @@ implements Serializable {
     
     // Molar mass of CO2 = 44.0095 g/mol
     // average density of air : 0.020 kg/m3
-	//double n = weather.getAirDensity(coordinates) * vol / 44D;
-	//private double n_CO2 = .02D * VOLUME_OF_AIRLOCK / 44*1000;
+	// double n = weather.getAirDensity(coordinates) * vol / 44D;
+//	private double n_CO2 = .02D * VOLUME_OF_AIRLOCK / 44*1000;
 	// 1 cubic feet of air has a total weight of 38.76 g
-	//private double n_air = 1D;
-	//private double n_sum = n_CO2 + n_air;
+//	private double n_air = 1D;
+//	private double n_sum = n_CO2 + n_air;
     
-    //private static final int HEAT_CAP = 200;  
+//    private static final int HEAT_CAP = 200;  
  	private static final int PER_UPDATE = 2 ; // must be a multiple of 2
     /** The cache for msols */     
  	private int msolCache;
@@ -195,13 +188,7 @@ implements Serializable {
   	private String buildingType;
   	
 	private Building building;
-	private Weather weather;
 	private Coordinates location;
-	private MasterClock masterClock;
-	private MarsClock marsClock;
-	private SurfaceFeatures surfaceFeatures;
-	private Settlement settlement;
-	private BuildingManager manager;
 	private Farming farm;
 
 	/** THe emissivity of the greenhouse canopy per millisol */
@@ -220,19 +207,10 @@ implements Serializable {
         sourceName = sourceName.substring(sourceName.lastIndexOf(".") + 1, sourceName.length());
         
 		this.building = building;
-		this.manager = building.getBuildingManager();
-		this.settlement = manager.getSettlement();
 
 		buildingType =  building.getBuildingType();
 		
-		masterClock = Simulation.instance().getMasterClock();
-		marsClock = masterClock.getMarsClock();
-		weather = Simulation.instance().getMars().getWeather();
-
 		location = building.getLocation();
-
-		if (surfaceFeatures == null)
-			surfaceFeatures = Simulation.instance().getMars().getSurfaceFeatures();
 
 		double length = building.getLength();
 		width = building.getWidth() ;
@@ -323,16 +301,16 @@ implements Serializable {
 		//for (double tc : temperatureCache) {
 		//	tc = t_initial;
 		//}
-/*		
-		emissivityMap = new HashMap<>();
-
-		for (int i = 0; i <= 1000; i++) {
-			// assuming the value of emissivity fluctuates as a cosine waveform between 0.8 (day) and 1.0ss (night)
-			emissivity = .1D * Math.cos(i/500D* Math.PI) + (EMISSIVITY_NIGHT + EMISSIVITY_DAY)/2D;
-			//System.out.println( i + " : " + emissivity);
-			emissivityMap.put(i, emissivity);
-		}
-*/		
+		
+//		emissivityMap = new HashMap<>();
+//
+//		for (int i = 0; i <= 1000; i++) {
+//			// assuming the value of emissivity fluctuates as a cosine waveform between 0.8 (day) and 1.0ss (night)
+//			emissivity = .1D * Math.cos(i/500D* Math.PI) + (EMISSIVITY_NIGHT + EMISSIVITY_DAY)/2D;
+//			//System.out.println( i + " : " + emissivity);
+//			emissivityMap.put(i, emissivity);
+//		}
+	
 	}
 
 	/**
@@ -442,7 +420,7 @@ implements Serializable {
 	public double determineDeltaTemperature(double t_in_C, double delta_time) {
 
 		// THIS IS A THREE-PART CALCULATION
-		double t_out_C = settlement.getOutsideTemperature();
+		double t_out_C = building.getSettlement().getOutsideTemperature();
 		// heatGain and heatLoss are to be converted from kJ to BTU below
 		double d_t =  t_in_C - t_out_C; //1.8 =  9D / 5D;
 		double t_in_K = t_in_C + C_TO_K;
@@ -477,10 +455,8 @@ implements Serializable {
 		// Note : Assuming EVA heater requires .5kW of power for heating up the air for each person in an airlock during EVA ingress.
 
 		// (1d) CALCULATE SOLAR HEAT GAIN
-		if (surfaceFeatures == null)
-			surfaceFeatures = Simulation.instance().getMars().getSurfaceFeatures();
-
-		double I = surfaceFeatures.getSolarIrradiance(location) / 1000 ; // in kW after divided by 1000
+		double I = surface.getSolarIrradiance(location) / 1000 ; 
+		// Convert from W to kW
 		double solarHeatGain =  0;
 
 		if (isGreenhouse) {
@@ -897,23 +873,23 @@ implements Serializable {
 			// Note : time = .121 at x128
 			
 			if (adjacentBuildings == null) {
-				adjacentBuildings = settlement.getBuildingConnectors(building);
+				adjacentBuildings = building.getSettlement().getBuildingConnectors(building);
 			}
 			
 			int size = adjacentBuildings.size();
 			//area_factor = Math.sqrt(Math.sqrt(floorArea));
-/*			
-			if (isHallway)
-				area_factor = .5;
-			else if (isGreenhouse) 
-				area_factor = 1.5;
-			else if (isLargeGreenhouse()) 
-				area_factor = 2.3;
-			else if (isGarage())
-				area_factor = 2;
-			else if (isLoadingDockGarage())
-				area_factor = 2.5;
-*/			
+			
+//			if (isHallway)
+//				area_factor = .5;
+//			else if (isGreenhouse) 
+//				area_factor = 1.5;
+//			else if (isLargeGreenhouse()) 
+//				area_factor = 2.3;
+//			else if (isGarage())
+//				area_factor = 2;
+//			else if (isLoadingDockGarage())
+//				area_factor = 2.5;
+		
 			
 			for (int i = 0; i < size; i++) {
 				double t_next = adjacentBuildings.get(i).getCurrentTemperature();
@@ -1007,70 +983,69 @@ implements Serializable {
 				total_gain += gain;
 
 			}
-/*			
-			if (total_gain > 0)
-				LogConsolidated.log(logger, Level.INFO, 20000, sourceName, 
-						"Pumping in " + Math.round(total_gain*100D)/100D + " kW of heat by air vent to " 
-				+ building + " in " + settlement + " from adjacent building(s).", null);
-			else if (total_gain < 0)
-				LogConsolidated.log(logger, Level.INFO, 20000, sourceName, 
-						"Dumping off " + -Math.round(total_gain*100D)/100D + " kW of excess heat by air vent from " 
-				+ building + " in " + settlement + " to adjacent building(s).", null);
-*/	
+		
+//			if (total_gain > 0)
+//				LogConsolidated.log(logger, Level.INFO, 20000, sourceName, 
+//						"Pumping in " + Math.round(total_gain*100D)/100D + " kW of heat by air vent to " 
+//				+ building + " in " + settlement + " from adjacent building(s).", null);
+//			else if (total_gain < 0)
+//				LogConsolidated.log(logger, Level.INFO, 20000, sourceName, 
+//						"Dumping off " + -Math.round(total_gain*100D)/100D + " kW of excess heat by air vent from " 
+//				+ building + " in " + settlement + " to adjacent building(s).", null);
+
 		}
 		
 		return total_gain;
 	}
 
 	
-	/**
-	 * Applies a "mathematical" heat buffer to artificially stabilize temperature fluctuation due to rapid simulation time
-	 * @return temperature (degree C)
-
-	// 2014-10-17 Added applyHeatBuffer()
-	public void applyHeatBuffer(double t) {
-		// 2015-02-18 Added heat trap
-		// This artificial heat trap or buffer serves to
-		// 1. stabilize the temperature calculation
-		// 2. smoothen out any abrupt temperature variation(*) in the settlement unit window
-		// 3. reduce the frequency of the more intensive computation of heat gain and heat loss in determineDeltaTemperature()
-		// Note*:  MSP is set to run at a much faster pace than the real time marsClock and the temperature change inside a room is time-dependent.
-		//double factor = t;
-		if (t > 2) { // && storedHeat >= -30  && storedHeat <= 30) {
-			// Arbitrarily select to "trap" the amount heat so as to reduce "t" to half of its value
-			storedHeat = storedHeat + 0.7 * t;
-			t = t - 0.7 * t;
-		}
-		else if (t <= 2 && t >= 1) { // && storedHeat >= -30  && storedHeat <= 30) {
-			// Arbitrarily select to "trap" the amount heat so as to reduce "t" to half of its value
-			storedHeat = storedHeat + 0.4 * t;
-			t = t - 0.4 *  t;
-		}
-		else if (t < -1 && t >= -2) {
-			t = t - 0.5 * t;
-			storedHeat = storedHeat + 0.4 * t;
-		}
-		else { //if (t < -2) {
-			storedHeat = storedHeat + 0.8 * t;
-			t = t - 0.8 * t;
-		}
-
-		if (storedHeat > HEAT_CAP) {
-			t = t + 0.3;
-			storedHeat = storedHeat - 0.3;
-		}
-		else if (storedHeat < -HEAT_CAP) {
-			t = t - 0.3;
-			storedHeat = storedHeat + 0.3;
-		}
-
-	    //System.out.println("storedHeat : "+ storedHeat);
-		//System.out.println("t : "+ t);
-
-	    deltaTemperature = t;
-
-	}
-*/
+//	/**
+//	 * Applies a "mathematical" heat buffer to artificially stabilize temperature fluctuation due to rapid simulation time
+//	 * @return temperature (degree C)
+//
+//	// 2014-10-17 Added applyHeatBuffer()
+//	public void applyHeatBuffer(double t) {
+//		// 2015-02-18 Added heat trap
+//		// This artificial heat trap or buffer serves to
+//		// 1. stabilize the temperature calculation
+//		// 2. smoothen out any abrupt temperature variation(*) in the settlement unit window
+//		// 3. reduce the frequency of the more intensive computation of heat gain and heat loss in determineDeltaTemperature()
+//		// Note*:  MSP is set to run at a much faster pace than the real time marsClock and the temperature change inside a room is time-dependent.
+//		//double factor = t;
+//		if (t > 2) { // && storedHeat >= -30  && storedHeat <= 30) {
+//			// Arbitrarily select to "trap" the amount heat so as to reduce "t" to half of its value
+//			storedHeat = storedHeat + 0.7 * t;
+//			t = t - 0.7 * t;
+//		}
+//		else if (t <= 2 && t >= 1) { // && storedHeat >= -30  && storedHeat <= 30) {
+//			// Arbitrarily select to "trap" the amount heat so as to reduce "t" to half of its value
+//			storedHeat = storedHeat + 0.4 * t;
+//			t = t - 0.4 *  t;
+//		}
+//		else if (t < -1 && t >= -2) {
+//			t = t - 0.5 * t;
+//			storedHeat = storedHeat + 0.4 * t;
+//		}
+//		else { //if (t < -2) {
+//			storedHeat = storedHeat + 0.8 * t;
+//			t = t - 0.8 * t;
+//		}
+//
+//		if (storedHeat > HEAT_CAP) {
+//			t = t + 0.3;
+//			storedHeat = storedHeat - 0.3;
+//		}
+//		else if (storedHeat < -HEAT_CAP) {
+//			t = t - 0.3;
+//			storedHeat = storedHeat + 0.3;
+//		}
+//
+//	    //System.out.println("storedHeat : "+ storedHeat);
+//		//System.out.println("t : "+ t);
+//
+//	    deltaTemperature = t;
+//
+//	}
 
 
 	/**
@@ -1094,12 +1069,6 @@ implements Serializable {
 	 * @param deltaTime amount of time passing (in millisols)
 	 */
 	public void timePassing(double deltaTime) {
-		//counts++;
-	
-		if (masterClock == null)
-			masterClock = Simulation.instance().getMasterClock();
-		if (marsClock == null)
-			marsClock = masterClock.getMarsClock();
 	
 		int msol =  marsClock.getMillisolInt();
 
@@ -1107,71 +1076,64 @@ implements Serializable {
 			msolCache = msol;
 			cycleThermalControl(deltaTime);
 		}
-		
-/*		
-		double time_ratio = masterClock.getTimeRatio();
-		double time_ratio_1 = Math.sqrt(time_ratio/2); // sqrt(128) = 11.3137 
-		double time_ratio_2 = Math.sqrt(Math.sqrt(time_ratio_1/2)); // sqrt(sqrt(11.3137/4)) = 1.2968
-		double update = Math.round(PER_UPDATE * time_ratio_2);
-		if (update < 1)
-			update = 1;
 	
-		LogConsolidated.log(logger, Level.INFO, 100, sourceName, 
-		//		" msol : "
-		//		+ _msol
-				//Math.round(_msol*1000D)/1000D 
-				 " c : " + counts
-				, null);
-*/		
-
-		
-/*		
-		if (msolCache != msol && counts % (int)update == 0) {
-			msolCache = msol;
-			counts = 0;
-
-			// Note 1 : the goal is to reduce dt to no more than ~1.6 millisols or else the temperature would
-			// fluctuate too much and the heat gain/loss would not be fine grained enough.
-
-
-			double limit = MSOL_LIMIT/time_ratio_2;
-			double new_deltaTime = update * deltaTime;
-
-			// Note 2 : if msol accidentally skips a millisols, the size of the delta time is still safe to use.
-
-			int numCycles = (int)(Math.round(new_deltaTime/limit));
-			if (numCycles < 1)
-				numCycles = 1;
-			
-			// Computes the dt (the final delta time). 
-			double dt = new_deltaTime/numCycles;
-			
-			//if (isGreenhouse)
-			//	emissivity = emissivityMap.get(msol);
-			//else
-			//	emissivity = EMISSIVITY_INSULATED;
-
-			int countDown = numCycles;
-			
-			while (countDown != 0) {
-				countDown--;
-				cycleThermalControl(dt);
-				//LogConsolidated.log(logger, Level.INFO, 1000, sourceName, 
-				//	"  msol : " + _msol
-				//	+ "   update : " + Math.round(update*1000.0)/1000.0
-				//	+ "   limit : " + Math.round(limit*1000.0)/1000.0
-				//	+ "   new_deltaTime : " + Math.round(new_deltaTime*1000.0)/1000.0
-				//	+ "   numCycles : " + numCycles
-				//	+ "   dt : " + Math.round(dt*1000.0)/1000.0 + " "
-				//	, null);
-			}
-			
-		}
-
-		//adjustHeatMode();
-
-*/
-
+//		double time_ratio = masterClock.getTimeRatio();
+//		double time_ratio_1 = Math.sqrt(time_ratio/2); // sqrt(128) = 11.3137 
+//		double time_ratio_2 = Math.sqrt(Math.sqrt(time_ratio_1/2)); // sqrt(sqrt(11.3137/4)) = 1.2968
+//		double update = Math.round(PER_UPDATE * time_ratio_2);
+//		if (update < 1)
+//			update = 1;
+//	
+//		LogConsolidated.log(logger, Level.INFO, 100, sourceName, 
+//		//		" msol : "
+//		//		+ _msol
+//				//Math.round(_msol*1000D)/1000D 
+//				 " c : " + counts
+//				, null);
+//
+//		if (msolCache != msol && counts % (int)update == 0) {
+//			msolCache = msol;
+//			counts = 0;
+//
+//			// Note 1 : the goal is to reduce dt to no more than ~1.6 millisols or else the temperature would
+//			// fluctuate too much and the heat gain/loss would not be fine grained enough.
+//
+//
+//			double limit = MSOL_LIMIT/time_ratio_2;
+//			double new_deltaTime = update * deltaTime;
+//
+//			// Note 2 : if msol accidentally skips a millisols, the size of the delta time is still safe to use.
+//
+//			int numCycles = (int)(Math.round(new_deltaTime/limit));
+//			if (numCycles < 1)
+//				numCycles = 1;
+//			
+//			// Computes the dt (the final delta time). 
+//			double dt = new_deltaTime/numCycles;
+//			
+//			//if (isGreenhouse)
+//			//	emissivity = emissivityMap.get(msol);
+//			//else
+//			//	emissivity = EMISSIVITY_INSULATED;
+//
+//			int countDown = numCycles;
+//			
+//			while (countDown != 0) {
+//				countDown--;
+//				cycleThermalControl(dt);
+//				//LogConsolidated.log(logger, Level.INFO, 1000, sourceName, 
+//				//	"  msol : " + _msol
+//				//	+ "   update : " + Math.round(update*1000.0)/1000.0
+//				//	+ "   limit : " + Math.round(limit*1000.0)/1000.0
+//				//	+ "   new_deltaTime : " + Math.round(new_deltaTime*1000.0)/1000.0
+//				//	+ "   numCycles : " + numCycles
+//				//	+ "   dt : " + Math.round(dt*1000.0)/1000.0 + " "
+//				//	, null);
+//			}
+//			
+//		}
+//
+//		//adjustHeatMode();
 	}
 
 	/**
@@ -1183,11 +1145,14 @@ implements Serializable {
 		// Detect temperatures
 		double old_t = currentTemperature;
 		double new_t = 0;
-		double t_out = settlement.getOutsideTemperature();
+		double t_out = building.getSettlement().getOutsideTemperature();
 
 		if (mass == 0) {
 			int id = building.getInhabitableID();
-			mass = building.getSettlement().getCompositionOfAir().getTotalMass()[id];
+			double[] totalMass = building.getSettlement().getCompositionOfAir().getTotalMass();
+			if (totalMass.length <= id)
+				return;
+			mass = totalMass[id]; 
 			conversion_factor = C_s * mass / timeSlice; 
 			//System.out.println(building.getNickName() + "'s total mass : " + mass);
 			// also, mass = density * HEIGHT * floorArea * M_TO_FT * M_TO_FT * M_TO_FT;
@@ -1224,16 +1189,15 @@ implements Serializable {
 		for (int i=0; i<size; i++) {
 			t += temperatureCache[i];
 		}
-		
-/*		
-		currentTemperature = (temperatureCache[0] 
-							+ temperatureCache[1]
-							+ temperatureCache[2]
-							+ temperatureCache[3]
-							+ old_t 
-							+ new_t)
-							/6D;
-*/	
+			
+//		currentTemperature = (temperatureCache[0] 
+//							+ temperatureCache[1]
+//							+ temperatureCache[2]
+//							+ temperatureCache[3]
+//							+ old_t 
+//							+ new_t)
+//							/6D;
+
 		currentTemperature = (t + old_t + new_t) / (size + 2);
 		
 		for (int i=size-1; i<0; i--) {
@@ -1332,18 +1296,8 @@ implements Serializable {
 	@Override
 	public void destroy() {
 		super.destroy();
-
 		building = null;
-	 	//thermalSystem = null;
-		building = null;
-		weather = null;
 		location = null;
-		//emissivityMap = null;
-		masterClock = null;
-		marsClock = null;
-		surfaceFeatures = null;
-		settlement = null;
-		manager = null;
 		farm = null;
 		adjacentBuildings = null;
 	}

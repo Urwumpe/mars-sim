@@ -1,35 +1,48 @@
 /**
  * Mars Simulation Project
  * SalvageTabPanel.java
- * @version 3.07 2014-12-06
-
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window;
 
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.table.AbstractTableModel;
+
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.manufacture.Salvagable;
 import org.mars_sim.msp.core.manufacture.SalvageInfo;
-import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
 
-import javax.swing.*;
-import javax.swing.table.AbstractTableModel;
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.util.*;
-import java.util.List;
-
 /**
  * A tab panel with info about an item's salvage.
  */
+@SuppressWarnings("serial")
 public class SalvageTabPanel extends TabPanel {
 
     // Data members
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
     private String finishTimeString;
     private JLabel finishTimeLabel;
     private PartTableModel partTableModel;
@@ -42,7 +55,17 @@ public class SalvageTabPanel extends TabPanel {
     public SalvageTabPanel(Unit unit, MainDesktopPane desktop) { 
         // Use the TabPanel constructor
         super("Salvage", null, "Salvage Info", unit, desktop);
-        
+
+		this.unit = unit;
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
         Salvagable salvageItem = (Salvagable) unit;
         SalvageInfo salvageInfo = salvageItem.getSalvageInfo();
         
@@ -118,7 +141,6 @@ public class SalvageTabPanel extends TabPanel {
     
     @Override
     public void update() {
-        
         // Update finish time.
         SalvageInfo salvageInfo = ((Salvagable) unit).getSalvageInfo();
         MarsClock finishTime = salvageInfo.getFinishTime();

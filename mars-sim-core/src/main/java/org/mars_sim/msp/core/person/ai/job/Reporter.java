@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Reporter.java
- * @version 3.1.0 2018-06-09
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.job;
@@ -9,10 +9,10 @@ package org.mars_sim.msp.core.person.ai.job;
 import java.io.Serializable;
 import java.util.Iterator;
 
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
+import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.mission.Trade;
 import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
 import org.mars_sim.msp.core.person.ai.task.ConnectWithEarth;
@@ -22,16 +22,18 @@ import org.mars_sim.msp.core.person.ai.task.MeetTogether;
 import org.mars_sim.msp.core.person.ai.task.RecordActivity;
 import org.mars_sim.msp.core.structure.Settlement;
 
-public class Reporter
-extends Job
-implements Serializable {
+public class Reporter extends Job implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	private static double TRADING_RANGE = 1500D;
-	private static double SETTLEMENT_MULTIPLIER = 3D;
+	private final int JOB_ID = 15;
 	
+	private double[] roleProspects = new double[] {5.0, 5.0, 30.0, 30.0, 20.0, 5.0, 5.0};
+
+	private static double TRADING_RANGE = 1500D;
+	private static double SETTLEMENT_MULTIPLIER = 1D;
+
 	/**
 	 * Constructor.
 	 */
@@ -44,24 +46,22 @@ implements Serializable {
 		jobTasks.add(ConnectWithEarth.class);
 		jobTasks.add(HaveConversation.class);
 		jobTasks.add(RecordActivity.class);
-		
+
 		// Add side tasks
 		jobTasks.add(ConsolidateContainers.class);
 
-		// Add Manager-related missions.
+		// Add reporter-related missions.
 		jobMissionStarts.add(Trade.class);
 		jobMissionJoins.add(Trade.class);
-        jobMissionStarts.add(TravelToSettlement.class);
+		jobMissionStarts.add(TravelToSettlement.class);
 		jobMissionJoins.add(TravelToSettlement.class);
 
-		// Should mayor be heroic in this frontier world? Yes
-		jobMissionStarts.add(RescueSalvageVehicle.class);
-		jobMissionJoins.add(RescueSalvageVehicle.class);
-
+		// Add missions
 	}
 
 	/**
 	 * Gets a person's capability to perform this job.
+	 * 
 	 * @param person the person to check.
 	 * @return capability (min 0.0).
 	 */
@@ -69,53 +69,75 @@ implements Serializable {
 
 		double result = 0D;
 		
-		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
+		int reportSkill = person.getSkillManager().getSkillLevel(SkillType.REPORTING);
+		result = reportSkill;
 		
+		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
+
 //		if (attributes == null)
 //			attributes = person.getNaturalAttributeManager();
-		 
+
 		// Add experience aptitude.
 		int experienceAptitude = attributes.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
-		result+= result * ((experienceAptitude - 50D) / 100D);
+		result += result * ((experienceAptitude - 50D) / 100D);
 
 		// Add leadership aptitude.
-		int leadershipAptitude = attributes.getAttribute(NaturalAttributeType.LEADERSHIP);
-		result+= result * ((leadershipAptitude - 50D) / 100D) / 2D;
+//		int leadershipAptitude = attributes.getAttribute(NaturalAttributeType.LEADERSHIP);
+//		result += result * ((leadershipAptitude - 50D) / 100D);
 
 		// Add conversation.
 		int conversation = attributes.getAttribute(NaturalAttributeType.CONVERSATION);
-		result+= 2D * result * ((conversation - 50D) / 100D);
+		result += result * ((conversation - 50D) / 100D);
 
 		// Add artistry aptitude.
 		int artistry = attributes.getAttribute(NaturalAttributeType.ARTISTRY);
-		result+= result * ((artistry - 50D) / 100D);
+		result += result * ((artistry - 50D) / 100D);
 
 		// Add attractiveness.
 		int attractiveness = attributes.getAttribute(NaturalAttributeType.ATTRACTIVENESS);
-		result+= 2D * result * ((attractiveness - 50D) / 100D);
-		
+		result += result * ((attractiveness - 50D) / 100D);
+
 		return result;
 	}
 
 	/**
 	 * Gets the base settlement need for this job.
+	 * 
 	 * @param settlement the settlement in need.
 	 * @return the base need >= 0
 	 */
 	public double getSettlementNeed(Settlement settlement) {
 
-        double result = 0D;
+		double result = .1;
 
-        Iterator<Settlement> i = settlement.getUnitManager().getSettlements().iterator();
-        while (i.hasNext()) {
-            Settlement otherSettlement = i.next();
-            if (otherSettlement != settlement) {
-                double distance = settlement.getCoordinates().getDistance(otherSettlement.getCoordinates());
-                if (distance <= TRADING_RANGE) result += SETTLEMENT_MULTIPLIER;
-            }
-        }
+		int population = settlement.getNumCitizens();
+		
+		Iterator<Settlement> i = unitManager.getSettlements().iterator();
+		while (i.hasNext()) {
+			Settlement otherSettlement = i.next();
+			if (otherSettlement != settlement) {
+				double distance = settlement.getCoordinates().getDistance(otherSettlement.getCoordinates());
+				if (distance <= TRADING_RANGE)
+					result += SETTLEMENT_MULTIPLIER / 6.0;
+			}
+		}
 
+		result = (result + population / 24D) / 2.0;
+		
+//		System.out.println(settlement + " Reporter need: " + result);
+		
 		return result;
 	}
 
+	public double[] getRoleProspects() {
+		return roleProspects;
+	}
+	
+	public void setRoleProspects(int index, int weight) {
+		roleProspects[index] = weight;
+	}
+	
+	public int getJobID() {
+		return JOB_ID;
+	}
 }

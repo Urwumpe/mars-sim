@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TabPanelResourceProcesses.java
- * @version 3.1.0 2017-10-18
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -29,7 +29,6 @@ import javax.swing.JScrollPane;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -39,23 +38,28 @@ import org.mars_sim.msp.core.structure.building.function.ResourceProcess;
 import org.mars_sim.msp.core.structure.building.function.ResourceProcessing;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
 /**
  * A tab panel for displaying all of the resource processes in a settlement.
  */
+@SuppressWarnings("serial")
 public class TabPanelResourceProcesses
 extends TabPanel {
 
 	// Data members
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
+	/** The Settlement instance. */
+	private Settlement settlement;
+	
 	private List<Building> buildings;
 	private JScrollPane processesScrollPane;
 	private JPanel processListPanel;
 	private JCheckBox overrideCheckbox;
 
-	private Settlement settlement;
 	private BuildingManager mgr;
 
 	private int size;
@@ -76,6 +80,14 @@ extends TabPanel {
 		);
 
 		settlement = (Settlement) unit;
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
 		mgr = settlement.getBuildingManager();
 		buildings = mgr.getBuildings(FunctionType.RESOURCE_PROCESSING);
 		size = buildings.size();
@@ -99,7 +111,7 @@ extends TabPanel {
 
 		// Prepare process list panel.
 		processListPanel = new JPanel(new GridLayout(0, 1, 5, 2));
-		processListPanel.setBorder(new MarsPanelBorder());
+//		processListPanel.setBorder(new MarsPanelBorder());
 		processesScrollPane.setViewportView(processListPanel);
 		populateProcessList();
 
@@ -147,6 +159,9 @@ extends TabPanel {
 
 	@Override
 	public void update() {
+		if (!uiDone)
+			initializeUI();
+		
 		// Check if building list has changed.
 		List<Building> newBuildings = selectBuildingsWithRP();
 		int newSize = buildings.size();

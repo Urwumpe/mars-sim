@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PerformMathematicalModelingMeta.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -11,18 +11,19 @@ import java.util.Iterator;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
-import org.mars_sim.msp.core.person.ai.task.PerformLaboratoryExperiment;
 import org.mars_sim.msp.core.person.ai.task.PerformMathematicalModeling;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.core.structure.Lab;
+import org.mars_sim.msp.core.tool.RandomUtil;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * Meta task for the PerformMathematicalModeling task.
@@ -37,10 +38,7 @@ public class PerformMathematicalModelingMeta implements MetaTask, Serializable {
             "Task.description.performMathematicalModeling"); //$NON-NLS-1$
 
     /** default logger. */
-    private static Logger logger = Logger.getLogger(PerformMathematicalModelingMeta.class.getName());
-
-    private static ScientificStudyManager studyManager;
-    
+    private static Logger logger = Logger.getLogger(PerformMathematicalModelingMeta.class.getName()); 
     
     @Override
     public String getName() {
@@ -55,23 +53,27 @@ public class PerformMathematicalModelingMeta implements MetaTask, Serializable {
     @Override
     public double getProbability(Person person) {
 
+        ScientificStudy primaryStudy = scientificStudyManager.getOngoingPrimaryStudy(person);
+        if (primaryStudy == null)
+        	return 0;
+        
         double result = 0D;
 
-        // Check if person is in a moving rover.
-        if (person.isInVehicle() && PerformLaboratoryExperiment.inMovingRover(person)) {
-	        // the bonus for being inside a vehicle since there's little things to do
-            result = 20D;
-        }
+        // Probability affected by the person's stress and fatigue.
+        PhysicalCondition condition = person.getPhysicalCondition();
+        double fatigue = condition.getFatigue();
+        double stress = condition.getStress();
+        double hunger = condition.getHunger();
+        
+        if (fatigue > 1000 || stress > 50 || hunger > 500)
+        	return 0;
+        
         
         if (person.isInside()) {
 
 	        ScienceType mathematics = ScienceType.MATHEMATICS;
 
 	        // Add probability for researcher's primary study (if any).
-	        if (studyManager == null)
-	        	studyManager = Simulation.instance().getScientificStudyManager();
-	        //ScientificStudyManager studyManager = Simulation.instance().getScientificStudyManager();
-	        ScientificStudy primaryStudy = studyManager.getOngoingPrimaryStudy(person);
 	        if ((primaryStudy != null) && ScientificStudy.RESEARCH_PHASE.equals(primaryStudy.getPhase())) {
 	            if (!primaryStudy.isPrimaryResearchCompleted()) {
 	                if (mathematics == primaryStudy.getScience()) {
@@ -93,6 +95,12 @@ public class PerformMathematicalModelingMeta implements MetaTask, Serializable {
 	                            }
 
 	                            result += primaryResult;
+	                            
+	                            // Check if person is in a moving rover.
+	                            if (person.isInVehicle() && Vehicle.inMovingRover(person)) {
+	                    	        // the bonus for being inside a vehicle since there's little things to do
+	                                result += 20D;
+	                            }
 	                        }
 	                    }
 	                    catch (Exception e) {
@@ -103,12 +111,12 @@ public class PerformMathematicalModelingMeta implements MetaTask, Serializable {
 	        }
 
 	        // Add probability for each study researcher is collaborating on.
-	        Iterator<ScientificStudy> i = studyManager.getOngoingCollaborativeStudies(person).iterator();
+	        Iterator<ScientificStudy> i = scientificStudyManager.getOngoingCollaborativeStudies(person).iterator();
 	        while (i.hasNext()) {
 	            ScientificStudy collabStudy = i.next();
 	            if (ScientificStudy.RESEARCH_PHASE.equals(collabStudy.getPhase())) {
 	                if (!collabStudy.isCollaborativeResearchCompleted(person)) {
-	                    ScienceType collabScience = collabStudy.getCollaborativeResearchers().get(person);
+	                    ScienceType collabScience = collabStudy.getCollaborativeResearchers().get(person.getIdentifier());
 	                    if (mathematics == collabScience) {
 	                        try {
 	                            Lab lab = PerformMathematicalModeling.getLocalLab(person);
@@ -138,6 +146,8 @@ public class PerformMathematicalModelingMeta implements MetaTask, Serializable {
 	            }
 	        }
 
+	        if (result == 0) return 0;
+	        
 	        // Effort-driven task modifier.
 	        result *= person.getPerformanceRating();
 
@@ -150,7 +160,7 @@ public class PerformMathematicalModelingMeta implements MetaTask, Serializable {
 
 	        // Modify if lab experimentation is the person's favorite activity.
 	        if (person.getFavorite().getFavoriteActivity() == FavoriteType.RESEARCH) {
-	            result *= 2D;
+	            result += RandomUtil.getRandomInt(1, 20);
 	        }
 
 	        // 2015-06-07 Added Preference modifier

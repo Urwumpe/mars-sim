@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TabPanelCredit.java
- * @version 3.1.0 2017-10-18
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
@@ -39,12 +40,18 @@ import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
 
+@SuppressWarnings("serial")
 public class TabPanelCredit
 extends TabPanel {
 
-	private WebTable creditTable;
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
+	/** The Settlement instance. */
+	private Settlement settlement;
+	
+	private JTable creditTable;
 
 	/**
 	 * Constructor.
@@ -60,6 +67,17 @@ extends TabPanel {
 			unit, desktop
 		);
 
+		settlement = (Settlement) unit;
+
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
 		// Prepare credit label panel.
 		WebPanel creditLabelPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
 		topContentPanel.add(creditLabelPanel);
@@ -81,26 +99,26 @@ extends TabPanel {
 		// Prepare credit table.
 		creditTable = new ZebraJTable(creditTableModel);
 		creditScrollPanel.setViewportView(creditTable);
-		creditTable.setCellSelectionEnabled(false);
-		creditTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2));
+		creditTable.setRowSelectionAllowed(true);
+		
+		creditTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2, true));
+		
 		creditTable.getColumnModel().getColumn(0).setPreferredWidth(100);
 		creditTable.getColumnModel().getColumn(1).setPreferredWidth(120);
 		creditTable.getColumnModel().getColumn(2).setPreferredWidth(50);
+		
 		// Added the two methods below to make all heatTable columns
 		// Resizable automatically when its Panel resizes
 		creditTable.setPreferredScrollableViewportSize(new Dimension(225, -1));
 		//creditTable.setAutoResizeMode(WebTable.AUTO_RESIZE_ALL_COLUMNS);
-		//creditTablePanel.add(creditTable.getTableHeader(), BorderLayout.NORTH);
-		//creditTablePanel.add(creditTable, BorderLayout.CENTER);
-
 		// Added sorting
 		creditTable.setAutoCreateRowSorter(true);
 
 		// Align the preference score to the center of the cell
 		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
-		renderer.setHorizontalAlignment(SwingConstants.CENTER);
+		renderer.setHorizontalAlignment(SwingConstants.RIGHT);
 		creditTable.getColumnModel().getColumn(0).setCellRenderer(renderer);
-		creditTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
+//		creditTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
 		creditTable.getColumnModel().getColumn(2).setCellRenderer(renderer);
 		
 		TableStyle.setTableStyle(creditTable);
@@ -112,6 +130,9 @@ extends TabPanel {
 	 */
 	@Override
 	public void update() {
+		if (!uiDone)
+			this.initializeUI();
+		
 		TableStyle.setTableStyle(creditTable);
 	}
 
@@ -130,6 +151,7 @@ extends TabPanel {
 		private Collection<Settlement> settlements;
 		private Settlement thisSettlement;
 		private UnitManager unitManager = Simulation.instance().getUnitManager();
+		
 		/**
 		 * hidden constructor.
 		 * @param thisSettlement {@link Settlement}
@@ -191,7 +213,7 @@ extends TabPanel {
 						e.printStackTrace(System.err);
 					}
 
-					if (column == 1) return Math.round(credit*10.0)/10.0;
+					if (column == 1) return Math.round(credit*100.0)/100.0;
 					else if (column == 2) {
 						if (credit > 0D) return Msg.getString("TabPanelCredit.column.credit"); //$NON-NLS-1$
 						else if (credit < 0D) return Msg.getString("TabPanelCredit.column.debt"); //$NON-NLS-1$
@@ -229,7 +251,7 @@ extends TabPanel {
 
 			if (event.getUnit() instanceof Settlement) {
 				settlements.clear();
-				Iterator<Settlement> i = CollectionUtils.sortByName(Simulation.instance().getUnitManager().
+				Iterator<Settlement> i = CollectionUtils.sortByName(unitManager.
 						getSettlements()).iterator();
 				while (i.hasNext()) {
 					Settlement settlement = i.next();
@@ -249,15 +271,16 @@ extends TabPanel {
 			}
 		}
 
-		/*
-		 * Prepare for deletion.
-		 *
-		public void destroy() {
-			manager.removeListener(this);
-			settlements = null;
-			thisSettlement = null;
-		}
-		 */
+//		/*
+//		 * Prepare for deletion.
+//		 *
+//		 */
+//		public void destroy() {
+//			manager.removeListener(this);
+//			settlements = null;
+//			thisSettlement = null;
+//		}
+
 	}
 	
 	/**

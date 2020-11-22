@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TravelMission.java
- * @version 3.1.0 2017-08-08
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -28,7 +28,9 @@ public abstract class TravelMission extends Mission {
 
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(TravelMission.class.getName());
-
+	private static String loggerName = logger.getName();
+	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	
 	// Travel Mission status
 	public final static String AT_NAVPOINT = "At a navpoint";
 	public final static String TRAVEL_TO_NAVPOINT = "Traveling to navpoint";
@@ -38,16 +40,33 @@ public abstract class TravelMission extends Mission {
 	private List<NavPoint> navPoints = new ArrayList<NavPoint>();
 	/** The current navpoint index. */
 	private int navIndex = 0;
+	
+	/** The total distance travelled so far. */
+	private double proposedRouteTotalDistance = 0;
+	/** The current leg remaining distance so far. */
+	private double currentLegRemainingDistance;
+	/** The total remaining distance so far. */
+	private double totalRemainingDistance;
+	
 	/** The current traveling status of the mission. */
 	private String travelStatus;
+	
 	/** The last navpoint the mission stopped at. */
 	private NavPoint lastStopNavpoint;
 	/** The time the last leg of the mission started at. */
 	private MarsClock legStartingTime;
 
-	protected TravelMission(String missionName, MissionMember startingMember, int minPeople) {
+	
+	/**
+	 * Constructor 1
+	 * 
+	 * @param missionName
+	 * @param startingMember
+	 * @param minPeople
+	 */
+	protected TravelMission(String missionName, MissionType missionType, MissionMember startingMember, int minPeople) {
 		// Use Mission constructor.
-		super(missionName, startingMember, minPeople);
+		super(missionName, missionType, startingMember, minPeople);
 
 		NavPoint startingNavPoint = null;
 		Coordinates c = getCurrentMissionLocation();
@@ -67,6 +86,10 @@ public abstract class TravelMission extends Mission {
 
 			setTravelStatus(AT_NAVPOINT);
 		}
+		
+		LogConsolidated.log(logger, Level.FINER, 0, sourceName,
+				"[" + getStartingMember().getLocationTag().getLocale() + "] " + getStartingMember().getName() 
+				+ " had put together the navpoints for the " + missionName + ".");
 	}
 
 	/**
@@ -80,7 +103,7 @@ public abstract class TravelMission extends Mission {
 			navPoints.add(navPoint);
 			fireMissionUpdate(MissionEventType.NAVPOINTS_EVENT);
 		} else {
-			LogConsolidated.log(logger, Level.SEVERE, 1000, logger.getName(), "navPoint is null", null);
+			LogConsolidated.log(logger, Level.SEVERE, 10_000, logger.getName(), "navPoint is null");
 			// throw new IllegalArgumentException("navPoint is null");
 		}
 	}
@@ -97,7 +120,7 @@ public abstract class TravelMission extends Mission {
 			navPoints.set(index, navPoint);
 			fireMissionUpdate(MissionEventType.NAVPOINTS_EVENT);
 		} else {
-			LogConsolidated.log(logger, Level.SEVERE, 1000, logger.getName(), "navPoint is null", null);
+			LogConsolidated.log(logger, Level.SEVERE, 10_000, logger.getName(), "navPoint is null");
 			// throw new IllegalArgumentException("navPoint is null");
 		}
 	}
@@ -158,7 +181,7 @@ public abstract class TravelMission extends Mission {
 			navIndex = newNavIndex;
 		} else
 			LogConsolidated.log(logger, Level.SEVERE, 0, logger.getName(),
-					getPhase() + "'s newNavIndex " + newNavIndex + " is out of bounds.", null);
+					getPhase() + "'s newNavIndex " + newNavIndex + " is out of bounds.");
 		// throw new IllegalStateException(getPhase() + " : newNavIndex: "
 		// + newNavIndex + " is outOfBounds.");
 	}
@@ -174,9 +197,11 @@ public abstract class TravelMission extends Mission {
 		if ((index >= 0) && (index < getNumberOfNavpoints()))
 			return navPoints.get(index);
 		else {
-			LogConsolidated.log(logger, Level.SEVERE, 0, logger.getName(),
-					// getPhase() + " index " + index + " out of bounds."
-					"Index is " + index + ". # of navpoints is " + getNumberOfNavpoints(), null);
+//			LogConsolidated.log(Level.SEVERE, 0, logger.getName(),
+//					// getPhase() + " index " + index + " out of bounds."
+//					this.getDescription() 
+////					+ " at " + getPhase() 
+//					+ "  Index is " + index + ". # of navpoints is " + getNumberOfNavpoints());
 			// throw new IllegalArgumentException("index: " + index
 			// + " out of bounds.");
 
@@ -208,6 +233,20 @@ public abstract class TravelMission extends Mission {
 		return navPoints.size();
 	}
 
+	/**
+	 * Gets a list of navpoint coordinates
+	 * 
+	 * @return
+	 */
+	public List<Coordinates> getNavCoordinates() {
+		List<Coordinates> list = new ArrayList<>();
+		int size = getNumberOfNavpoints();
+		for (int i=0; i< size; i++) {
+			list.add(navPoints.get(i).getLocation());
+		}
+		return list;
+	}
+	
 	/**
 	 * Gets the current navpoint the mission is stopped at.
 	 * 
@@ -293,7 +332,7 @@ public abstract class TravelMission extends Mission {
 		if (legStartingTime != null) {
 			return (MarsClock) legStartingTime.clone();
 		} else {
-			return null;
+			throw new IllegalArgumentException("legStartingTime is null");
 		}
 	}
 
@@ -328,8 +367,37 @@ public abstract class TravelMission extends Mission {
 				setNextNavpointIndex(getNumberOfNavpoints() - offset);
 				updateTravelDestination();
 			}
-
-			return getCurrentMissionLocation().getDistance(getNextNavpoint().getLocation());
+			
+			Coordinates c1 = null;
+			
+			if (getNextNavpoint() != null) {
+				c1 = getNextNavpoint().getLocation();
+			}
+			else if (this instanceof TravelToSettlement) {
+				c1 = ((TravelToSettlement)this).getDestinationSettlement().getCoordinates();	
+			}
+			
+			double dist = 0;
+			
+			if (c1 != null) {
+				dist = Coordinates.computeDistance(getCurrentMissionLocation(), c1);
+			
+				if (Double.isNaN(dist)) {
+					LogConsolidated.log(logger, Level.SEVERE, 20_000, sourceName,
+							"[" + getVehicle().getLocale() + "] Rover " + getVehicle()
+								+ "'s current leg's remaining distance is NaN.");
+					dist = 0;
+				}
+			}
+			
+			if (currentLegRemainingDistance != dist) {
+				currentLegRemainingDistance = dist;
+				fireMissionUpdate(MissionEventType.DISTANCE_EVENT);
+			}
+			
+					
+//			System.out.println("   c0 : " + c0 + "   c1 : " + c1 + "   dist : " + dist);
+			return dist;
 		}
 
 		else
@@ -337,23 +405,40 @@ public abstract class TravelMission extends Mission {
 	}
 
 	/**
-	 * Gets the total distance of the trip.
+	 * Computes the proposed route total distance of the trip.
 	 * 
-	 * @return total distance (km)
+	 * @return distance (km)
 	 */
-	public final double getTotalDistance() {
-		double result = 0D;
-		if (navPoints.size() > 1) {
-			for (int x = 1; x < navPoints.size(); x++) {
-				NavPoint prevNav = navPoints.get(x - 1);
-				NavPoint currNav = navPoints.get(x);
-				double distance = currNav.getLocation().getDistance(prevNav.getLocation());
-				result += distance;
+	public final void computeProposedRouteTotalDistance() {
+		if (proposedRouteTotalDistance == 0) {
+			if (navPoints.size() > 1) {
+				double result = 0D;
+				
+				for (int x = 1; x < navPoints.size(); x++) {
+					NavPoint prevNav = navPoints.get(x - 1);
+					NavPoint currNav = navPoints.get(x);
+					double distance = Coordinates.computeDistance(currNav.getLocation(), prevNav.getLocation());
+					result += distance;
+				}
+				
+				if (result > proposedRouteTotalDistance) {
+					// Record the distance
+					proposedRouteTotalDistance = result;
+					fireMissionUpdate(MissionEventType.DISTANCE_EVENT);	
+				}
 			}
 		}
-		return result;
 	}
 
+	/**
+	 * Gets the proposed route total distance of the trip.
+	 * 
+	 * @return distance (km)
+	 */
+	public final double getProposedRouteTotalDistance() {
+		return proposedRouteTotalDistance;
+	}
+	
 	/**
 	 * Gets the total remaining distance to travel in the mission.
 	 * 
@@ -361,26 +446,51 @@ public abstract class TravelMission extends Mission {
 	 * @throws MissionException if error determining distance.
 	 */
 	public final double getTotalRemainingDistance() {
-		double result = getCurrentLegRemainingDistance();
-
+		// TODO: check for Double.isInfinite() and Double.isNaN()
+		double leg = getCurrentLegRemainingDistance();
 		int index = 0;
+		double navDist = 0;
 		if (AT_NAVPOINT.equals(travelStatus))
 			index = getCurrentNavpointIndex();
 		else if (TRAVEL_TO_NAVPOINT.equals(travelStatus))
 			index = getNextNavpointIndex();
 
-		for (int x = (index + 1); x < getNumberOfNavpoints(); x++)
-			result += getNavpoint(x - 1).getLocation().getDistance(getNavpoint(x).getLocation());
-
-		return result;
+		for (int x = index + 1; x < getNumberOfNavpoints(); x++) {
+			navDist += Coordinates.computeDistance(getNavpoint(x - 1).getLocation(), getNavpoint(x).getLocation());
+//			if (getVehicle().getName().equalsIgnoreCase("Opportunity")) {
+//				System.out.print("     index = " + index + "     x = " + x);
+//				System.out.println("     Nav Distance from " + (x-1) + " to " + x + " : " + Math.round(navDist*10.0)/10.0);
+//			}
+		}
+		
+		if (Double.isNaN(navDist)) {
+			LogConsolidated.log(logger, Level.SEVERE, 20_000, sourceName,
+					"[" + getVehicle().getLocale() + "] " + getVehicle()
+						+ "'s navDist is NaN");
+			navDist = 0;
+		}
+	
+//		if (getVehicle().getName().equalsIgnoreCase("Opportunity")) {
+//			System.out.print("    Nav : " + navDist);//Math.round(navDist*10.0)/10.0);
+//			System.out.println("    Total : " + (leg + navDist));//Math.round((leg + navDist)*10.0)/10.0);
+//		}
+		double total = leg + navDist;
+		
+		if (totalRemainingDistance < total) {
+			totalRemainingDistance = total;
+			fireMissionUpdate(MissionEventType.DISTANCE_EVENT);	
+		}
+			
+		
+		return total;
 	}
 
 	/**
-	 * Gets the total distance travelled during the mission so far.
+	 * Gets the actual total distance travelled during the mission so far.
 	 * 
 	 * @return distance (km)
 	 */
-	public abstract double getTotalDistanceTravelled();
+	public abstract double getActualTotalDistanceTravelled();
 
 	/**
 	 * Gets the estimated time of arrival (ETA) for the current leg of the mission.
@@ -414,8 +524,8 @@ public abstract class TravelMission extends Mission {
 	public abstract void updateTravelDestination();
 
 	@Override
-	public void endMission(String reason) {
-		super.endMission(reason);
+	public void endMission() {
+		super.endMission();
 	}
 
 	@Override

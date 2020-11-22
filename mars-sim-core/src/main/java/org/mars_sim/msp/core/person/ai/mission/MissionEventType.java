@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MissionEventType.java
- * @version 3.1.0 2018-10-10
+ * @version 3.1.2 2020-09-02
  * @author stpa
  */
 package org.mars_sim.msp.core.person.ai.mission;
@@ -9,8 +9,11 @@ package org.mars_sim.msp.core.person.ai.mission;
 public enum MissionEventType {
 
 	// from Mission.java
+	DATE_EVENT					("date"),
 	NAME_EVENT					("name"),
+	TYPE_EVENT					("type"),
 	DESCRIPTION_EVENT			("description"),
+	DESIGNATION_EVENT			("designation"),
 	PHASE_EVENT					("phase"),
 	PHASE_DESCRIPTION_EVENT		("phase description"),
 	MIN_MEMBERS_EVENT           ("minimum members"),

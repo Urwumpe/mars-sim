@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TransportDetailPanel.java
- * @version 3.1.0 2017-11-21
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.resupply;
@@ -23,6 +23,7 @@ import org.mars_sim.msp.ui.swing.MainDesktopPane;
  * A panel showing a selected transport details.
  * TODO externalize strings
  */
+@SuppressWarnings("serial")
 public class TransportDetailPanel
 extends JPanel
 implements ListSelectionListener {

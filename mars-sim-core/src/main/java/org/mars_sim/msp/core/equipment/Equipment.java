@@ -1,35 +1,34 @@
 /**
  * Mars Simulation Project
  * Equipment.java
- * @version 3.1.0 2017-09-07
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.equipment;
 
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
+import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.location.LocationStateType;
 import org.mars_sim.msp.core.manufacture.Salvagable;
 import org.mars_sim.msp.core.manufacture.SalvageInfo;
 import org.mars_sim.msp.core.manufacture.SalvageProcessInfo;
-import org.mars_sim.msp.core.person.LocationSituation;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.task.Maintenance;
 import org.mars_sim.msp.core.person.ai.task.Repair;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.Indoor;
-import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
-
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * The Equipment class is an abstract class that represents a useful piece of
@@ -39,33 +38,89 @@ public abstract class Equipment extends Unit implements Indoor, Salvagable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
-
+	/** The unit count for this person. */
+	private static int uniqueCount = Unit.FIRST_EQUIPMENT_UNIT_ID;
+	
 	// Data members.
+	/** is this equipment being salvage. */
 	private boolean isSalvaged;
-
+	/** Unique identifier for this equipment. */
+	private int identifier;
+	/** Unique identifier for the settlement that owns this equipment. */
+	private int associatedSettlementID;
+	
+	/** The identifier for the last owner of this equipment. */
+	private Integer lastOwner;
+	/** The equipment type. */
+	private String type;
+	
+	/** The SalvageInfo instatnce. */	
 	private SalvageInfo salvageInfo;
-
-	private Unit lastOwner;
-
-	private static UnitManager unitManager;
-
+	/** The equipment type enum. */
+	private EquipmentType equipmentType;
+	
+	/**
+	 * Must be synchronised to prevent duplicate ids being assigned via different
+	 * threads.
+	 * 
+	 * @return
+	 */
+	private static synchronized int getNextIdentifier() {
+		return uniqueCount++;
+	}
+	
+	/**
+	 * Get the unique identifier for this person
+	 * 
+	 * @return Identifier
+	 */
+	public int getIdentifier() {
+		return identifier;
+	}
+	
+	/**
+	 * Increments the identifier
+	 */
+	public void incrementID() {
+		// Gets the identifier
+		this.identifier = getNextIdentifier();
+	}
+	
 	/**
 	 * Constructs an Equipment object
 	 * 
 	 * @param name     the name of the unit
-	 * @param location the unit's location
+	 * @param type     the type of the unit
+	 * @param location the unit's coordinates
 	 */
-	protected Equipment(String name, Coordinates location) {
+	protected Equipment(String name, String type, Coordinates location) {
 		super(name, location);
-
-		// this.name = name;
+		
 		// Initialize data members.
+		this.type = type;
+		this.equipmentType = EquipmentType.convertName2Enum(type);
 		isSalvaged = false;
 		salvageInfo = null;
+		
+		lastOwner = Integer.valueOf(-1);
+		
+		if (unitManager == null)
+			unitManager = Simulation.instance().getUnitManager();
+		
+		// Adds this equipment to the equipment lookup map	
+		unitManager.addEquipmentID(this);
 
-		unitManager = Simulation.instance().getUnitManager();
+		if (!(this instanceof Robot) && location != null && !location.equals(ContainerUtil.tempCoordinates)) {
+			Settlement s = CollectionUtils.findSettlement(location);
+			associatedSettlementID = s.getIdentifier();
+			
+			// Stores this equipment into its settlement
+			s.getInventory().storeUnit(this);
+			// Add this equipment as being owned by this settlement
+			s.addOwnedEquipment(this);
+		}
 	}
-
+	
 	/**
 	 * Gets a collection of people affected by this entity.
 	 * 
@@ -75,8 +130,8 @@ public abstract class Equipment extends Unit implements Indoor, Salvagable {
 		Collection<Person> people = new ConcurrentLinkedQueue<Person>();
 
 		Person owner = null;
-		if (lastOwner != null && lastOwner instanceof Person) {
-			owner = (Person) lastOwner;
+		if (lastOwner != Integer.valueOf(-1)) {// && lastOwner instanceof Person) {
+			owner = unitManager.getPersonByID(lastOwner);
 			people.add(owner);
 		}
 
@@ -115,17 +170,13 @@ public abstract class Equipment extends Unit implements Indoor, Salvagable {
 		return isSalvaged;
 	}
 
-	// public String getName() {
-	// return name;
-	// }
-
 	/**
 	 * Indicate the start of a salvage process on the item.
 	 * 
 	 * @param info       the salvage process info.
 	 * @param settlement the settlement where the salvage is taking place.
 	 */
-	public void startSalvage(SalvageProcessInfo info, Settlement settlement) {
+	public void startSalvage(SalvageProcessInfo info, int settlement) {
 		salvageInfo = new SalvageInfo(this, info, settlement);
 		isSalvaged = true;
 	}
@@ -139,38 +190,7 @@ public abstract class Equipment extends Unit implements Indoor, Salvagable {
 		return salvageInfo;
 	}
 
-//	/**
-//	 * Get settlement equipment is at, null if not at a settlement
-//	 *
-//	 * @return the equipment's settlement
-//	 */
-//    @Override
-//	  public Settlement getSettlement() {
-//		LocationSituation ls = getLocationSituation();
-//		if (LocationSituation.IN_SETTLEMENT == ls) {
-//			return (Settlement) getContainerUnit();
-//		}
-//
-//		else if (LocationSituation.OUTSIDE == ls)
-//			return null;
-//
-//		else if (LocationSituation.IN_VEHICLE == ls) {
-//			Vehicle vehicle = (Vehicle) getContainerUnit();
-//			Settlement settlement = (Settlement) vehicle.getContainerUnit();
-//			return settlement;
-//		}
-//
-//		else if (LocationSituation.BURIED == ls) {
-//			// should not be the case
-//			return null;
-//		}
-//
-//		else {
-//			System.err.println("Equipment : error in determining " + getName() + "'s getSettlement() ");
-//			return null;
-//		}
-//	}
-
+	
 	/**
 	 * Get the equipment's settlement, null if equipment is not at a settlement
 	 *
@@ -178,6 +198,9 @@ public abstract class Equipment extends Unit implements Indoor, Salvagable {
 	 */
 	public Settlement getSettlement() {
 
+		if (getContainerID() == 0)
+			return null;
+		
 		Unit c = getContainerUnit();
 
 		if (c instanceof Settlement) {
@@ -185,15 +208,7 @@ public abstract class Equipment extends Unit implements Indoor, Salvagable {
 		}
 
 		else if (c instanceof Person) {
-			Unit cc = ((Person) c).getContainerUnit();
-			if (cc instanceof Settlement) {
-				return (Settlement) c;
-			}
-//		} else if (c instanceof Vehicle && ((Vehicle) c).getStatus() == StatusType.GARAGED) {
-//			Unit cc = ((Vehicle) c).getContainerUnit();
-//			if (cc instanceof Settlement) {
-//				return (Settlement) c;
-//			}
+			return c.getSettlement();
 		}
 		else if (c instanceof Vehicle) {
 			Building b = BuildingManager.getBuilding((Vehicle) getContainerUnit());
@@ -206,11 +221,6 @@ public abstract class Equipment extends Unit implements Indoor, Salvagable {
 //				return null;
 		}
 
-//		else if (container == null) {
-//			return null;
-//		}
-
-//		logger.warning("Error in determining " + getName() + "'s getSettlement() ");
 		return null;
 	}
 
@@ -223,6 +233,9 @@ public abstract class Equipment extends Unit implements Indoor, Salvagable {
 		Unit container = getContainerUnit();
 		if (container instanceof Vehicle)
 			return (Vehicle) container;
+		if (container.getContainerUnit() instanceof Vehicle)
+			return (Vehicle) (container.getContainerUnit());
+		
 		return null;
 	}
 
@@ -232,84 +245,111 @@ public abstract class Equipment extends Unit implements Indoor, Salvagable {
 	 * @return true if the equipment's is just right outside of a settlement
 	 */
 	public boolean isRightOutsideSettlement() {
-		if (getLocationStateType() == LocationStateType.OUTSIDE_SETTLEMENT_VICINITY)
+		if (LocationStateType.WITHIN_SETTLEMENT_VICINITY  == currentStateType)
 			return true;
 		return false;
 	}
 	
-	/**
-	 * Get the equipment's location
-	 * 
-	 * @deprecated use other more efficient methods
-	 * @return {@link LocationSituation} the person's location
-	 */
-	public LocationSituation getLocationSituation() {
-		Unit container = getContainerUnit();
-		if (container instanceof Settlement)
-			return LocationSituation.IN_SETTLEMENT;
-		else if (container instanceof Vehicle)
-			return LocationSituation.IN_VEHICLE;
-		else if (container == null)
-			return LocationSituation.OUTSIDE;
-		else
-			return LocationSituation.UNKNOWN;
-	}
+//	/**
+//	 * Get the equipment's location
+//	 * 
+//	 * @return {@link LocationSituation} the person's location
+//	 */
+//	public LocationSituation getLocationSituation() {
+//		Unit container = getContainerUnit();
+//		if (container instanceof Settlement)
+//			return LocationSituation.IN_SETTLEMENT;
+//		else if (container instanceof Vehicle)
+//			return LocationSituation.IN_VEHICLE;
+//		else if (container instanceof Person || container instanceof Robot)
+//			return container.getLocationSituation();
+//		else if (container instanceof MarsSurface)
+//			return LocationSituation.OUTSIDE;
+//		else
+//			return LocationSituation.UNKNOWN;
+//	}
 
-	/**
-	 * Is the equipment's immediate container a settlement ?
-	 * 
-	 * @return true if yes
-	 */
-	public boolean isInSettlement() {
-		Unit c = getTopContainerUnit();
-		if (c instanceof Settlement)
-			return true;
-//		else if (c instanceof Vehicle && ((Vehicle) c).getStatus() == StatusType.GARAGED)
+//	/**
+//	 * Is a person carrying this equipment? Is this equipment's container a person ?
+//	 * 
+//	 * @return true if yes
+//	 */
+//	public boolean isCarriedByAPerson() {
+//		if (LocationStateType.ON_A_PERSON_OR_ROBOT == currentStateType)
 //			return true;
-		return false;
-	}
+//		
+//		return false;
+//	}
 
 	/**
-	 * Is the equipment's immediate container a person ?
+	 * Sets the last owner of this equipment
 	 * 
-	 * @return true if yes
+	 * @param unit
 	 */
-	public boolean isInPerson() {
-		if (getContainerUnit() instanceof Person)
-			return true;
-		return false;
-	}
-
-	/**
-	 * Is the equipment's immediate container a vehicle ?
-	 * 
-	 * @return true if yes
-	 */
-	public boolean isInVehicle() {
-		if (getContainerUnit() instanceof Vehicle)
-			return true;
-		return false;
-	}
-
-	/**
-	 * Is the equipment outside on the surface of Mars
-	 * 
-	 * @return true if the equipment is outside
-	 */
-	public boolean isOutside() {
-		if (getContainerUnit() == null)
-			return true;
-		return false;
-	}
-
 	public void setLastOwner(Unit unit) {
-		lastOwner = unit;
+		if (unit != null) {
+			 if ((Integer) unit.getIdentifier() != lastOwner)
+				 lastOwner = (Integer) unit.getIdentifier();
+		}	
+		else
+			lastOwner = (Integer) Unit.UNKNOWN_UNIT_ID;
 	}
 
+	/**
+	 * Gets the last owner of this equipment
+	 * 
+	 * @return
+	 */
 	public Unit getLastOwner() {
-		return lastOwner;
+		return unitManager.getPersonByID(lastOwner);
 	}
 
+	public String getType() {
+		return type;
+	}
+	
+	public EquipmentType getEquipmentType() {
+		return equipmentType;
+	}
+	
+	public Settlement getAssociatedSettlement() {
+		return unitManager.getSettlementByID(associatedSettlementID);
+	}
+	
+	/**
+	 * Reset uniqueCount to the current number of equipment
+	 */
+	public static void reinitializeIdentifierCount() {
+		uniqueCount = unitManager.getEquipmentNum() + Unit.FIRST_EQUIPMENT_UNIT_ID;
+	}
+	
+	
+	/**
+	 * Compares if an object is the same as this equipment 
+	 * 
+	 * @param obj
+	 */
+	public boolean equals(Object obj) {
+		if (this == obj) return true;
+		if (obj == null) return false;
+		if (this.getClass() != obj.getClass()) return false;
+		Equipment e = (Equipment) obj;
+		return this.identifier == e.getIdentifier()
+				&& this.getNickName().equals(e.getNickName());
+	}
+	
+	/**
+	 * Gets the hash code for this object.
+	 * 
+	 * @return hash code.
+	 */
+	public int hashCode() {
+		int hashCode = getNickName().hashCode();
+		hashCode *= type.hashCode();
+		hashCode *= identifier;
+		return hashCode;
+	}
+	
 	@Override
 	public void destroy() {
 		super.destroy();

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * BuildingKit.java
- * @version 3.1.0 2017-09-04
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -11,7 +11,6 @@ import java.io.Serializable;
 import java.util.Collection;
 
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
@@ -32,7 +31,7 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 	public static final double EMPTY_MASS = 30D;
 
 	/** 334 Sols (1/2 orbit). */
-	private static final double WEAR_LIFETIME = 334000D;
+	private static final double WEAR_LIFETIME = 334_000;
 	/** 100 millisols. */
 	private static final double MAINTENANCE_TIME = 100D;
 	// Data members.
@@ -47,7 +46,7 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 	 * The BuildingKit class represents a building kit in a building.
 	 */
 	public BuildingKit(Coordinates location) {
-		super(TYPE, location);
+		super(TYPE, TYPE, location);
 
 		// Initialize data members.
 		isSalvaged = false;
@@ -78,7 +77,7 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 	 * @param info       the salvage process info.
 	 * @param settlement the settlement where the salvage is taking place.
 	 */
-	public void startSalvage(SalvageProcessInfo info, Settlement settlement) {
+	public void startSalvage(SalvageProcessInfo info, int settlement) {
 		salvageInfo = new SalvageInfo(this, info, settlement);
 		isSalvaged = true;
 	}
@@ -137,7 +136,7 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 
 	public Settlement findSettlementVicinity() {
 
-		Collection<Settlement> ss = Simulation.instance().getUnitManager().getSettlements();
+		Collection<Settlement> ss = unitManager.getSettlements();
 		for (Settlement s : ss) {
 			if (s.getCoordinates().equals(getCoordinates()))
 				return s;
@@ -177,13 +176,7 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 
 	@Override
 	public Settlement getAssociatedSettlement() {
-		return this.getAssociatedSettlement();
-	}
-
-	@Override
-	public Settlement getBuriedSettlement() {
-		// TODO Auto-generated method stub
-		return null;
+		return getContainerUnit().getAssociatedSettlement();
 	}
 
 	@Override

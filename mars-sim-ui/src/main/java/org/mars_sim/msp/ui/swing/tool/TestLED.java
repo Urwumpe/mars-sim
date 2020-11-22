@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * TestLED.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 package org.mars_sim.msp.ui.swing.tool;
 
 import java.awt.BorderLayout;
@@ -25,7 +32,8 @@ public class TestLED {
 	        }
 	    });
 	}
-    private void createAndShowUI() {
+    @SuppressWarnings("serial")
+	private void createAndShowUI() {
         final JFrame frame = new JFrame();
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLocationByPlatform(true);

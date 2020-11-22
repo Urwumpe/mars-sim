@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Function.java
- * @version 3.1.0 2017-09-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -14,11 +14,20 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.mars_sim.msp.core.LocalAreaUtil;
+import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.mars.Mars;
+import org.mars_sim.msp.core.mars.SurfaceFeatures;
+import org.mars_sim.msp.core.mars.Weather;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PersonConfig;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.function.FunctionType;
+import org.mars_sim.msp.core.structure.building.BuildingConfig;
+import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
@@ -30,8 +39,20 @@ public abstract class Function implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	private FunctionType type;
-	private Building building;
+	protected Building building;
 	private List<Point2D> activitySpots;
+	private List<Point2D> bedLocations;
+
+//	private static List<FunctionType> buildingFunctions;
+	
+	protected static BuildingConfig buildingConfig;
+	protected static MasterClock masterClock;
+	protected static MarsClock marsClock;
+	protected static PersonConfig personConfig;
+	protected static Weather weather;
+	protected static SurfaceFeatures surface;
+	protected static Mars mars;
+	protected static UnitManager unitManager;
 
 	/**
 	 * Constructor.
@@ -42,8 +63,23 @@ public abstract class Function implements Serializable {
 	public Function(FunctionType type, Building building) {
 		this.type = type;
 		this.building = building;
+		
+		Simulation sim = Simulation.instance();
+		buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
+		masterClock = sim.getMasterClock();
+		marsClock = masterClock.getMarsClock();
+		personConfig = SimulationConfig.instance().getPersonConfig();
+		mars = sim.getMars();
+		weather = mars.getWeather();
+		surface = mars.getSurfaceFeatures();
+		unitManager = sim.getUnitManager();
+
 	}
 
+//	public void createFunctionTypeMap() {
+//		buildingFunctions  = new ArrayList<>();
+//	}
+	
 	/**
 	 * Gets the function.
 	 * 
@@ -73,7 +109,6 @@ public abstract class Function implements Serializable {
 	 * Gets the function's malfunction scope strings.
 	 * 
 	 * @return array of scope strings.
-	 * @deprecated TODO malfunction scope strings should be internationalized.
 	 */
 	public String[] getMalfunctionScopeStrings() {
 		String[] result = { type.getName() };
@@ -138,6 +173,20 @@ public abstract class Function implements Serializable {
 	}
 
 	/**
+	 * Loads bed locations into the building function.
+	 * 
+	 * @param newBedLocations bed locations to add.
+	 */
+	protected void loadBedLocations(Collection<Point2D> newBedLocations) {
+
+		if (bedLocations == null) {
+			bedLocations = new ArrayList<Point2D>(newBedLocations);
+		} else {
+			bedLocations.addAll(newBedLocations);
+		}
+	}
+	
+	/**
 	 * Gets an available activity spot for the person.
 	 * 
 	 * @param person the person looking for the activity spot.
@@ -159,7 +208,7 @@ public abstract class Function implements Serializable {
 
 				// Check if spot is unoccupied.
 				boolean available = true;
-				Settlement settlement = getBuilding().getBuildingManager().getSettlement();
+				Settlement settlement = getBuilding().getSettlement();
 				Iterator<Person> j = settlement.getIndoorPeople().iterator();
 				while (j.hasNext() && available) {
 					Person tempPerson = j.next();
@@ -215,7 +264,7 @@ public abstract class Function implements Serializable {
 
 					// Check if spot is unoccupied.
 					boolean available = true;
-					Settlement settlement = getBuilding().getBuildingManager().getSettlement();
+					Settlement settlement = getBuilding().getSettlement();
 					Iterator<Robot> j = settlement.getRobots().iterator();
 					while (j.hasNext() && available) {
 						Robot tempRobot = j.next();
@@ -254,42 +303,46 @@ public abstract class Function implements Serializable {
 	 * @return true if this activity spot is empty.
 	 */
 	public boolean isActivitySpotEmpty(Point2D spot) {
+		if (activitySpots == null || activitySpots.isEmpty())
+			return true;
+		
 		boolean result = false;
 
-		if (activitySpots.isEmpty())
-			return true;
+		Iterator<Point2D> i = activitySpots.iterator();
+		while (i.hasNext()) {
+			Point2D activitySpot = i.next();
 
-		else {
-			Iterator<Point2D> i = activitySpots.iterator();
-			while (i.hasNext()) {
-				Point2D activitySpot = i.next();
+			if (activitySpot == spot) {
+				// Convert activity spot from building local to settlement local.
+				Building b = getBuilding();
+				Point2D settlementActivitySpot = LocalAreaUtil.getLocalRelativeLocation(activitySpot.getX(),
+						activitySpot.getY(), b);
 
-				if (activitySpot == spot) {
-					// Convert activity spot from building local to settlement local.
-					Building b = getBuilding();
-					Point2D settlementActivitySpot = LocalAreaUtil.getLocalRelativeLocation(activitySpot.getX(),
-							activitySpot.getY(), b);
-
-					for (Person person : b.getInhabitants()) {
-						// Check if person's location is identical or very very close (1e-5 meters) to
-						// activity spot.
-						Point2D personLoc = new Point2D.Double(person.getXLocation(), person.getYLocation());
-						if (LocalAreaUtil.areLocationsClose(settlementActivitySpot, personLoc)) {
-							result = false;
-						} else {
-							result = true;
-							break;
-						}
+				for (Person person : b.getInhabitants()) {
+					// Check if person's location is identical or very very close (1e-5 meters) to
+					// activity spot.
+					Point2D personLoc = new Point2D.Double(person.getXLocation(), person.getYLocation());
+					if (!LocalAreaUtil.areLocationsClose(settlementActivitySpot, personLoc)) {
+						return true;
+					}
+				}
+				
+				for (Robot robot : b.getRobots()) {
+					// Check if robot location is identical or very very close (1e-5 meters) to
+					// activity spot.
+					Point2D loc = new Point2D.Double(robot.getXLocation(), robot.getYLocation());
+					if (!LocalAreaUtil.areLocationsClose(settlementActivitySpot, loc)) {
+						return true;
 					}
 				}
 			}
-
-			return result;
 		}
+
+		return result;
 	}
 
 	/**
-	 * Checks if a person is at an activity for this building function.
+	 * Checks if a person is at an activity spot for this building function.
 	 * 
 	 * @param person the person.
 	 * @return true if the person is currently at an activity spot.
@@ -315,7 +368,7 @@ public abstract class Function implements Serializable {
 	}
 
 	/**
-	 * Checks if a robot is at an activity for this building function.
+	 * Checks if a robot is at an activity spot for this building function.
 	 * 
 	 * @param robot the robot.
 	 * @return true if the robot is currently at an activity spot.
@@ -353,6 +406,75 @@ public abstract class Function implements Serializable {
 		return activitySpots;
 	}
 
+	/**
+	 * Gets the number of currently empty activity spots
+	 * 
+	 * @return
+	 */
+	public int getNumEmptyActivitySpots() {
+		int empty = 0;
+		if (activitySpots != null && !activitySpots.isEmpty()) {
+			for (Point2D s: activitySpots) {
+				if (isActivitySpotEmpty(s))
+					empty++;		
+			}	
+		}
+		return empty;
+	}
+	
+	/**
+	 * Checks if an empty activity spot is available
+	 * 
+	 * @return
+	 */
+	public boolean hasEmptyActivitySpot() {
+		if (activitySpots != null && !activitySpots.isEmpty()) {
+			for (Point2D s: activitySpots) {
+				if (isActivitySpotEmpty(s))
+					return true;		
+			}	
+		}
+		return false;
+	}
+	
+	/**
+	 * Gets the number of currently occupied activity spots
+	 * 
+	 * @return
+	 */
+	public int getNumOccupiedActivitySpots() {
+		int occupied = 0;
+		if (activitySpots != null && !activitySpots.isEmpty()) {
+			for (Point2D s: activitySpots) {
+				if (!isActivitySpotEmpty(s))
+					occupied++;		
+			}	
+		}
+		return occupied;
+		
+//		return activitySpots.size() - getNumEmptyActivitySpots();
+	}
+	
+	/**
+	 * Reloads instances after loading from a saved sim
+	 * 
+	 * @param bc {@link BuildingConfig}
+	 * @param c0 {@link MasterClock}
+	 * @param c1 {@link MarsClock}
+	 * @param pc {@link PersonConfig}
+	 */
+	public static void initializeInstances(BuildingConfig bc, MasterClock c0, MarsClock c1, PersonConfig pc,
+			Mars m, SurfaceFeatures sf, Weather w, UnitManager u) {
+		masterClock = c0;
+		marsClock = c1;
+		personConfig = pc;
+		buildingConfig = bc;
+		mars = m;
+		weather = w;
+		surface = sf;
+		unitManager = u;
+	}
+	
 	/**
 	 * Prepare object for garbage collection.
 	 */

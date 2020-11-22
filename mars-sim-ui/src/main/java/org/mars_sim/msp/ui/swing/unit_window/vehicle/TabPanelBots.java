@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TabPanelBots.java
- * @version 3.08 2015-03-24
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.unit_window.vehicle;
@@ -20,7 +20,6 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import javax.swing.DefaultListModel;
-
 import javax.swing.JList;
 
 import org.mars_sim.msp.core.Msg;
@@ -29,7 +28,6 @@ import org.mars_sim.msp.core.vehicle.Crewable;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.monitor.RobotTableModel;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
@@ -41,6 +39,7 @@ import com.alee.laf.scroll.WebScrollPane;
 /** 
  * The TabPanelBots is a tab panel for a vehicle's bots crew information.
  */
+@SuppressWarnings("serial")
 public class TabPanelBots
 extends TabPanel
 implements MouseListener, ActionListener {
@@ -57,6 +56,12 @@ implements MouseListener, ActionListener {
 	private int crewNumCache;
 	private int crewCapacityCache;
 
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+	
+	/** The Crewable instance. */
+	private Crewable crewable;
+	
 	/**
 	 * Constructor.
 	 * @param vehicle the vehicle.
@@ -71,7 +76,16 @@ implements MouseListener, ActionListener {
 			vehicle, desktop
 		);
 
-		Crewable crewable = (Crewable) vehicle;
+		crewable = (Crewable) vehicle;
+
+	}
+
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
 
 		// Prepare title label.
 		WebPanel titlePanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
@@ -82,7 +96,7 @@ implements MouseListener, ActionListener {
 		
 		// Create crew count panel
 		WebPanel crewCountPanel = new WebPanel(new GridLayout(2, 1, 0, 0));
-		crewCountPanel.setBorder(new MarsPanelBorder());
+//		crewCountPanel.setBorder(new MarsPanelBorder());
 		topContentPanel.add(crewCountPanel);
 
 		// Create crew num label
@@ -97,7 +111,7 @@ implements MouseListener, ActionListener {
 
 		// Create crew display panel
 		WebPanel crewDisplayPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
-		crewDisplayPanel.setBorder(new MarsPanelBorder());
+//		crewDisplayPanel.setBorder(new MarsPanelBorder());
 		topContentPanel.add(crewDisplayPanel);
 
 		// Create scroll panel for crew list.
@@ -132,8 +146,8 @@ implements MouseListener, ActionListener {
 	 * Updates the info on this panel.
 	 */
 	public void update() {
-		Vehicle vehicle = (Vehicle) unit;
-		Crewable crewable = (Crewable) vehicle;
+		if (!uiDone)
+			initializeUI();
 
 		// Update crew num
 		if (crewNumCache !=  crewable.getRobotCrewNum()) {

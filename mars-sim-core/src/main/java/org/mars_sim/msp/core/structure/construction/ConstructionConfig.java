@@ -1,23 +1,11 @@
 /**
  * Mars Simulation Project
  * ConstructionConfig.java
- * @version 3.1.0 2017-09-11
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.structure.construction;
-
-import org.jdom.Document;
-import org.jdom.Element;
-import org.mars_sim.msp.core.SimulationConfig;
-import org.mars_sim.msp.core.resource.AmountResource;
-import org.mars_sim.msp.core.resource.ItemResource;
-import org.mars_sim.msp.core.resource.ItemResourceUtil;
-import org.mars_sim.msp.core.resource.Part;
-import org.mars_sim.msp.core.resource.ResourceUtil;
-import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
-import org.mars_sim.msp.core.vehicle.Rover;
-import org.mars_sim.msp.core.vehicle.Vehicle;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -29,6 +17,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
+
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.resource.AmountResource;
+import org.mars_sim.msp.core.resource.ItemResourceUtil;
+import org.mars_sim.msp.core.resource.Part;
+import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
+import org.mars_sim.msp.core.vehicle.Rover;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 
 /**
@@ -116,7 +115,6 @@ public class ConstructionConfig implements Serializable {
      * @return list of construction stage infos.
      * @throws Exception if error parsing XML file.
      */
-    @SuppressWarnings("unchecked")
     private List<ConstructionStageInfo> createConstructionStageInfoList(String stageType) {
         
         List<ConstructionStageInfo> stageInfoList = null;
@@ -205,7 +203,7 @@ public class ConstructionConfig implements Serializable {
                 for (Element partElement : partList) {
                     String partName = partElement.getAttributeValue(NAME);
                     int partNum = Integer.parseInt(partElement.getAttributeValue(NUMBER));
-                    Part part = (Part) ItemResource.findItemResource(partName);
+                    Part part = (Part) ItemResourceUtil.findItemResource(partName);
                     
     				if (part == null)
     					logger.severe(partName + " shows up in constructions.xml but doesn't exist in parts.xml.");
@@ -220,7 +218,7 @@ public class ConstructionConfig implements Serializable {
                 for (Element resourceElement : resourceList) {
                     String resourceName = resourceElement.getAttributeValue(NAME);
                     double resourceAmount = Double.parseDouble(resourceElement.getAttributeValue(AMOUNT));
-                    AmountResource resource = AmountResource.findAmountResource(resourceName);
+                    AmountResource resource = ResourceUtil.findAmountResource(resourceName);
        				if (resource == null)
     					logger.severe(resourceName + " shows up in constructions.xml but doesn't exist in resources.xml.");
     				else

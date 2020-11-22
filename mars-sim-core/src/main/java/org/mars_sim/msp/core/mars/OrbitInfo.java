@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * OrbitInfo.java
- * @version 3.1.0 2018-08-19
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.mars;
@@ -9,7 +9,6 @@ package org.mars_sim.msp.core.mars;
 import java.io.Serializable;
 
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.time.ClockUtils;
 import org.mars_sim.msp.core.time.EarthClock;
@@ -54,7 +53,7 @@ public class OrbitInfo implements Serializable {
 	 * obtain the most accurate value of L_AT_START numerically by running
 	 * ClockUtils.getLs()
 	 */
-	private static final double L_AT_START = 12.72010790886634; // 252.5849107170493;
+//	private static final double L_AT_START = 12.72010790886634; // 252.5849107170493;
 	// Note : An areocentric orbit is an orbit around the planet Mars.
 
 	/**
@@ -62,7 +61,7 @@ public class OrbitInfo implements Serializable {
 	 * Note: may obtain the most accurate value numerically by running
 	 * ClockUtils.getHeliocentricDistance()
 	 */
-	private static final double SUN_MARS_DIST_AT_START = 1.587624202793963;// 1.5876367428334057;//1.3817913894302327;
+//	private static final double SUN_MARS_DIST_AT_START = 1.587624202793963;// 1.5876367428334057;//1.3817913894302327;
 																			// //1.665732D; //
 
 	// Data members
@@ -126,21 +125,18 @@ public class OrbitInfo implements Serializable {
 	/** The solar zenith angle z */
 	// private double solarZenithAngle;
 
-	/**
-	 * The point on the surface of Mars perpendicular to the Sun as Mars rotates.
-	 */
+	/**  The point on the surface of Mars perpendicular to the Sun as Mars rotates. */
 	private Coordinates sunDirection;
 
-	private Simulation sim = Simulation.instance();
-	private MarsClock marsClock;
-	private EarthClock earthClock;// = sim.getMasterClock().getEarthClock();
+	// static instances
+//	private static Simulation sim = Simulation.instance();
+	private static MarsClock marsClock;
+	private static EarthClock earthClock;
 
 	/** Constructs an {@link OrbitInfo} object */
 	public OrbitInfo() {
 		// Set orbit coordinates to start of orbit.
-//		if (earthClock == null)
-//			earthClock = sim.getMasterClock().getEarthClock();
-
+	
 		orbitTime = 0D;
 		theta = 0D;
 
@@ -297,9 +293,6 @@ public class OrbitInfo implements Serializable {
 		// Determine new radius
 		instantaneousSunMarsDistance = 1.510818924D / (1 + (ECCENTRICITY * Math.cos(theta)));
 
-		if (earthClock == null)
-			earthClock = sim.getMasterClock().getEarthClock();
-
 //		offsetL_s = computePerihelion(earthClock.getYear());
 //		double v = getTrueAnomaly(instantaneousSunMarsDistance);
 
@@ -325,8 +318,8 @@ public class OrbitInfo implements Serializable {
 	}
 
 	public double computePerihelion() {
-		if (earthClock == null)
-			earthClock = sim.getMasterClock().getEarthClock();
+//		if (earthClock == null)
+//			earthClock = sim.getMasterClock().getEarthClock();
 
 		L_s_perihelion = 251D + .0064891 * (earthClock.getYear() - 2000);
 
@@ -411,8 +404,8 @@ public class OrbitInfo implements Serializable {
 	// Reference : https://en.wiki2.org/wiki/Solar_zenith_angle
 	public double getCosineSolarZenithAngle(Coordinates location) {
 
-		if (marsClock == null)
-			marsClock = sim.getMasterClock().getMarsClock();
+//		if (marsClock == null)
+//			marsClock = sim.getMasterClock().getMarsClock();
 
 		double solar_time = marsClock.getMillisol();
 
@@ -446,8 +439,7 @@ public class OrbitInfo implements Serializable {
 		// 1. http://www.giss.nasa.gov/research/briefs/allison_02/
 		// 2. https://en.wiki2.org/wiki/Equation_of_time
 		// 3. https://en.wiki2.org/wiki/Analemma
-		// 4.
-		// http://www.planetary.org/blogs/emily-lakdawalla/2014/a-martian-analemma.html?referrer=https://www.google.com/
+		// 4. http://www.planetary.org/blogs/emily-lakdawalla/2014/a-martian-analemma.html
 
 		computeSineSolarDeclinationAngle();
 		double d = getSolarDeclinationAngle();
@@ -628,12 +620,22 @@ public class OrbitInfo implements Serializable {
 	}
 
 	/**
+	 * Initialize transient data in the simulation.
+	 * 
+	 * @param m {@link MarsClock}
+	 * @param e {@link EarthClock}
+	 */
+	public static void initializeInstances(MarsClock m, EarthClock e) {
+		marsClock = m;
+		earthClock = e;
+	}
+	
+	/**
 	 * Prepare object for garbage collection.
 	 */
 	public void destroy() {
 		sunDirection = null;
 		marsClock = null;
-		sim = null;
 		earthClock = null;
 	}
 }

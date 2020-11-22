@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MedicalCare.java
- * @version 3.1.0 2017-03-09
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -11,17 +11,16 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.task.MedicalAssistance;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.RequestMedicalTreatment;
+import org.mars_sim.msp.core.person.ai.task.TreatMedicalPatient;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.person.health.MedicalStation;
 import org.mars_sim.msp.core.person.health.Treatment;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.BuildingException;
 
 /**
@@ -39,8 +38,6 @@ public class MedicalCare extends Function implements MedicalAid, Serializable {
 
 	private Building building;
 
-	private static BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
-
 	/**
 	 * Constructor.
 	 * 
@@ -52,13 +49,16 @@ public class MedicalCare extends Function implements MedicalAid, Serializable {
 		super(FUNCTION, building);
 
 		this.building = building;
-		int techLevel = config.getMedicalCareTechLevel(building.getBuildingType());
-		int beds = config.getMedicalCareBeds(building.getBuildingType());
+		int techLevel = buildingConfig.getMedicalCareTechLevel(building.getBuildingType());
+		int beds = buildingConfig.getMedicalCareBeds(building.getBuildingType());
 		medicalStation = new MedicalStation(techLevel, beds);
 		medicalStation.setBuilding(building);
 
 		// Load activity spots
-		loadActivitySpots(config.getMedicalCareActivitySpots(building.getBuildingType()));
+		loadActivitySpots(buildingConfig.getMedicalCareActivitySpots(building.getBuildingType()));
+		// TODO: need to distinguish between activity spots and bed locations
+		// Load bed locations
+		loadBedLocations(buildingConfig.getMedicalCareBedLocations(building.getBuildingType()));
 	}
 
 	/**
@@ -95,8 +95,8 @@ public class MedicalCare extends Function implements MedicalAid, Serializable {
 
 		// BuildingConfig config =
 		// SimulationConfig.instance().getBuildingConfiguration();
-		double tech = config.getMedicalCareTechLevel(buildingName);
-		double beds = config.getMedicalCareBeds(buildingName);
+		double tech = buildingConfig.getMedicalCareTechLevel(buildingName);
+		double beds = buildingConfig.getMedicalCareBeds(buildingName);
 		double medicalPoints = (tech * tech) * beds;
 
 		return medicalPoints * medicalPointValue;
@@ -119,7 +119,19 @@ public class MedicalCare extends Function implements MedicalAid, Serializable {
 	public int getPatientNum() {
 		return medicalStation.getPatientNum();
 	}
-
+	
+	/**
+	 * Checks if there are any empty beds for new patients
+	 * 
+	 * @return true or false
+	 */
+	public boolean hasEmptyBeds() {
+		if (getPatientNum() < getSickBedNum())
+			return true;
+		else
+			return false;
+	}
+	
 	/**
 	 * Gets the patients at this medical station.
 	 * 
@@ -143,11 +155,18 @@ public class MedicalCare extends Function implements MedicalAid, Serializable {
 				Iterator<Person> i = lifeSupport.getOccupants().iterator();
 				while (i.hasNext()) {
 					Task task = i.next().getMind().getTaskManager().getTask();
-					if (task instanceof MedicalAssistance) {
-						MedicalAid aid = ((MedicalAssistance) task).getMedicalAid();
+//					if (task instanceof MedicalAssistance) {
+//						MedicalAid aid = ((MedicalAssistance) task).getMedicalAid();
+					if (task instanceof TreatMedicalPatient) {
+						MedicalAid aid = ((TreatMedicalPatient) task).getMedicalAid();						
 						if ((aid != null) && (aid == this))
 							result++;
 					}
+					else if (task instanceof RequestMedicalTreatment) {
+						MedicalAid aid = ((RequestMedicalTreatment) task).getMedicalAid();						
+						if ((aid != null) && (aid == this))
+							result++;
+					}	
 				}
 			} catch (Exception e) {
 			}

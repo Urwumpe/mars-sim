@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * AssistScientificStudyResearcherMeta.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -12,13 +12,15 @@ import java.util.Collection;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.task.AssistScientificStudyResearcher;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
-import org.mars_sim.msp.core.vehicle.StatusType;
+import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
@@ -48,25 +50,37 @@ public class AssistScientificStudyResearcherMeta implements MetaTask, Serializab
 
         double result = 0D;
         
-        if (person.isInVehicle()) {	
-	        // Check if person is in a moving rover.
-	        if (inMovingRover(person)) {
-	            return 0;
-	        } 	       
-	        else
-	        // the penalty for performing experiment inside a vehicle
-	        	result = -50D;
-        }
+        // Probability affected by the person's stress and fatigue.
+        PhysicalCondition condition = person.getPhysicalCondition();
+        double fatigue = condition.getFatigue();
+        double stress = condition.getStress();
+        double hunger = condition.getHunger();
+        
+        if (fatigue > 1000 || stress > 50 || hunger > 500)
+        	return 0;
         
         if (person.isInside()) {
 	        // Find potential researchers.
 	        Collection<Person> potentialResearchers = AssistScientificStudyResearcher.getBestResearchers(person);
-	        if (potentialResearchers.size() > 0) {
-	            result = 50D;
+	        int size = potentialResearchers.size();
+	        if (size == 0)
+	        	return 0;
+	        
+	        else {
+	            result += size * RandomUtil.getRandomInt(1, 10);
 
-	            // If assistant is in a settlement, use crowding modifier.
+	            if (person.isInVehicle()) {	
+	    	        // Check if person is in a moving rover.
+	    	        if (Vehicle.inMovingRover(person)) {
+	    		        // the bonus for proposing scientific study inside a vehicle, 
+	    	        	// rather than having nothing to do if a person is not driving
+	    	        	result += 20;
+	    	        }
+	            }
+	            
                 Person researcher = (Person) potentialResearchers.toArray()[0];
 
+	            // If assistant is in a settlement, use crowding modifier.
                 Building building = BuildingManager.getBuilding(researcher);
                 if (building != null) {
                     result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(person, building);
@@ -82,46 +96,21 @@ public class AssistScientificStudyResearcherMeta implements MetaTask, Serializab
 
 	            // Modify if research is the person's favorite activity.
 	            if (person.getFavorite().getFavoriteActivity() == FavoriteType.RESEARCH) {
-	                result *= 2D;
+		        	result *= RandomUtil.getRandomDouble(3.0);
 	            }
 
-                // 2015-06-07 Added Preference modifier
+                // Add Preference modifier
 	            if (result > 0)
 	            	result = result + result * person.getPreference().getPreferenceScore(this)/2D;
 
 	        }
         }
 
-        if (result < 0) result = 0;
+        if (result <= 0) result = 0;
         
         return result;
     }
 
-    /**
-     * Checks if the person is in a moving vehicle.
-     * @param person the person.
-     * @return true if person is in a moving vehicle.
-     */
-    public static boolean inMovingRover(Person person) {
-
-        boolean result = false;
-
-        if (person.isInVehicle()) {
-            Vehicle vehicle = person.getVehicle();
-            if (vehicle.getStatus() == StatusType.MOVING) {
-                result = true;
-            }
-            else if (vehicle.getStatus() == StatusType.TOWED) {
-                Vehicle towingVehicle = vehicle.getTowingVehicle();
-                if (towingVehicle.getStatus() == StatusType.MOVING ||
-                        towingVehicle.getStatus() == StatusType.TOWED) {
-                    result = false;
-                }
-            }
-        }
-
-        return result;
-    }
     
 	@Override
 	public Task constructInstance(Robot robot) {

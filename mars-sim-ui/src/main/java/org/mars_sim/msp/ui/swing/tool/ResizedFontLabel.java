@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * ResizedFontLabel.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 package org.mars_sim.msp.ui.swing.tool;
 
 import java.awt.Dimension;
@@ -16,7 +23,7 @@ import javax.swing.JLabel;
 /** @see http://stackoverflow.com/questions/8281886 */
 public class ResizedFontLabel extends JLabel {
 
-    private static final int SIZE = 20;
+    private static final int SIZE = 128;
     private BufferedImage image;
 
     public ResizedFontLabel(String string) {
@@ -43,15 +50,15 @@ public class ResizedFontLabel extends JLabel {
         g.drawImage(image, 0, 0, getWidth(), getHeight(), null);
     }
 
-/*    
-	@Override
-	protected void paintComponent(Graphics g) {
-	    final Graphics2D g2d = (Graphics2D) g;
-	    g2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
-	    g2d.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-	    super.paintComponent(g2d);
-	}
-*/	
+   
+//	@Override
+//	protected void paintComponent(Graphics g) {
+//	    final Graphics2D g2d = (Graphics2D) g;
+//	    g2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+//	    g2d.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+//	    super.paintComponent(g2d);
+//	}
+	
     private BufferedImage createImage(String label) {
         Font font = new Font(Font.SANS_SERIF, Font.BOLD, SIZE);
         FontRenderContext frc = new FontRenderContext(null, true, true);
@@ -64,6 +71,9 @@ public class ResizedFontLabel extends JLabel {
         g2d.setRenderingHint(
             RenderingHints.KEY_ANTIALIASING,
             RenderingHints.VALUE_ANTIALIAS_ON);
+		g2d.setRenderingHint(
+		        RenderingHints.KEY_TEXT_ANTIALIASING,
+		        RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
         g2d.setColor(getBackground());
         g2d.fillRect(0, 0, bi.getWidth(), bi.getHeight());
         g2d.setColor(getForeground());

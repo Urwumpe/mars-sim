@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MaintainGroundVehicleGarageMeta.java
- * @version 3.1.0 2017-10-16
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -15,16 +15,20 @@ import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.task.MaintainGroundVehicleGarage;
 import org.mars_sim.msp.core.person.ai.task.Maintenance;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.robot.RobotType;
 import org.mars_sim.msp.core.robot.ai.job.RobotJob;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.VehicleMaintenance;
+import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
@@ -56,19 +60,35 @@ public class MaintainGroundVehicleGarageMeta implements MetaTask, Serializable {
 
 		double result = 0D;
 
-		if (person.isInSettlement() || person.isRightOutsideSettlement()) {
+		if (person.isInSettlement()) {
 
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double fatigue = condition.getFatigue();
+            double stress = condition.getStress();
+            double hunger = condition.getHunger();
+            
+            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            	return 0;
+            
 			try {
 				// Get all vehicles requiring maintenance.
 				Iterator<Vehicle> i = MaintainGroundVehicleGarage.getAllVehicleCandidates(person).iterator();
 				while (i.hasNext()) {
 					Vehicle vehicle = i.next();
 					MalfunctionManager manager = vehicle.getMalfunctionManager();
+					
 					boolean hasMalfunction = manager.hasMalfunction();
+					if (hasMalfunction)
+						return 0;
+					
 					boolean hasParts = Maintenance.hasMaintenanceParts(person, vehicle);
+					if (!hasParts)
+						return 0;
+					
 					double effectiveTime = manager.getEffectiveTimeSinceLastMaintenance();
 					boolean minTime = (effectiveTime >= 1000D);
-					if (!hasMalfunction && hasParts && minTime) {
+					if (minTime) {
 						double entityProb = effectiveTime / 50D;
 						if (entityProb > 100D) {
 							entityProb = 100D;
@@ -105,10 +125,14 @@ public class MaintainGroundVehicleGarageMeta implements MetaTask, Serializable {
 				}
 			}
 
-			if (!garageSpace && !needyVehicleInGarage) {
-				result = 0D;
+			if (!garageSpace) {
+				return 0D;
 			}
 
+			if (!needyVehicleInGarage) {
+				return 0D;
+			}
+			
 			// Effort-driven task modifier.
 			result *= person.getPerformanceRating();
 
@@ -121,7 +145,7 @@ public class MaintainGroundVehicleGarageMeta implements MetaTask, Serializable {
 
 			// Modify if tinkering is the person's favorite activity.
 			if (person.getFavorite().getFavoriteActivity() == FavoriteType.TINKERING) {
-				result *= 1.5D;
+				result += RandomUtil.getRandomInt(1, 20);
 			}
 
 			// Add Preference modifier
@@ -147,7 +171,7 @@ public class MaintainGroundVehicleGarageMeta implements MetaTask, Serializable {
 
 		double result = 0D;
 
-		if (robot.isInSettlement()) {
+		if (robot.isInSettlement() && robot.getRobotType() == RobotType.REPAIRBOT) {
 
 			try {
 				// Get all vehicles requiring maintenance.
@@ -156,10 +180,16 @@ public class MaintainGroundVehicleGarageMeta implements MetaTask, Serializable {
 					Vehicle vehicle = i.next();
 					MalfunctionManager manager = vehicle.getMalfunctionManager();
 					boolean hasMalfunction = manager.hasMalfunction();
+					if (hasMalfunction)
+						return 0;
+					
 					boolean hasParts = Maintenance.hasMaintenanceParts(robot, vehicle);
+					if (!hasParts)
+						return 0;
+					
 					double effectiveTime = manager.getEffectiveTimeSinceLastMaintenance();
 					boolean minTime = (effectiveTime >= 1000D);
-					if (!hasMalfunction && hasParts && minTime) {
+					if (hasParts && minTime) {
 						double entityProb = effectiveTime / 50D;
 						if (entityProb > 100D) {
 							entityProb = 100D;

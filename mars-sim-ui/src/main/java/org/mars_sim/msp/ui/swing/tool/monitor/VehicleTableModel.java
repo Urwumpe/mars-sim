@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * VehicleTableModel.java
- * @version 3.1.0 2017-03-03
+ * @version 3.1.2 2020-09-02
  * @author Barry Evans
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -17,6 +17,8 @@ import java.util.logging.Logger;
 import javax.swing.SwingUtilities;
 
 import org.mars_sim.msp.core.Coordinates;
+import org.mars_sim.msp.core.GameManager;
+import org.mars_sim.msp.core.GameManager.GameMode;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
@@ -39,7 +41,6 @@ import org.mars_sim.msp.core.person.ai.mission.TravelMission;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ResourceUtil;
-import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.function.cooking.PreparingDessert;
 import org.mars_sim.msp.core.vehicle.Crewable;
@@ -50,22 +51,29 @@ import org.mars_sim.msp.ui.swing.tool.Conversion;
  * The VehicleTableModel that maintains a list of Vehicle objects.
  * It maps key attributes of the Vehicle into Columns.
  */
-public class VehicleTableModel
-extends UnitTableModel {
+@SuppressWarnings("serial")
+public class VehicleTableModel extends UnitTableModel {
 
 	//private DecimalFormat decFormatter = new DecimalFormat("#,###,###.#");
 
 	private static Logger logger = Logger.getLogger(VehicleTableModel.class.getName());
 
+	private final static String AT = "At ";
+	private static String ON = "On";	
+	private static String OFF = "Off";
+	private static String TRUE = "True";	
+	private static String FALSE = "False";
+	
 	// Column indexes
 	private final static int NAME = 0;
 	private final static int TYPE = 1;
-	private final static int LOCATION = 2;
-	private final static int DESTINATION = 3;
-	private final static int DESTDIST = 4;
-	private final static int MISSION = 5;
-	private final static int CREW = 6;
-	private final static int BOTS = 7;
+	private final static int HOME = 2;
+	private final static int LOCATION = 3;
+	private final static int DESTINATION = 4;
+	private final static int DESTDIST = 5;
+	private final static int MISSION = 6;
+	private final static int CREW = 7;
+//	private final static int BOTS = 8;
 	private final static int DRIVER = 8;
 	private final static int STATUS = 9;
 	private final static int BEACON = 10;
@@ -83,11 +91,6 @@ extends UnitTableModel {
 	private final static int COLUMNCOUNT = 21;
 	/** Names of Columns. */
 	private static String columnNames[];
-	
-	private static String ON = "On";	
-	private static String OFF = "Off";
-	private static String TRUE = "True";	
-	private static String FALSE = "False";
 		
 	/** Names of Columns. */
 	private static Class<?> columnTypes[];
@@ -102,6 +105,20 @@ extends UnitTableModel {
 		columnTypes[NAME] = String.class;
 		columnNames[TYPE] = "Type";
 		columnTypes[TYPE] = String.class;
+		columnNames[HOME] = "Home";
+		columnTypes[HOME] = String.class;
+		columnNames[LOCATION] = "Location";
+		columnTypes[LOCATION] = String.class;
+		columnNames[DESTINATION] = "Next Waypoint";
+		columnTypes[DESTINATION] = Coordinates.class;
+		columnNames[DESTDIST] = "Dist. to next [km]";
+		columnTypes[DESTDIST] = Integer.class;
+		columnNames[MISSION] = "Mission";
+		columnTypes[MISSION] = String.class;
+		columnNames[CREW] = "Crew";
+		columnTypes[CREW] = Integer.class;
+//		columnNames[BOTS] = "Bots";
+//		columnTypes[BOTS] = Integer.class;
 		columnNames[DRIVER] = "Driver";
 		columnTypes[DRIVER] = String.class;
 		columnNames[STATUS] = "Status";
@@ -110,49 +127,33 @@ extends UnitTableModel {
 		columnTypes[BEACON] = String.class;
 		columnNames[RESERVED] = "Reserved";
 		columnTypes[RESERVED] = String.class;
-		columnNames[LOCATION] = "Location";
-		columnTypes[LOCATION] = String.class;
 		columnNames[SPEED] = "Speed";
 		columnTypes[SPEED] = Integer.class;
 		columnNames[MALFUNCTION] = "Malfunction";
 		columnTypes[MALFUNCTION] = String.class;
-		columnNames[CREW] = "Crew";
-		columnTypes[CREW] = Integer.class;
-		columnNames[BOTS] = "Bots";
-		columnTypes[BOTS] = Integer.class;
-		columnNames[DESTINATION] = "Destination";
-		columnTypes[DESTINATION] = Coordinates.class;
-		columnNames[DESTDIST] = "Dest. Dist.";
-		columnTypes[DESTDIST] = Integer.class;
-		columnNames[MISSION] = "Mission";
-		columnTypes[MISSION] = String.class;
+		columnNames[OXYGEN] = "Oxygen";
+		columnTypes[OXYGEN] = Integer.class;
+		columnNames[METHANE] = "Methane";
+		columnTypes[METHANE] = Integer.class;
+		columnNames[WATER] = "Water";
+		columnTypes[WATER] = Integer.class;
 		columnNames[FOOD] = "Food";
 		columnTypes[FOOD] = Integer.class;
 		columnNames[DESSERT] = "Dessert";
 		columnTypes[DESSERT] = Integer.class;
-		columnNames[OXYGEN] = "Oxygen";
-		columnTypes[OXYGEN] = Integer.class;
-		columnNames[WATER] = "Water";
-		columnTypes[WATER] = Integer.class;
-		columnNames[METHANE] = "Methane";
-		columnTypes[METHANE] = Integer.class;
 		columnNames[ROCK_SAMPLES] = "Rock Samples";
 		columnTypes[ROCK_SAMPLES] = Integer.class;
 		columnNames[ICE] = "Ice";
 		columnTypes[ICE] = Integer.class;
 	}
 
-	// Data members
-	private UnitManagerListener unitManagerListener;
-	private LocalMissionManagerListener missionManagerListener;
-	private Map<Unit, Map<AmountResource, Double>> resourceCache;
 
-	private static AmountResource foodAR = ResourceUtil.foodAR;
-	private static AmountResource oxygenAR = ResourceUtil.oxygenAR;
-	private static AmountResource waterAR = ResourceUtil.waterAR;
-	private static AmountResource methaneAR = ResourceUtil.methaneAR;
-	private static AmountResource rockSamplesAR = ResourceUtil.rockSamplesAR;
-	private static AmountResource iceAR = ResourceUtil.iceAR;
+	private static int foodID = ResourceUtil.foodID;
+	private static int oxygenID = ResourceUtil.oxygenID;
+	private static int waterID = ResourceUtil.waterID;
+	private static int methaneID = ResourceUtil.methaneID;
+	private static int rockSamplesID = ResourceUtil.rockSamplesID;
+	private static int iceID = ResourceUtil.iceID;
 
 	private static AmountResource [] availableDesserts = PreparingDessert.getArrayOfDessertsAR();
 
@@ -160,7 +161,18 @@ extends UnitTableModel {
 
 	private static MissionManager missionManager = Simulation.instance().getMissionManager();
 	
+	// Data members
 	private int mapSizeCache = 0;
+	
+	private UnitManagerListener unitManagerListener;
+	private LocalMissionManagerListener missionManagerListener;
+	
+	private Map<Vehicle, Map<Integer, Double>> resourceCache;
+
+	private GameMode mode;
+	
+	private Settlement commanderSettlement;
+
 	
 	/**
 	 * Constructs a VehicleTableModel object. It creates the list of possible
@@ -176,7 +188,14 @@ extends UnitTableModel {
 			columnTypes
 		);
 
-		setSource(unitManager.getVehicles());
+		if (GameManager.mode == GameMode.COMMAND) {
+			mode = GameMode.COMMAND;
+			commanderSettlement = unitManager.getCommanderSettlement();
+			setSource(commanderSettlement.getAllAssociatedVehicles());
+		}
+		else
+			setSource(unitManager.getVehicles());
+		
 		unitManagerListener = new LocalUnitManagerListener();
 		unitManager.addUnitManagerListener(unitManagerListener);
 
@@ -193,7 +212,7 @@ extends UnitTableModel {
 
 		if (rowIndex < getUnitNumber()) {
 			Vehicle vehicle = (Vehicle)getUnit(rowIndex);
-			Map<AmountResource, Double> resourceMap = resourceCache.get(vehicle);
+			Map<Integer, Double> resourceMap = resourceCache.get(vehicle);
 
 			try {
 				// Invoke the appropriate method, switch is the best solution
@@ -207,67 +226,83 @@ extends UnitTableModel {
 					result = Conversion.capitalize(vehicle.getDescription());
 				} break;
 
+				case HOME : {
+					Settlement as = vehicle.getAssociatedSettlement();
+					if (as != null) {
+						result = as.getName();
+					}
+					else {
+						result = vehicle.getCoordinates().getFormattedString();
+					}
+				} break;
+				
+				case LOCATION : {
+					Settlement settle = vehicle.getSettlement();
+					if (settle != null) {
+						result = settle.getName();
+					}
+					else {
+						result = vehicle.getCoordinates().getFormattedString();
+					}
+				} break;
+
+				case DESTINATION : {
+					result = null;
+					Mission mission = missionManager.getMissionForVehicle(vehicle);
+					if ((mission != null) && (mission instanceof VehicleMission)) {
+						VehicleMission vehicleMission = (VehicleMission) mission;
+						String status = vehicleMission.getTravelStatus();
+						if (status != null) {
+							if (status.equals(TravelMission.TRAVEL_TO_NAVPOINT)) {
+								NavPoint destination = vehicleMission.getNextNavpoint();	
+								if (destination.isSettlementAtNavpoint()) 
+									result = destination.getSettlement().getName();
+								else
+									result = Conversion.capitalize(destination.getDescription()) + " - " + destination.getLocation().getFormattedString();
+							}
+							else if (status.equals(TravelMission.AT_NAVPOINT)) {
+								NavPoint destination = vehicleMission.getCurrentNavpoint();
+//								result = destination.getLocation().getFormattedString();
+								result = Conversion.capitalize(destination.getDescription());
+							}					
+						}			
+					}
+				} break;
+
+				case DESTDIST : {
+					Mission mission = missionManager.getMissionForVehicle(vehicle);
+					if ((mission != null) && (mission instanceof VehicleMission)) {
+						VehicleMission vehicleMission = (VehicleMission) mission;
+						try {
+							result = Math.round(vehicleMission.getCurrentLegRemainingDistance()*10.0)/10.0;
+						}
+						catch (Exception e) {
+							logger.log(Level.SEVERE,"Error getting current leg remaining distance.");
+							e.printStackTrace(System.err);
+						}
+					}
+					else result = null;
+				} break;
+
+				case MISSION : {
+					Mission mission = missionManager.getMissionForVehicle(vehicle);
+					if (mission != null) {
+						result = mission.getFullMissionDesignation();//getDescription();.getName();
+					}
+					else result = null;
+				} break;
+				
 				case CREW : {
 					if (vehicle instanceof Crewable)
 						result = ((Crewable) vehicle).getCrewNum();
 					else result = 0;
 				} break;
 
-				case BOTS : {
-					if (vehicle instanceof Crewable)
-						result = ((Crewable) vehicle).getRobotCrewNum();
-					else result = 0;
-				} break;
-
-				case WATER : {
-					//result = decFormatter.format(resourceMap.get(AmountResource.findAmountResource(LifeSupport.WATER)));
-					result = resourceMap.get(waterAR);
-				} break;
-
-				case FOOD : {
-					//result = decFormatter.format(resourceMap.get(AmountResource.findAmountResource(LifeSupport.FOOD)));
-					result= resourceMap.get(foodAR);
-				} break;
-
-				case DESSERT : {
-					double sum = 0;
-					int mapSize = resourceMap.size();
-					if (mapSizeCache != mapSize) {
-						mapSizeCache = mapSize ;
-					}
-		    		for (AmountResource ar : resourceMap.keySet()) {
-		    	        for(AmountResource n : availableDesserts) {
-		    	        	//if (n.getName().equals(ar.getName())) {
-		    	        	//if (n.equals(ar)) {
-			    	        if (n == ar) {
-		    	        		double amount = resourceMap.get(ar);
-		    	        		sum += amount;
-		    	    			break;
-		    	        	}
-		    			}
-		    		}
-				    result = new Double(sum);
-
-				} break;
-
-				case OXYGEN : {
-					//result = decFormatter.format(resourceMap.get(AmountResource.findAmountResource(LifeSupport.OXYGEN)));
-					result = resourceMap.get(oxygenAR);
-				} break;
-
-				case METHANE : {
-					//result = decFormatter.format(resourceMap.get(AmountResource.findAmountResource("methane")));
-					result = resourceMap.get(methaneAR);
-				} break;
-
-				case ROCK_SAMPLES : {
-					//result = decFormatter.format(resourceMap.get(AmountResource.findAmountResource("rock samples")));
-					result = resourceMap.get(rockSamplesAR);
-				} break;
-
-				case SPEED : {
-					result = new Float(vehicle.getSpeed()).intValue();
-				} break;
+//				case BOTS : {
+//					if (vehicle instanceof Crewable)
+//						result = ((Crewable) vehicle).getRobotCrewNum();
+//					else result = 0;
+//				} break;
 
 				case DRIVER : {
 					if (vehicle.getOperator() != null) {
@@ -277,10 +312,15 @@ extends UnitTableModel {
 						result = null;
 					}
 				} break;
+				
+				case SPEED : {
+					result = Math.round(vehicle.getSpeed()*10.0)/10.0;
+				} break;
+
 
 				// Status is a combination of Mechanical failure and maintenance
 				case STATUS : {
-					result = vehicle.getStatus();
+					result = vehicle.printStatusTypes();
 				} break;
 
 				case BEACON : {
@@ -298,56 +338,79 @@ extends UnitTableModel {
 					if (failure != null) result = failure.getName();
 				} break;
 
-				case LOCATION : {
-					Settlement settle = vehicle.getSettlement();
-					if (settle != null) {
-						result = settle.getName();
-					}
-					else {
-						result = vehicle.getCoordinates().getFormattedString();
-					}
+
+				case WATER : {
+					//result = decFormatter.format(resourceMap.get(AmountResource.findAmountResource(LifeSupport.WATER)));
+					double value = resourceMap.get(waterID);
+					if (value == 0)
+						result = "--";
+					else
+						result = value;
 				} break;
 
-				case DESTINATION : {
-					result = null;
-					Mission mission = missionManager.getMissionForVehicle(vehicle);
-					if ((mission != null) && (mission instanceof VehicleMission)) {
-						VehicleMission vehicleMission = (VehicleMission) mission;
-						if (vehicleMission.getTravelStatus() != null 
-								&& vehicleMission.getTravelStatus().equals(TravelMission.TRAVEL_TO_NAVPOINT)) {
-							NavPoint destination = vehicleMission.getNextNavpoint();
-							if (destination.isSettlementAtNavpoint()) result = destination.getSettlement().getName();
-							else result = destination.getLocation().getFormattedString();
-						}
-					}
+				case FOOD : {
+					//result = decFormatter.format(resourceMap.get(AmountResource.findAmountResource(LifeSupport.FOOD)));
+					double value = resourceMap.get(foodID);
+					if (value == 0)
+						result = "--";
+					else
+						result = value;
 				} break;
 
-				case DESTDIST : {
-					Mission mission = missionManager.getMissionForVehicle(vehicle);
-					if ((mission != null) && (mission instanceof VehicleMission)) {
-						VehicleMission vehicleMission = (VehicleMission) mission;
-						try {
-							result = new Float(vehicleMission.getCurrentLegRemainingDistance()).intValue();
-						}
-						catch (Exception e) {
-							logger.log(Level.SEVERE,"Error getting current leg remaining distance.");
-							e.printStackTrace(System.err);
-						}
+				case DESSERT : {
+					double sum = 0;
+					int mapSize = resourceMap.size();
+					if (mapSizeCache != mapSize) {
+						mapSizeCache = mapSize ;
 					}
-					else result = null;
+		    		for (Integer ar : resourceMap.keySet()) {
+		    	        for(AmountResource n : availableDesserts) {
+		    	        	//if (n.getName().equals(ar.getName())) {
+		    	        	//if (n.equals(ar)) {
+			    	        if (n.getID() == ar) {
+		    	        		double amount = resourceMap.get(ar);
+		    	        		sum += amount;
+		    	    			break;
+		    	        	}
+		    			}
+		    		}
+		    		double value = Double.valueOf(sum);
+					if (value == 0)
+						result = "--";
+					else
+						result = value;
 				} break;
 
-				case MISSION : {
-					Mission mission = missionManager.getMissionForVehicle(vehicle);
-					if (mission != null) {
-						result = mission.getName();
-					}
-					else result = null;
+				case OXYGEN : {
+					//result = decFormatter.format(resourceMap.get(AmountResource.findAmountResource(LifeSupport.OXYGEN)));
+					double value = resourceMap.get(oxygenID);
+					if (value == 0)
+						result = "--";
+					else
+						result = value;
+				} break;
+
+				case METHANE : {
+					//result = decFormatter.format(resourceMap.get(AmountResource.findAmountResource("methane")));
+					double value = resourceMap.get(methaneID);
+					if (value == 0)
+						result = "--";
+					else
+						result = value;
+				} break;
+
+				case ROCK_SAMPLES : {
+					//result = decFormatter.format(resourceMap.get(AmountResource.findAmountResource("rock samples")));
+					double value = resourceMap.get(rockSamplesID);
+					if (value == 0)
+						result = "--";
+					else
+						result = value;
 				} break;
 
 				case ICE : {
 					//result = decFormatter.format(resourceMap.get(AmountResource.findAmountResource("ice")));
-					result = resourceMap.get(iceAR);
+					result = resourceMap.get(iceID);
 				} break;
 
 				}
@@ -367,68 +430,107 @@ extends UnitTableModel {
 	 */
 	public void unitUpdate(UnitEvent event) {
 		Unit unit = (Unit) event.getSource();
-		int unitIndex = getUnitIndex(unit);
-		Object target = event.getTarget();
-		UnitEventType eventType = event.getType();
-
-		int columnNum = -1;
-		if (eventType == UnitEventType.NAME_EVENT) columnNum = NAME;
-		else if (eventType == UnitEventType.LOCATION_EVENT) columnNum = LOCATION;
-		else if (eventType == UnitEventType.INVENTORY_STORING_UNIT_EVENT ||
-				eventType == UnitEventType.INVENTORY_RETRIEVING_UNIT_EVENT) {
-			if (target instanceof Person) columnNum = CREW;
-			else if (target instanceof Robot) columnNum = BOTS;
-		}
-		else if (eventType == UnitEventType.OPERATOR_EVENT) columnNum = DRIVER;
-		else if (eventType == UnitEventType.STATUS_EVENT) columnNum = STATUS;
-		else if (eventType == UnitEventType.EMERGENCY_BEACON_EVENT) columnNum = BEACON;
-		else if (eventType == UnitEventType.RESERVED_EVENT) columnNum = RESERVED;
-		else if (eventType == UnitEventType.SPEED_EVENT) columnNum = SPEED;
-		else if (eventType == UnitEventType.MALFUNCTION_EVENT) columnNum = MALFUNCTION;
-		else if (eventType == UnitEventType.INVENTORY_RESOURCE_EVENT) {
-			try {
-				int tempColumnNum = -1;
-
-				if (target.equals(oxygenAR))
-					tempColumnNum = OXYGEN;
-				else if (target.equals(methaneAR))
-					tempColumnNum = METHANE;
-				else if (target.equals(foodAR))
-					tempColumnNum = FOOD;
-				else if (target.equals(waterAR))
-					tempColumnNum = WATER;
-				else if (target.equals(rockSamplesAR))
-					tempColumnNum = ROCK_SAMPLES;
-				else if (target.equals(iceAR))
-					tempColumnNum = ICE;
-				else {
-				  	// Put together a list of available dessert
-			        for(AmountResource ar : availableDesserts) {
-			        	//if (((AmountResource) target).getName().equals(n.getName()))
-			        	if (target.equals(ar))
-			        		tempColumnNum = DESSERT;
-			        }
+		
+		if (unit instanceof Vehicle) {
+			Vehicle vehicle = (Vehicle) unit;
+			int unitIndex = -1;
+			Object source = event.getTarget();
+			UnitEventType eventType = event.getType();
+			
+			if (mode == GameMode.COMMAND) {
+				if (vehicle.getAssociatedSettlement().getName().equalsIgnoreCase(commanderSettlement.getName()))
+					unitIndex = 0;
+			}
+			else {
+				unitIndex = getUnitIndex(vehicle);
+			}
+			
+			if (unitIndex > -1) {
+		
+				int columnNum = -1;
+				if (eventType == UnitEventType.NAME_EVENT) columnNum = NAME;
+				else if (eventType == UnitEventType.LOCATION_EVENT) columnNum = LOCATION;
+				else if (eventType == UnitEventType.INVENTORY_STORING_UNIT_EVENT ||
+						eventType == UnitEventType.INVENTORY_RETRIEVING_UNIT_EVENT) {
+					if (source instanceof Person) columnNum = CREW;
+//					else if (source instanceof Robot) columnNum = BOTS;
 				}
-
-				if (tempColumnNum > -1) {
-					// 2015-03-10 Converted resourceCache and resourceMap from Map<AmountResource, Integer> to Map<AmountResource, Double> in VehicleTableModel.java.
-					double currentValue =  Math.round ( (Double) getValueAt(unitIndex, tempColumnNum) * 10.0 ) / 10.0;
-					double newValue = Math.round ( getResourceStored(unit, (AmountResource) target) * 10.0 ) / 10.0;
-					if (currentValue != newValue) {
-						//System.out.println("Column : " + tempColumnNum + "  currentValue : " + currentValue + "   newValue : " + newValue);
-						columnNum = tempColumnNum;
-						Map<AmountResource, Double> resourceMap = resourceCache.get(unit);
-						resourceMap.put((AmountResource) target, newValue);
+				else if (eventType == UnitEventType.OPERATOR_EVENT) columnNum = DRIVER;
+				else if (eventType == UnitEventType.STATUS_EVENT) columnNum = STATUS;
+				else if (eventType == UnitEventType.EMERGENCY_BEACON_EVENT) columnNum = BEACON;
+				else if (eventType == UnitEventType.RESERVED_EVENT) columnNum = RESERVED;
+				else if (eventType == UnitEventType.SPEED_EVENT) columnNum = SPEED;
+				else if (eventType == UnitEventType.MALFUNCTION_EVENT) columnNum = MALFUNCTION;
+				else if (eventType == UnitEventType.INVENTORY_RESOURCE_EVENT) {
+					int target = -1;	
+					if (source instanceof AmountResource) {
+						target = ((AmountResource)source).getID();
+					}
+						
+					else if (source instanceof Integer) {
+						target = (Integer)source;
+						if (target >= ResourceUtil.FIRST_ITEM_RESOURCE_ID)
+							// if it's an item resource, quit
+							return;
+					}
+						
+					try {
+						int tempColumnNum = -1;
+						double currentValue = 0.0;
+						Map<Integer, Double> resourceMap = resourceCache.get(vehicle);
+						
+						if (target == oxygenID) {
+							tempColumnNum = OXYGEN;
+							currentValue = resourceMap.get(oxygenID);
+						}
+						else if (target == methaneID) {
+							tempColumnNum = METHANE;		
+							currentValue = resourceMap.get(methaneID);
+						}
+						else if (target == foodID) {
+							tempColumnNum = FOOD;
+							currentValue = resourceMap.get(foodID);
+						}
+						else if (target == waterID) {
+							tempColumnNum = WATER;
+							currentValue = resourceMap.get(waterID);
+						}
+						else if (target == rockSamplesID) {
+							tempColumnNum = ROCK_SAMPLES;
+							currentValue = resourceMap.get(rockSamplesID);
+						}
+						else if (target == iceID) {
+							tempColumnNum = ICE;
+							currentValue = resourceMap.get(iceID);
+						}
+						else {
+						  	// Put together a list of available dessert
+					        for(AmountResource ar : availableDesserts) {
+					        	if (target == ar.getID()) {
+					        		tempColumnNum = DESSERT;
+					        		currentValue = resourceMap.get(ar.getID());
+					        	}
+					        }
+						}
+		
+						if (tempColumnNum > -1 && unitIndex > -1) {
+							currentValue = Math.round (currentValue * 10.0 ) / 10.0;
+							double newValue = Math.round (getResourceStored(unit, target) * 10.0 ) / 10.0;
+							if (currentValue != newValue) {
+								columnNum = tempColumnNum;
+								resourceMap.put(target, newValue);
+							}
+						}
+					}
+					catch (Exception e) {
+						logger.log(Level.SEVERE, "Issues with unitUpdate()", e);
 					}
 				}
+		
+				if (columnNum > -1 && unitIndex > -1) {
+					SwingUtilities.invokeLater(new VehicleTableCellUpdater(unitIndex, columnNum));
+				}
 			}
-			catch (Exception e) {
-				logger.log(Level.SEVERE, "Issues with unitUpdate()", e);
-			}
-		}
-
-		if (columnNum > -1) {
-			SwingUtilities.invokeLater(new VehicleTableCellUpdater(unitIndex, columnNum));
 		}
 	}
 
@@ -445,22 +547,22 @@ extends UnitTableModel {
 	 * @param newUnit Unit to add to the model.
 	 */
 	protected void addUnit(Unit newUnit) {
-		if (resourceCache == null) resourceCache = new HashMap<Unit, Map<AmountResource, Double>>();
+		if (resourceCache == null) resourceCache = new HashMap<>();
 		if (!resourceCache.containsKey(newUnit)) {
 			try {
-				Map<AmountResource, Double> resourceMap = new HashMap<AmountResource, Double>();
-				resourceMap.put(foodAR, Math.round(100.0 * getResourceStored(newUnit, foodAR))/100.0);
-				resourceMap.put(oxygenAR, Math.round(100.0 * getResourceStored(newUnit, oxygenAR))/100.0);
-				resourceMap.put(waterAR, Math.round(100.0 * getResourceStored(newUnit, waterAR))/100.0);
-				resourceMap.put(methaneAR, Math.round(100.0 *getResourceStored(newUnit, methaneAR))/100.0);
-				resourceMap.put(rockSamplesAR, Math.round(100.0 *getResourceStored(newUnit, rockSamplesAR))/100.0);
-				resourceMap.put(iceAR, Math.round(100.0 *getResourceStored(newUnit, iceAR))/100.0);
+				Map<Integer, Double> resourceMap = new HashMap<Integer, Double>();
+				resourceMap.put(foodID, Math.round(100.0 * getResourceStored(newUnit, foodID))/100.0);
+				resourceMap.put(oxygenID, Math.round(100.0 * getResourceStored(newUnit, oxygenID))/100.0);
+				resourceMap.put(waterID, Math.round(100.0 * getResourceStored(newUnit, waterID))/100.0);
+				resourceMap.put(methaneID, Math.round(100.0 *getResourceStored(newUnit, methaneID))/100.0);
+				resourceMap.put(rockSamplesID, Math.round(100.0 *getResourceStored(newUnit, rockSamplesID))/100.0);
+				resourceMap.put(iceID, Math.round(100.0 *getResourceStored(newUnit, iceID))/100.0);
 			  	// Put together a list of available dessert
 		        for(AmountResource ar : availableDesserts) {
-		        	resourceMap.put(ar, Math.round(100.0 *getResourceStored(newUnit, ar))/100.0);
+		        	resourceMap.put(ar.getID(), Math.round(100.0 *getResourceStored(newUnit, ar.getID()))/100.0);
 		        }
 
-				resourceCache.put(newUnit, resourceMap);
+				resourceCache.put((Vehicle)newUnit, resourceMap);
 
 			}
 			catch (Exception e) {
@@ -475,9 +577,9 @@ extends UnitTableModel {
 	 * @param oldUnit Unit to remove from the model.
 	 */
 	protected void removeUnit(Unit oldUnit) {
-		if (resourceCache == null) resourceCache = new HashMap<Unit, Map<AmountResource, Double>>();
+		if (resourceCache == null) resourceCache = new HashMap<>();
 		if (resourceCache.containsKey(oldUnit)) {
-			Map<AmountResource, Double> resourceMap = resourceCache.get(oldUnit);
+			Map<Integer, Double> resourceMap = resourceCache.get(oldUnit);
 			resourceMap.clear();
 			resourceCache.remove(oldUnit);
 		}
@@ -490,8 +592,9 @@ extends UnitTableModel {
 	 * @param resource the resource to check.
 	 * @return  amount of resource.
 	 */
-	private double getResourceStored(Unit unit, AmountResource resource) {
-		return unit.getInventory().getAmountResourceStored(resource, false);
+	private double getResourceStored(Unit unit, int resource) {
+//		return unit.getInventory().getAmountResourceStored(resource, false);
+		return Math.round(unit.getInventory().getAmountResourceStored(resource, true) * 100.0) / 100.0;
 	}
 
 	/**
@@ -527,12 +630,24 @@ extends UnitTableModel {
 		public void unitManagerUpdate(UnitManagerEvent event) {
 			Unit unit = event.getUnit();
 			UnitManagerEventType eventType = event.getEventType();
+			
 			if (unit instanceof Vehicle) {
-				if (eventType == UnitManagerEventType.ADD_UNIT) {
-					if (!containsUnit(unit)) addUnit(unit);
+				boolean change = false;
+				if (mode == GameMode.COMMAND) {
+					if (unit.getAssociatedSettlement().getName().equalsIgnoreCase(commanderSettlement.getName()))
+						change = true;
 				}
-				else if (eventType == UnitManagerEventType.REMOVE_UNIT) {
-					if (containsUnit(unit)) removeUnit(unit);
+				else {
+					change = true;
+				}
+				
+				if (change) {
+					if (eventType == UnitManagerEventType.ADD_UNIT) {
+						if (!containsUnit(unit)) addUnit(unit);
+					}
+					else if (eventType == UnitManagerEventType.REMOVE_UNIT) {
+						if (containsUnit(unit)) removeUnit(unit);
+					}
 				}
 			}
 		}
@@ -545,10 +660,16 @@ extends UnitTableModel {
 
 		LocalMissionManagerListener() {
 			missionListener = new LocalMissionListener();
-			missions = missionManager.getMissions();
-			//Iterator<Mission> i = missions.iterator();
-			//while (i.hasNext()) addMission(i.next());
-			for (Mission m : missions) addMission(m);			
+
+			if (mode == GameMode.COMMAND) {
+				missions = missionManager.getMissionsForSettlement(commanderSettlement);
+			}
+			else {
+				missions = missionManager.getMissions();	
+			}
+			
+			for (Mission m : missions) 
+				addMission(m);
 		}
 
 		/**
@@ -570,13 +691,13 @@ extends UnitTableModel {
 		}
 
 		private void updateVehicleMissionCell(Mission mission) {
-			//    		if (mission instanceof VehicleMission) {
-			//    			Vehicle vehicle = ((VehicleMission) mission).getVehicle();
-			//    			if (vehicle != null) {
-			//    				int unitIndex = getUnitIndex(vehicle);
-			//    				SwingUtilities.invokeLater(new VehicleTableCellUpdater(unitIndex, MISSION));
-			//    			}
-			//    		}
+//			if (mission instanceof VehicleMission) {
+//				Vehicle vehicle = ((VehicleMission) mission).getVehicle();
+//				if (vehicle != null) {
+//					int unitIndex = getUnitIndex(vehicle);
+//					SwingUtilities.invokeLater(new VehicleTableCellUpdater(unitIndex, MISSION));
+//				}
+//			}
 
 			// Update all table cells because construction/salvage mission may affect more than one vehicle.
 			fireTableDataChanged();
@@ -625,8 +746,7 @@ extends UnitTableModel {
 			Mission mission = (Mission) event.getSource();
 			MissionEventType eventType = event.getType();
 			int columnNum = -1;
-			if (
-					eventType == MissionEventType.TRAVEL_STATUS_EVENT ||
+			if (eventType == MissionEventType.TRAVEL_STATUS_EVENT ||
 					eventType == MissionEventType.NAVPOINTS_EVENT
 					) columnNum = DESTINATION;
 			else if (eventType == MissionEventType.DISTANCE_EVENT) columnNum = DESTDIST;
@@ -637,7 +757,8 @@ extends UnitTableModel {
 					Vehicle vehicle = ((VehicleMission) mission).getVehicle();
 					if (vehicle != null) {
 						int unitIndex = getUnitIndex(vehicle);
-						SwingUtilities.invokeLater(new VehicleTableCellUpdater(unitIndex, columnNum));
+						if (unitIndex > -1)
+							SwingUtilities.invokeLater(new VehicleTableCellUpdater(unitIndex, columnNum));
 					}
 				}
 			}

@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * TestLinear.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 package org.mars_sim.msp.ui.swing.tool;
 
 import java.awt.BorderLayout;
@@ -19,7 +26,8 @@ import org.mars_sim.msp.ui.steelseries.tools.Orientation;
 
 
 public class TestLinear {
-    private static void createAndShowUI() {
+    @SuppressWarnings("serial")
+	private static void createAndShowUI() {
         final JFrame frame = new JFrame();
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLocationByPlatform(true);

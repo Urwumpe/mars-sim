@@ -1,28 +1,24 @@
 /**
  * Mars Simulation Project
  * DigLocalIceMeta.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
 import java.io.Serializable;
 
+import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Inventory;
-
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.equipment.Bag;
-import org.mars_sim.msp.core.equipment.EVASuit;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
-
 import org.mars_sim.msp.core.person.ai.task.DigLocalIce;
 import org.mars_sim.msp.core.person.ai.task.EVAOperation;
-import org.mars_sim.msp.core.person.ai.task.Task;
-
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.tool.RandomUtil;
@@ -40,10 +36,10 @@ public class DigLocalIceMeta implements MetaTask, Serializable {
     private static final String NAME = Msg.getString(
             "Task.description.digLocalIce"); //$NON-NLS-1$
 
+    private static final double VALUE = .5;
+    
     /** default logger. */
     //private static Logger logger = Logger.getLogger(DigLocalIceMeta.class.getName());
-
-    private static SurfaceFeatures surface;
 
     @Override
     public String getName() {
@@ -58,12 +54,22 @@ public class DigLocalIceMeta implements MetaTask, Serializable {
     @Override
     public double getProbability(Person person) {
 
+    	// Will not perform this task if he has a mission
+    	if (missionManager.hasMission(person))
+    		return 0;
+
+    	Settlement settlement = CollectionUtils.findSettlement(person.getCoordinates());
+        
         double result = 0D;
    
-        if (person.isInSettlement()) {
-        	
-	    	Settlement settlement = person.getSettlement();
-	     
+    	// If a person is on a mission out there, he/she should not run this task
+        if (settlement != null) {
+        	 
+        	double collectionRate = settlement.getIceCollectionRate();
+            
+            if (collectionRate <= 0)
+            	return 0; 
+            
 	    	// Check if an airlock is available
 	        if (EVAOperation.getWalkableAvailableAirlock(person) == null)
 	    		return 0;
@@ -71,38 +77,54 @@ public class DigLocalIceMeta implements MetaTask, Serializable {
 	        // Checked for radiation events
 	    	boolean[] exposed = settlement.getExposed();
 	
-	
 			if (exposed[2]) {
 				// SEP can give lethal dose of radiation
 	            return 0;
 			}
 			
-            // Check if it is night time.
-			if (surface == null)
-				surface = Simulation.instance().getMars().getSurfaceFeatures();
-            if (surface.getSolarIrradiance(person.getCoordinates()) == 0D) {
-                if (!surface.inDarkPolarRegion(person.getCoordinates())) {
-                    return 0;
-                }
-            }
-
+            // Check if it is night time.          
+            if (EVAOperation.isGettingDark(person))
+            	return 0;
+            
+            // Checks if the person's settlement is at meal time and is hungry
+            if (EVAOperation.isHungryAtMealTime(person))
+            	return 0;
+            
+            // Checks if the person is physically drained
+			if (EVAOperation.isExhausted(person))
+				return 0;
+			
+			
             Inventory inv = settlement.getInventory();
 
             // Check at least one EVA suit at settlement.
-            int numSuits = inv.findNumUnitsOfClass(EVASuit.class);
+            int numSuits = inv.findNumEVASuits(false, true);
             if (numSuits == 0) {
                 return 0;
             }
 
             // Check if at least one empty bag at settlement.
-            int numEmptyBags = inv.findNumEmptyUnitsOfClass(Bag.class, false);
+            int numEmptyBags = inv.findNumBags(true, true);
             if (numEmptyBags == 0) {
                 return 0;
             }
 
-            result = settlement.getIceProbabilityValue() * 4000D;
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double stress = condition.getStress();
+            double fatigue = condition.getFatigue();
+            
+            if (fatigue > 1000 || stress > 50)
+            	return 0;
+            
+            result = settlement.getIceProbabilityValue() / VALUE;
 
-            if (result < 1)
+            // Stress modifier
+            result -= stress * 3.5D;
+            // fatigue modifier
+            result -= (fatigue - 100) / 1.5D;
+
+            if (result < 0)
             	return 0;
 
             // Crowded settlement modifier
@@ -114,7 +136,7 @@ public class DigLocalIceMeta implements MetaTask, Serializable {
 
             // Effort-driven task modifier.
             result *= person.getPerformanceRating();
-
+     
             // Job modifier.
             Job job = person.getMind().getJob();
             if (job != null)
@@ -122,19 +144,19 @@ public class DigLocalIceMeta implements MetaTask, Serializable {
 
             // Modify if field work is the person's favorite activity.
             if (person.getFavorite().getFavoriteActivity() == FavoriteType.FIELD_WORK)
-                result *= RandomUtil.getRandomInt(1, 3);
+                result += RandomUtil.getRandomInt(1, 5);
 
             if (result > 0)
-            	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
+            	result = result + result * person.getPreference().getPreferenceScore(this)/8D;
 
             //logger.info("DigLocalIceMeta's probability : " + Math.round(result*100D)/100D);
 
 	    	if (exposed[0]) {
-				result = result/2D;// Baseline can give a fair amount dose of radiation
+				result = result/5D;// Baseline can give a fair amount dose of radiation
 			}
 
 	    	if (exposed[1]) {// GCR can give nearly lethal dose of radiation
-				result = result/4D;
+				result = result/10D;
 			}
 	    	
             if (result < 0D) {

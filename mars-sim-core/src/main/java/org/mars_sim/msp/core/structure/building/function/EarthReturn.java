@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * EarthReturn.java
- * @version 3.07 2014-12-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -10,17 +10,13 @@ package org.mars_sim.msp.core.structure.building.function;
 import java.io.Serializable;
 import java.util.Iterator;
 
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 
 /**
  * A building function for launching an Earth return mission.
  */
-public class EarthReturn
-extends Function
-implements Serializable {
+public class EarthReturn extends Function implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -33,6 +29,7 @@ implements Serializable {
 
 	/**
 	 * Constructor.
+	 * 
 	 * @param building the building this function is for.
 	 */
 	public EarthReturn(Building building) {
@@ -40,8 +37,7 @@ implements Serializable {
 		super(NAME, building);
 
 		// Populate data members.
-		BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
-		crewCapacity = config.getEarthReturnCrewCapacity(building.getBuildingType());
+		crewCapacity = buildingConfig.getEarthReturnCrewCapacity(building.getBuildingType());
 
 		// Initialize hasLaunched to false.
 		hasLaunched = false;
@@ -49,13 +45,13 @@ implements Serializable {
 
 	/**
 	 * Gets the value of the function for a named building.
+	 * 
 	 * @param buildingName the building name.
-	 * @param newBuilding true if adding a new building.
-	 * @param settlement the settlement.
+	 * @param newBuilding  true if adding a new building.
+	 * @param settlement   the settlement.
 	 * @return value (VP) of building function.
 	 */
-	public static double getFunctionValue(String buildingName, boolean newBuilding,
-			Settlement settlement) {
+	public static double getFunctionValue(String buildingName, boolean newBuilding, Settlement settlement) {
 
 		// Settlements need enough Earth return facilities to support population.
 		double demand = settlement.getNumCitizens();
@@ -72,9 +68,9 @@ implements Serializable {
 		}
 
 		if (!newBuilding) {
-			BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
-			supply -= config.getEarthReturnCrewCapacity(buildingName);
-			if (supply < 0D) supply = 0D;
+			supply -= buildingConfig.getEarthReturnCrewCapacity(buildingName);
+			if (supply < 0D)
+				supply = 0D;
 		}
 
 		return demand / (supply + 1D);
@@ -82,6 +78,7 @@ implements Serializable {
 
 	/**
 	 * Get the crew capacity for an Earth return mission.
+	 * 
 	 * @return crew capacity.
 	 */
 	public int getCrewCapacity() {
@@ -90,6 +87,7 @@ implements Serializable {
 
 	/**
 	 * Checks if the Earth return mission for this building has launched.
+	 * 
 	 * @return true if mission has launched.
 	 */
 	public boolean hasLaunched() {

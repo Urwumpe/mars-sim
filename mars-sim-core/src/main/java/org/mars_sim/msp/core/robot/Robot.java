@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Robot.java
- * @version 3.1.0 2017-01-14
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -13,10 +13,9 @@ import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.equipment.Equipment;
 import org.mars_sim.msp.core.location.LocationStateType;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
@@ -24,22 +23,17 @@ import org.mars_sim.msp.core.malfunction.Malfunctionable;
 import org.mars_sim.msp.core.manufacture.Salvagable;
 import org.mars_sim.msp.core.manufacture.SalvageInfo;
 import org.mars_sim.msp.core.manufacture.SalvageProcessInfo;
-import org.mars_sim.msp.core.person.LocationSituation;
-import org.mars_sim.msp.core.robot.RoboticAttributeType;
-import org.mars_sim.msp.core.robot.RoboticAttributeManager;
+import org.mars_sim.msp.core.mars.MarsSurface;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ShiftType;
-import org.mars_sim.msp.core.person.TaskSchedule;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionMember;
 import org.mars_sim.msp.core.person.ai.task.Maintenance;
-import org.mars_sim.msp.core.person.ai.task.Relax;
 import org.mars_sim.msp.core.person.ai.task.Repair;
-import org.mars_sim.msp.core.person.ai.task.Sleep;
-import org.mars_sim.msp.core.person.ai.task.Task;
-import org.mars_sim.msp.core.person.ai.task.Walk;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.robot.ai.BotMind;
 import org.mars_sim.msp.core.science.ScienceType;
@@ -50,105 +44,154 @@ import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.RoboticStation;
 import org.mars_sim.msp.core.structure.building.function.SystemType;
 import org.mars_sim.msp.core.time.EarthClock;
-import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Crewable;
-import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * The robot class represents a robot on Mars. It keeps track of everything
  * related to that robot
  */
-public class Robot
-//extends Unit
-		extends Equipment implements Salvagable, Malfunctionable, MissionMember, Serializable {
+public class Robot extends Equipment implements Salvagable, Malfunctionable, MissionMember, Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/* default logger. */
-	private static transient Logger logger = Logger.getLogger(Robot.class.getName());
+	private static final  Logger logger = Logger.getLogger(Robot.class.getName());
 //	private static String sourceName = logger.getName();
 
 	// Static members
 	/** The base carrying capacity (kg) of a robot. */
-	private final static double BASE_CAPACITY = 60D;
-	/** The enum type of this equipment. */
-	public static final String TYPE = "Robot";
+	private static final double BASE_CAPACITY = 60D;
 	/** Unloaded mass of EVA suit (kg.). */
 	public static final double EMPTY_MASS = 80D;
 	/** 334 Sols (1/2 orbit). */
-	private static final double WEAR_LIFETIME = 334000D;
+	private static final double WEAR_LIFETIME = 334_000;
 	/** 100 millisols. */
 	private static final double MAINTENANCE_TIME = 100D;
-
+	
+	/** The enum type of this equipment. */
+	public static final String TYPE = "Robot";
+	
+	private static final String OPERABLE = "Operable";
+	private static final String INOPERABLE = "Inoperable";
+	
+	/** The unit count for this robot. */
+	private static int uniqueCount = Unit.FIRST_ROBOT_UNIT_ID;
+	
 	// Data members
-	/** The cache for msol */
-	private double msolCache = -1D;
+	/** Is the robot is inoperable. */
+	private boolean isInoperable;
+	/** Is the robot is salvaged. */
+	private boolean isSalvaged;
+	
+	/** The cache for sol. */
+	private int solCache = 1;
+	/** Unique identifier for this robot. */
+	private int identifier;
+	/** The year of birth of this robot. */
+	private int year;
+	/** The month of birth of this robot. */
+	private int month;
+	/** The day of birth of this robot. */
+	private int day;
+	/** The age of this robot. */
+	private int age;
+	/** The settlement the robot is currently associated with. */
+	private Integer associatedSettlementID = -1;
 	/** The height of the robot (in cm). */
 	private int height;
+	
 	/** Settlement X location (meters) from settlement center. */
 	private double xLoc;
 	/** Settlement Y location (meters) from settlement center. */
 	private double yLoc;
-	/** True if robot is dead and buried. */
-	private boolean isInoperable;
+	/** The cache for msol */
+	private double msolCache = -1D;
 
-	private boolean isSalvaged;
-
-	private String name;
+	/** The nick name for this robot. e.g. Chefbot 001 */
+	private String nickName;
+	/** The country of the robot made. */
 	private String country;
+	/** The sponsor of the robot. */
 	private String sponsor;
-
+	
+	/** The robot's skill manager. */
+	private SkillManager skillManager;
 	/** Manager for robot's natural attributes. */
 	private RoboticAttributeManager attributes;
 	/** robot's mind. */
 	private BotMind botMind;
 	/** robot's System condition. */
 	private SystemCondition health;
-
+	/** The SalvageInfo instance. */
 	private SalvageInfo salvageInfo;
 	/** The equipment's malfunction manager. */
 	protected MalfunctionManager malfunctionManager;
 	/** The birthplace of the robot. */
 	private String birthplace;
 	/** The birth time of the robot. */
-	private EarthClock birthTimeStamp;
-
+	private String birthTimeStamp;
+	/** The TaskSchedule instance. */
 	private TaskSchedule taskSchedule;
-
+	/** The Robot Type. */
 	private RobotType robotType;
+	/** The building the robot is at. */
+	private int currentBuildingInt;
 
-	private RobotConfig config;
-
-	/** The settlement the robot is currently associated with. */
-	private Settlement associatedSettlement;
-
-	private Building currentBuilding;
-
-	private Relax relax;
-
-	private Sleep sleep;
-
-	private Walk walk;
-
-	private MarsClock marsClock;
-	private EarthClock earthClock;
-	private MasterClock masterClock;
-
-	// private Vehicle vehicle;
-
+	/**
+	 * Must be synchronised to prevent duplicate ids being assigned via different
+	 * threads.
+	 * 
+	 * @return
+	 */
+	private static synchronized int getNextIdentifier() {
+		return uniqueCount++;
+	}
+	
+	/**
+	 * Get the unique identifier for this person
+	 * 
+	 * @return Identifier
+	 */
+	public int getIdentifier() {
+		return identifier;
+	}
+	
+	public void incrementID() {
+		// Gets the identifier
+		this.identifier = getNextIdentifier();
+	}
+	
 	protected Robot(String name, Settlement settlement, RobotType robotType) {
-		super(name, settlement.getCoordinates()); // if extending equipment
-		// super(name, settlement.getCoordinates()); // if extending Unit
-		// super(name, null, birthplace, settlement); // if extending Person
+		super(name, robotType.getName(), settlement.getCoordinates()); // extending equipment
+		
+		// Add this robot to the lookup map
+		unitManager.addRobotID(this);
+		// Store this robot to the settlement 
+		settlement.getInventory().storeUnit(this);
+		// Add this robot to be owned by the settlement
+		settlement.addOwnedRobot(this);
 
 		// Initialize data members.
-		this.name = name;
-		this.associatedSettlement = settlement;
+		this.nickName = name;
+		this.associatedSettlementID = (Integer) settlement.getIdentifier();
+//		System.out.println("(1) " + associatedSettlementID + " : " + settlement + " : " + name);
 		this.robotType = robotType;
+		xLoc = 0D;
+		yLoc = 0D;
+		
+		isSalvaged = false;
+		salvageInfo = null;
+		isInoperable = false;
+		// set description for this robot
+		super.setDescription(OPERABLE);
+
+		// Construct the SkillManager instance.
+		skillManager = new SkillManager(this);
+		// Construct the RoboticAttributeManager instance.
+		attributes = new RoboticAttributeManager(this);
 	}
 
 	/*
@@ -158,53 +201,25 @@ public class Robot
 		return new RobotBuilderImpl(name, settlement, robotType);
 	}
 
-//    /**
-//     * Constructs a robot object at a given settlement.
-//     * @param name the robot's name
-//     * @param gender {@link robotGender} the robot's gender
-//     * @param birthplace the location of the robot's birth
-//     * @param settlement {@link Settlement} the settlement the robot is at
-//     * @throws Exception if no inhabitable building available at settlement.
-//
-//    public Robot(String name, RobotType robotType, String birthplace, Settlement settlement, Coordinates location) {
-//        super(name, location); // if extending equipment
-//    	//super(name, settlement.getCoordinates()); // if extending Unit
-//        //super(name, null, birthplace, settlement); // if extending Person
-//
-//		// Initialize data members.
-//        this.name = name;
-//        this.associatedSettlement = settlement;
-//        this.robotType = robotType;
-//        this.birthplace = birthplace;
-//    }
-
 	public void initialize() {
-
-		xLoc = 0D;
-		yLoc = 0D;
-		isSalvaged = false;
-		salvageInfo = null;
-		isInoperable = false;
-
-		masterClock = Simulation.instance().getMasterClock();
-		marsClock = masterClock.getMarsClock();
-		earthClock = masterClock.getEarthClock();
-
-		config = SimulationConfig.instance().getRobotConfiguration();
-		// support = getLifeSupportType();
-
+		// Put robot in proper building.
+		BuildingManager.addToRandomBuilding(this, associatedSettlementID);
+		
+		robotConfig = SimulationConfig.instance().getRobotConfiguration();
+		unitManager = sim.getUnitManager();
+		
 		// Add scope to malfunction manager.
 		malfunctionManager = new MalfunctionManager(this, WEAR_LIFETIME, MAINTENANCE_TIME);
 		malfunctionManager.addScopeString(SystemType.ROBOT.getName());
 
-		// TODO : avoid declaring a birth clock for each robot
-		// Find a way to use existing EarthClock inside MasterClock, plus the difference
-		// in date
-		birthTimeStamp = new EarthClock(createBirthTimeString());
-		attributes = new RoboticAttributeManager(this);
+		// Set up the time stamp for the robot
+		birthTimeStamp = createBirthTimeStamp();
+		
+		// Construct the BotMind instance.
 		botMind = new BotMind(this);
+		// Construct the SystemCondition instance.
 		health = new SystemCondition(this);
-
+		// Construct the TaskSchedule instance.
 		taskSchedule = new TaskSchedule(this);
 
 		setBaseMass(100D + (RandomUtil.getRandomInt(100) + RandomUtil.getRandomInt(100)) / 10D);
@@ -213,11 +228,6 @@ public class Robot
 		// Set inventory total mass capacity based on the robot's strength.
 		int strength = attributes.getAttribute(RoboticAttributeType.STRENGTH);
 		getInventory().addGeneralCapacity(BASE_CAPACITY + strength);
-
-		// Put robot into the settlement.
-		associatedSettlement.getInventory().storeUnit(this);
-		// Put robot in proper building.
-		BuildingManager.addToRandomBuilding(this, associatedSettlement);
 	}
 
 	/**
@@ -228,23 +238,23 @@ public class Robot
 	}
 
 	/**
-	 * Create a string representing the birth time of the robot.
-	 * 
+	 * Create a string representing the birth time of the person.
+	 *
 	 * @return birth time string.
 	 */
-	private String createBirthTimeString() {
+	private String createBirthTimeStamp() {
 		StringBuilder s = new StringBuilder();
-		// Set a birth time for the robot
-		int year = EarthClock.getCurrentYear(earthClock);
+		// Set a birth time for the person
+		year = EarthClock.getCurrentYear(earthClock) - RandomUtil.getRandomInt(22, 62);
+		// 2003 + RandomUtil.getRandomInt(10) + RandomUtil.getRandomInt(10);
 		s.append(year);
 
-		int month = RandomUtil.getRandomInt(11) + 1;
+		month = RandomUtil.getRandomInt(11) + 1;
 		s.append("-");
 		if (month < 10)
 			s.append(0);
 		s.append(month).append("-");
 
-		int day;
 		if (month == 2) {
 			if (((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0)) {
 				day = RandomUtil.getRandomInt(28) + 1;
@@ -261,9 +271,12 @@ public class Robot
 
 		// TODO: find out why sometimes day = 0 as seen on
 		if (day == 0) {
-			logger.warning(name + "'s date of birth is on the day 0th. Incremementing to the 1st.");
+			logger.warning(nickName + "'s date of birth is on the day 0th. Incrementing to the 1st.");
 			day = 1;
 		}
+
+		// Set the age
+		age = updateAge();
 
 		if (day < 10)
 			s.append(0);
@@ -284,125 +297,23 @@ public class Robot
 			s.append(0);
 		s.append(second).append(".000");
 
-		// return month + "/" + day + "/" + year + " " + hour + ":"
-		// + minute + ":" + second;
-
-		// return year + "-" + monthString + "-" + day + " "
-		// + hour + ":" + minute + ":" + second;
-
 		return s.toString();
 	}
-
-	/**
-	 * Is the robot outside
-	 * 
-	 * @return true if the robot is outside
-	 */
-	public boolean isOutside() {
-		if (isInoperable)
-			return true;
-		else if (getContainerUnit() == null)
-				return true;
-		return false;
-	}
-
-	/**
-	 * Is the robot inside a vehicle
-	 * 
-	 * @return true if the robot is inside a vehicle
-	 */
-	public boolean isInVehicle() {
-		if (isInoperable)
-			return false;
-		else if (getContainerUnit() instanceof Vehicle)
-				return true;
-		return false;
-	}
-
-	/**
-	 * Is the robot in a vehicle inside a garage
-	 * 
-	 * @return true if the robot is in a vehicle inside a garage
-	 */
-	public boolean isInVehicleInGarage() {
-//		if (isInoperable)
-//			return false;
-//		else {
-//			Unit c = getContainerUnit();
-//			if (c instanceof Vehicle && ((Vehicle) c).getStatus() == StatusType.GARAGED)//.getGarage() != null)
-//				return true;
-		if (getContainerUnit() instanceof Vehicle) {
-				Building b = BuildingManager.getBuilding((Vehicle) getContainerUnit());
-				if (b != null)
-					// still inside the garage
-					return true;
-		}
-		return false;
-	}
-
+	
 //	/**
-//	 * Is the robot inside a settlement but not in a vehicle inside a garage
+//	 * Is the robot in a vehicle inside a garage
 //	 * 
-//	 * @return true or false
+//	 * @return true if the robot is in a vehicle inside a garage
 //	 */
-//	public boolean isInSettlementNotVehicleGarage() {
-////		if (isInoperable)
-////			return false;
-////		else {
-////			Unit c = getContainerUnit();
-////			if (c instanceof Vehicle && ((Vehicle) c).getStatus() == StatusType.GARAGED)//.getGarage() != null)
-////				return false;	
-//		if (getContainerUnit() instanceof Settlement) {
-//			return true;
+//	public boolean isInVehicleInGarage() {
+//	if (getContainerUnit() instanceof Vehicle) {
+//			Building b = BuildingManager.getBuilding((Vehicle) getContainerUnit());
+//			if (b != null)
+//				// still inside the garage
+//				return true;
 //		}
 //		return false;
 //	}
-	
-	/**
-	 * Is the robot inside a settlement
-	 * 
-	 * @return true if the robot is inside a settlement
-	 */
-	public boolean isInSettlement() {
-		if (getContainerUnit() instanceof Settlement) {
-			return true;
-		}
-//		else if (getContainerUnit() instanceof Vehicle) {
-//		Building b = BuildingManager.getBuilding((Vehicle) getContainerUnit());
-//		if (b != null)
-//			// still inside the garage
-//			return true;
-//		}		
-		
-//		if (isInoperable)
-//			return false;
-//			if (getContainerUnit() instanceof Settlement)
-//				return true;
-//			else if (getContainerUnit() instanceof Vehicle && ((Vehicle) getContainerUnit()).getStatus() == StatusType.GARAGED)//getGarage() != null)
-//				return true;
-		return false;
-	}
-
-	/**
-	 * Is the robot inside a settlement or a vehicle
-	 * 
-	 * @return true if the robot is inside a settlement or a vehicle
-	 */
-	public boolean isInside() {
-//		if (isInoperable)
-//			return false;
-//		else {
-			Unit container = getContainerUnit();
-			if (container instanceof Settlement)
-				return true;
-			else if (container instanceof Vehicle)
-				return true;
-//			else if (container == null)
-//				return false;
-//		}
-		return false;
-
-	}
 
 	/**
 	 * Is the robot outside of a settlement but within its vicinity
@@ -410,29 +321,29 @@ public class Robot
 	 * @return true if the robot is just right outside of a settlement
 	 */
 	public boolean isRightOutsideSettlement() {
-		if (getLocationStateType() == LocationStateType.OUTSIDE_SETTLEMENT_VICINITY)
+		if (LocationStateType.WITHIN_SETTLEMENT_VICINITY  == currentStateType)
 			return true;
 		return false;
 	}
 
-	/**
-	 * @return {@link LocationSituation} the robot's location
-	 */
-	@Override
-	public LocationSituation getLocationSituation() {
-		if (isInoperable)
-			return LocationSituation.DECOMMISSIONED;
-		else {
-			Unit container = getContainerUnit();
-			if (container instanceof Settlement)
-				return LocationSituation.IN_SETTLEMENT;
-			else if (container instanceof Vehicle)
-				return LocationSituation.IN_VEHICLE;
-			else if (container == null)
-				return LocationSituation.OUTSIDE;
-		}
-		return LocationSituation.UNKNOWN;
-	}
+//	/**
+//	 * @return {@link LocationSituation} the robot's location
+//	 */
+//	@Override
+//	public LocationSituation getLocationSituation() {
+//		if (isInoperable)
+//			return LocationSituation.DECOMMISSIONED;
+//		else {
+//			Unit container = getContainerUnit();
+//			if (container instanceof Settlement)
+//				return LocationSituation.IN_SETTLEMENT;
+//			else if (container instanceof Vehicle)
+//				return LocationSituation.IN_VEHICLE;
+//			else if (container instanceof MarsSurface)
+//				return LocationSituation.OUTSIDE;
+//		}
+//		return LocationSituation.UNKNOWN;
+//	}
 
 	/**
 	 * Gets the robot's X location at a settlement.
@@ -471,13 +382,26 @@ public class Robot
 	}
 
 	/**
-	 * Get settlement robot is at, null if robot is not at a settlement
-	 * 
+	 * Get the settlement in vicinity. This is used assume the robot's is not at a settlement
+	 *
+	 * @return the robot's settlement
+	 */
+	public Settlement getNearbySettlement() {	
+		return CollectionUtils.findSettlement(getCoordinates());
+	}
+	
+	/**
+	/**
+	 * Get the settlement the robot is at.
+	 * Returns null if robot is not at a settlement.
+	 *
 	 * @return the robot's settlement
 	 */
 	@Override
 	public Settlement getSettlement() {
-
+		if (getContainerID() == Unit.MARS_SURFACE_UNIT_ID)
+			return null;
+		
 		Unit c = getContainerUnit();
 
 		if (c instanceof Settlement) {
@@ -489,43 +413,9 @@ public class Robot
 			if (b != null)
 				// still inside the garage
 				return b.getSettlement();
-//			else
-				// either at the vicinity of a settlement or already outside on a mission
-				// TODO: need to differentiate which case in future better granularity
-//				return null;
 		}
 
-//		else if (container == null) {
-//			return null;
-//		}
-
-//		logger.warning("Error in determining " + getName() + "'s settlement when calling getSettlement().");
-
 		return null;
-
-//       if (getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
-//    	   Settlement settlement = (Settlement) getContainerUnit();
-//    	   return settlement;
-//       }
-//
-//       else if (getLocationSituation() == LocationSituation.OUTSIDE)
-//    	   return null;
-//
-//       else if (getLocationSituation() == LocationSituation.IN_VEHICLE) {
-//    	   Vehicle vehicle = (Vehicle) getContainerUnit();
-//    	   Settlement settlement = (Settlement) vehicle.getContainerUnit();
-//    	   return settlement;
-//       }
-//
-//       else if (getLocationSituation() == LocationSituation.DECOMMISSIONED) {
-//    	   return null; // TODO: create buriedSettlement;
-//       }
-//
-//       else {
-//    	   System.err.println("Error in determining " + getName() + "'s getSettlement() ");
-//    	   return null;
-//       }
-
 	}
 
 	/**
@@ -547,25 +437,31 @@ public class Robot
 	 * @param containerUnit the unit to contain this unit.
 	 */
 	public void setContainerUnit(Unit containerUnit) {
-		// if (containerUnit instanceof Vehicle) {
-		// vehicle = (Vehicle) containerUnit;
-		// }
 		super.setContainerUnit(containerUnit);
+//		if (containerUnit instanceof Vehicle) {
+//			vehicle = containerUnit.getIdentifier();
+//		} else
+//			vehicle = -1;
 	}
 
 	// TODO: allow parts to be recycled
 	public void toBeSalvaged() {
 		Unit containerUnit = getContainerUnit();
-		if (containerUnit != null) {
+		if (!(containerUnit instanceof MarsSurface)) {
 			containerUnit.getInventory().retrieveUnit(this);
 		}
 		isInoperable = true;
-		setAssociatedSettlement(null);
+		// Set home town
+		setAssociatedSettlement(-1);
 	}
 
 	// TODO: allow robot parts to be stowed in storage
 	void setInoperable() {
+		// set description for this robot
+		super.setDescription(INOPERABLE);  
+		
 		botMind.setInactive();
+		
 		toBeSalvaged();
 	}
 
@@ -575,8 +471,21 @@ public class Robot
 	 * @param time amount of time passing (in millisols).
 	 */
 	public void timePassing(double time) {
-		// convert to using owner
+		
+		// If robot is dead, then skip
+		if (health != null && !health.isInoperable()) {
+			
+			if (health.timePassing(time, robotConfig)) {
 
+				// Mental changes with time passing.
+				if (botMind != null)
+					botMind.timePassing(time);
+			} else {
+				// robot has died as a result of physical condition
+				setInoperable();
+			}
+		}
+		
 //		Unit container = getContainerUnit();
 //		if (container instanceof Person) {
 //			Person person = (Person) container;
@@ -586,30 +495,24 @@ public class Robot
 //		}
 //		malfunctionManager.timePassing(time);
 
-		if (marsClock == null) {
-			masterClock = Simulation.instance().getMasterClock();
-			marsClock = masterClock.getMarsClock();
-		}
+//		if (marsClock == null) {
+//			masterClock = Simulation.instance().getMasterClock();
+//			marsClock = masterClock.getMarsClock();
+//		}
 
 		double msol1 = marsClock.getMillisolOneDecimal();
 
 		if (msolCache != msol1) {
 			msolCache = msol1;
 
-			// If robot is dead, then skip
-			if (!health.isInoperable()) {
+			// check for the passing of each day
+			int solElapsed = marsClock.getMissionSol();
 
-				// support = getLifeSupportType();
-				// Pass the time in the physical condition first as this may
-				// result in death.
-				if (health.timePassing(time, config)) {
-
-					// Mental changes with time passing.
-					botMind.timePassing(time);
-				} else {
-					// robot has died as a result of physical condition
-					setInoperable();
-				}
+			if (solCache != solElapsed) {
+				// Check if a person's age should be updated
+				age = updateAge();
+				
+				solCache = solElapsed;
 			}
 		}
 	}
@@ -660,11 +563,10 @@ public class Robot
 	 * @return the robot's age
 	 */
 	public int updateAge() {
-		// EarthClock simClock = Simulation.instance().getMasterClock().getEarthClock();
-		int age = earthClock.getYear() - birthTimeStamp.getYear() - 1;
-		if (earthClock.getMonth() >= birthTimeStamp.getMonth() && earthClock.getMonth() >= birthTimeStamp.getMonth()) {
-			age++;
-		}
+		age = earthClock.getYear() - year - 1;
+		if (earthClock.getMonth() >= month)
+			if (earthClock.getDayOfMonth() >= day)
+				age++;
 
 		return age;
 	}
@@ -684,8 +586,20 @@ public class Robot
 	 * @return the robot's birth date
 	 */
 	public String getBirthDate() {
-		return birthTimeStamp.getDateStringF0();
+		StringBuilder s = new StringBuilder();
+		s.append(year).append("-");
+		if (month < 10)
+			s.append("0").append(month).append("-");
+		else
+			s.append(month).append("-");
+		if (day < 10)
+			s.append("0").append(day);
+		else
+			s.append(day);
+
+		return s.toString();
 	}
+
 
 //    /**
 //     * robot consumes given amount of power.
@@ -774,7 +688,7 @@ public class Robot
 	 * @return associated settlement or null if none.
 	 */
 	public Settlement getAssociatedSettlement() {
-		return associatedSettlement;
+		return unitManager.getSettlementByID(associatedSettlementID);
 	}
 
 	/**
@@ -782,25 +696,15 @@ public class Robot
 	 * 
 	 * @param newSettlement the new associated settlement or null if none.
 	 */
-	public void setAssociatedSettlement(Settlement newSettlement) {
-		if (associatedSettlement != newSettlement) {
-			Settlement oldSettlement = associatedSettlement;
-			associatedSettlement = newSettlement;
-			fireUnitUpdate(UnitEventType.ASSOCIATED_SETTLEMENT_EVENT, associatedSettlement);
-			if (oldSettlement != null) {
-				oldSettlement.removeRobot(this);
-				oldSettlement.fireUnitUpdate(UnitEventType.REMOVE_ASSOCIATED_ROBOT_EVENT, this);
-			}
-			if (newSettlement != null) {
-				newSettlement.addRobot(this);
-				newSettlement.fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_ROBOT_EVENT, this);
-			}
+	public void setAssociatedSettlement(int newSettlement) {
+		if (associatedSettlementID != newSettlement) {
+			
+			int oldSettlement = associatedSettlementID;
+			associatedSettlementID = newSettlement;
 
-			// set description for this robot
-			if (associatedSettlement == null) {
-				super.setDescription("Inoperable");
-			} else
-				super.setDescription(associatedSettlement.getName());
+			if (oldSettlement != -1) {
+				unitManager.getSettlementByID(oldSettlement).removeOwnedRobot(this);
+			}
 		}
 	}
 
@@ -825,7 +729,7 @@ public class Robot
 		Collection<Person> people = new ConcurrentLinkedQueue<Person>();
 
 		// Check all people.
-		Iterator<Person> i = Simulation.instance().getUnitManager().getPeople().iterator();
+		Iterator<Person> i = unitManager.getPeople().iterator();
 		while (i.hasNext()) {
 			Person person = i.next();
 			Task task = person.getMind().getTaskManager().getTask();
@@ -860,7 +764,7 @@ public class Robot
 	}
 
 	public String getName() {
-		return name;
+		return nickName;
 	}
 
 	/**
@@ -869,7 +773,7 @@ public class Robot
 	 * @param info       the salvage process info.
 	 * @param settlement the settlement where the salvage is taking place.
 	 */
-	public void startSalvage(SalvageProcessInfo info, Settlement settlement) {
+	public void startSalvage(SalvageProcessInfo info, int settlement) {
 		salvageInfo = new SalvageInfo(this, info, settlement);
 		isSalvaged = true;
 	}
@@ -909,13 +813,17 @@ public class Robot
 	 * @return building
 	 */
 	public Building computeCurrentBuilding() {
-		if (isInSettlement()) {
-			currentBuilding = getSettlement().getBuildingManager().getBuildingAtPosition(getXLocation(),
-					getYLocation());
-		} else
-			currentBuilding = null;
-
-		return currentBuilding;
+//		if (isInSettlement()) {
+//			currentBuilding = getSettlement().getBuildingManager().getBuildingAtPosition(getXLocation(),
+//					getYLocation());
+//		} else
+//			currentBuilding = null;
+//
+//		return currentBuilding;
+		
+		if (currentBuildingInt == -1)
+			return null;
+		return unitManager.getBuildingByID(currentBuildingInt);
 	}
 
 	/**
@@ -925,7 +833,11 @@ public class Robot
 	 * @return building
 	 */
 	public void setCurrentBuilding(Building building) {
-		currentBuilding = building;
+//		currentBuilding = building;
+		if (building == null)
+			currentBuildingInt = -1;
+		else
+			currentBuildingInt = building.getIdentifier();
 	}
 
 	@Override
@@ -935,7 +847,7 @@ public class Robot
 
 	@Override
 	public void setMission(Mission newMission) {
-		getBotMind().setMission(newMission);
+//		getBotMind().setMission(newMission);
 	}
 
 	@Override
@@ -944,14 +856,10 @@ public class Robot
 	}
 
 	public int getProduceFoodSkill() {
-		int skill = getSkillManager().getEffectiveSkillLevel(SkillType.COOKING) * 5;
-		skill += getSkillManager().getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE) * 2;
+		int skill = skillManager.getEffectiveSkillLevel(SkillType.COOKING) * 5;
+		skill += skillManager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE) * 2;
 		skill = (int) Math.round(skill / 7D);
 		return skill;
-	}
-
-	public SkillManager getSkillManager() {
-		return botMind.getSkillManager();
 	}
 
 	public String getCountry() {
@@ -980,7 +888,7 @@ public class Robot
 
 	@Override
 	public String getNickName() {
-		return name;
+		return nickName;
 	}
 
 	@Override
@@ -988,52 +896,121 @@ public class Robot
 		return getLocationTag().getImmediateLocation();
 	}
 
+	/**
+	 * Obtains the modified immediate location 
+	 * 
+	 * @return the name string of the location the unit is at
+	 */
+	public String getModifiedLoc() {
+		return getLocationTag().getModifiedLoc();
+	}
+	
 	@Override
 	public String getLocale() {
 		return getLocationTag().getLocale();
 	}
-
-	public Relax getRelax() {
-		return relax;
+	
+	public String getExtendedLocations() {
+		return getLocationTag().getExtendedLocations();
 	}
-
-	public void setRelax(Relax relax) {
-		this.relax = relax;
+	
+	public Settlement findSettlementVicinity() {
+		return getLocationTag().findSettlementVicinity();
 	}
+		
+//	public Relax getRelax() {
+//		return relax;
+//	}
+//
+//	public void setRelax(Relax relax) {
+//		this.relax = relax;
+//	}
+//
+//	public Sleep getSleep() {
+//		return sleep;
+//	}
+//
+//	public void setSleep(Sleep sleep) {
+//		this.sleep = sleep;
+//	}
+//
+//	public Walk getWalk() {
+//		return walk;
+//	}
+//
+//	public void setWalk(Walk walk) {
+//		this.walk = walk;
+//	}
 
-	public Sleep getSleep() {
-		return sleep;
-	}
-
-	public void setSleep(Sleep sleep) {
-		this.sleep = sleep;
-	}
-
-	public Walk getWalk() {
-		return walk;
-	}
-
-	public void setWalk(Walk walk) {
-		this.walk = walk;
-	}
-
-	@Override
-	public Settlement getBuriedSettlement() {
-		return this.getAssociatedSettlement();
-	}
+//	public Settlement getBuriedSettlement() {
+//		return this.getAssociatedSettlement();
+//	}
 
 	@Override
 	public Unit getUnit() {
 		return this;
 	}
 
+	/**
+	 * Returns a reference to the robot's skill manager
+	 * 
+	 * @return the robot's skill manager
+	 */
+	public SkillManager getSkillManager() {
+		return skillManager;
+	}
+	
+	/**
+	 * Returns the effective integer skill level from a named skill based on
+	 * additional modifiers such as fatigue.
+	 * 
+	 * @param skillType the skill's type
+	 * @return the skill's effective level
+	 */
+	public int getEffectiveSkillLevel(SkillType skillType) {
+		// Modify for fatigue, minus 1 skill level for every 1000 points of fatigue.
+		return (int) Math.round(getPerformanceRating() * skillManager.getSkillLevel(skillType));
+	}
+	
+	/**
+	 * Calculate the modifier for walking speed based on how much this unit is carrying
+	 * 
+	 * @return modifier
+	 */
+	public double getWalkSpeedMod() {
+		double mass = getInventory().getTotalInventoryMass(false);
+		double cap = getInventory().getGeneralCapacity();
+		// At full capacity, may still move at 10% 
+		return 1.1 - mass/cap;
+	}
+	
+	public boolean equals(Object obj) {
+		if (this == obj) return true;
+		if (obj == null) return false;
+		if (this.getClass() != obj.getClass()) return false;
+		Robot r = (Robot) obj;
+		return this.identifier == r.getIdentifier()
+				&& this.robotType == r.getRobotType(); 
+//				&& this.nickName.equals(r.getNickName());
+	}
+
+	/**
+	 * Reinitialize references after loading from a saved sim
+	 */
+	public void reinit() {
+		botMind.reinit();
+	}
+	
+	/**
+	 * Reset uniqueCount to the current number of robots
+	 */
+	public static void reinitializeIdentifierCount() {
+		uniqueCount = unitManager.getRobotsNum() + Unit.FIRST_ROBOT_UNIT_ID;
+	}
+	
 	@Override
 	public void destroy() {
 		super.destroy();
-		relax = null;
-		sleep = null;
-		walk = null;
-		// vehicle = null;
 		if (salvageInfo != null)
 			salvageInfo.destroy();
 		salvageInfo = null;
@@ -1043,9 +1020,8 @@ public class Robot
 		botMind = null;
 		health.destroy();
 		health = null;
+		skillManager.destroy();
+		skillManager = null;
 		birthTimeStamp = null;
-		associatedSettlement = null;
-		// scientificAchievement.clear();
-		// scientificAchievement = null;
 	}
 }

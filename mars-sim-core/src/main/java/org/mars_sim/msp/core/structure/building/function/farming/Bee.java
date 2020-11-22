@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Bee.java
- * @version 3.07 2015-02-18
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -54,7 +54,7 @@ implements Serializable {
         this.farm = beeGrowing.getFarming();      
         this.building = farm.getBuilding();		
         this.inv = building.getSettlementInventory();
-        this.settlement = building.getBuildingManager().getSettlement();
+        this.settlement = building.getSettlement();
    
 	}
 

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * BotTaskManager.java
- * @version 3.1.0 2017-01-19
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.robot.ai.task;
@@ -10,20 +10,23 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.UnitEventType;
-import org.mars_sim.msp.core.person.ai.task.Task;
-import org.mars_sim.msp.core.person.ai.task.TaskPhase;
 import org.mars_sim.msp.core.person.ai.task.Walk;
-import org.mars_sim.msp.core.person.ai.task.meta.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.meta.MetaTaskUtil;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTaskUtil;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.SystemCondition;
 import org.mars_sim.msp.core.robot.ai.BotMind;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
@@ -42,29 +45,47 @@ implements Serializable {
 
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(BotTaskManager.class.getName());
-
+	
+	private static String loggerName = logger.getName();
+	
+	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	
+	private static String WALKING = "Walking";
+	private static String WALK = "Walk";
+	
 	// Data members
-    /** The cache for msol */     
+    /** The cache for msol. */     
  	private double msolCache = -1D;
-	// Cache variables.
+	/** The cache for total probability. */
 	private transient double totalProbCache;
-	
+	/** The cache for task description phase. */		
 	private String taskDescriptionCache = "";
-	
+	/** The cache for task phase. */	
 	private String taskPhaseCache = "";
 	/** The current task the robot is doing. */
-	private Task currentTask; 
+	private transient Task currentTask;
+	/** The last task the robot was doing. */
+	private transient Task lastTask;
 	/** The mind of the robot. */
 	private BotMind botMind;
+	
+	/** The robot instance. */
+	private transient Robot robot = null;
+	
+	/** The MasterClock static instance. */	
+	private static MasterClock masterClock;
+	/** The MarsClock instance. */	
+	private static MarsClock marsClock;
 
-	private Robot robot = null;
-	
-	private transient MarsClock timeCache;
-	
-	private MarsClock marsClock;
-	
+	/** The cache map for the task probability. */		
 	private transient Map<MetaTask, Double> taskProbCache;
 
+	static {
+		masterClock = Simulation.instance().getMasterClock();
+		/** The MarsClock instance. */	
+		marsClock = masterClock.getMarsClock(); 
+	}
+	
 	/**
 	 * Constructor.
 	 * @param botMind the mind that uses this bot task manager.
@@ -77,13 +98,11 @@ implements Serializable {
 
 		currentTask = null;
 
-		// Initialize cache values.
-		timeCache = null;
 		taskProbCache = new HashMap<MetaTask, Double>(MetaTaskUtil.getRobotMetaTasks().size());
 		totalProbCache = 0D;
 	
-		if (Simulation.instance().getMasterClock() != null) // use this check to pass maven test
-			marsClock = Simulation.instance().getMasterClock().getMarsClock(); 
+//		if (masterClock != null) // use this check to pass maven test
+//			marsClock = masterClock.getMarsClock(); 
 	}
 	
 	/**
@@ -115,20 +134,43 @@ implements Serializable {
 		}
 	}
 
-	/**
-	 * Returns the name of the current task for UI purposes.
-	 * Returns a blank string if there is no current task.
-	 * @return name of the current task
-	 */
-	public String getTaskClassName() {
-		if (currentTask != null) {
-			return currentTask.getTaskName();
+//	public String getSubTaskName() {
+//		if (currentTask != null && currentTask.getSubTask() != null) {
+//			return currentTask.getSubTask().getName();
+//		} else {
+//			return "";
+//		}
+//	}
+	
+	public String getSubTask2Name() {
+		Task task = getRealTask();
+		if (task != null) {
+			return task.getName();
 		} else {
 			return "";
 		}
+		
+//		if (currentTask != null && currentTask.getSubTask() != null
+//				&& currentTask.getSubTask().getSubTask() != null) {
+//			return currentTask.getSubTask().getSubTask().getName();
+//		} else {
+//			return "";
+//		}
 	}
-
-
+	
+//	/**
+//	 * Returns the name of the current task for UI purposes.
+//	 * Returns a blank string if there is no current task.
+//	 * @return name of the current task
+//	 */
+//	public String getTaskClassName() {
+//		if (currentTask != null) {
+//			return currentTask.getTaskName();
+//		} else {
+//			return "";
+//		}
+//	}
+	
 	/**
 	 * Returns a description of current task for UI purposes.
 	 * Returns a blank string if there is no current task.
@@ -146,16 +188,41 @@ implements Serializable {
 		else
 			return "";
 	}
-/*	
-	public FunctionType getFunction(boolean subTask) {
-		if (currentTask != null) {
-			return currentTask.getFunction(subTask);
+	
+	public String getSubTaskDescription() {
+		if (currentTask.getSubTask() != null) {
+			String t = currentTask.getSubTask().getDescription();
+			if (t != null)
+				return t;
+			else
+				return "";		
 		} 
-		else {
-			return FunctionType.UNKNOWN;
-		}
+		
+		else
+			return "";
 	}
-*/
+	
+	public String getSubTask2Description() {
+		if (currentTask != null && currentTask.getSubTask() != null
+				&& currentTask.getSubTask().getSubTask() != null) {
+			String t = currentTask.getSubTask().getSubTask().getDescription();
+			if (t != null) // || !t.equals(""))
+				return t;
+			else
+				return "";
+		} else
+			return "";
+	}
+	
+//	public FunctionType getFunction(boolean subTask) {
+//		if (currentTask != null) {
+//			return currentTask.getFunction(subTask);
+//		} 
+//		else {
+//			return FunctionType.UNKNOWN;
+//		}
+//	}
+
 	/**
 	 * Returns the current task phase if there is one.
 	 * Returns null if current task has no phase.
@@ -170,6 +237,24 @@ implements Serializable {
 		}
 	}
 
+	
+	public TaskPhase getSubTaskPhase() {
+		if (currentTask.getSubTask() != null) {
+			return currentTask.getSubTask().getPhase();
+		} else {
+			return null;
+		}
+	}
+	
+	public TaskPhase getSubTask2Phase() {
+		if (currentTask != null && currentTask.getSubTask() != null
+				&& currentTask.getSubTask().getSubTask() != null) {
+			return currentTask.getSubTask().getSubTask().getPhase();
+		} else {
+			return null;
+		}
+	}
+	
 	/**
 	 * Returns the current task.
 	 * Return null if there is no current task.
@@ -189,30 +274,62 @@ implements Serializable {
 		robot.fireUnitUpdate(UnitEventType.TASK_EVENT);
 	}
 
+	
+	/**
+	 * Gets the real-time task 
+	 * 
+	 * @return
+	 */
+	public Task getRealTask() {
+		if (currentTask == null) {
+			return null;
+		}
+		
+		Task subtask1 = currentTask.getSubTask();
+		if (subtask1 == null) {
+			return currentTask;
+		}
+		
+		if (subtask1.getSubTask() == null) {
+			return subtask1;
+		}
+		
+		Task subtask2 = subtask1.getSubTask();
+		if (subtask2 == null) {
+			return subtask1;
+		}
+		
+		if (subtask2.getSubTask() == null) {
+			return subtask2;
+		}
+		
+		return subtask2.getSubTask();
+	}
 
 	/*
 	 * Prepares the task for recording in the task schedule
 	 */
-	public void recordTask() {
-		String taskDescription = getTaskDescription(false);
-		String taskName = getTaskClassName();
-		String taskPhase = null;
+	public void recordFilterTask() {
+		Task task = getRealTask();
+		if (task == null)
+			return;
+		String taskDescription = task.getDescription();
+		String taskName = task.getTaskName();
+		String taskPhase = "";
 	
-		if (!taskName.toLowerCase().contains("walk")
-			&& !taskDescription.equals(taskDescriptionCache)
-			&& !taskDescription.toLowerCase().contains("walk")
-			&& !taskDescription.equals("")
-			&& getPhase() != null) {
-
-			taskPhase = getPhase().getName();
-
-			if (!taskPhase.equals(taskPhaseCache)) {
+		if (!taskName.equals("") && !taskDescription.equals("")
+				&& !taskName.contains(WALK)) {
+			
+			if (!taskDescription.equals(taskDescriptionCache)
+				|| !taskPhase.equals(taskPhaseCache)) {
 				
+				if (task.getPhase() != null)
+					taskPhase = task.getPhase().getName();
+			
 				robot.getTaskSchedule().recordTask(taskName, taskDescription, taskPhase, "");
 				taskPhaseCache = taskPhase;
 				taskDescriptionCache = taskDescription;
 			}
-
 		}
 	}
 
@@ -226,7 +343,7 @@ implements Serializable {
 			currentTask.addSubTask(newTask);
 
 		} else {
-			//lastTask = currentTask;
+			lastTask = currentTask;
 			currentTask = newTask;
 			//taskNameCache = currentTask.getTaskName();
 			taskDescriptionCache = currentTask.getDescription();
@@ -241,7 +358,6 @@ implements Serializable {
 				taskPhaseCache = "";
 			
 		}
-
 
 		robot.fireUnitUpdate(UnitEventType.TASK_EVENT, newTask);
 
@@ -279,7 +395,9 @@ implements Serializable {
 
 			checkForEmergency();
 			remainingTime = currentTask.performTask(time);
-
+			// Record the action (task/mission)
+			recordFilterTask();
+			
 			// Expend energy based on activity.
 		    double energyTime = time - remainingTime;
 
@@ -423,6 +541,8 @@ implements Serializable {
 	 */
 	public Task getNewTask() {
 		Task result = null;
+		MetaTask selectedMetaTask = null;
+
 		// If cache is not current, calculate the probabilities.
 		if (!useCache()) {
 			calculateProbability();
@@ -431,36 +551,41 @@ implements Serializable {
 		double totalProbability = getTotalTaskProbability(true);
 
 		if (totalProbability == 0D) {
-			throw new IllegalStateException(botMind.getRobot() +
-						" has zero total task probability weight.");
-		}
+//			LogConsolidated.log(Level.SEVERE, 5_000, sourceName,
+//			person.getName() + " has zero total task probability weight.");
 
-		double r = RandomUtil.getRandomDouble(totalProbability);
+			// Switch to loading non-work hour meta tasks since
+			// leisure tasks are NOT based on needs
+			List<MetaTask> list = MetaTaskUtil.getNonWorkHourMetaTasks();
+			selectedMetaTask = list.get(RandomUtil.getRandomInt(list.size() - 1));
+			
+		} else {
 
-		MetaTask selectedMetaTask = null;
-		//System.out.println("size of metaTask : " + taskProbCache.size());
-		// Determine which task is selected.
-		for (MetaTask mt : taskProbCache.keySet()) {
-			double probWeight = taskProbCache.get(mt);
-			if (r <= probWeight) {
-				// Select this task
-				selectedMetaTask = mt;
-			}
-			else {
-				r -= probWeight;
+			double r = RandomUtil.getRandomDouble(totalProbability);
+
+			// Determine which task is selected.
+			for (MetaTask mt : taskProbCache.keySet()) {
+				double probWeight = taskProbCache.get(mt);
+				if (r <= probWeight) {
+					// Select this task
+					selectedMetaTask = mt;
+				} else {
+					r -= probWeight;
+				}
 			}
 		}
 		
 		if (selectedMetaTask == null) {
-			throw new IllegalStateException(botMind.getRobot() +
-							" could not determine a new task.");
-
-		} 
-		else {
-				result = selectedMetaTask.constructInstance(botMind.getRobot());
+			LogConsolidated.flog(Level.SEVERE, 5_000, sourceName, robot.getName() + " could not determine a new task.");
+		} else {
+			// Call constructInstance of the selected Meta Task to commence the ai task
+			result = selectedMetaTask.constructInstance(botMind.getRobot());
+//			LogConsolidated.log(Level.FINE, 5_000, sourceName, robot + " is going to " + selectedMetaTask.getName());
 		}
+
 		// Clear time cache.
-		timeCache = null;
+		msolCache = -1;
+
 		return result;
 	}
 
@@ -481,20 +606,7 @@ implements Serializable {
 	 */
 	private void calculateProbability() {
 
-//    	if (marsClock == null) {
-//    		marsClock = Simulation.instance().getMasterClock().getMarsClock();
-//    	}
-    	
-	    if (timeCache == null) {
-	    	timeCache = Simulation.instance().getMasterClock().getMarsClock();
-	    	marsClock = timeCache;
-	    }
-	    
-	    
-	    double msol1 = marsClock.getMillisolOneDecimal();
-	    
-	    if (msolCache != msol1) {
-	    	msolCache = msol1;
+		if (!useCache()) {
 		    	
 			List<MetaTask> mtList = MetaTaskUtil.getRobotMetaTasks();
 	
@@ -518,11 +630,6 @@ implements Serializable {
 								" probability: " + probability);
 				}
 			}
-	
-			// Set the time cache to the current time.
-			//if (marsClock != null)
-			//	marsClock = Simulation.instance().getMasterClock().getMarsClock();
-			timeCache = (MarsClock) marsClock.clone();
 	    }
 	}
 
@@ -531,11 +638,24 @@ implements Serializable {
 	 * @return true if cache should be used.
 	 */
 	private boolean useCache() {
-		//MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
-		//return currentTime.equals(timeCache);
-		return marsClock.equals(timeCache);
+		double msol = marsClock.getMillisolOneDecimal();
+		int diff = Double.compare(msolCache, msol);
+		if (diff > 0 || diff < 0) {
+			msolCache = msol;
+			return false;
+		}
+		return true;
 	}
 
+	public void reinit() {
+		robot = botMind.getRobot();
+		
+		if (currentTask != null)		
+			currentTask.reinit();
+		if (lastTask != null)
+			lastTask.reinit();
+	}
+	
 	/**
 	 * Prepare object for garbage collection.
 	 */
@@ -545,7 +665,6 @@ implements Serializable {
 		}
 		botMind = null;
 		robot = null;
-		timeCache = null;
 		marsClock = null;
 		if (taskProbCache != null) {
 			taskProbCache.clear();

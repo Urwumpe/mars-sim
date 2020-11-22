@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PeerReviewStudyPaper.java
- * @version 3.1.0 2017-09-13
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -11,19 +11,20 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.LocationSituation;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
@@ -42,6 +43,9 @@ implements Serializable {
 
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(PeerReviewStudyPaper.class.getName());
+
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			 logger.getName().length());
 
 	/** Task name */
     private static final String NAME = Msg.getString(
@@ -74,18 +78,18 @@ implements Serializable {
 
             // If person is in a settlement, try to find an administration building.
             boolean adminWalk = false;
-            if (person.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
+            if (person.isInSettlement()) {
                 Building adminBuilding = getAvailableAdministrationBuilding(person);
                 if (adminBuilding != null) {
                     // Walk to administration building.
-                    walkToActivitySpotInBuilding(adminBuilding, false);
+                    walkToTaskSpecificActivitySpotInBuilding(adminBuilding, false);
                     adminWalk = true;
                 }
             }
 
             if (!adminWalk) {
 
-                if (person.getLocationSituation() == LocationSituation.IN_VEHICLE) {
+                if (person.isInVehicle()) {
                     // If person is in rover, walk to passenger activity spot.
                     if (person.getVehicle() instanceof Rover) {
                         walkToPassengerActivitySpotInRover((Rover) person.getVehicle(), false);
@@ -116,7 +120,7 @@ implements Serializable {
 
         Building result = null;
 
-        if (person.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
+        if (person.isInSettlement()) {
             BuildingManager manager = person.getSettlement().getBuildingManager();
             List<Building> administrationBuildings = manager.getBuildings(FunctionType.ADMINISTRATION);
             administrationBuildings = BuildingManager.getNonMalfunctioningBuildings(administrationBuildings);
@@ -133,7 +137,7 @@ implements Serializable {
     }
 
     @Override
-    protected FunctionType getLivingFunction() {
+    public FunctionType getLivingFunction() {
         return FunctionType.ADMINISTRATION;
     }
 
@@ -147,15 +151,15 @@ implements Serializable {
         List<ScientificStudy> possibleStudies = new ArrayList<ScientificStudy>();
 
         // Get all studies in the peer review phase.
-        ScientificStudyManager studyManager = Simulation.instance().getScientificStudyManager();
-        Iterator<ScientificStudy> i = studyManager.getOngoingStudies().iterator();
+//        ScientificStudyManager studyManager = Simulation.instance().getScientificStudyManager();
+        Iterator<ScientificStudy> i = scientificStudyManager.getOngoingStudies().iterator();
         while (i.hasNext()) {
             ScientificStudy study = i.next();
             if (ScientificStudy.PEER_REVIEW_PHASE.equals(study.getPhase())) {
 
                 // Check that person isn't a researcher in the study.
                 if (!person.equals(study.getPrimaryResearcher()) &&
-                        !study.getCollaborativeResearchers().keySet().contains(person)) {
+                        !study.getCollaborativeResearchers().keySet().contains(person.getIdentifier())) {
 
                     // Check if person's current job is related to study primary science.
                     Job job = person.getMind().getJob();
@@ -187,19 +191,19 @@ implements Serializable {
         int academicAptitude = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
         newPoints += newPoints * ((double) academicAptitude - 50D) / 100D;
         newPoints *= getTeachingExperienceModifier();
-		person.getMind().getSkillManager().addExperience(study.getScience().getSkill(), newPoints);
+		person.getSkillManager().addExperience(study.getScience().getSkill(), newPoints, time);
     }
 
     @Override
 	public List<SkillType> getAssociatedSkills() {
 		List<SkillType> results = new ArrayList<SkillType>(1);
-		results.add(study.getScience().getSkill());
+		if (study != null) results.add(study.getScience().getSkill());
         return results;
     }
 
     @Override
     public int getEffectiveSkillLevel() {
-        SkillManager manager = person.getMind().getSkillManager();
+        SkillManager manager = person.getSkillManager();
 		return manager.getEffectiveSkillLevel(study.getScience().getSkill());
     }
 
@@ -230,6 +234,12 @@ implements Serializable {
 
         // Check if peer review phase in study is completed.
         if (study.isCompleted()) {
+			LogConsolidated.flog(Level.INFO, 0, sourceName, "[" + person.getLocationTag().getLocale() + "] "
+					+ person.getName() + " just spent " 
+					+ Math.round(study.getPeerReviewTimeCompleted() *10.0)/10.0
+					+ " millisols to finish peer reviewing a paper "
+					+ " in " + study.getScience().getName() 
+					+ " in " + person.getLocationTag().getImmediateLocation());	
             endTask();
         }
 

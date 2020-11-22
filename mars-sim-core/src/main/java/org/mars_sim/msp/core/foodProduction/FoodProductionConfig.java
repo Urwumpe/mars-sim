@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * FoodProductionConfig.java
- * @version 3.07 2015-02-24
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -12,9 +12,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.jdom.Document;
-import org.jdom.Element;
-import org.mars_sim.msp.core.foodProduction.FoodProductionProcessItem;
+import org.jdom2.Document;
+import org.jdom2.Element;
 import org.mars_sim.msp.core.resource.ItemType;
 
 public class FoodProductionConfig implements Serializable {
@@ -39,12 +38,6 @@ public class FoodProductionConfig implements Serializable {
 	private static final String NUMBER = "number";
 	private static final String EQUIPMENT = "equipment";
 	
-	//private static final String VEHICLE = "vehicle";
-	private static final String SALVAGE = "salvage";
-	private static final String ITEM_NAME = "item-name";
-	private static final String TYPE = "type";
-	private static final String PART_SALVAGE = "part-salvage";
-
 	private Document foodProductionDoc;
 	private List<FoodProductionProcessInfo> foodproductionProcessList;
 
@@ -61,7 +54,6 @@ public class FoodProductionConfig implements Serializable {
      * @return list of manufacturing process information.
      * @throws Exception if error getting info.
      */
-    @SuppressWarnings("unchecked")
     public List<FoodProductionProcessInfo> getFoodProductionProcessList() {
 
         if (foodproductionProcessList == null) {
@@ -113,8 +105,6 @@ public class FoodProductionConfig implements Serializable {
 
                 parseEquipment(inputList, inputs.getChildren(EQUIPMENT));
 
-//                parseVehicles(inputList, inputs.getChildren(VEHICLE));
-
                 Element outputs = processElement.getChild(OUTPUTS);
                 List<FoodProductionProcessItem> outputList = new ArrayList<FoodProductionProcessItem>();
                 process.setOutputList(outputList);
@@ -123,11 +113,7 @@ public class FoodProductionConfig implements Serializable {
 
                 parseParts(outputList, outputs.getChildren(PART));
 
-                parseEquipment(outputList, outputs.getChildren(EQUIPMENT));
-
-                //parseVehicles(outputList, outputs.getChildren(VEHICLE));
-  
-                
+                parseEquipment(outputList, outputs.getChildren(EQUIPMENT));               
             }
         }
 
@@ -189,24 +175,6 @@ public class FoodProductionConfig implements Serializable {
         }
     }
 
-    /**
-     * Parses the vehicle elements in a node list.
-     * @param list the list to store the vehicles in.
-     * @param vehicleNodes the node list.
-     * @throws Exception if error parsing vehicles.
-
-    private void parseVehicles(List<FoodProductionProcessItem> list,
-            List<Element> vehicleNodes) {
-        for (Element vehicleElement : vehicleNodes) {
-            FoodProductionProcessItem vehicleItem = new FoodProductionProcessItem();
-            vehicleItem.setType(Type.VEHICLE);
-            vehicleItem.setName(vehicleElement.getAttributeValue(NAME));
-            vehicleItem.setAmount(Integer.parseInt(vehicleElement
-                    .getAttributeValue(NUMBER)));
-            list.add(vehicleItem);
-        }
-    }
-*/
     /**
      * Prepare object for garbage collection.
      */

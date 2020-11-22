@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PartPackageConfig.java
- * @version 3.1.0 2017-09-05
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.resource;
@@ -15,8 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import org.jdom.Document;
-import org.jdom.Element;
+import org.jdom2.Document;
+import org.jdom2.Element;
 
 /**
  * Provides configuration information about part packages. Uses a JDOM document
@@ -45,10 +45,7 @@ public class PartPackageConfig implements Serializable {
 	 * @param partPackageDoc the part package XML document.
 	 * @throws Exception if error reading XML document
 	 */
-	public PartPackageConfig(Document partPackageDoc) {
-		// Call to just initialize PartConfig in this constructor
-		// new ItemResource();
-		ResourceUtil.getInstance();
+	public PartPackageConfig(Document partPackageDoc) {		
 		partPackages = new ArrayList<PartPackage>();
 		loadPartPackages(partPackageDoc);
 	}
@@ -59,7 +56,6 @@ public class PartPackageConfig implements Serializable {
 	 * @param partPackageDoc the part package XML document.
 	 * @throws Exception if error reading XML document.
 	 */
-	@SuppressWarnings("unchecked")
 	private void loadPartPackages(Document partPackageDoc) {
 		Element root = partPackageDoc.getRootElement();
 		List<Element> partPackageNodes = root.getChildren(PART_PACKAGE);
@@ -71,7 +67,7 @@ public class PartPackageConfig implements Serializable {
 			List<Element> partNodes = partPackageElement.getChildren(PART);
 			for (Element partElement : partNodes) {
 				String partType = partElement.getAttributeValue(TYPE);
-				Part part = (Part) ItemResource.findItemResource(partType);
+				Part part = (Part) ItemResourceUtil.findItemResource(partType);
 				if (part == null)
 					logger.severe(partType + " shows up in part_packages.xml but doesn't exist in parts.xml.");
 				else {

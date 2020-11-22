@@ -1,6 +1,7 @@
-/* Mars Simulation Project
+/**
+ * Mars Simulation Project
  * OrbitViewer.java
- * @version 3.1.0 2017-02-02
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  * Original work by Osamu Ajiki and Ron Baalke (NASA/JPL)
  * http://www.astroarts.com/products/orbitviewer/
@@ -46,8 +47,13 @@ package org.mars_sim.msp.ui.astroarts;
  *
  */
 
-//import java.applet.*;
-import java.awt.*;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
@@ -56,12 +62,13 @@ import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
-import java.util.*;
+import java.util.Date;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
@@ -69,14 +76,15 @@ import javax.swing.WindowConstants;
 import javax.swing.event.InternalFrameEvent;
 import javax.swing.event.InternalFrameListener;
 
-
+import org.mars_sim.msp.core.astroarts.ATime;
+import org.mars_sim.msp.core.astroarts.Astro;
+import org.mars_sim.msp.core.astroarts.Comet;
+import org.mars_sim.msp.core.astroarts.TimeSpan;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.ModalInternalFrame;
 import org.mars_sim.msp.ui.swing.unit_window.structure.building.BuildingPanelAstronomicalObservation;
 
-//import com.astroarts.*;
-//import java.math.*;
 
 /**
  * This Class creates a pictorial representation of a solar system showing the orbits of all planets plus a satellite of interest
@@ -113,9 +121,9 @@ implements InternalFrameListener, ActionListener, WindowListener {
 	//private Choice			choiceCenterObject;
 	//private Choice			choiceOrbitObject;
 
-	private JComboBox			choiceTimeStep;
-	private JComboBox			choiceCenterObject;
-	private JComboBox			choiceOrbitObject;
+	private JComboBox<String>			choiceTimeStep;
+	private JComboBox<String>			choiceCenterObject;
+	private JComboBox<String>			choiceOrbitObject;
 
 	private JCheckBox		checkPlanetName;
 	private JCheckBox		checkObjectName;
@@ -213,10 +221,10 @@ implements InternalFrameListener, ActionListener, WindowListener {
 	//	return "OrbitViewer v1.3 Copyright(C) 1996-2001 by O.Ajiki/R.Baalke";
 	//}
 
-	private double xPos;
-	private double yPos;
+//	private double xPos;
+//	private double yPos;
 	//private double rotation;
-	private double scale;
+//	private double scale;
 	/** Last X mouse drag position. */
 	//private int xLast;
 	/** Last Y mouse drag position. */
@@ -325,9 +333,7 @@ implements InternalFrameListener, ActionListener, WindowListener {
 	public MainDesktopPane getDesktop() {
 		return desktop;
 	}
-	/*
-	 *
-	 */
+
 	public void createGUI() {
 
 	 	setLayout(new FlowLayout());
@@ -344,10 +350,11 @@ implements InternalFrameListener, ActionListener, WindowListener {
 		if ((strParam = getParameter("Date")) != null) {
 			this.atime = ymdStringToAtime(strParam);
 		} else {
-			Date date = new Date();
+//			Date date = new Date();
 			// TODO: get date from MarsClock
-			this.atime = new ATime(date.getYear() + 1900, date.getMonth() + 1,
-					   (double)date.getDate(), 0.0);
+//			this.atime = new ATime(date.getYear() + 1900, date.getMonth() + 1,
+//					   (double)date.getDate(), 0.0);
+			this.atime = new ATime(1900, 1, 1, 0.0);
 		}
 		orbitCanvas = new OrbitCanvas(object, this.atime);
 		gbcMainPanel.weightx = 1.0;
@@ -361,7 +368,6 @@ implements InternalFrameListener, ActionListener, WindowListener {
 	    //scrollPane.setViewportView(orbitCanvas);
 		//mainPanel.add(scrollPane);
 
-
 		orbitCanvas.addMouseWheelListener(new MouseAdapter() {
 			public void mouseWheelMoved(MouseWheelEvent e) {
 				int value = 0;
@@ -370,33 +376,33 @@ implements InternalFrameListener, ActionListener, WindowListener {
 		       //String newline = "\n";
 
 		       int notches = e.getWheelRotation();
-		       /*
-		       if (notches < 0) {
-		           message = "Mouse wheel moved UP "
-		                        + -notches + " notch(es)" + newline;
-		       } else {
-		           message = "Mouse wheel moved DOWN "
-		                        + notches + " notch(es)" + newline;
-		       }
+		       
+//		       if (notches < 0) {
+//		           message = "Mouse wheel moved UP "
+//		                        + -notches + " notch(es)" + newline;
+//		       } else {
+//		           message = "Mouse wheel moved DOWN "
+//		                        + notches + " notch(es)" + newline;
+//		       }
+//
+//		       if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
+//		           message += "    Scroll type: WHEEL_UNIT_SCROLL" + newline;
+//		           message += "    Scroll amount: " + e.getScrollAmount()
+//		                   + " unit increments per notch" + newline;
+//		           message += "    Units to scroll: " + e.getUnitsToScroll()
+//		                   + " unit increments" + newline;
+//		           message += "    Vertical unit increment: "
+//		               //+ scrollPane.getVerticalScrollBar().getUnitIncrement(1)
+//		               + " pixels" + newline;
+//		           //value = e.getScrollAmount();
+//		       } else { //scroll type == MouseWheelEvent.WHEEL_BLOCK_SCROLL
+//		           message += "    Scroll type: WHEEL_BLOCK_SCROLL" + newline;
+//		           message += "    Vertical block increment: "
+//		               //+ scrollPane.getVerticalScrollBar().getBlockIncrement(1)
+//		               + " pixels" + newline;
+//		           //value = e.getScrollAmount();
+//		       }
 
-		       if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
-		           message += "    Scroll type: WHEEL_UNIT_SCROLL" + newline;
-		           message += "    Scroll amount: " + e.getScrollAmount()
-		                   + " unit increments per notch" + newline;
-		           message += "    Units to scroll: " + e.getUnitsToScroll()
-		                   + " unit increments" + newline;
-		           message += "    Vertical unit increment: "
-		               //+ scrollPane.getVerticalScrollBar().getUnitIncrement(1)
-		               + " pixels" + newline;
-		           //value = e.getScrollAmount();
-		       } else { //scroll type == MouseWheelEvent.WHEEL_BLOCK_SCROLL
-		           message += "    Scroll type: WHEEL_BLOCK_SCROLL" + newline;
-		           message += "    Vertical block increment: "
-		               //+ scrollPane.getVerticalScrollBar().getBlockIncrement(1)
-		               + " pixels" + newline;
-		           //value = e.getScrollAmount();
-		       }
-*/
 		       value = scrollZoom.getValue() + notches * 2;
 		       if (value < 0)
 		    	   value = 0;
@@ -510,29 +516,29 @@ implements InternalFrameListener, ActionListener, WindowListener {
 
 		orbitCanvas.setRotateVert(180 - yvalue);
 		orbitCanvas.setRotateHorz(270 - xvalue);
-/*
-		// Vertical Scrollbar
-		scrollVert = new JScrollBar(JScrollBar.VERTICAL,
-								   initialScrollVert, 12, 0, 180+12);
-		//Scrollbar s = new Scrollbar(JScrollBar.VERTICAL,
-		//		   initialScrollVert, 12, 0, 180+12);
-		gbcMainPanel.weightx = 0.0;
-		gbcMainPanel.weighty = 0.0;
-		gbcMainPanel.gridwidth = GridBagConstraints.REMAINDER;
-		gblMainPanel.setConstraints(scrollVert, gbcMainPanel);
-//		mainPanel.add(scrollVert);
-		orbitCanvas.setRotateVert(180 - scrollVert.getValue());
 
-		// Horizontal Scrollbar
-		scrollHorz = new JScrollBar(JScrollBar.HORIZONTAL,
-								   initialScrollHorz, 15, 0, 360+15);
-		gbcMainPanel.weightx = 1.0;
-		gbcMainPanel.weighty = 0.0;
-		gbcMainPanel.gridwidth = 1;
-		gblMainPanel.setConstraints(scrollHorz, gbcMainPanel);
-//		mainPanel.add(scrollHorz);
-		orbitCanvas.setRotateHorz(270 - scrollHorz.getValue());
-*/
+//		// Vertical Scrollbar
+//		scrollVert = new JScrollBar(JScrollBar.VERTICAL,
+//								   initialScrollVert, 12, 0, 180+12);
+//		//Scrollbar s = new Scrollbar(JScrollBar.VERTICAL,
+//		//		   initialScrollVert, 12, 0, 180+12);
+//		gbcMainPanel.weightx = 0.0;
+//		gbcMainPanel.weighty = 0.0;
+//		gbcMainPanel.gridwidth = GridBagConstraints.REMAINDER;
+//		gblMainPanel.setConstraints(scrollVert, gbcMainPanel);
+////		mainPanel.add(scrollVert);
+//		orbitCanvas.setRotateVert(180 - scrollVert.getValue());
+//
+//		// Horizontal Scrollbar
+//		scrollHorz = new JScrollBar(JScrollBar.HORIZONTAL,
+//								   initialScrollHorz, 15, 0, 360+15);
+//		gbcMainPanel.weightx = 1.0;
+//		gbcMainPanel.weighty = 0.0;
+//		gbcMainPanel.gridwidth = 1;
+//		gblMainPanel.setConstraints(scrollHorz, gbcMainPanel);
+////		mainPanel.add(scrollHorz);
+//		orbitCanvas.setRotateHorz(270 - scrollHorz.getValue());
+
 		// Right-Bottom Corner Rectangle
 		JPanel cornerPanel = new JPanel();
 		gbcMainPanel.weightx = 0.0;
@@ -651,7 +657,7 @@ implements InternalFrameListener, ActionListener, WindowListener {
         ctrlPanel.add(stepLabel);
 
 		// Step choice box
-		choiceTimeStep = new JComboBox();
+		choiceTimeStep = new JComboBox<String>();
 		choiceTimeStep.setFont(new Font("Dialog", Font.PLAIN, fontSize));
 		choiceTimeStep.addActionListener(this);
 		gbcCtrlPanel.gridx = 1;
@@ -683,7 +689,7 @@ implements InternalFrameListener, ActionListener, WindowListener {
                 ctrlPanel.add(centerLabel);
 
                // Center Object choice box
-                choiceCenterObject = new JComboBox();
+                choiceCenterObject = new JComboBox<String>();
                 choiceCenterObject.setFont(new Font("Dialog", Font.PLAIN, fontSize));
                 choiceCenterObject.addActionListener(this);
                 gbcCtrlPanel.gridx = 1;
@@ -715,7 +721,7 @@ implements InternalFrameListener, ActionListener, WindowListener {
                 ctrlPanel.add(orbitLabel);
 
               // Display Orbit choice box
-                choiceOrbitObject = new JComboBox();
+                choiceOrbitObject = new JComboBox<String>();
                 choiceOrbitObject.setFont(new Font("Dialog", Font.PLAIN, fontSize));
                 choiceOrbitObject.addActionListener(this);
                 gbcCtrlPanel.gridx = 1;
@@ -1029,7 +1035,7 @@ implements InternalFrameListener, ActionListener, WindowListener {
 			endDateDialog(null);
 		}
 		if (playerThread != null) {
-			playerThread.stop();
+			playerThread.interrupt();//stop();
 			playerThread = null;
 			buttonDate.setEnabled(true);//.enable();
 		}
@@ -1080,7 +1086,7 @@ implements InternalFrameListener, ActionListener, WindowListener {
 			} else if (source == buttonForPlay) {		// ForPlay
 				if (playerThread != null
 					&&  playDirection != ATime.F_INCTIME) {
-					playerThread.stop();
+					playerThread.interrupt();//stop();
 					playerThread = null;
 				}
 				if (playerThread == null) {
@@ -1093,7 +1099,7 @@ implements InternalFrameListener, ActionListener, WindowListener {
 			} else if (source == buttonRevPlay) {		// RevPlay
 				if (playerThread != null
 					&&  playDirection != ATime.F_DECTIME) {
-					playerThread.stop();
+					playerThread.interrupt();//stop();
 					playerThread = null;
 				}
 				if (playerThread == null) {
@@ -1105,7 +1111,7 @@ implements InternalFrameListener, ActionListener, WindowListener {
 				}
 			} else if (source == buttonStop) {			// Stop
 				if (playerThread != null) {
-					playerThread.stop();
+					playerThread.interrupt();//stop();
 					playerThread = null;
 					buttonDate.setEnabled(true);//enable();
 				}
@@ -1191,145 +1197,145 @@ implements InternalFrameListener, ActionListener, WindowListener {
 
 
 
-	/**
-	 * Event Handler
+//	/**
+//	 * Event Handler
+//	 */
+//    public boolean handleEvent(Event evt) {
+//		switch (evt.id) {
+//
+//		case Event.SCROLL_ABSOLUTE:
+//		case Event.SCROLL_LINE_DOWN:
+//		case Event.SCROLL_LINE_UP:
+//		case Event.SCROLL_PAGE_UP:
+//		case Event.SCROLL_PAGE_DOWN:
+//			if (evt.target == scrollHorz) {
+//				orbitCanvas.setRotateHorz(270 - scrollHorz.getValue());
+//			} else if (evt.target == scrollVert) {
+//				orbitCanvas.setRotateVert(180 - scrollVert.getValue());
+//			} else if (evt.target == scrollZoom) {
+//				orbitCanvas.setZoom(scrollZoom.getValue());
+//			} else {
+//				return false;
+//			}
+//			orbitCanvas.repaint();
+//			return true;
+//
+//		case Event.ACTION_EVENT:
+//			if (evt.target == buttonDate) {					// Set Date
+//				dateDialog = new DateDialog(this, atime);
+//				buttonDate.disable();
+//				return true;
+//			} else if (evt.target == buttonForPlay) {		// ForPlay
+//				if (playerThread != null
+//					&&  playDirection != ATime.F_INCTIME) {
+//					playerThread.stop();
+//					playerThread = null;
+//				}
+//				if (playerThread == null) {
+//					buttonDate.disable();
+//					playDirection = ATime.F_INCTIME;
+//					playerThread = new Thread(orbitPlayer);
+//					playerThread.setPriority(Thread.MIN_PRIORITY);
+//					playerThread.start();
+//				}
+//			} else if (evt.target == buttonRevPlay) {		// RevPlay
+//				if (playerThread != null
+//					&&  playDirection != ATime.F_DECTIME) {
+//					playerThread.stop();
+//					playerThread = null;
+//				}
+//				if (playerThread == null) {
+//					buttonDate.disable();
+//					playDirection = ATime.F_DECTIME;
+//					playerThread = new Thread(orbitPlayer);
+//					playerThread.setPriority(Thread.MIN_PRIORITY);
+//					playerThread.start();
+//				}
+//			} else if (evt.target == buttonStop) {			// Stop
+//				if (playerThread != null) {
+//					playerThread.stop();
+//					playerThread = null;
+//					buttonDate.enable();
+//				}
+//			} else if (evt.target == buttonForStep) {		// +1 Step
+//				atime.changeDate(timeStep, ATime.F_INCTIME);
+//				setNewDate();
+//				return true;
+//			} else if (evt.target == buttonRevStep) {		// -1 Step
+//				atime.changeDate(timeStep, ATime.F_DECTIME);
+//				setNewDate();
+//				return true;
+//			} else if (evt.target == checkPlanetName) {		// Planet Name
+//				orbitCanvas.switchPlanetName(checkPlanetName.getState());
+//				orbitCanvas.repaint();
+//				return true;
+//			} else if (evt.target == checkObjectName) {		// Object Name
+//				orbitCanvas.switchObjectName(checkObjectName.getState());
+//				orbitCanvas.repaint();
+//				return true;
+//			} else if (evt.target == checkDistanceLabel) {	// Distance
+//				orbitCanvas.switchDistanceLabel(checkDistanceLabel.getState());
+//				orbitCanvas.repaint();
+//				return true;
+//			} else if (evt.target == checkDateLabel) {		// Date
+//				orbitCanvas.switchDateLabel(checkDateLabel.getState());
+//				orbitCanvas.repaint();
+//				return true;
+//			} else if (evt.target == choiceTimeStep) {		// Time Step
+//				for (int i = 0; i < timeStepCount; i++) {
+//					if ((String)evt.arg == timeStepLabel[i]) {
+//						timeStep = timeStepSpan[i];
+//						break;
+//					}
+//				}
+//			} else if (evt.target == choiceCenterObject) {    // Center Object
+//				for (int i = 0; i < CenterObjectCount; i++) {
+//					if ((String)evt.arg == CenterObjectLabel[i]) {
+//						CenterObjectSelected = i;
+//						orbitCanvas.SelectCenterObject(i);
+//						orbitCanvas.repaint();
+//						break;
+//					}
+//				}
+//			} else if (evt.target == choiceOrbitObject) {    // Orbit Display
+//				for (int i = 0; i < OrbitDisplayCount; i++) {
+//					if ((String)evt.arg == OrbitDisplayLabel[i]) {
+//						if (i == 1) {
+//							for (int j = 0; j < OrbitCount; j++) {
+//								OrbitDisplay[j] = true;
+//							}
+//						}
+//						else if (i == 2) {
+//							for (int j = 0; j < OrbitCount; j++) {
+//								OrbitDisplay[j] = false;
+//							}
+//						}
+//						else if (i == 0) {
+//							for (int j = 0; j < OrbitCount; j++) {
+//								OrbitDisplay[j] = OrbitDisplayDefault[j];
+//							}
+//						}
+//						else if (i > 3) {
+//							if (OrbitDisplay[i-3]) {
+//								OrbitDisplay[i-3] = false;
+//							}
+//							else {
+//								OrbitDisplay[i-3] = true;
+//							}
+//						}
+//						evt.arg = OrbitDisplayLabel[0];
+//						orbitCanvas.SelectOrbits(OrbitDisplay, OrbitCount);
+//						orbitCanvas.repaint();
+//						break;
+//					}
+//				}
+//			}
+//			return false;
+//		default:
+//			return false;
+//		}
+//    }
 
-    public boolean handleEvent(Event evt) {
-		switch (evt.id) {
-
-		case Event.SCROLL_ABSOLUTE:
-		case Event.SCROLL_LINE_DOWN:
-		case Event.SCROLL_LINE_UP:
-		case Event.SCROLL_PAGE_UP:
-		case Event.SCROLL_PAGE_DOWN:
-			if (evt.target == scrollHorz) {
-				orbitCanvas.setRotateHorz(270 - scrollHorz.getValue());
-			} else if (evt.target == scrollVert) {
-				orbitCanvas.setRotateVert(180 - scrollVert.getValue());
-			} else if (evt.target == scrollZoom) {
-				orbitCanvas.setZoom(scrollZoom.getValue());
-			} else {
-				return false;
-			}
-			orbitCanvas.repaint();
-			return true;
-
-		case Event.ACTION_EVENT:
-			if (evt.target == buttonDate) {					// Set Date
-				dateDialog = new DateDialog(this, atime);
-				buttonDate.disable();
-				return true;
-			} else if (evt.target == buttonForPlay) {		// ForPlay
-				if (playerThread != null
-					&&  playDirection != ATime.F_INCTIME) {
-					playerThread.stop();
-					playerThread = null;
-				}
-				if (playerThread == null) {
-					buttonDate.disable();
-					playDirection = ATime.F_INCTIME;
-					playerThread = new Thread(orbitPlayer);
-					playerThread.setPriority(Thread.MIN_PRIORITY);
-					playerThread.start();
-				}
-			} else if (evt.target == buttonRevPlay) {		// RevPlay
-				if (playerThread != null
-					&&  playDirection != ATime.F_DECTIME) {
-					playerThread.stop();
-					playerThread = null;
-				}
-				if (playerThread == null) {
-					buttonDate.disable();
-					playDirection = ATime.F_DECTIME;
-					playerThread = new Thread(orbitPlayer);
-					playerThread.setPriority(Thread.MIN_PRIORITY);
-					playerThread.start();
-				}
-			} else if (evt.target == buttonStop) {			// Stop
-				if (playerThread != null) {
-					playerThread.stop();
-					playerThread = null;
-					buttonDate.enable();
-				}
-			} else if (evt.target == buttonForStep) {		// +1 Step
-				atime.changeDate(timeStep, ATime.F_INCTIME);
-				setNewDate();
-				return true;
-			} else if (evt.target == buttonRevStep) {		// -1 Step
-				atime.changeDate(timeStep, ATime.F_DECTIME);
-				setNewDate();
-				return true;
-			} else if (evt.target == checkPlanetName) {		// Planet Name
-				orbitCanvas.switchPlanetName(checkPlanetName.getState());
-				orbitCanvas.repaint();
-				return true;
-			} else if (evt.target == checkObjectName) {		// Object Name
-				orbitCanvas.switchObjectName(checkObjectName.getState());
-				orbitCanvas.repaint();
-				return true;
-			} else if (evt.target == checkDistanceLabel) {	// Distance
-				orbitCanvas.switchDistanceLabel(checkDistanceLabel.getState());
-				orbitCanvas.repaint();
-				return true;
-			} else if (evt.target == checkDateLabel) {		// Date
-				orbitCanvas.switchDateLabel(checkDateLabel.getState());
-				orbitCanvas.repaint();
-				return true;
-			} else if (evt.target == choiceTimeStep) {		// Time Step
-				for (int i = 0; i < timeStepCount; i++) {
-					if ((String)evt.arg == timeStepLabel[i]) {
-						timeStep = timeStepSpan[i];
-						break;
-					}
-				}
-			} else if (evt.target == choiceCenterObject) {    // Center Object
-				for (int i = 0; i < CenterObjectCount; i++) {
-					if ((String)evt.arg == CenterObjectLabel[i]) {
-						CenterObjectSelected = i;
-						orbitCanvas.SelectCenterObject(i);
-						orbitCanvas.repaint();
-						break;
-					}
-				}
-			} else if (evt.target == choiceOrbitObject) {    // Orbit Display
-				for (int i = 0; i < OrbitDisplayCount; i++) {
-					if ((String)evt.arg == OrbitDisplayLabel[i]) {
-						if (i == 1) {
-							for (int j = 0; j < OrbitCount; j++) {
-								OrbitDisplay[j] = true;
-							}
-						}
-						else if (i == 2) {
-							for (int j = 0; j < OrbitCount; j++) {
-								OrbitDisplay[j] = false;
-							}
-						}
-						else if (i == 0) {
-							for (int j = 0; j < OrbitCount; j++) {
-								OrbitDisplay[j] = OrbitDisplayDefault[j];
-							}
-						}
-						else if (i > 3) {
-							if (OrbitDisplay[i-3]) {
-								OrbitDisplay[i-3] = false;
-							}
-							else {
-								OrbitDisplay[i-3] = true;
-							}
-						}
-						evt.arg = OrbitDisplayLabel[0];
-						orbitCanvas.SelectOrbits(OrbitDisplay, OrbitCount);
-						orbitCanvas.repaint();
-						break;
-					}
-				}
-			}
-			return false;
-		default:
-			return false;
-		}
-    }
-*/
 	/**
 	 * message sent by DateDialog (when disposed)
 	 */

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ConstructionValues.java
- * @version 3.1.0 2017-09-11
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -474,7 +474,7 @@ implements Serializable {
                         Iterator<Building> i = settlement.getBuildingManager().getACopyOfBuildings().iterator();
                         while (i.hasNext()) {
                             ConstructionStageInfo tempBuildingStage = ConstructionUtil.getConstructionStageInfo(
-                                    i.next().getName());
+                                    i.next().getBuildingType());
                             if (tempBuildingStage != null) {
                                 ConstructionStageInfo tempFrameStage = ConstructionUtil.getPrerequisiteStage(
                                         tempBuildingStage);

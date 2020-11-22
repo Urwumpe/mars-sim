@@ -1,11 +1,13 @@
 /**
  * Mars Simulation Project
  * VehicleWindow.java
- * @version 3.1.0 2017-03-19
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.unit_window.vehicle;
+
+import javax.swing.event.ChangeEvent;
 
 import org.mars_sim.msp.core.vehicle.Crewable;
 import org.mars_sim.msp.core.vehicle.Rover;
@@ -14,12 +16,14 @@ import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.unit_window.InventoryTabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.LocationTabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.MaintenanceTabPanel;
+import org.mars_sim.msp.ui.swing.unit_window.NotesTabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.SalvageTabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.UnitWindow;
 
 /**
  * The VehicleWindow is the window for displaying a vehicle.
  */
+@SuppressWarnings("serial")
 public class VehicleWindow extends UnitWindow {
 
 	// Data members
@@ -47,6 +51,8 @@ public class VehicleWindow extends UnitWindow {
 				addTabPanel(new TabPanelBots(vehicle, desktop));
 		}
 
+		addTabPanel(new TabPanelMission(vehicle, desktop));
+		
 		addTabPanel(new InventoryTabPanel(vehicle, desktop));
 
 		if (vehicle instanceof Rover) {
@@ -57,8 +63,10 @@ public class VehicleWindow extends UnitWindow {
 		}
 
 		addTopPanel(new LocationTabPanel(vehicle, desktop));
+		addTopPanel(new TabPanelLog(vehicle, desktop));
 		addTabPanel(new MaintenanceTabPanel(vehicle, desktop));
-		addTabPanel(new TabPanelMission(vehicle, desktop));
+		addTabPanel(new NotesTabPanel(vehicle, desktop));
+
 		addTabPanel(new NavigationTabPanel(vehicle, desktop));
 
 		salvaged = vehicle.isSalvaged();
@@ -85,5 +93,18 @@ public class VehicleWindow extends UnitWindow {
 
 	public void destroy() {
 		vehicle = null;
+	}
+
+    @Override
+	public void stateChanged(ChangeEvent e) {
+//		// SwingUtilities.updateComponentTreeUI(this);
+//		TabPanel newTab = getSelected();
+//
+//		if (oldTab == null || newTab != oldTab) {
+//			oldTab = newTab;
+//			
+//			if (!newTab.isUIDone());
+//				newTab.initializeUI();		
+//		}
 	}
 }

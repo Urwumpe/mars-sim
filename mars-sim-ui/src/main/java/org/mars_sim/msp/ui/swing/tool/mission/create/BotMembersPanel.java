@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MembersPanel.java
- * @version 3.1.0 2017-09-20
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-
+import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
@@ -31,6 +31,7 @@ import javax.swing.event.ListSelectionListener;
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionMember;
+import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
@@ -55,10 +56,10 @@ implements ActionListener {
 
 	// Data members.
 	private BotsTableModel botsTableModel;
-	private WebTable botsTable;
+	private JTable botsTable;
 	private BotMembersTableModel botMembersTableModel;
 
-	private WebTable botMembersTable;
+	private JTable botMembersTable;
 	private WebLabel errorMessageLabel;
 	private WebButton addButton;
 	private WebButton removeButton;
@@ -300,11 +301,11 @@ implements ActionListener {
 	 * Updates the rover capacity label.
 	 */
 	void updateRoverCapacityLabel() {
-		String type = getWizard().getMissionData().getType();
-		if (MissionDataBean.CONSTRUCTION_MISSION.equals(type)) {
+		MissionType type = getWizard().getMissionData().getMissionType();
+		if (MissionType.BUILDING_CONSTRUCTION == type) {
 			roverCapacityLabel.setText(" ");
 		}
-		else if (MissionDataBean.SALVAGE_MISSION.equals(type)) { 
+		else if (MissionType.BUILDING_SALVAGE == type) { 
 			roverCapacityLabel.setText(" ");
 		}
 		else {
@@ -317,9 +318,9 @@ implements ActionListener {
 	 * @return rover capacity.
 	 */
 	int getRemainingRoverCapacity() {
-		String type = getWizard().getMissionData().getType();
-		if (MissionDataBean.CONSTRUCTION_MISSION.equals(type)) return Integer.MAX_VALUE;
-		else if (MissionDataBean.SALVAGE_MISSION.equals(type)) return Integer.MAX_VALUE;
+		MissionType type = getWizard().getMissionData().getMissionType();
+		if (MissionType.BUILDING_CONSTRUCTION == type) return Integer.MAX_VALUE;
+		else if (MissionType.BUILDING_SALVAGE == type) return Integer.MAX_VALUE;
 		else {
 			int roverCapacity = getWizard().getMissionData().getRover().getCrewCapacity();
 			int memberNum = botMembersTableModel.getRowCount();
@@ -393,9 +394,9 @@ implements ActionListener {
 			units.clear();
 			MissionDataBean missionData = getWizard().getMissionData();
 			Settlement settlement = missionData.getStartingSettlement();
-			if (MissionDataBean.CONSTRUCTION_MISSION.equals(missionData.getType()))
+			if (MissionType.BUILDING_CONSTRUCTION == missionData.getMissionType())
 				settlement = missionData.getConstructionSettlement();
-			else if (MissionDataBean.SALVAGE_MISSION.equals(missionData.getType()))
+			else if (MissionType.BUILDING_SALVAGE == missionData.getMissionType())
 				settlement = missionData.getSalvageSettlement();
 			Collection<Robot> robots = CollectionUtils.sortByName(settlement.getRobots());
 			Iterator<Robot> i = robots.iterator();
@@ -413,10 +414,11 @@ implements ActionListener {
 			boolean result = false;
 
 			if (row < units.size()) {
-				Robot robot = (Robot) getUnit(row);
+//				Robot robot = (Robot) getUnit(row);
 
 				if (column == 2) {
-					if (robot.getBotMind().getMission() != null) return true;
+//					if (robot.getBotMind().getMission() != null) 
+//						return true;
 				}
 			}
 
@@ -493,7 +495,8 @@ implements ActionListener {
 					else if (column == 2) {
 						Mission mission = robot.getBotMind().getMission();
 						if (mission != null) result = mission.getName();
-						else result = "None";
+						else 
+							result = "None";
 					}
 					else if (column == 3) 
 						result = (int) (robot.getPerformanceRating() * 100D) + "%";

@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * DecompressXZ.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 package org.mars_sim.mapdata;
 
 import java.io.EOFException;
@@ -117,6 +124,8 @@ public class DecompressXZ {
 	              int size;
 	              while ((size = in.read(buf)) != -1)
 	                  System.out.write(buf, 0, size);
+	              
+	              in.close();
 	
 	          } else {
 	              // Read from files given on the command line.

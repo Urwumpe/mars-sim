@@ -1,13 +1,12 @@
 /**
  * Mars Simulation Project
  * TabPanelAirComposition.java
- * @version 3.1.0 2017-10-18
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
 
 import java.awt.BorderLayout;
-
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -20,9 +19,7 @@ import java.util.List;
 
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
-
-
-
+import javax.swing.JTable;
 import javax.swing.SpringLayout;
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
@@ -34,9 +31,7 @@ import org.mars_sim.msp.core.structure.CompositionOfAir;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
-
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
 import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
@@ -47,11 +42,11 @@ import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.radiobutton.WebRadioButton;
 import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
 
 /**
  * This is a tab panel for displaying the composition of air of each inhabitable building in a settlement.
  */
+@SuppressWarnings("serial")
 public class TabPanelAirComposition
 extends TabPanel {
 
@@ -59,6 +54,9 @@ extends TabPanel {
 	//private static Logger logger = Logger.getLogger(TabPanelAirComposition.class.getName());
 
 	// Data cache
+	/** Is UI constructed. */
+	private boolean uiDone = false;
+
 	private int numBuildingsCache;
 	
 	private double o2Cache;
@@ -80,7 +78,7 @@ extends TabPanel {
 	private WebLabel indoorPressureLabel;
 	private WebLabel averageTemperatureLabel;
 
-	private WebTable table ;
+	private JTable table ;
 
 	private WebRadioButton percent_btn;
 	private WebRadioButton mass_btn;//, moles_btn, temperature_btn;
@@ -120,6 +118,16 @@ extends TabPanel {
 		);
 
 		settlement = (Settlement) unit;
+
+	}
+	
+	public boolean isUIDone() {
+		return uiDone;
+	}
+	
+	public void initializeUI() {
+		uiDone = true;
+		
 		manager = settlement.getBuildingManager();
 		air = settlement.getCompositionOfAir();
 
@@ -134,7 +142,7 @@ extends TabPanel {
 		titleLabel.setFont(new Font("Serif", Font.BOLD, 16));
 		titlePanel.add(titleLabel);
 
-		// Prepare info panel.
+		// Prepare the top panel using spring layout.
 		WebPanel topPanel = new WebPanel(new SpringLayout());
 		//topPanel.setBorder(new MarsPanelBorder());
 		topContentPanel.add(topPanel);
@@ -151,14 +159,14 @@ extends TabPanel {
 		indoorPressureLabel = new WebLabel(Msg.getString("TabPanelAirComposition.label.totalPressure.kPa", indoorPressureCache), WebLabel.LEFT); //$NON-NLS-1$
 		topPanel.add(indoorPressureLabel);
 		
-		//Lay out the spring panel.
+		// Lay out the spring panel.
 		SpringUtilities.makeCompactGrid(topPanel,
 		                                2, 2, //rows, cols
 		                                5, 5,        //initX, initY
 		                                10, 1);       //xPad, yPad
 		
 		WebPanel gasesPanel = new WebPanel(new GridLayout(2,1));
-		gasesPanel.setBorder(new MarsPanelBorder());
+//		gasesPanel.setBorder(new MarsPanelBorder());
 		topContentPanel.add(gasesPanel); 
 		
 		// CO2, H2O, N2, O2, Others (Ar2, He, CH4...)
@@ -300,28 +308,30 @@ extends TabPanel {
 		table = new ZebraJTable(tableModel);
 	    //SwingUtilities.invokeLater(() -> ColumnResizer.adjustColumnPreferredWidths(table));
 
-		table.setCellSelectionEnabled(false);
-		table.setDefaultRenderer(Double.class, new NumberCellRenderer());
-		table.getColumnModel().getColumn(0).setPreferredWidth(60);
-		table.getColumnModel().getColumn(1).setPreferredWidth(25);
+		table.setRowSelectionAllowed(true);
+		table.getColumnModel().getColumn(0).setPreferredWidth(100);
+		table.getColumnModel().getColumn(1).setPreferredWidth(20);
 		table.getColumnModel().getColumn(2).setPreferredWidth(20);
 		table.getColumnModel().getColumn(3).setPreferredWidth(20);
 		table.getColumnModel().getColumn(4).setPreferredWidth(20);
 		table.getColumnModel().getColumn(5).setPreferredWidth(20);
 		table.getColumnModel().getColumn(6).setPreferredWidth(20);
 
+		// Override default cell renderer for formatting double values.
+		table.setDefaultRenderer(Double.class, new NumberCellRenderer(2, true));
+        
 		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
-		renderer.setHorizontalAlignment(SwingConstants.CENTER);
+		renderer.setHorizontalAlignment(SwingConstants.RIGHT);
 		table.getColumnModel().getColumn(0).setCellRenderer(renderer);
-		table.getColumnModel().getColumn(1).setCellRenderer(renderer);
-		table.getColumnModel().getColumn(2).setCellRenderer(renderer);
-		table.getColumnModel().getColumn(3).setCellRenderer(renderer);
-		table.getColumnModel().getColumn(4).setCellRenderer(renderer);
-		table.getColumnModel().getColumn(5).setCellRenderer(renderer);
-		table.getColumnModel().getColumn(6).setCellRenderer(renderer);
+//		table.getColumnModel().getColumn(1).setCellRenderer(renderer);
+//		table.getColumnModel().getColumn(2).setCellRenderer(renderer);
+//		table.getColumnModel().getColumn(3).setCellRenderer(renderer);
+//		table.getColumnModel().getColumn(4).setCellRenderer(renderer);
+//		table.getColumnModel().getColumn(5).setCellRenderer(renderer);
+//		table.getColumnModel().getColumn(6).setCellRenderer(renderer);
 		
 		table.setPreferredScrollableViewportSize(new Dimension(225, -1));
-		//table.setAutoResizeMode(WebTable.AUTO_RESIZE_ALL_COLUMNS);
+		table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
 
 		table.setAutoCreateRowSorter(true);
 
@@ -331,18 +341,17 @@ extends TabPanel {
 
 	}
 
-	/**
-	 * Sets .
-	 * @param value true or false.
-
-	private void setMetric(boolean value) {
-		if (value)
-			buildings = manager.getSortedBuildings();
-		else
-			buildings = manager.getBuildingsWithThermal();
-		tableModel.update();
-	}
-	 */
+//	/**
+//	 * Sets .
+//	 * @param value true or false.
+//
+//	private void setMetric(boolean value) {
+//		if (value)
+//			buildings = manager.getSortedBuildings();
+//		else
+//			buildings = manager.getBuildingsWithThermal();
+//		tableModel.update();
+//	}
 	
 	public double getOverallComposition(int gas) {
 		double result = 0;
@@ -364,27 +373,32 @@ extends TabPanel {
 			for (int gas = 0; gas < CompositionOfAir.numGases; gas++) {
 				v += air.getPartialPressure()[gas][row];
 			}			
-			return String.format("%1.3f", v/air.getTotalPressure()[row] *100D);
+//			return String.format("%1.1f", v/air.getTotalPressure()[row] *100D);
+			return v/air.getTotalPressure()[row] *100D + "";
 		}
 		else if (kPa_btn.isSelected()) {
 			v = air.getTotalPressure()[row];
 			// convert from atm to kPascal
-			return String.format("%1.2f", v * CompositionOfAir.KPA_PER_ATM);
+//			return String.format("%1.2f", v * CompositionOfAir.KPA_PER_ATM);
+			return v * CompositionOfAir.KPA_PER_ATM + "";
 		}
 		else if (atm_btn.isSelected()) {
 			v = air.getTotalPressure()[row];
 			// convert from atm to kPascal
-			return String.format("%1.4f", v);
+//			return String.format("%1.4f", v);
+			return v + "";
 		}
 		else if (mb_btn.isSelected()) {
 			v = air.getTotalPressure()[row];
 			// convert from atm to kPascal
-			return String.format("%1.2f", v * CompositionOfAir.MB_PER_ATM);
+//			return String.format("%1.2f", v * CompositionOfAir.MB_PER_ATM);
+			return v * CompositionOfAir.MB_PER_ATM + "";
 		}
 		else if (psi_btn.isSelected()) {
 			v = air.getTotalPressure()[row];
 			// convert from atm to kPascal
-			return String.format("%1.3f", v * CompositionOfAir.PSI_PER_ATM);
+//			return String.format("%1.3f", v * CompositionOfAir.PSI_PER_ATM);
+			return v * CompositionOfAir.PSI_PER_ATM + "";
 		}
 		//else if (moles_btn.isSelected()) {
 		//	v = air.getTotalMoles()[row];
@@ -392,7 +406,8 @@ extends TabPanel {
 		//}
 		else if (mass_btn.isSelected()) {
 			v = air.getTotalMass()[row];
-			return String.format("%1.3f", v); 
+//			return String.format("%1.3f", v); 
+			return v + "";
 		}
 		//else if (temperature_btn.isSelected()) {
 			/*
@@ -413,7 +428,9 @@ extends TabPanel {
 	 * Updates the info on this panel.
 	 */
 	public void update() {
-
+		if (!uiDone)
+			this.initializeUI();
+		
 		List<Building> buildings = manager.getBuildingsWithLifeSupport();//getBuildings(BuildingFunction.LIFE_SUPPORT);
 		int numBuildings = buildings.size();
 
@@ -525,19 +542,19 @@ extends TabPanel {
 
 		private int size;
 
-		private Settlement settlement;
+//		private Settlement settlement;
 		private BuildingManager manager;
 
 		private List<Building> buildings = new ArrayList<>();;
 
 		private CompositionOfAir air;
 
-		private DecimalFormat fmt3 = new DecimalFormat(Msg.getString("decimalFormat3")); //$NON-NLS-1$
-		private DecimalFormat fmt2 = new DecimalFormat(Msg.getString("decimalFormat2")); //$NON-NLS-1$
-		private DecimalFormat fmt1 = new DecimalFormat(Msg.getString("decimalFormat1")); //$NON-NLS-1$
+//		private DecimalFormat fmt3 = new DecimalFormat(Msg.getString("decimalFormat3")); //$NON-NLS-1$
+//		private DecimalFormat fmt2 = new DecimalFormat(Msg.getString("decimalFormat2")); //$NON-NLS-1$
+//		private DecimalFormat fmt1 = new DecimalFormat(Msg.getString("decimalFormat1")); //$NON-NLS-1$
 
 		private TableModel(Settlement settlement) {
-			this.settlement = settlement;
+//			this.settlement = settlement;
 			this.manager = settlement.getBuildingManager();
 			this.air = settlement.getCompositionOfAir();
 			this.buildings = selectBuildingsWithLS();
@@ -593,35 +610,39 @@ extends TabPanel {
 			}
 			else if (column == 1) {
 				//return air.getTotalPressure()[row]* CompositionOfAir.kPASCAL_PER_ATM;
-				return getSubtotal(row);//getTotalPressure(row);
+				return getSubtotal(row) + " ";//getTotalPressure(row);
 			}
 			else if (column > 1) {
 				//double amt = air.getPercentComposition()[column - 2][b.getInhabitableID()];//getComposition(column - 2);
+				
 				double amt = getValue(column - 2, b.getInhabitableID());
 				if (amt == 0)
 					return "N/A";
-				else if (percent_btn.isSelected())
-					return String.format("%1.3f", amt); 
-				else if (kPa_btn.isSelected())
-					return String.format("%1.2f", amt); 
-				else if (atm_btn.isSelected())
-					return String.format("%1.4f", amt); 
-				else if (mb_btn.isSelected())
-					return String.format("%1.2f", amt); 
-				else if (psi_btn.isSelected())
-					return String.format("%1.3f", amt); 
-				//else if (moles_btn.isSelected())
-				//	return String.format("%1.1e", amt).replaceAll("e+0", "e"); 
-				else if (mass_btn.isSelected())
-					return String.format("%1.3f", amt);//.replaceAll("e+0", "e"); 
-				//else if (temperature_btn.isSelected())
-				//	return String.format("%3.1f", amt); 
-				else if (column == 2 || column == 6)
-					return fmt3.format(amt);
-				else if (column == 3 || column == 4 || column == 5)
-					return fmt2.format(amt);
 				else
-					return null;
+					return amt;
+				
+//				else if (percent_btn.isSelected())
+//					return String.format("%1.3f", amt); 
+//				else if (kPa_btn.isSelected())
+//					return String.format("%1.2f", amt); 
+//				else if (atm_btn.isSelected())
+//					return String.format("%1.4f", amt); 
+//				else if (mb_btn.isSelected())
+//					return String.format("%1.2f", amt); 
+//				else if (psi_btn.isSelected())
+//					return String.format("%1.3f", amt); 
+//				//else if (moles_btn.isSelected())
+//				//	return String.format("%1.1e", amt).replaceAll("e+0", "e"); 
+//				else if (mass_btn.isSelected())
+//					return String.format("%1.3f", amt);//.replaceAll("e+0", "e"); 
+//				//else if (temperature_btn.isSelected())
+//				//	return String.format("%3.1f", amt); 
+//				else if (column == 2 || column == 6)
+//					return fmt3.format(amt);
+//				else if (column == 3 || column == 4 || column == 5)
+//					return fmt2.format(amt);
+//				else
+//					return null;
 			}
 			else  {
 				return null;
@@ -649,71 +670,68 @@ extends TabPanel {
 			else
 				return 0;
 		}
-		
-/*		
-		public double getMole(int gas) {
-			double mole = 0;
-			Iterator<Building> k = buildings.iterator();
-			while (k.hasNext()) {
-				Building b = k.next();
-				int id = b.getInhabitableID();
-				double [][] numMoles = air.getNumMoles();
+			
+//		public double getMole(int gas) {
+//			double mole = 0;
+//			Iterator<Building> k = buildings.iterator();
+//			while (k.hasNext()) {
+//				Building b = k.next();
+//				int id = b.getInhabitableID();
+//				double [][] numMoles = air.getNumMoles();
+//
+//				if (id < numMoles[0].length)
+//					mole = numMoles[gas][id];
+//				else
+//					mole = 0;
+//			}
+//			return mole;
+//		}	
+//		
+//		public double getMass(int gas) {
+//			double kg = 0;
+//			double moles = getMole(gas);
+//			if (gas == 0)
+//				kg = CompositionOfAir.CO2_MOLAR_MASS * moles;
+//			else if (gas == 1)
+//				kg = CompositionOfAir.ARGON_MOLAR_MASS * moles;
+//			else if (gas == 2)
+//				kg = CompositionOfAir.N2_MOLAR_MASS * moles;
+//			else if (gas == 3)
+//				kg = CompositionOfAir.O2_MOLAR_MASS * moles;
+//			else if (gas == 4)
+//				kg = 0;
+//							
+//			return kg;
+//		}
+	
+//		public double getComposition(int gas) {
+//			double percent = 0;
+//			Iterator<Building> k = buildings.iterator();
+//			while (k.hasNext()) {
+//				Building b = k.next();
+//				int id = b.getInhabitableID();
+//				double [][] comp = air.getPercentComposition();
+//
+//				if (id < comp[0].length)
+//					percent = comp[gas][id];
+//				else
+//					percent = 0;
+//
+//			}
+//			return percent;
+//		}
 
-				if (id < numMoles[0].length)
-					mole = numMoles[gas][id];
-				else
-					mole = 0;
-			}
-			return mole;
-		}	
-		
-		public double getMass(int gas) {
-			double kg = 0;
-			double moles = getMole(gas);
-			if (gas == 0)
-				kg = CompositionOfAir.CO2_MOLAR_MASS * moles;
-			else if (gas == 1)
-				kg = CompositionOfAir.ARGON_MOLAR_MASS * moles;
-			else if (gas == 2)
-				kg = CompositionOfAir.N2_MOLAR_MASS * moles;
-			else if (gas == 3)
-				kg = CompositionOfAir.O2_MOLAR_MASS * moles;
-			else if (gas == 4)
-				kg = 0;
-							
-			return kg;
-		}
-*/		
-/*		
-		public double getComposition(int gas) {
-			double percent = 0;
-			Iterator<Building> k = buildings.iterator();
-			while (k.hasNext()) {
-				Building b = k.next();
-				int id = b.getInhabitableID();
-				double [][] comp = air.getPercentComposition();
+//		public double getTotalPressure(int row) {
+//			double [] tp = air.getTotalPressure();
+//			double p = 0;
+//			if (row < tp.length)
+//				p = tp[row];
+//			else
+//				p = 0;
+//			// convert from atm to kPascal
+//			return p * CompositionOfAir.kPASCAL_PER_ATM;
+//		}
 
-				if (id < comp[0].length)
-					percent = comp[gas][id];
-				else
-					percent = 0;
-
-			}
-			return percent;
-		}
-*/
-/*
-		public double getTotalPressure(int row) {
-			double [] tp = air.getTotalPressure();
-			double p = 0;
-			if (row < tp.length)
-				p = tp[row];
-			else
-				p = 0;
-			// convert from atm to kPascal
-			return p * CompositionOfAir.kPASCAL_PER_ATM;
-		}
-*/
 		public void update() {
 			//int newSize = buildings.size();
 			//if (size != newSize) {

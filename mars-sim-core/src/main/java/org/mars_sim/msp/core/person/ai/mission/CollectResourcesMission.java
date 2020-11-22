@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * CollectResourcesMission.java
- * @version 3.1.0 2017-10-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -14,24 +14,27 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Direction;
 import org.mars_sim.msp.core.Inventory;
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.equipment.EVASuit;
 import org.mars_sim.msp.core.equipment.EquipmentFactory;
-import org.mars_sim.msp.core.mars.Mars;
-import org.mars_sim.msp.core.person.LocationSituation;
+import org.mars_sim.msp.core.equipment.EquipmentType;
+import org.mars_sim.msp.core.location.LocationStateType;
+import org.mars_sim.msp.core.mars.TerrainElevation;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PersonConfig;
 import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.task.CollectResources;
 import org.mars_sim.msp.core.person.ai.task.EVAOperation;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -50,18 +53,25 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	/** default logger. */
-//	private static Logger logger = Logger.getLogger(CollectResourcesMission.class.getName());
-
+	private static final Logger logger = Logger.getLogger(CollectResourcesMission.class.getName());
+	private static final String loggerName = logger.getName();
+	private static final String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	
 	/** Mission phase. */
-	public final static MissionPhase COLLECT_RESOURCES = new MissionPhase(
+	public static final MissionPhase COLLECT_RESOURCES = new MissionPhase(
 			Msg.getString("Mission.phase.collectResources")); //$NON-NLS-1$
 
 	/** Estimated collection time multiplier for EVA. */
 	public final static double EVA_COLLECTION_OVERHEAD = 20D;
 
+	/** THe maximum number of sites under consideration. */
+	public final static int MAX_NUM_PRIMARY_SITES = 30;
+	/** THe maximum number of sites under consideration. */
+	public final static int MAX_NUM_SECONDARY_SITES = 5;
+	
 	// Data members
-
+	/** The total site score of this prospective resource collection mission. */
+	private double totalSiteScore;
 	/** The amount of resources (kg) collected at a collection site. */
 	private double siteCollectedResources;
 	/** The starting amount of resources in a rover at a collection site. */
@@ -69,40 +79,53 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 	/** The goal amount of resources to collect at a site (kg). */
 	private double siteResourceGoal;
 	/** The resource collection rate for a person (kg/millisol). */
-	private double resourceCollectionRate;
+	protected double resourceCollectionRate;
 	/** The number of containers needed for the mission. */
 	private int containerNum;
 	/** External flag for ending collection at the current site. */
 	private boolean endCollectingSite;
 	/** The total amount (kg) of resource collected. */
 	private double totalResourceCollected;
-
+	/** The total amount (kg) of ice collected. */
+//	private double totalCollectedIce;
+//	/** The total amount (kg) of Regolith-B collected. */
+//	private double totalCollectedRegolithB;
+//	/** The total amount (kg) of Regolith-C collected. */
+//	private double totalCollectedRegolithC;
+//	/** The total amount (kg) of Regolith-D collected. */
+//	private double totalCollectedRegolithD;
+	
 	/** The type of container needed for the mission or null if none. */
-	private Integer containerType;
+	private Integer containerID;
 	/** The start time at the current collection site. */
 	private MarsClock collectionSiteStartTime;
 	/** The type of resource to collect. */
-	private Integer resourceType;
+	private Integer resourceID;
 
 	// Static members
-	private static int oxygenID = ResourceUtil.oxygenID;
-	private static int waterID = ResourceUtil.waterID;
-	private static int foodID = ResourceUtil.foodID;
-	private static int methaneID = ResourceUtil.methaneID;
+	private static final int oxygenID = ResourceUtil.oxygenID;
+	private static final int waterID = ResourceUtil.waterID;
+	private static final int foodID = ResourceUtil.foodID;
+//	private static final int methaneID = ResourceUtil.methaneID;
 
-	private static PersonConfig personConfig;
-
+	private static final int[] REGOLITH_TYPES = new int[] {
+			ResourceUtil.regolithBID,
+			ResourceUtil.regolithCID,
+			ResourceUtil.regolithDID};
+	
+	protected static TerrainElevation terrainElevation;
+	
 	/**
 	 * Constructor
 	 * 
 	 * @param missionName            The name of the mission.
 	 * @param startingPerson         The person starting the mission.
-	 * @param resourceType           The type of resource.
+	 * @param resourceID           The type of resource.
 	 * @param siteResourceGoal       The goal amount of resources to collect at a
 	 *                               site (kg) (or 0 if none).
 	 * @param resourceCollectionRate The resource collection rate for a person
 	 *                               (kg/millisol).
-	 * @param containerType          The type of container needed for the mission or
+	 * @param containerID          The type of container needed for the mission or
 	 *                               null if none.
 	 * @param containerNum           The number of containers needed for the
 	 *                               mission.
@@ -110,11 +133,11 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 	 * @param minPeople              The mimimum number of people for the mission.
 	 * @throws MissionException if problem constructing mission.
 	 */
-	CollectResourcesMission(String missionName, Person startingPerson, Integer resourceType, double siteResourceGoal,
-			double resourceCollectionRate, Integer containerType, int containerNum, int numSites, int minPeople) {
+	CollectResourcesMission(String missionName, MissionType missionType, Person startingPerson, Integer resourceID, double siteResourceGoal,
+			double resourceCollectionRate, Integer containerID, int containerNum, int numSites, int minPeople) {
 
 		// Use RoverMission constructor
-		super(missionName, startingPerson, minPeople);
+		super(missionName, missionType, startingPerson, minPeople);
 
 		Settlement s = startingPerson.getSettlement();
 		
@@ -134,26 +157,49 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 			if (s != null) {
 				setStartingSettlement(s);
 
-				this.resourceType = resourceType;
+				this.resourceID = resourceID;
 				this.siteResourceGoal = siteResourceGoal;
 				this.resourceCollectionRate = resourceCollectionRate;
-				this.containerType = containerType;
+				this.containerID = containerID;
 				this.containerNum = containerNum;
 
 				// Recruit additional members to mission.
-				recruitMembersForMission(startingPerson);
+				if (!recruitMembersForMission(startingPerson))
+					return;
 
 				// Determine collection sites
-				if (hasVehicle())
-					determineCollectionSites(getVehicle().getRange(),
+				if (hasVehicle()) {
+					if (resourceID == ResourceUtil.iceID) {		
+						for (int i=0; i < 10; i++) {
+							determineCollectionSites(getVehicle().getRange(CollectIce.missionType),
+								getTotalTripTimeLimit(getRover(), getPeopleNumber(), true), numSites);
+							// Quit if totalSiteScore is > zero
+							if (totalSiteScore > 0) i = 10;
+							// Re-do the for loop again if totalSiteScore is zero
+							if (i == 9 && totalSiteScore == 0) i = 0;	
+								
+						}
+						
+						if (totalSiteScore == 0) {
+							addMissionStatus(MissionStatus.NO_ICE_COLLECTION_SITES);
+							endMission();
+						}
+					}
+					
+					else if (resourceID == ResourceUtil.regolithID) {
+						determineCollectionSites(getVehicle().getRange(CollectRegolith.missionType),
 							getTotalTripTimeLimit(getRover(), getPeopleNumber(), true), numSites);
+					}
+				}
+
 
 				// Add home settlement
 				addNavpoint(new NavPoint(s.getCoordinates(), s, s.getName()));
 
 				// Check if vehicle can carry enough supplies for the mission.
 				if (hasVehicle() && !isVehicleLoadable()) {
-					endMission(VEHICLE_NOT_LOADABLE);// "Vehicle is not loadable at CollectingResourcesMission");
+					addMissionStatus(MissionStatus.VEHICLE_NOT_LOADABLE);
+					endMission();
 				}
 			}
 		}
@@ -163,9 +209,11 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 			addPhase(COLLECT_RESOURCES);
 
 			// Set initial mission phase.
-			setPhase(VehicleMission.APPROVAL);//.EMBARKING);
-			setPhaseDescription(Msg.getString("Mission.phase.approval.description", s.getName())); //$NON-NLS-1$
+			setPhase(VehicleMission.REVIEWING);
+			setPhaseDescription(Msg.getString("Mission.phase.reviewing.description"));//, s.getName())); //$NON-NLS-1$
 		}
+		
+//		logger.info(startingPerson + " had started CollectResourcesMission");
 	}
 
 	/**
@@ -174,12 +222,12 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 	 * @param missionName            The name of the mission.
 	 * @param members                collection of mission members.
 	 * @param startingSettlement     the starting settlement.
-	 * @param resourceType           The type of resource.
+	 * @param resourceID           The type of resource.
 	 * @param siteResourceGoal       The goal amount of resources to collect at a
 	 *                               site (kg) (or 0 if none).
 	 * @param resourceCollectionRate The resource collection rate for a person
 	 *                               (kg/millisol).
-	 * @param containerType          The type of container needed for the mission or
+	 * @param containerID          The type of container needed for the mission or
 	 *                               null if none.
 	 * @param containerNum           The number of containers needed for the
 	 *                               mission.
@@ -189,12 +237,12 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 	 * @param iceCollectionSites     the sites to collect ice.
 	 * @throws MissionException if problem constructing mission.
 	 */
-	CollectResourcesMission(String missionName, Collection<MissionMember> members, Settlement startingSettlement,
-			Integer resourceType, double siteResourceGoal, double resourceCollectionRate, Integer containerType,
+	CollectResourcesMission(String missionName, MissionType missionType, Collection<MissionMember> members, Settlement startingSettlement,
+			Integer resourceID, double siteResourceGoal, double resourceCollectionRate, Integer containerID,
 			int containerNum, int numSites, int minPeople, Rover rover, List<Coordinates> collectionSites) {
 
 		// Use RoverMission constructor
-		super(missionName, (MissionMember) members.toArray()[0], minPeople, rover);
+		super(missionName, missionType, (MissionMember) members.toArray()[0], minPeople, rover);
 
 		setStartingSettlement(startingSettlement);
 
@@ -204,10 +252,10 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 		if (availableSuitNum < getMissionCapacity())
 			setMissionCapacity(availableSuitNum);
 
-		this.resourceType = resourceType;
+		this.resourceID = resourceID;
 		this.siteResourceGoal = siteResourceGoal;
 		this.resourceCollectionRate = resourceCollectionRate;
-		this.containerType = containerType;
+		this.containerID = containerID;
 		this.containerNum = containerNum;
 
 		// Set collection navpoints.
@@ -219,7 +267,7 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 				new NavPoint(startingSettlement.getCoordinates(), startingSettlement, startingSettlement.getName()));
 
 		Person person = null;
-		Robot robot = null;
+//		Robot robot = null;
 
 		// Add mission members.
 		Iterator<MissionMember> i = members.iterator();
@@ -230,8 +278,8 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 				person = (Person) member;
 				person.getMind().setMission(this);
 			} else if (member instanceof Robot) {
-				robot = (Robot) member;
-				robot.getBotMind().setMission(this);
+//				robot = (Robot) member;
+//				robot.getBotMind().setMission(this);
 			}
 		}
 
@@ -239,69 +287,49 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 		addPhase(COLLECT_RESOURCES);
 
 		// Set initial mission phase.
-		setPhase(VehicleMission.APPROVAL);//.EMBARKING);
-		setPhaseDescription(Msg.getString("Mission.phase.approval.description", getStartingSettlement().getName())); // $NON-NLS-1$
+		setPhase(VehicleMission.EMBARKING);
+		setPhaseDescription(Msg.getString("Mission.phase.embarking.description", getStartingSettlement().getName())); // $NON-NLS-1$
 
 		// Check if vehicle can carry enough supplies for the mission.
-		if (hasVehicle() && !isVehicleLoadable())
-			endMission(VEHICLE_NOT_LOADABLE);// "Vehicle is not loadable at CollectingResourcesMission");
+		if (hasVehicle() && !isVehicleLoadable()) {
+			addMissionStatus(MissionStatus.VEHICLE_NOT_LOADABLE);
+			endMission();
+		}
 	}
 
-	/**
-	 * Gets the weighted probability that a given person would start this mission.
-	 * 
-	 * @param person        the given person
-	 * @param containerType = the required container class.
-	 * @param containerNum  = the number of containers required.
-	 * @param minPeople     = the minimum number of people required.
-	 * @param missionType   the mission class.
-	 * @return the weighted probability
-	 */
-	public static double getNewMissionProbability(Person person, Class<? extends Unit> containerType, int containerNum,
-			int minPeople) {
-		double result = 1;
-
-		Settlement settlement = person.getSettlement();
-
-		if (settlement == null) {
-			return 0;
-		}
-
-		else {
-			// Check if a mission-capable rover is available.
-			if (!areVehiclesAvailable(settlement, false))
-				return 0;
-
-			// Check if available backup rover.
-			if (!hasBackupRover(settlement))
-				return 0;
-
-			// Check if minimum number of people are available at the settlement.
-			// Plus one to hold down the fort.
-			if (!minAvailablePeopleAtSettlement(settlement, (minPeople + 1)))
-				return 0;
-
-			// Check if there are enough specimen containers at the settlement for
-			// collecting rock samples.
-			if ((numCollectingContainersAvailable(settlement, containerType) < containerNum))
-				return 0;
-
-			// Check for embarking missions.
-			if (VehicleMission.hasEmbarkingMissions(settlement))
-				return 0;
-
-			// Check if settlement has enough basic resources for a rover mission.
-//			 if (!RoverMission.hasEnoughBasicResources(settlement))
-//			 return 0;
-
-			// Check if starting settlement has minimum amount of methane fuel.
-			if (settlement.getInventory().getARStored(methaneID, false) < RoverMission.MIN_STARTING_SETTLEMENT_METHANE)
-				return 0;
-
-		}
-
-		return result;
-	}
+//	/**
+//	 * Gets the weighted probability that a given person would start this mission.
+//	 * 
+//	 * @param person        the given person
+//	 * @param containerType = the required container class.
+//	 * @param containerNum  = the number of containers required.
+//	 * @param minPeople     = the minimum number of people required.
+//	 * @param missionType   the mission class.
+//	 * @return the weighted probability
+//	 */
+//	public static double getNewMissionProbability(Settlement settlement, Class<? extends Unit> containerType, int containerNum,
+//			int minPeople) {
+//		double result = 1;
+//		
+//		if (settlement == null) {
+//			return 0;
+//		}
+//
+//		else {
+//			if (resourceID == ResourceUtil.iceID)
+//				result = settlement.getMissionBaseProbability(CollectIce.DEFAULT_DESCRIPTION);
+//			else
+//				result = settlement.getMissionBaseProbability(CollectRegolith.DEFAULT_DESCRIPTION);
+//			
+//			// Check if there are enough specimen containers at the settlement for
+//			// collecting rock samples.
+//			if ((numCollectingContainersAvailable(settlement, containerType) < containerNum))
+//				return 0;
+//
+//		}
+//
+//		return result;
+//	}
 
 	/**
 	 * Gets the total amount of resources collected so far in the mission.
@@ -318,7 +346,8 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 	 * @throws MissionException if problem setting a new phase.
 	 */
 	protected void determineNewPhase() {
-		if (APPROVAL.equals(getPhase())) {
+//		logger.info(this.getStartingMember() + " was at '" + getPhase() + "' phase in determineNewPhase().");
+		if (REVIEWING.equals(getPhase())) {
 			setPhase(VehicleMission.EMBARKING);
 			setPhaseDescription(
 					Msg.getString("Mission.phase.embarking.description", getStartingSettlement().getName()));//getCurrentNavpoint().getDescription()));//startingMember.getSettlement().toString())); // $NON-NLS-1$
@@ -359,8 +388,19 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 					Msg.getString("Mission.phase.travelling.description", getNextNavpoint().getDescription())); // $NON-NLS-1$
 		}
 
-		else if (DISEMBARKING.equals(getPhase()))
-			endMission(ALL_DISEMBARKED);
+//		else if (DISEMBARKING.equals(getPhase()))
+//			endMission(ALL_DISEMBARKED);
+		
+		else if (DISEMBARKING.equals(getPhase())) {
+			setPhase(VehicleMission.COMPLETED);
+			setPhaseDescription(
+					Msg.getString("Mission.phase.completed.description")); // $NON-NLS-1$
+		}
+		
+		else if (COMPLETED.equals(getPhase())) {
+			addMissionStatus(MissionStatus.MISSION_ACCOMPLISHED);
+			endMission();
+		}
 	}
 
 	@Override
@@ -390,55 +430,101 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 	}
 
 	/**
+	 * Updates the resources collected
+	 * 
+	 * @param inv
+	 * @return
+	 */
+	private double updateResources(Inventory inv) {
+
+		double resourcesCollected = 0;
+		double resourcesCapacity = 0;
+		
+		if (resourceID == ResourceUtil.iceID) {
+			resourcesCollected = inv.getAmountResourceStored(resourceID, false);
+			resourcesCapacity = inv.getAmountResourceCapacity(resourceID, false);
+		}
+		else {
+			for (Integer type : REGOLITH_TYPES) {
+				resourcesCollected += inv.getAmountResourceStored(type, false);
+				resourcesCapacity += inv.getAmountResourceCapacity(type, false);
+			}
+		}
+		
+		// Set total collected resources.
+		totalResourceCollected = resourcesCollected;
+
+		// Calculate resources collected at the site so far.
+		siteCollectedResources = resourcesCollected - collectingStart;
+		
+		// Check if rover capacity for resources is met, then end this phase.
+		if (resourcesCollected >= resourcesCapacity) {
+			setPhaseEnded(true);
+		}
+		
+		return resourcesCapacity;
+	}
+	
+	/**
 	 * Performs the collecting phase of the mission.
 	 * 
 	 * @param member the mission member currently performing the mission
 	 */
 	private void collectingPhase(MissionMember member) {
 		Inventory inv = getRover().getInventory();
-		double resourcesCollected = inv.getARStored(resourceType, false);
-		double resourcesCapacity = inv.getARCapacity(resourceType, false);
+		
+		double roverRemainingCap = inv.getRemainingGeneralCapacity(false);
+		
+		double weight = ((Person)member).getMass();
 
-		// Set total collected resources.
-		totalResourceCollected = resourcesCollected;
+		if (roverRemainingCap < weight + 5) {
+			endCollectingSite = false;
+			setPhaseEnded(true);
+		}
+		
+		double resourcesCapacity = updateResources(inv);
 
-		// Calculate resources collected at the site so far.
-		siteCollectedResources = resourcesCollected - collectingStart;
+		// Check if end collecting flag is set.
+		if (endCollectingSite) {
+			endCollectingSite = false;
+			setPhaseEnded(true);
+		}
+
+		// If collected resources are sufficient for this site, end the collecting
+		// phase.
+		if (siteCollectedResources >= siteResourceGoal) {
+			setPhaseEnded(true);
+		}
 
 		if (isEveryoneInRover()) {
-
-			// Check if end collecting flag is set.
-			if (endCollectingSite) {
-				endCollectingSite = false;
-				setPhaseEnded(true);
-			}
-
-			// Check if rover capacity for resources is met, then end this phase.
-			if (resourcesCollected >= resourcesCapacity) {
-				setPhaseEnded(true);
-			}
-
-			// If collected resources are sufficient for this site, end the collecting
-			// phase.
-			if (siteCollectedResources >= siteResourceGoal) {
-				setPhaseEnded(true);
-			}
 
 			// Determine if no one can start the collect resources task.
 			boolean nobodyCollect = true;
 			Iterator<MissionMember> j = getMembers().iterator();
-			while (j.hasNext()) {
-				if (CollectResources.canCollectResources(j.next(), getRover(), containerType, resourceType)) {
-					nobodyCollect = false;
+			while (j.hasNext()) {				
+				if (resourceID == ResourceUtil.iceID) {
+					if (CollectResources.canCollectResources(j.next(), getRover(), containerID, resourceID)) {
+						nobodyCollect = false;
+					}
+				}
+				else {
+					MissionMember m = j.next();
+					for (Integer type : REGOLITH_TYPES) {
+						if (CollectResources.canCollectResources(m, getRover(), containerID, type)) {
+							nobodyCollect = false;
+						}
+					}
 				}
 			}
 
-			// If no one can collect resources and this is not due to it just being
-			// night time, end the collecting phase.
-			Mars mars = Simulation.instance().getMars();
-			boolean inDarkPolarRegion = mars.getSurfaceFeatures().inDarkPolarRegion(getCurrentMissionLocation());
-			double sunlight = mars.getSurfaceFeatures().getSolarIrradiance(getCurrentMissionLocation());
-			if (nobodyCollect && ((sunlight > 0D) || inDarkPolarRegion)) {
+			if (nobodyCollect) {
+				setPhaseEnded(true);
+			}
+			
+			// If it gets too dark (except in polar region), end the collecting phase.
+			boolean inDarkPolarRegion = surfaceFeatures.inDarkPolarRegion(getCurrentMissionLocation());
+			double sunlight = surfaceFeatures.getSolarIrradiance(getCurrentMissionLocation());
+			if (sunlight < 20D || inDarkPolarRegion) {
 				setPhaseEnded(true);
 			}
 
@@ -448,7 +534,7 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 				setPhaseEnded(true);
 			}
 
-			// Check if enough resources for remaining trip.
+			// Check if enough resources for remaining trip. false = not using margin.
 			if (!hasEnoughResourcesForRemainingMission(false)) {
 				// If not, determine an emergency destination.
 				determineEmergencyDestination(member);
@@ -462,12 +548,50 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 				if (member instanceof Person) {
 					Person person = (Person) member;
 
+					if (resourceID == ResourceUtil.iceID) {
+					
+						if (terrainElevation == null)
+							terrainElevation = sim.getMars().getSurfaceFeatures().getTerrainElevation();
+								
+						double rate = terrainElevation.getIceCollectionRate(person.getCoordinates());
+						
+						// Randomize the rate of collection upon arrival
+						rate = rate 
+								* (1 + RandomUtil.getRandomDouble(.3) - RandomUtil.getRandomDouble(.3));
+						
+						// TODO: Add how areologists and some scientific study may come up with better technique 
+						// to obtain better estimation of the collection rate. Go to a prospective site, rather 
+						// than going to a site coordinate in the blind.
+						
+						if (rate > 0)
+							resourceCollectionRate = rate;
+					}
+
+					else { //if (resourceID == ResourceUtil.regolithID) {
+						
+						int rand = RandomUtil.getRandomInt(2);
+						// Randomly pick a regolith
+						resourceID = REGOLITH_TYPES[rand];
+						
+						if (terrainElevation == null)
+							terrainElevation = sim.getMars().getSurfaceFeatures().getTerrainElevation();
+								
+						double rate = terrainElevation.getRegolithCollectionRate(null, person.getCoordinates());
+				
+						// Randomize the rate of collection upon arrival
+						rate = rate 
+								* (1 + RandomUtil.getRandomDouble(.3) - RandomUtil.getRandomDouble(.3));
+
+						if (rate > 0)
+							resourceCollectionRate = rate;
+					}
+					
 					// If person can collect resources, start him/her on that task.
-					if (CollectResources.canCollectResources(person, getRover(), containerType, resourceType)) {
+					if (CollectResources.canCollectResources(person, getRover(), containerID, resourceID)) {
 						CollectResources collectResources = new CollectResources("Collecting Resources", person,
-								getRover(), resourceType, resourceCollectionRate,
-								siteResourceGoal - siteCollectedResources, inv.getARStored(resourceType, false),
-								containerType);
+								getRover(), resourceID, resourceCollectionRate,
+								siteResourceGoal - siteCollectedResources, inv.getAmountResourceStored(resourceID, false),
+								containerID);
 						assignTask(person, collectResources);
 					}
 				}
@@ -480,20 +604,24 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 				siteCollectedResources = 0D;
 			}
 		}
+		
+		// This will update the siteCollectedResources and totalResourceCollected after the last on-site collection activity
+		updateResources(inv);
 	}
 
 	/**
 	 * Determine the locations of the sample collection sites.
 	 * 
-	 * @param roverRange the rover's driving range
-	 * @param numSites   the number of collection sites
+	 * @param roverRange the rover's driving range.
+	 * @param tripTimeLimit the time limit of trip (millisols).
+	 * @param numSites   the number of collection sites.
 	 * @throws MissionException of collection sites can not be determined.
 	 */
 	private void determineCollectionSites(double roverRange, double tripTimeLimit, int numSites) {
 
 		List<Coordinates> unorderedSites = new ArrayList<Coordinates>();
 
-		// Determining the actual travelling range.
+		// Determining the actual traveling range.
 		double range = roverRange;
 		double timeRange = getTripTimeRange(tripTimeLimit, numSites, true);
 		if (timeRange < range)
@@ -502,29 +630,178 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 		// Get the current location.
 		Coordinates startingLocation = getCurrentMissionLocation();
 
+		double limit = 0;
+		Direction direction = null;
+		Coordinates newLocation = null;
+		Coordinates currentLocation = null;
+		double siteDistance = 0;
+	
 		// Determine the first collection site.
-		Direction direction = new Direction(RandomUtil.getRandomDouble(2 * Math.PI));
-		double limit = range / 4D;
-		double siteDistance = RandomUtil.getRandomDouble(limit);
-		Coordinates newLocation = startingLocation.getNewLocation(direction, siteDistance);
-		unorderedSites.add(newLocation);
-		Coordinates currentLocation = newLocation;
+		if (resourceID == ResourceUtil.iceID) {
+			boolean quit = false;
+			double bestScore = 0;
+			Coordinates bestLocation = null;
+			int count = 0;
+			while (!quit) {
+				direction = new Direction(RandomUtil.getRandomDouble(2 * Math.PI));
+				limit = range / 4D;
+				siteDistance = RandomUtil.getRandomDouble(limit);
+				newLocation = startingLocation.getNewLocation(direction, siteDistance);
+				if (terrainElevation == null)
+					terrainElevation = surfaceFeatures.getTerrainElevation();
+				double score = terrainElevation.getIceCollectionRate(newLocation);
+				if (score > bestScore) {
+					bestScore = score;
+					bestLocation = newLocation;
+					if (count >= MAX_NUM_PRIMARY_SITES)
+						quit = true;
+				}
+				count++;
+			}
+			totalSiteScore += bestScore;
+//			System.out.println("(1) Ice totalSiteScore: " + Math.round(totalSiteScore*1000.0)/1000.0 
+//					+ "   bestScore: " + Math.round(bestScore*1000.0)/1000.0);
+			unorderedSites.add(bestLocation);
+			currentLocation = bestLocation;
+		}
+		
+		else {
+			// for ResourceUtil.regolithID
+			boolean quit = false;
+			double bestScore = 0;
+			Coordinates bestLocation = null;
+			int count = 0;
+			while (!quit) {
+				direction = new Direction(RandomUtil.getRandomDouble(2 * Math.PI));
+				limit = range / 4D;
+				siteDistance = RandomUtil.getRandomDouble(limit);
+				newLocation = startingLocation.getNewLocation(direction, siteDistance);
+				if (terrainElevation == null)
+					terrainElevation = surfaceFeatures.getTerrainElevation();
+				double score = terrainElevation.getRegolithCollectionRate(null, newLocation);
+				if (score > bestScore) {
+					bestScore = score;
+					bestLocation = newLocation;
+					if (count >= MAX_NUM_PRIMARY_SITES)
+						quit = true;
+				}
+				count++;
+			}
+			totalSiteScore += bestScore;
+//			System.out.println("(1) Regolith totalSiteScore: " + Math.round(totalSiteScore*1000.0)/1000.0 
+//					+ "   bestScore: " + Math.round(bestScore*1000.0)/1000.0);
+			
+			unorderedSites.add(bestLocation);
+			currentLocation = bestLocation;
+			
+//			direction = new Direction(RandomUtil.getRandomDouble(2 * Math.PI));
+//			limit = range / 4D;
+//			siteDistance = RandomUtil.getRandomDouble(limit);
+//			newLocation = startingLocation.getNewLocation(direction, siteDistance);
+//			unorderedSites.add(newLocation);
+//			currentLocation = newLocation;
+		}
 
 		// Determine remaining collection sites.
 		double remainingRange = (range / 2D) - siteDistance;
-		for (int x = 1; x < numSites; x++) {
-			double currentDistanceToSettlement = currentLocation.getDistance(startingLocation);
-			if (remainingRange > currentDistanceToSettlement) {
-				direction = new Direction(RandomUtil.getRandomDouble(2D * Math.PI));
-				double tempLimit1 = Math.pow(remainingRange, 2D) - Math.pow(currentDistanceToSettlement, 2D);
-				double tempLimit2 = (2D * remainingRange)
-						- (2D * currentDistanceToSettlement * direction.getCosDirection());
-				limit = tempLimit1 / tempLimit2;
-				siteDistance = RandomUtil.getRandomDouble(limit);
-				newLocation = currentLocation.getNewLocation(direction, siteDistance);
-				unorderedSites.add(newLocation);
-				currentLocation = newLocation;
-				remainingRange -= siteDistance;
+		
+		// Determine the first collection site.
+		if (resourceID == ResourceUtil.iceID) {
+
+			for (int x = 1; x < numSites; x++) {
+				double currentDistanceToSettlement = Coordinates.computeDistance(currentLocation, startingLocation);
+				if (remainingRange > currentDistanceToSettlement) {
+					boolean quit = false;
+					double bestScore = 0;
+					Coordinates bestLocation = null;
+					int count = 0;
+	
+					while (!quit) {
+							
+						direction = new Direction(RandomUtil.getRandomDouble(2D * Math.PI));
+						
+						double tempLimit1 = Math.pow(remainingRange, 2D) - Math.pow(currentDistanceToSettlement, 2D);
+						double tempLimit2 = (2D * remainingRange)
+								- (2D * currentDistanceToSettlement * direction.getCosDirection());
+						limit = tempLimit1 / tempLimit2;
+						
+						siteDistance = RandomUtil.getRandomDouble(limit);
+						newLocation = currentLocation.getNewLocation(direction, siteDistance);
+						
+						if (terrainElevation == null)
+							terrainElevation = sim.getMars().getSurfaceFeatures().getTerrainElevation();
+
+						double score = terrainElevation.getIceCollectionRate(newLocation);
+//						if (score < 0) {
+//							bestScore = 0; 
+//						}
+						if (score > bestScore) {
+							bestScore = score;
+							bestLocation = newLocation;
+							if (count >= MAX_NUM_SECONDARY_SITES)
+								quit = true;
+						}
+						count++;
+					}
+					
+					totalSiteScore += bestScore;
+					System.out.println("(2) Ice totalSiteScore: " + Math.round(totalSiteScore*1000.0)/1000.0 
+							+ "   bestScore: " + Math.round(bestScore*1000.0)/1000.0);
+					unorderedSites.add(bestLocation);
+					currentLocation = bestLocation;
+				
+					remainingRange -= siteDistance;
+				}
+			}
+		}
+		
+		else {
+			// for regolith collection mission
+			
+			for (int x = 1; x < numSites; x++) {
+				double currentDistanceToSettlement = Coordinates.computeDistance(currentLocation, startingLocation);
+				if (remainingRange > currentDistanceToSettlement) {
+					boolean quit = false;
+					double bestScore = 0;
+					Coordinates bestLocation = null;
+					int count = 0;
+	
+					while (!quit) {
+							
+						direction = new Direction(RandomUtil.getRandomDouble(2D * Math.PI));
+						
+						double tempLimit1 = Math.pow(remainingRange, 2D) - Math.pow(currentDistanceToSettlement, 2D);
+						double tempLimit2 = (2D * remainingRange)
+								- (2D * currentDistanceToSettlement * direction.getCosDirection());
+						limit = tempLimit1 / tempLimit2;
+						
+						siteDistance = RandomUtil.getRandomDouble(limit);
+						newLocation = currentLocation.getNewLocation(direction, siteDistance);
+						
+						if (terrainElevation == null)
+							terrainElevation = sim.getMars().getSurfaceFeatures().getTerrainElevation();
+
+						double score = terrainElevation.getRegolithCollectionRate(null, newLocation);
+//						if (score < 0) {
+//							bestScore = 0; 
+//						}
+						if (score > bestScore) {
+							bestScore = score;
+							bestLocation = newLocation;
+							if (count >= MAX_NUM_SECONDARY_SITES)
+								quit = true;
+						}
+						count++;
+					}
+					
+					totalSiteScore += bestScore;
+					System.out.println("(2) Regolith totalSiteScore: " + Math.round(totalSiteScore*1000.0)/1000.0 
+							+ "   bestScore: " + Math.round(bestScore*1000.0)/1000.0);
+					unorderedSites.add(bestLocation);
+					currentLocation = bestLocation;
+				
+					remainingRange -= siteDistance;
+				}
 			}
 		}
 
@@ -536,7 +813,7 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 			Iterator<Coordinates> i = unorderedSites.iterator();
 			while (i.hasNext()) {
 				Coordinates site = i.next();
-				if (currentLocation.getDistance(site) < currentLocation.getDistance(shortest))
+				if (Coordinates.computeDistance(currentLocation, site) < Coordinates.computeDistance(currentLocation, shortest))
 					shortest = site;
 			}
 			addNavpoint(new NavPoint(shortest, getCollectionSiteDescription(collectionSiteNum)));
@@ -558,8 +835,8 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 		double timeAtSites = getEstimatedTimeAtCollectionSite(useBuffer) * numSites;
 		double tripTimeTravellingLimit = tripTimeLimit - timeAtSites;
 		double averageSpeed = getAverageVehicleSpeedForOperators();
-		double millisolsInHour = MarsClock.convertSecondsToMillisols(60D * 60D);
-		double averageSpeedMillisol = averageSpeed / millisolsInHour;
+//		double millisolsInHour = MarsClock.convertSecondsToMillisols(60D * 60D);
+		double averageSpeedMillisol = averageSpeed / MarsClock.MILLISOLS_PER_HOUR;//millisolsInHour;
 		return tripTimeTravellingLimit * averageSpeedMillisol;
 	}
 
@@ -578,7 +855,7 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 
 		if (result) {
 			boolean atStartingSettlement = false;
-			if (member.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
+			if (member.getLocationStateType() == LocationStateType.INSIDE_SETTLEMENT) {
 				if (member.getSettlement() == getStartingSettlement()) {
 					atStartingSettlement = true;
 				}
@@ -598,7 +875,22 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 	 * @throws MissionException if error determining number.
 	 */
 	protected static int numCollectingContainersAvailable(Settlement settlement, Class<? extends Unit> containerType) {
-		return settlement.getInventory().findNumEmptyUnitsOfClass(containerType, false);
+		int num = settlement.getInventory().findNumEmptyUnitsOfClass(containerType, false);
+		
+		if (num == 0) {
+			int id = EquipmentType.convertClass2ID(containerType);
+			String name = EquipmentType.convertID2Enum(id).toString();
+	    	// Add the equipment demand for a bag
+//	    	settlement.getInventory().addEquipmentDemandTotalRequest(id, 1);
+//	    	settlement.getInventory().addEquipmentDemand(id, 1);
+        	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
+					"[" 
+					+ settlement
+					+ "] no more empty " + name 
+					+ " available.");
+		}
+		
+		return num;
 	}
 
 	/**
@@ -644,7 +936,7 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 
 	@Override
 	public Map<Integer, Number> getResourcesNeededForRemainingMission(boolean useBuffer) {
-
+		// Note: currently, it has methane resource only
 		Map<Integer, Number> result = super.getResourcesNeededForRemainingMission(useBuffer);
 
 		double collectionSitesTime = getEstimatedRemainingCollectionSiteTime(useBuffer);
@@ -673,14 +965,15 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 
 	@Override
 	protected Map<Integer, Number> getPartsNeededForTrip(double distance) {
-		Map<Integer, Number> result = super.getPartsNeededForTrip(distance);
+		// Load the standard parts from VehicleMission.
+		Map<Integer, Number> result = super.getPartsNeededForTrip(distance); // new HashMap<>();
 
 		// Determine repair parts for EVA Suits.
 		double evaTime = getEstimatedRemainingCollectionSiteTime(false);
 		double numberAccidents = evaTime * getPeopleNumber() * EVAOperation.BASE_ACCIDENT_CHANCE;
 
-		// Average number malfunctions per accident is two.
-		double numberMalfunctions = numberAccidents * 2D;
+		// Assume the average number malfunctions per accident is 1.5.
+		double numberMalfunctions = numberAccidents * VehicleMission.AVERAGE_EVA_MALFUNCTION;
 
 		// Get temporary EVA suit.
 		EVASuit suit = (EVASuit) EquipmentFactory.createEquipment(EVASuit.class, new Coordinates(0, 0), true);
@@ -690,11 +983,16 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 		Iterator<Integer> i = parts.keySet().iterator();
 		while (i.hasNext()) {
 			Integer part = i.next();
-			int number = (int) Math.round(parts.get(part) * numberMalfunctions);
-			if (number > 0) {
-				if (result.containsKey(part))
-					number += result.get(part).intValue();
-				result.put(part, number);
+			String name = ItemResourceUtil.findItemResourceName(part);
+			for (String n : EVASuit.getParts()) {
+				if (n.equalsIgnoreCase(name)) {
+					int number = (int) Math.round(parts.get(part) * numberMalfunctions);
+					if (number > 0) {
+						if (result.containsKey(part))
+							number += result.get(part).intValue();
+						result.put(part, number);
+					}
+				}
 			}
 		}
 
@@ -749,26 +1047,23 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 
 		double timeLimit = Double.MAX_VALUE;
 
-		if (personConfig == null)
-			personConfig = SimulationConfig.instance().getPersonConfiguration();
-
 		// Check food capacity as time limit.
 		double foodConsumptionRate = personConfig.getFoodConsumptionRate();
-		double foodCapacity = vInv.getARCapacity(foodID, false);
+		double foodCapacity = vInv.getAmountResourceCapacity(foodID, false);
 		double foodTimeLimit = foodCapacity / (foodConsumptionRate * memberNum);
 		if (foodTimeLimit < timeLimit)
 			timeLimit = foodTimeLimit;
 
 		// Check water capacity as time limit.
 		double waterConsumptionRate = personConfig.getWaterConsumptionRate();
-		double waterCapacity = vInv.getARCapacity(waterID, false);
+		double waterCapacity = vInv.getAmountResourceCapacity(waterID, false);
 		double waterTimeLimit = waterCapacity / (waterConsumptionRate * memberNum);
 		if (waterTimeLimit < timeLimit)
 			timeLimit = waterTimeLimit;
 
 		// Check oxygen capacity as time limit.
 		double oxygenConsumptionRate = personConfig.getNominalO2ConsumptionRate();
-		double oxygenCapacity = vInv.getARCapacity(oxygenID, false);
+		double oxygenCapacity = vInv.getAmountResourceCapacity(oxygenID, false);
 		double oxygenTimeLimit = oxygenCapacity / (oxygenConsumptionRate * memberNum);
 		if (oxygenTimeLimit < timeLimit)
 			timeLimit = oxygenTimeLimit;
@@ -789,13 +1084,21 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 			Map<Integer, Integer> result = new HashMap<>();
 
 			// Include required number of containers.
-			result.put(containerType, containerNum);
+			result.put(containerID, containerNum);
 
 			equipmentNeededCache = result;
 			return result;
 		}
 	}
 
+	/**
+	 * Gets the computed site score of this prospective resource collection mission.
+	 * @return
+	 */
+	public double getTotalSiteScore() {
+		return totalSiteScore;
+	}
+	
 	/**
 	 * Gets the description of a collection site.
 	 * 
@@ -809,8 +1112,8 @@ public abstract class CollectResourcesMission extends RoverMission implements Se
 		super.destroy();
 
 		personConfig = null;
-		resourceType = null;
-		containerType = null;
+		resourceID = null;
+		containerID = null;
 		collectionSiteStartTime = null;
 	}
 }

@@ -1,12 +1,11 @@
 /**
  * Mars Simulation Project
  * EventTab.java
- * @version 3.1.0 2017-03-09
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
 
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.notification.NotificationWindow;
 
@@ -14,18 +13,19 @@ import org.mars_sim.msp.ui.swing.notification.NotificationWindow;
  * This class represents a historical event table displayed within the Monitor
  * Window.
  */
+@SuppressWarnings("serial")
 public class EventTab extends TableTab {
 
 	/**
 	 * constructor.
 	 * 
 	 * @param window {@link MonitorWindow} the containing window
-	 * @param model  {@link EventTableModel}
+	 * @param notifyBox  {@link NotificationWindow}
+	 * @param desktop
 	 */
-	// Changed param list to include notifyBox and desktop
 	public EventTab(final MonitorWindow window, NotificationWindow notifyBox, MainDesktopPane desktop) {
 		// Use TableTab constructor
-		super(window, new EventTableModel(Simulation.instance().getEventManager(), notifyBox, desktop), true, false,
+		super(window, new EventTableModel(notifyBox, desktop), true, false,
 				MonitorWindow.EVENT_ICON);
 
 	}

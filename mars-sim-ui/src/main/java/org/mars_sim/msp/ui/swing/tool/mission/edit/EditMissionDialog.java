@@ -1,28 +1,11 @@
 /**
  * Mars Simulation Project
  * EditMissionDialog.java
- * @version 3.1.0 2017-02-03
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.mission.edit;
-
-import org.mars_sim.msp.core.person.ai.mission.CollectResourcesMission;
-import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionMember;
-import org.mars_sim.msp.core.person.ai.mission.NavPoint;
-import org.mars_sim.msp.core.person.ai.mission.TravelMission;
-import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
-import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.ModalInternalFrame;
-import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
-
-import com.alee.laf.button.WebButton;
-import com.alee.laf.panel.WebPanel;
-
-import javax.swing.JComponent;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -30,6 +13,21 @@ import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.Iterator;
+
+import javax.swing.JComponent;
+
+import org.mars_sim.msp.core.person.ai.mission.CollectResourcesMission;
+import org.mars_sim.msp.core.person.ai.mission.Mission;
+import org.mars_sim.msp.core.person.ai.mission.MissionMember;
+import org.mars_sim.msp.core.person.ai.mission.TravelMission;
+import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
+import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.MarsPanelBorder;
+import org.mars_sim.msp.ui.swing.ModalInternalFrame;
+import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
+
+import com.alee.laf.button.WebButton;
+import com.alee.laf.panel.WebPanel;
 
 /**
  * The edit mission dialog for the mission tool.
@@ -103,10 +101,10 @@ public class EditMissionDialog extends ModalInternalFrame {
 		//setVisible(true);
 		
         // Add to its own tab pane
-        if (desktop.getMainScene() != null)
-        	desktop.add(this);
-        	//desktop.getMainScene().getDesktops().get(1).add(this);
-        else 
+//        if (desktop.getMainScene() != null)
+//        	desktop.add(this);
+//        	//desktop.getMainScene().getDesktops().get(1).add(this);
+//        else 
         	desktop.add(this);
 	    
 	    
@@ -174,21 +172,22 @@ public class EditMissionDialog extends ModalInternalFrame {
 	 * Go to the nearest settlement and end collection phase if necessary.
 	 */
 	private void goToNearestSettlement() {
-		if (mission instanceof VehicleMission) {
-			VehicleMission vehicleMission = (VehicleMission) mission;
-			try {
-				Settlement nearestSettlement = vehicleMission.findClosestSettlement();
-				if (nearestSettlement != null) {
-					vehicleMission.clearRemainingNavpoints();
-		    		vehicleMission.addNavpoint(new NavPoint(nearestSettlement.getCoordinates(), nearestSettlement, 
-		    				nearestSettlement.getName()));
-		    		vehicleMission.associateAllMembersWithSettlement(nearestSettlement);
-		    		vehicleMission.updateTravelDestination();
-		    		endCollectionPhase();
-				}
-			}
-			catch (Exception e) {}
-		}
+		mission.goToNearestSettlement();
+//		if (mission instanceof VehicleMission) {
+//			VehicleMission vehicleMission = (VehicleMission) mission;
+//			try {
+//				Settlement nearestSettlement = vehicleMission.findClosestSettlement();
+//				if (nearestSettlement != null) {
+//					vehicleMission.clearRemainingNavpoints();
+//		    		vehicleMission.addNavpoint(new NavPoint(nearestSettlement.getCoordinates(), nearestSettlement, 
+//		    				nearestSettlement.getName()));
+//		    		vehicleMission.associateAllMembersWithSettlement(nearestSettlement);
+//		    		vehicleMission.updateTravelDestination();
+//		    		endCollectionPhase();
+//				}
+//			}
+//			catch (Exception e) {}
+//		}
 	}
 	
 	/**

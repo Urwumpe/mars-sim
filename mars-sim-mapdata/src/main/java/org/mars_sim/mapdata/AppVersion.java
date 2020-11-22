@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * AppVersion.java
+ * @version 3.1.2 2020-09-02
+ * @author Manny Kung
+ */
+
 package org.mars_sim.mapdata;
 
 import java.io.EOFException;
@@ -7,13 +14,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+
 import java.util.Properties;
 
-import org.tukaani.xz.BasicArrayCache;
-import org.tukaani.xz.SeekableFileInputStream;
-import org.tukaani.xz.SeekableInputStream;
-import org.tukaani.xz.SeekableXZInputStream;
 import org.tukaani.xz.XZInputStream;
 
 
@@ -54,7 +57,7 @@ public class AppVersion {
     
 	/**
 	 * Gets the app.version property value from
-	 * the ./main.properties file of the base folder
+	 * the ./map.properties file of the base folder
 	 *
 	 * @return app.version string
 	 * @throws IOException
@@ -124,40 +127,43 @@ public class AppVersion {
               int size;
               while ((size = in.read(buf)) != -1)
                   System.out.write(buf, 0, size);
+              
+              in.close();
 
           } else {
               // Read from files given on the command line.
 //              for (int i = 0; i < args.length; ++i) {
 //                  name = args[i];
 
-                  InputStream in = new FileInputStream(name); //  loader.getResourceAsStream(name);//
+              InputStream in = new FileInputStream(name); //  loader.getResourceAsStream(name);//
 
-                  try {
-                      // Since XZInputStream does some buffering internally
-                      // anyway, BufferedInputStream doesn't seem to be
-                      // needed here to improve performance.
-                      // in = new BufferedInputStream(in);
-                      in = new XZInputStream(in);
+              try {
+                  // Since XZInputStream does some buffering internally
+                  // anyway, BufferedInputStream doesn't seem to be
+                  // needed here to improve performance.
+                  // in = new BufferedInputStream(in);
+                  in = new XZInputStream(in);
 
 //                      int size;
 //                      while ((size = in.read(buf)) != -1)
 //                          System.out.write(buf, 0, size);
-                      
-          	        Files.copy(in, Paths.get(datFilename));//, StandardCopyOption.REPLACE_EXISTING);
+                  
+      	        Files.copy(in, Paths.get(datFilename));//, StandardCopyOption.REPLACE_EXISTING);
 
-                  } catch (NullPointerException e) {
-                      System.err.println("XZDecDemo: Cannot open " + name + ": "
-                                         + e.getMessage());
-                      e.printStackTrace();
-                      System.exit(1);
+              } catch (NullPointerException e) {
+                  System.err.println("XZDecDemo: Cannot open " + name + ": "
+                                     + e.getMessage());
+                  e.printStackTrace();
+                  System.exit(1);
 
-                  } finally {
-                      // Close FileInputStream (directly or indirectly
-                      // via XZInputStream, it doesn't matter).
-                      in.close();
-                  }
-//              }
+              } finally {
+                  // Close FileInputStream (directly or indirectly
+                  // via XZInputStream, it doesn't matter).
+                  in.close();
+              }
+
           }
+          
           
       } catch (FileNotFoundException e) {
           System.err.println("XZDecDemo: Cannot open " + name + ": "

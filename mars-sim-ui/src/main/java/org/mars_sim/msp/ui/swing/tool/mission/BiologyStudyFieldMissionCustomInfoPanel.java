@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * BiologyStudyFieldMissionCustomInfoPanel.java
- * @version 3.1.0 2017-11-01
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -15,7 +15,7 @@ import java.awt.event.ActionListener;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.mission.BiologyStudyFieldMission;
+import org.mars_sim.msp.core.person.ai.mission.BiologyFieldStudy;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
 import org.mars_sim.msp.core.science.ScientificStudy;
@@ -41,7 +41,7 @@ public class BiologyStudyFieldMissionCustomInfoPanel extends MissionCustomInfoPa
 	// Data members.
 	private MainDesktopPane desktop;
 	private ScientificStudy study;
-	private BiologyStudyFieldMission biologyMission;
+	private BiologyFieldStudy biologyMission;
 	private WebLabel studyNameLabel;
 	private WebLabel researcherNameLabel;
 	private WebProgressBar studyResearchBar;
@@ -120,8 +120,8 @@ public class BiologyStudyFieldMissionCustomInfoPanel extends MissionCustomInfoPa
 
 	@Override
 	public void updateMission(Mission mission) {
-		if (mission instanceof BiologyStudyFieldMission) {
-			biologyMission = (BiologyStudyFieldMission) mission;
+		if (mission instanceof BiologyFieldStudy) {
+			biologyMission = (BiologyFieldStudy) mission;
 
 			// Remove as scientific study listener.
 			if (study != null) {
@@ -130,16 +130,18 @@ public class BiologyStudyFieldMissionCustomInfoPanel extends MissionCustomInfoPa
 
 			// Add as scientific study listener to new study.
 			study = biologyMission.getScientificStudy();
-			study.addScientificStudyListener(this);
+			if (study != null) {
+				study.addScientificStudyListener(this);
+				
+				// Update study name.
+				studyNameLabel.setText(study.toString());
 
-			// Update study name.
-			studyNameLabel.setText(study.toString());
+				// Update lead researcher for mission.
+				researcherNameLabel.setText(biologyMission.getLeadResearcher().getName());
 
-			// Update lead researcher for mission.
-			researcherNameLabel.setText(biologyMission.getLeadResearcher().getName());
-
-			// Update study research bar.
-			updateStudyResearchBar(study, biologyMission.getLeadResearcher());
+				// Update study research bar.
+				updateStudyResearchBar(study, biologyMission.getLeadResearcher());
+			}
 		}
 	}
 
@@ -187,7 +189,7 @@ public class BiologyStudyFieldMissionCustomInfoPanel extends MissionCustomInfoPa
 	private boolean isStudyCollaborativeResearcher(Person researcher, ScientificStudy study) {
 		boolean result = false;
 
-		if (study.getCollaborativeResearchers().containsKey(researcher))
+		if (study.getCollaborativeResearchers().containsKey(researcher.getIdentifier()))
 			result = true;
 
 		return result;

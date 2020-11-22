@@ -1,8 +1,7 @@
-
 /**
  * Mars Simulation Project
  * Indoor.java
- * @version 3.1.0 2018-06-27
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building;
@@ -20,7 +19,5 @@ public interface Indoor {
 
 	public Settlement getAssociatedSettlement();
 
-	public Settlement getBuriedSettlement();
-	
 }
 

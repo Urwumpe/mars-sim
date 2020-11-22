@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ToggleFuelPowerSource.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -11,27 +11,26 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.LocalAreaUtil;
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
-import org.mars_sim.msp.core.person.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.resource.AmountResource;
-import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
-import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.FuelPowerSource;
+import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.PowerGeneration;
 import org.mars_sim.msp.core.structure.building.function.PowerSource;
-import org.mars_sim.msp.core.structure.goods.Good;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
@@ -48,6 +47,9 @@ implements Serializable {
 
     /** default logger. */
     private static Logger logger = Logger.getLogger(ToggleFuelPowerSource.class.getName());
+
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			 logger.getName().length());
 
     /** Task name */
     private static final String NAME_ON = Msg.getString(
@@ -134,7 +136,7 @@ implements Serializable {
             Point2D.Double boundedLocalPoint = LocalAreaUtil.getRandomExteriorLocation(building, 1D);
             newLocation = LocalAreaUtil.getLocalRelativeLocation(boundedLocalPoint.getX(),
                     boundedLocalPoint.getY(), building);
-            goodLocation = LocalAreaUtil.checkLocationCollision(newLocation.getX(), newLocation.getY(),
+            goodLocation = LocalAreaUtil.isLocationCollisionFree(newLocation.getX(), newLocation.getY(),
                     person.getCoordinates());
         }
 
@@ -153,11 +155,11 @@ implements Serializable {
         Point2D.Double settlementLoc = LocalAreaUtil.getLocalRelativeLocation(buildingLoc.getX(),
                 buildingLoc.getY(), powerBuilding);
 
-        if (Walk.canWalkAllSteps(person, settlementLoc.getX(), settlementLoc.getY(),
+        if (Walk.canWalkAllSteps(person, settlementLoc.getX(), settlementLoc.getY(), 0,
                 powerBuilding)) {
 
             // Add subtask for walking to power building.
-            addSubTask(new Walk(person, settlementLoc.getX(), settlementLoc.getY(),
+            addSubTask(new Walk(person, settlementLoc.getX(), settlementLoc.getY(), 0,
                     powerBuilding));
         }
         else {
@@ -204,7 +206,7 @@ implements Serializable {
     public static FuelPowerSource getFuelPowerSource(Building building) {
         FuelPowerSource result = null;
 
-        Settlement settlement = building.getBuildingManager().getSettlement();
+        Settlement settlement = building.getSettlement();
         if (building.hasFunction(FunctionType.POWER_GENERATION)) {
             double bestDiff = 0D;
             PowerGeneration powerGeneration = building.getPowerGeneration();
@@ -262,8 +264,8 @@ implements Serializable {
 
     	int resource = fuelSource.getFuelResourceID();
         double massPerSol = fuelSource.getFuelConsumptionRate();
-        Good good = GoodsUtil.getResourceGood(ResourceUtil.findAmountResource(resource));
-        double value = settlement.getGoodsManager().getGoodValuePerItem(good);
+//        Good good = GoodsUtil.getResourceGood(ResourceUtil.findAmountResource(resource));
+        double value = settlement.getGoodsManager().getGoodsDemandValue(resource);
 
         return value * massPerSol;
     }
@@ -278,8 +280,8 @@ implements Serializable {
 
         // Get settlement value for kW hr produced.
         double power = fuelSource.getMaxPower();
-        double hoursInSol = MarsClock.convertMillisolsToSeconds(1000D) / 60D / 60D;
-        double powerPerSol = power * hoursInSol;
+//        double hoursInSol = MarsClock.convertMillisolsToSeconds(1000D) / 60D / 60D;
+        double powerPerSol = power * MarsClock.HOURS_PER_MILLISOL * 1000D;
         double powerValue = powerPerSol * settlement.getPowerGrid().getPowerValue();
 
         return powerValue;
@@ -318,7 +320,7 @@ implements Serializable {
             double evaExperience = time / 100D;
             evaExperience += evaExperience * experienceAptitudeModifier;
             evaExperience *= getTeachingExperienceModifier();
-            person.getMind().getSkillManager().addExperience(SkillType.EVA_OPERATIONS, evaExperience);
+            person.getSkillManager().addExperience(SkillType.EVA_OPERATIONS, evaExperience, time);
         }
 
         // If phase is toggle power source, add experience to mechanics skill.
@@ -327,7 +329,7 @@ implements Serializable {
             // Experience points adjusted by person's "Experience Aptitude" attribute.
             double mechanicsExperience = time / 100D;
             mechanicsExperience += mechanicsExperience * experienceAptitudeModifier;
-            person.getMind().getSkillManager().addExperience(SkillType.MECHANICS, mechanicsExperience);
+            person.getSkillManager().addExperience(SkillType.MECHANICS, mechanicsExperience, time);
         }
     }
 
@@ -343,7 +345,7 @@ implements Serializable {
 
     @Override
     public int getEffectiveSkillLevel() {
-        SkillManager manager = person.getMind().getSkillManager();
+        SkillManager manager = person.getSkillManager();
         int EVAOperationsSkill = manager.getEffectiveSkillLevel(SkillType.EVA_OPERATIONS);
         int mechanicsSkill = manager.getEffectiveSkillLevel(SkillType.MECHANICS);
         if (isEVA) {
@@ -431,10 +433,12 @@ implements Serializable {
                 endTask();
             }
 
-            Settlement settlement = building.getBuildingManager().getSettlement();
+            Settlement settlement = building.getSettlement();
             String toggle = "off";
             if (toggleOn) toggle = "on";
-            logger.fine(person.getName() + " turning " + toggle + " " + powerSource.getType() +
+            
+            LogConsolidated.flog(Level.FINE, 3_000, sourceName,
+    				"[" + settlement + "] " + person.getName() + " was turning " + toggle + " " + powerSource.getType() +
                     " at " + settlement.getName() + ": " + building.getNickName());
         }
 
@@ -458,7 +462,7 @@ implements Serializable {
         double chance = .005D;
 
         // Mechanic skill modification.
-        int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
+        int skill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MECHANICS);
         if (skill <= 3) {
             chance *= (4 - skill);
         }

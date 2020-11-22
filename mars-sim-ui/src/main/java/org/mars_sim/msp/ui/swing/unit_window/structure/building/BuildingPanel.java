@@ -1,13 +1,12 @@
 /**
  * Mars Simulation Project
  * BuildingPanel.java
- * @version 3.1.0 2017-02-21
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -17,28 +16,27 @@ import java.awt.event.ActionListener;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.logging.Logger;
-
-import javafx.application.Platform;
-import javafx.scene.control.Alert;
-import javafx.scene.control.TextInputDialog;
-import javafx.scene.control.Alert.AlertType;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
-
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.AstronomicalObservation;
-import org.mars_sim.msp.core.structure.building.function.FunctionType;
+import org.mars_sim.msp.core.structure.building.function.EVA;
 import org.mars_sim.msp.core.structure.building.function.FoodProduction;
+import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.LifeSupport;
+import org.mars_sim.msp.core.structure.building.function.LivingAccommodations;
 import org.mars_sim.msp.core.structure.building.function.Manufacture;
 import org.mars_sim.msp.core.structure.building.function.MedicalCare;
 import org.mars_sim.msp.core.structure.building.function.PowerStorage;
@@ -51,25 +49,24 @@ import org.mars_sim.msp.core.structure.building.function.cooking.Cooking;
 import org.mars_sim.msp.core.structure.building.function.cooking.PreparingDessert;
 import org.mars_sim.msp.core.structure.building.function.farming.Farming;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.settlement.PopUpUnitMenu;
 import org.mars_sim.msp.ui.swing.tool.settlement.SettlementMapPanel;
 import org.mars_sim.msp.ui.swing.unit_window.UnitWindow;
 import org.mars_sim.msp.ui.swing.unit_window.structure.building.food.BuildingPanelCooking;
 import org.mars_sim.msp.ui.swing.unit_window.structure.building.food.BuildingPanelFoodProduction;
 import org.mars_sim.msp.ui.swing.unit_window.structure.building.food.BuildingPanelPreparingDessert;
 
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
 
 /**
  * The BuildingPanel class is a panel representing a settlement building.
  */
-public class BuildingPanel extends WebPanel {
+@SuppressWarnings("serial")
+public class BuildingPanel extends JPanel {
 
 	private static final Logger logger = Logger.getLogger(BuildingPanel.class.getName());
 
+	public static final int WIDTH = UnitWindow.WIDTH - 170;
+	public static final int HEIGHT = UnitWindow.HEIGHT - 190;
+	
 	/** The name of the panel. */
 	private String panelName;
 
@@ -78,8 +75,8 @@ public class BuildingPanel extends WebPanel {
 	/** The function panels. */
 	private List<BuildingFunctionPanel> functionPanels;
 
-	private WebLabel buildingNameLabel;
-	private WebPanel namePanel;
+	private JLabel buildingNameLabel;
+	private JPanel namePanel;
 
 	/** The building this panel is for. */
 	private Building building;
@@ -119,11 +116,11 @@ public class BuildingPanel extends WebPanel {
 		this.panelName = panelName;
 		this.building = building;
 		this.desktop = desktop;
-		// this.isTranslucent = isTranslucent;
-		if (isTranslucent) {
-			setOpaque(false);
-			setBackground(new Color(0, 0, 0, 128));
-		}
+//		this.isTranslucent = isTranslucent;
+//		if (isTranslucent) {
+//			setOpaque(false);
+//			setBackground(new Color(0, 0, 0, 128));
+//		}
 		init();
 	}
 
@@ -135,17 +132,19 @@ public class BuildingPanel extends WebPanel {
 		this.functionPanels = new ArrayList<BuildingFunctionPanel>();
 
 		setLayout(new BorderLayout(0, 5));
-		this.setMaximumSize(new Dimension(UnitWindow.WIDTH, UnitWindow.HEIGHT));
 
-		namePanel = new WebPanel(new GridLayout(2, 1, 0, 0));
-		buildingNameLabel = new WebLabel(building.getNickName(), WebLabel.CENTER);
+		setMaximumSize(new Dimension(WIDTH, HEIGHT));
+		setPreferredSize(new Dimension(WIDTH, HEIGHT));
+	
+		namePanel = new JPanel(new GridLayout(2, 1, 0, 0));
+		buildingNameLabel = new JLabel(building.getNickName(), JLabel.CENTER);
 		buildingNameLabel.setFont(new Font("Serif", Font.BOLD, 16));
 		namePanel.add(buildingNameLabel);
 		add(namePanel, BorderLayout.NORTH);
 
 		// Add renameBtn for renaming a building
-		WebPanel btnPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		WebButton renameBtn = new WebButton(Msg.getString("BuildingPanel.renameBuilding.renameButton")); //$NON-NLS-1$
+		JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+		JButton renameBtn = new JButton(Msg.getString("BuildingPanel.renameBuilding.renameButton")); //$NON-NLS-1$
 		renameBtn.setPreferredSize(new Dimension(70, 20));
 		renameBtn.setFont(new Font("Serif", Font.PLAIN, 9));
 		// renameBtn.setBackground(Color.GRAY);
@@ -160,22 +159,23 @@ public class BuildingPanel extends WebPanel {
 		namePanel.add(btnPanel);
 
 		// Prepare function list panel.
-		WebPanel functionListPanel = new WebPanel();
+		JPanel functionListPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		functionListPanel.setLayout(new BoxLayout(functionListPanel, BoxLayout.Y_AXIS));
-		functionListPanel.setMaximumWidth(PopUpUnitMenu.WIDTH - 80); // This width is very important
-
+//		functionListPanel.setPreferredSize(new Dimension(PopUpUnitMenu.WIDTH - 80, PopUpUnitMenu.HEIGHT)); // This width is very important
+//		add(functionListPanel, BorderLayout.CENTER);
+		
 		// Prepare function scroll panel.
-		WebScrollPane scrollPanel = new WebScrollPane();
+		JScrollPane scrollPanel = new JScrollPane();
 		scrollPanel.setViewportView(functionListPanel);
 		// CustomScroll scrollPanel = new CustomScroll(functionListPanel);
-		scrollPanel.setPreferredSize(new Dimension(PopUpUnitMenu.WIDTH - 80, PopUpUnitMenu.HEIGHT - 70));
+		scrollPanel.setPreferredSize(new Dimension(WIDTH, HEIGHT));//UnitWindow.HEIGHT - 300));
 		scrollPanel.getVerticalScrollBar().setUnitIncrement(20);
 		add(scrollPanel, BorderLayout.CENTER);
 
 		// Add SVG Image loading for the building
 		Dimension expectedDimension = new Dimension(100, 100);
 		// GraphicsNode node = SVGMapUtil.getSVGGraphicsNode("building", buildingType);
-		Settlement settlement = building.getBuildingManager().getSettlement();
+		Settlement settlement = building.getSettlement();
 		// Conclusion: this panel is called only once per opening the unit window
 		// session.
 		SettlementMapPanel svgPanel = new SettlementMapPanel(settlement, building);
@@ -183,40 +183,54 @@ public class BuildingPanel extends WebPanel {
 		svgPanel.setPreferredSize(expectedDimension);
 		svgPanel.setMaximumSize(expectedDimension);
 		svgPanel.setMinimumSize(expectedDimension);
-		// setPanelStyle(svgPanel);
 
-		WebPanel borderPanel = new WebPanel();
-		// borderPanel.setBorder(new MarsPanelBorder());//
+		JPanel borderPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+		borderPanel.setMaximumSize(expectedDimension);
+		borderPanel.setPreferredSize(expectedDimension);
 		borderPanel.add(svgPanel);
 
 		Box box = new Box(BoxLayout.Y_AXIS);
 		box.add(Box.createVerticalGlue());
 		box.setAlignmentX(JComponent.CENTER_ALIGNMENT);
-		// box.setBorder(BorderFactory.createLineBorder(Color.black, 2, true));
+//		box.setAlignmentY(JComponent.CENTER_ALIGNMENT);
+//		 box.setBorder(BorderFactory.createLineBorder(Color.black, 1, true));
 		box.add(borderPanel);
 		box.add(Box.createVerticalGlue());
 		functionListPanel.add(box);
 
-		// Prepare inhabitable panel if building has lifeSupport.
-		if (building.hasFunction(FunctionType.LIFE_SUPPORT)) {
-//        	try {
-			LifeSupport lifeSupport = building.getLifeSupport();
-			BuildingFunctionPanel inhabitablePanel = new BuildingPanelInhabitable(lifeSupport, desktop);
-			functionPanels.add(inhabitablePanel);
-			functionListPanel.add(inhabitablePanel);
-//        	}
-//        	catch (BuildingException e) {}
+		// Prepare cooking panel if building has cooking.
+		if (building.hasFunction(FunctionType.COOKING)) {
+//			try {
+			Cooking kitchen = building.getCooking();
+			BuildingFunctionPanel cookingPanel = new BuildingPanelCooking(kitchen, desktop);
+			functionPanels.add(cookingPanel);
+			functionListPanel.add(cookingPanel);
+			// if (isTranslucent)setPanelStyle(powerPanel);
+//			}
+//			catch (BuildingException e) {}
 		}
-
-		// Prepare manufacture panel if building has manufacturing.
-		if (building.hasFunction(FunctionType.MANUFACTURE)) {
+		
+		// Prepare cooking panel if building has cooking.
+		if (building.hasFunction(FunctionType.EVA)) {
+//			try {
+			EVA eva = building.getEVA();
+			BuildingFunctionPanel evaPanel = new BuildingPanelEVA(eva, desktop);
+			functionPanels.add(evaPanel);
+			functionListPanel.add(evaPanel);
+			// if (isTranslucent)setPanelStyle(powerPanel);
+//			}
+//			catch (BuildingException e) {}
+		}
+		
+//		Simulation.instance().getMasterClock().addClockListener(buildingPanelEVA);
+		
+		// Prepare farming panel if building has farming.
+		if (building.hasFunction(FunctionType.FARMING)) {
 //        	try {
-			Manufacture workshop = building.getManufacture();
-			BuildingFunctionPanel manufacturePanel = new BuildingPanelManufacture(workshop, desktop);
-			// manufacturePanel.setOpaque(false);
-			// manufacturePanel.setBackground(new Color(0,0,0,128));
-			functionPanels.add(manufacturePanel);
-			functionListPanel.add(manufacturePanel);
+			Farming farm = building.getFarming();
+			BuildingFunctionPanel farmingPanel = new BuildingPanelFarming(farm, desktop);
+			functionPanels.add(farmingPanel);
+			functionListPanel.add(farmingPanel);
 //        	}
 //        	catch (BuildingException e) {}
 		}
@@ -231,28 +245,43 @@ public class BuildingPanel extends WebPanel {
 //        	catch (BuildingException e) {}
 		}
 
-		// Prepare farming panel if building has farming.
-		if (building.hasFunction(FunctionType.FARMING)) {
+
+		
+		// Prepare inhabitable panel if building has lifeSupport.
+		if (building.hasFunction(FunctionType.LIFE_SUPPORT)) {
 //        	try {
-			Farming farm = building.getFarming();
-			BuildingFunctionPanel farmingPanel = new BuildingPanelFarming(farm, desktop);
-			functionPanels.add(farmingPanel);
-			functionListPanel.add(farmingPanel);
+			LifeSupport lifeSupport = building.getLifeSupport();
+			BuildingFunctionPanel inhabitablePanel = new BuildingPanelInhabitable(lifeSupport, desktop);
+			functionPanels.add(inhabitablePanel);
+			functionListPanel.add(inhabitablePanel);
 //        	}
 //        	catch (BuildingException e) {}
 		}
 
-		// Prepare cooking panel if building has cooking.
-		if (building.hasFunction(FunctionType.COOKING)) {
-//			try {
-			Cooking kitchen = building.getCooking();
-			BuildingFunctionPanel cookingPanel = new BuildingPanelCooking(kitchen, desktop);
-			functionPanels.add(cookingPanel);
-			functionListPanel.add(cookingPanel);
-			// if (isTranslucent)setPanelStyle(powerPanel);
-//			}
-//			catch (BuildingException e) {}
+		// Prepare living panel if building has living accommodations.
+		if (building.hasFunction(FunctionType.LIVING_ACCOMMODATIONS)) {
+//        	try {
+			LivingAccommodations living = building.getLivingAccommodations();
+			BuildingFunctionPanel livingPanel = new BuildingPanelLiving(living, desktop);
+			functionPanels.add(livingPanel);
+			functionListPanel.add(livingPanel);
+//        	}
+//        	catch (BuildingException e) {}
 		}
+		
+		// Prepare manufacture panel if building has manufacturing.
+		if (building.hasFunction(FunctionType.MANUFACTURE)) {
+//        	try {
+			Manufacture workshop = building.getManufacture();
+			BuildingFunctionPanel manufacturePanel = new BuildingPanelManufacture(workshop, desktop);
+			// manufacturePanel.setOpaque(false);
+			// manufacturePanel.setBackground(new Color(0,0,0,128));
+			functionPanels.add(manufacturePanel);
+			functionListPanel.add(manufacturePanel);
+//        	}
+//        	catch (BuildingException e) {}
+		}
+
 
 		// Add preparing dessert function
 		// Prepare dessert panel if building has preparing dessert function.
@@ -348,7 +377,7 @@ public class BuildingPanel extends WebPanel {
 		// Prepare resource processing panel if building has resource processes.
 		if (building.hasFunction(FunctionType.RESOURCE_PROCESSING)) {
 //        	try {
-			ResourceProcessing processor = (ResourceProcessing) building.getFunction(FunctionType.RESOURCE_PROCESSING);
+			ResourceProcessing processor = building.getResourceProcessing();
 			BuildingFunctionPanel resourceProcessingPanel = new BuildingPanelResourceProcessing(processor, desktop);
 			functionPanels.add(resourceProcessingPanel);
 			functionListPanel.add(resourceProcessingPanel);
@@ -396,28 +425,28 @@ public class BuildingPanel extends WebPanel {
 				Msg.getString("BuildingPanel.renameBuilding.dialogTitle"), JOptionPane.QUESTION_MESSAGE);
 	}
 
-	/**
-	 * Ask for a new building name using TextInputDialog in JavaFX/8
-	 * 
-	 * @return new name
-	 */
-	public String askNameFX(String oldName) {
-		String newName = null;
-		TextInputDialog dialog = new TextInputDialog(oldName);
-		dialog.setTitle(Msg.getString("BuildingPanel.renameBuilding.dialogTitle"));
-		dialog.setHeaderText(Msg.getString("BuildingPanel.renameBuilding.dialog.header"));
-		dialog.setContentText(Msg.getString("BuildingPanel.renameBuilding.dialog.content"));
-
-		Optional<String> result = dialog.showAndWait();
-		// result.ifPresent(name -> {});
-
-		if (result.isPresent()) {
-			logger.info("The old building name has been changed to: " + result.get());
-			newName = result.get();
-		}
-
-		return newName;
-	}
+//	/**
+//	 * Ask for a new building name using TextInputDialog in JavaFX/8
+//	 * 
+//	 * @return new name
+//	 */
+//	public String askNameFX(String oldName) {
+//		String newName = null;
+//		TextInputDialog dialog = new TextInputDialog(oldName);
+//		dialog.setTitle(Msg.getString("BuildingPanel.renameBuilding.dialogTitle"));
+//		dialog.setHeaderText(Msg.getString("BuildingPanel.renameBuilding.dialog.header"));
+//		dialog.setContentText(Msg.getString("BuildingPanel.renameBuilding.dialog.content"));
+//
+//		Optional<String> result = dialog.showAndWait();
+//		// result.ifPresent(name -> {});
+//
+//		if (result.isPresent()) {
+//			logger.info("The old building name has been changed to: " + result.get());
+//			newName = result.get();
+//		}
+//
+//		return newName;
+//	}
 
 	/**
 	 * Change and validate the new name of a Building
@@ -430,25 +459,24 @@ public class BuildingPanel extends WebPanel {
 		newName = oldName;
 		logger.info("Old name was " + oldName);
 
-		if (desktop.getMainScene() != null) {
-
-			Platform.runLater(() -> {
-
-				String newName = askNameFX(oldName);
-				if (!isBlank(newName)) { // newName != null && !newName.isEmpty() && newName with only whitespace(s)
-					building.setNickName(newName);
-					logger.info("New name is now " + newName);
-					buildingNameLabel.setText(building.getNickName());
-				} else {
-					Alert alert = new Alert(AlertType.ERROR, "Please use a valid name.");
-					alert.initOwner(desktop.getMainScene().getStage());
-					alert.showAndWait();
-				}
-			});
-
-		}
-
-		else {
+//		if (desktop.getMainScene() != null) {
+//
+//			Platform.runLater(() -> {
+//
+//				String newName = askNameFX(oldName);
+//				if (!isBlank(newName)) { // newName != null && !newName.isEmpty() && newName with only whitespace(s)
+//					building.setNickName(newName);
+//					logger.info("New name is now " + newName);
+//					buildingNameLabel.setText(building.getNickName());
+//				} else {
+//					Alert alert = new Alert(AlertType.ERROR, "Please use a valid name.");
+//					alert.initOwner(desktop.getMainScene().getStage());
+//					alert.showAndWait();
+//				}
+//			});
+//
+//		}
+//		else {
 
 			JDialog.setDefaultLookAndFeelDecorated(true);
 			newName = askNameDialog();
@@ -462,7 +490,7 @@ public class BuildingPanel extends WebPanel {
 				logger.info("New name is now " + newName);
 				// isRenamed = true;
 			}
-		}
+//		}
 
 		// return isRenamed;
 	}
@@ -522,7 +550,8 @@ public class BuildingPanel extends WebPanel {
 	public void update() {
 		// Update each building function panel.
 		for (BuildingFunctionPanel p : functionPanels)
-			p.update();
+//			if (p.isVisible())//&& p.isShowing())
+				p.update();
 	}
 
 }

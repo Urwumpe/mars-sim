@@ -1,8 +1,7 @@
 /**
  * Mars Simulation Project
  * GuideWindow.java
- * @version 3.07 2014-12-06
-
+ * @version 3.1.2 2020-09-02
  * @author Lars Naesbye Christensen
  */
 package org.mars_sim.msp.ui.swing;
@@ -39,6 +38,14 @@ public class HTMLContentPane extends JEditorPane {
 	public HTMLContentPane() {
 
 		setEditable(false);
+		
+//		HTMLEditorKit kit = new HTMLEditorKit();
+//		StyleSheet styleSheet = kit.getStyleSheet();
+////		styleSheet.addRule("A:active {orange}");
+//		this.setEditorKit(kit);
+		
+//		setContentType("text/html");
+//		setEditorKit(JEditorPane.createEditorKitForContentType("text/html"));
 	}
 
 	public void goToURL(URL url) {

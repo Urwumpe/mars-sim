@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Mission.java
- * @version 3.1.0 2017-05-05
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission;
@@ -9,31 +9,40 @@ package org.mars_sim.msp.core.person.ai.mission;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.LogConsolidated;
+import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.equipment.EVASuit;
+import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.events.HistoricalEvent;
+import org.mars_sim.msp.core.events.HistoricalEventManager;
+import org.mars_sim.msp.core.mars.SurfaceFeatures;
 import org.mars_sim.msp.core.person.EventType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PersonConfig;
 import org.mars_sim.msp.core.person.ShiftType;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
-import org.mars_sim.msp.core.person.ai.task.Task;
-import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.ai.job.RobotJob;
+import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.goods.CreditManager;
+import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.Conversion;
 import org.mars_sim.msp.core.tool.RandomUtil;
+import org.mars_sim.msp.core.vehicle.Rover;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * The Mission class represents a large multi-person task There is at most one
@@ -45,63 +54,43 @@ public abstract class Mission implements Serializable {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(Mission.class.getName());
+	private static final Logger logger = Logger.getLogger(Mission.class.getName());
 
-	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+	private static final String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
 			logger.getName().length());
 
-	protected static final int MAX_AMOUNT_RESOURCE = ResourceUtil.FIRST_ITEM_RESOURCE;
-
-	public static final String CONSTRUCTION_ENDED = "Construction ended.";
-	public static final String ALL_DISEMBARKED = "All members disembarked.";
-	public static final String USER_ABORTED_MISSION = "Mission aborted by user.";
-	public static final String UNREPAIRABLE_MALFUNCTION = "Unrepairable malfunction.";
-	public static final String NO_RESERVABLE_VEHICLES = "No reservable vehicles.";
-	public static final String NO_AVAILABLE_VEHICLES = "No available vehicles.";
-	public static final String NOT_ENOUGH_RESOURCES = "Not enough resources.";
-	public static final String NO_EMERGENCY_SETTLEMENT_DESTINATION_FOUND = "No emergency settlement destination found.";
-	public static final String MEDICAL_EMERGENCY = "A member has a medical emergency.";
-	public static final String NO_TRADING_SETTLEMENT = "No trading settlement found.";
-	public static final String NO_GOOD_EVA_SUIT = "No good EVA suit.";
-	public static final String REQUEST_RESCUE = "Requesting rescue.";
-	public static final String NO_ONGOING_SCIENTIFIC_STUDY = "No on-going scientific study being conducted in this subject.";
-	public static final String VEHICLE_NOT_LOADABLE = "Cannot load resources into the rover.";
-	public static final String NO_EXPLORATION_SITES = "Exploration sites could not be determined.";
-	public static final String NOT_ENOUGH_MEMBERS = "Not enough members recruited.";
-	public static final String NO_MEMBERS_ON_MISSION = "No members available for mission.";
-	public static final String MISSION_NOT_APPROVED = "Mission not approved.";
-	public static final String TARGET_VEHICLE_NOT_FOUND = "Target vehicle not found.";
-	
-
-	public static final String MISSION = " mission";
+	public static final String MISSION_SUFFIX = " mission";
 	public static final String[] EXPRESSIONS = new String[] {
 			"Where is everybody when I need someone for ",
 			"So no one is available for ",
 			"How come no one is available for "
-	};
-	
+	};	
 	public static final String OUTSIDE = "Outside";
+
+	
+	public static final int MAX_CAP = 8;
+
+	// Global mission identifier
+	private static int missionIdentifer = 0;
 
 	/**
 	 * The marginal factor for the amount of water to be brought during a mission.
 	 */
-	public final static double WATER_MARGIN = 4.4; // TODO: need to find out why water is running so fast in vehicle
+	public final static double WATER_MARGIN = 2.5;
 	/**
 	 * The marginal factor for the amount of oxygen to be brought during a mission.
 	 */
-	public final static double OXYGEN_MARGIN = 3.1;
+	public final static double OXYGEN_MARGIN = 2.5;
 	/**
 	 * The marginal factor for the amount of food to be brought during a mission.
 	 */
-	public final static double FOOD_MARGIN = 2.1;
+	public final static double FOOD_MARGIN = 2.5;
 	/**
 	 * The marginal factor for the amount of dessert to be brought during a mission.
 	 */
 	public final static double DESSERT_MARGIN = 1.5;
 
-	// Global mission identifier
-	private static int missionIdentifer = 0;
-
+	
 	// Data members
 	/** mission type id */
 	private int missionID;
@@ -111,20 +100,42 @@ public abstract class Mission implements Serializable {
 	private int minMembers;
 	/** The number of people that can be in the mission. */
 	private int missionCapacity;
+	/** The recorded number of people participated in this mission. */
+	private int membersCache;
+	/** The mission priority (between 1 and 5, with 1 the lowest, 5 the highest) */
+	private int priority = 2;
+	
 	/** Has the current phase ended? */
 	private boolean phaseEnded;
 	/** True if mission is completed. */
-	private boolean done;
+	private boolean done = false;
 	/** True if the mission has been approved. */
 	protected boolean approved = false;
 	/** True if the mission has been requested. */
 	protected boolean requested = false;
-	/** Name of mission. */
+	
+	/** The name of the vehicle reserved. */
+	private String vehicleReserved;
+	/** The date the mission was filed. */
+	private String dateFiled = "";
+	/** The date the mission embarked. */
+	private String dateEmbarked = "";
+	/** The date the mission was completed. */
+	private String dateCompleted = "";
+	/** The Name of this mission. */
 	private String missionName;
+	/** The description of this mission. */
+	private String description;
 	/** The description of the current phase of operation. */
 	private String phaseDescription;
+	/** The full mission designation. */
+	private String fullMissionDesignation = "";
 	
-
+	/** The mission type enum. */
+	private MissionType missionType;
+	
+	/** A list of mission status. */
+	private List<MissionStatus> missionStatus;
 	/** The current phase of the mission. */
 	private MissionPhase phase;
 	/** The name of the starting member */
@@ -142,7 +153,18 @@ public abstract class Mission implements Serializable {
 	private transient List<MissionListener> listeners;
 
 	// Static members
-
+	protected static Simulation sim = Simulation.instance();
+	
+	protected static UnitManager unitManager;
+	protected static HistoricalEventManager eventManager;
+	protected static MissionManager missionManager;
+	protected static ScientificStudyManager scientificManager;
+	protected static SurfaceFeatures surfaceFeatures;
+	protected static PersonConfig personConfig;
+	protected static MarsClock marsClock;// = sim.getMasterClock().getMarsClock();
+	protected static RelationshipManager relationshipManager;
+	protected static CreditManager creditManager;
+	
 	/**
 	 * Must be synchronised to prevent duplicate ids being assigned via different
 	 * threads.
@@ -153,25 +175,38 @@ public abstract class Mission implements Serializable {
 		return missionIdentifer++;
 	}
 
-	public Mission(String missionName, MissionMember startingMember, int minMembers) {
+	/**
+	 * Constructor 1
+	 * 
+	 * @param missionName
+	 * @param startingMember
+	 * @param minMembers
+	 */
+	public Mission(String missionName, MissionType missionType, MissionMember startingMember, int minMembers) {
 		// Initialize data members
 		this.identifier = getNextIdentifier();
 		this.missionName = missionName;
+		this.missionType = missionType;
 		this.startingMember = startingMember;
+		this.description = missionName;
 		
+		// Create the date filed timestamp
+		createDateFiled();
+			
 		missionID = MissionManager.matchMissionID(missionName);
 		
+		missionStatus = new ArrayList<>();
 		members = new ConcurrentLinkedQueue<MissionMember>();
 		done = false;
 		phase = null;
-		phaseDescription = null;
+		phaseDescription = "";
 		phases = new ArrayList<MissionPhase>();
 		phaseEnded = false;
 		this.minMembers = minMembers;
-		missionCapacity = Integer.MAX_VALUE;
+		missionCapacity = MAX_CAP;//Integer.MAX_VALUE;
 				
-		listeners = Collections.synchronizedList(new ArrayList<MissionListener>());
-
+		listeners = new CopyOnWriteArrayList<>(); //Collections.synchronizedList(new ArrayList<MissionListener>());
+		
 		Person person = (Person) startingMember;
 		String loc0 = null;
 		String loc1 = null;
@@ -182,39 +217,107 @@ public abstract class Mission implements Serializable {
 
 			// Created mission starting event.
 			HistoricalEvent newEvent = new MissionHistoricalEvent(EventType.MISSION_START, this,
-					"Mission Starting", missionName, person.getName(), loc0, loc1);
-
-			Simulation.instance().getEventManager().registerNewEvent(newEvent);
+					"Mission Starting", missionName, person.getName(), loc0, loc1, person.getAssociatedSettlement().getName());
+			
+			eventManager.registerNewEvent(newEvent);
 
 			// Log mission starting.
 			int n = members.size();
-			String str = null;
+			String appendStr = "";
 			if (n == 0)
-				str = ".";
+				appendStr = ".";
 			else if (n == 1)
-				str = "' with 1 other.";
+				appendStr = "' with 1 other.";
 			else
-				str = "' with " + n + " others.";
+				appendStr = "' with " + n + " others.";
 			
 			String article = "a ";
 					
+			String missionStr = missionName;
+			
+			if (!missionStr.toLowerCase().contains("mission"))
+				missionStr = missionName + " mission";
+				
 			if(Conversion.isVowel(missionName))
 				article = "an ";
 
-			LogConsolidated.log(logger, Level.INFO, 500, sourceName, "[" + person.getSettlement() + "] "
-					+ startingMember.getName() + " is organizing " + article + missionName + " mission" + str, null);
+			LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + person.getSettlement() + "] "
+					+ startingMember.getName() + " began organizing " + article + missionStr + appendStr);
 
 			// Add starting member to mission.
-			// Temporarily set the shift type to none during the mission
 			startingMember.setMission(this);
 
-			if (startingMember instanceof Person)
-				startingMember.setShiftType(ShiftType.ON_CALL);
+			// Note: do NOT set his shift to ON_CALL yet.
+			// let the mission lead have more sleep before departing
+//			if (startingMember instanceof Person)
+//				startingMember.setShiftType(ShiftType.ON_CALL);
 
 		}
 
 	}
 
+	/**
+	 * Gets the date filed timestamp of the mission.
+	 * 
+	 * @return
+	 */
+	public String getDateFiled() {
+		return dateFiled;
+	}
+
+	/**
+	 * Gets the date embarked timestamp of the mission.
+	 * 
+	 * @return
+	 */
+	public String getDateEmbarked() {
+		return dateEmbarked;
+	}
+
+	/**
+	 * Gets the date returned timestamp of the mission.
+	 * 
+	 * @return
+	 */
+	public String getDateReturned() {
+		return dateCompleted;
+	}
+
+	/**
+	 * Creates the date filed timestamp of the mission.
+	 */
+	public void createDateFiled() {
+		if (dateFiled.equals("")) {
+			dateFiled = marsClock.getTrucatedDateTimeStamp();
+			fireMissionUpdate(MissionEventType.DATE_EVENT, dateFiled);
+		}
+	}
+	
+	/**
+	 * Creates the date completed timestamp of the mission.
+	 */
+	public void createDateCompleted() {
+		if (dateCompleted.equals("")) {
+			dateCompleted = marsClock.getTrucatedDateTimeStamp();
+			fireMissionUpdate(MissionEventType.DATE_EVENT, dateCompleted);
+		}
+	}
+
+	/**
+	 * Creates the date embarked timestamp of the mission.
+	 */
+	public void createDateEmbarked() {
+		if (dateEmbarked.equals("")) {
+			dateEmbarked = marsClock.getTrucatedDateTimeStamp();
+			fireMissionUpdate(MissionEventType.DATE_EVENT, dateEmbarked);
+		}
+	}
+	
+	/**
+	 * Return the unique identifier of the mission.
+	 * 
+	 * @return
+	 */
 	public int getIdentifier() {
 		return identifier;
 	}
@@ -235,7 +338,7 @@ public abstract class Mission implements Serializable {
 	 */
 	public final void addMissionListener(MissionListener newListener) {
 		if (listeners == null) {
-			listeners = Collections.synchronizedList(new ArrayList<MissionListener>());
+			listeners = new CopyOnWriteArrayList<>();//Collections.synchronizedList(new ArrayList<MissionListener>());
 		}
 		if (!listeners.contains(newListener)) {
 			listeners.add(newListener);
@@ -249,7 +352,7 @@ public abstract class Mission implements Serializable {
 	 */
 	public final void removeMissionListener(MissionListener oldListener) {
 		if (listeners == null) {
-			listeners = Collections.synchronizedList(new ArrayList<MissionListener>());
+			listeners = new CopyOnWriteArrayList<>();//Collections.synchronizedList(new ArrayList<MissionListener>());
 		}
 		if (listeners.contains(oldListener)) {
 			listeners.remove(oldListener);
@@ -262,7 +365,7 @@ public abstract class Mission implements Serializable {
 	 * @param updateType the update type.
 	 */
 	protected final void fireMissionUpdate(MissionEventType updateType) {
-		fireMissionUpdate(updateType, null);
+		fireMissionUpdate(updateType, this);
 	}
 
 	/**
@@ -273,19 +376,19 @@ public abstract class Mission implements Serializable {
 	 */
 	protected final void fireMissionUpdate(MissionEventType addMemberEvent, Object target) {
 		if (listeners == null)
-			listeners = Collections.synchronizedList(new ArrayList<MissionListener>());
-		synchronized (listeners) {
+			listeners = new CopyOnWriteArrayList<>();// Collections.synchronizedList(new ArrayList<MissionListener>());
+//		synchronized (listeners) {
 			Iterator<MissionListener> i = listeners.iterator();
 			while (i.hasNext())
 				i.next().missionUpdate(new MissionEvent(this, addMemberEvent, target));
-		}
+//		}
 	}
 
 	/**
 	 * Gets the string representation of this mission.
 	 */
 	public String toString() {
-		return missionName;
+		return description;//missionName;
 	}
 
 	public final void addMember(MissionMember member) {
@@ -312,9 +415,9 @@ public abstract class Mission implements Serializable {
 
 			// Creating mission joining event.
 			HistoricalEvent newEvent = new MissionHistoricalEvent(EventType.MISSION_JOINING, this,
-					"Adding a member", missionName, person.getName(), loc0, loc1);
+					"Adding a member", missionName, person.getName(), loc0, loc1, person.getAssociatedSettlement().getName());
 
-			Simulation.instance().getEventManager().registerNewEvent(newEvent);
+			eventManager.registerNewEvent(newEvent);
 
 			fireMissionUpdate(MissionEventType.ADD_MEMBER_EVENT, member);
 
@@ -368,13 +471,17 @@ public abstract class Mission implements Serializable {
 					loc1 = person.getCoordinates().toString();
 				}
 
-				Simulation.instance().getEventManager()
-						.registerNewEvent(new MissionHistoricalEvent(EventType.MISSION_FINISH, this,
-								"Removing a member", missionName, person.getName(), loc0, loc1));
+				eventManager.registerNewEvent(new MissionHistoricalEvent(EventType.MISSION_FINISH, this,
+								"Removing a member", missionName, person.getName(), loc0, loc1, person.getAssociatedSettlement().getName()));
 				fireMissionUpdate(MissionEventType.REMOVE_MEMBER_EVENT, member);
 
-				if ((members.size() == 0) && !done) {
-					endMission(NOT_ENOUGH_MEMBERS);
+//				if ((members.size() == 0) && !done) {
+//					addMissionStatus(MissionStatus.NOT_ENOUGH_MEMBERS);
+//					endMission();
+//				} else 
+				if (getPeopleNumber() == 0 && !done) {
+					addMissionStatus(MissionStatus.NO_MEMBERS_AVAILABLE);
+					endMission();
 				}
 				// logger.fine(member.getName() + " removed from mission : " + name);
 			}
@@ -391,6 +498,21 @@ public abstract class Mission implements Serializable {
 		return members.contains(member);
 	}
 
+	/**
+	 * Determines if a mission includes the given person.
+	 * 
+	 * @param person person to be checked
+	 * @return true if person is a part of the mission.
+	 */
+	public final boolean hasPerson(Person person) {
+		for (MissionMember m : members) {
+			if (m.getName().equalsIgnoreCase(person.getName()))
+				return true;
+		}
+		
+		return false;
+	}
+	
 //	/**
 //	 * Determines if a mission includes the given person.
 //	 * @param person person to be checked
@@ -406,9 +528,19 @@ public abstract class Mission implements Serializable {
 	 * @return number of members.
 	 */
 	public final int getMembersNumber() {
-		return members.size();
+		membersCache = members.size();
+		return membersCache;
 	}
 
+	/**
+	 * Gets the number of members in the mission.
+	 * 
+	 * @return number of members.
+	 */
+	public final int getMembersNumberCache() {
+		return membersCache;
+	}
+	
 	/**
 	 * Gets the number of people in the mission.
 	 * 
@@ -514,12 +646,30 @@ public abstract class Mission implements Serializable {
 	}
 
 	/**
+	 * Gets the mission type enum.
+	 * 
+	 * @return
+	 */
+	public MissionType getMissionType() {
+		return missionType;
+	}
+	
+	/**
+	 * Sets the mission type enum.
+	 * 
+	 * @param missionType
+	 */
+	protected void setMissionType(MissionType missionType) {
+		this.missionType = missionType;
+	}
+	
+	/**
 	 * Gets the mission's description.
 	 * 
 	 * @return mission description
 	 */
 	public final String getDescription() {
-		return missionName;
+		return description;
 	}
 
 	/**
@@ -528,9 +678,9 @@ public abstract class Mission implements Serializable {
 	 * @param description the new description.
 	 */
 	public final void setDescription(String description) {
-		if (!this.missionName.equals(description)) {
-			this.missionName = description;
-			fireMissionUpdate(MissionEventType.DESCRIPTION_EVENT, description);
+		if (!this.description.equals(description)) {
+			this.description = description;
+			fireMissionUpdate(MissionEventType.DESIGNATION_EVENT, description);
 		}
 	}
 
@@ -550,13 +700,13 @@ public abstract class Mission implements Serializable {
 	 * @throws MissionException if newPhase is not in the mission's collection of
 	 *                          phases.
 	 */
-	protected final void setPhase(MissionPhase newPhase) {
+	public final void setPhase(MissionPhase newPhase) {
 		if (newPhase == null) {
 			throw new IllegalArgumentException("newPhase is null");
 		} else if (phases.contains(newPhase)) {
 			phase = newPhase;
 			setPhaseEnded(false);
-			phaseDescription = null;
+			phaseDescription = "";
 			fireMissionUpdate(MissionEventType.PHASE_EVENT, newPhase);
 		} else {
 			throw new IllegalStateException(
@@ -572,7 +722,7 @@ public abstract class Mission implements Serializable {
 	public final void addPhase(MissionPhase newPhase) {
 		if (newPhase == null) {
 			throw new IllegalArgumentException("newPhase is null");
-		} else if (!phases.contains(newPhase)) {
+		} else if (phases.isEmpty() || !phases.contains(newPhase)) {
 			phases.add(newPhase);
 		}
 	}
@@ -583,10 +733,10 @@ public abstract class Mission implements Serializable {
 	 * @return phase description.
 	 */
 	public final String getPhaseDescription() {
-		if (phaseDescription != null) {
-			return Conversion.capitalize(phaseDescription);
+		if (phaseDescription != null || !phaseDescription.equals("")) {
+			return phaseDescription;
 		} else if (phase != null) {
-			return Conversion.capitalize(phase.toString());
+			return phase.toString();
 		} else
 			return "";
 	}
@@ -633,7 +783,8 @@ public abstract class Mission implements Serializable {
 	 */
 	protected void performPhase(MissionMember member) {
 		if (phase == null) {
-			endMission("Current mission phase is null.");
+			addMissionStatus(MissionStatus.CURRENT_MISSION_PHASE_IS_NULL);
+			endMission();
 		}
 	}
 
@@ -683,7 +834,7 @@ public abstract class Mission implements Serializable {
 	 * Go to the nearest settlement and end collection phase if necessary.
 	 */
 	// TODO : connect to determineEmergencyDestination() in VehicleMission
-	private void goToNearestSettlement() {
+	public void goToNearestSettlement() {
 		if (this instanceof VehicleMission) {
 			VehicleMission vehicleMission = (VehicleMission) this;
 			try {
@@ -692,7 +843,8 @@ public abstract class Mission implements Serializable {
 					vehicleMission.clearRemainingNavpoints();
 					vehicleMission.addNavpoint(new NavPoint(nearestSettlement.getCoordinates(), nearestSettlement,
 							nearestSettlement.getName()));
-					vehicleMission.associateAllMembersWithSettlement(nearestSettlement);
+					// TODO: Not sure if they should become citizens of another settlement
+//					vehicleMission.associateAllMembersWithSettlement(nearestSettlement);
 					vehicleMission.updateTravelDestination();
 					endCollectionPhase();
 				}
@@ -706,23 +858,26 @@ public abstract class Mission implements Serializable {
 	 * 
 	 * @param reason
 	 */
-	public void addMissionScore(String reason) {
-		if (reason.equals(ALL_DISEMBARKED)) {
+	public void addMissionScore() {
+		if (haveMissionStatus(MissionStatus.MISSION_ACCOMPLISHED)) {
 			for (MissionMember member : members) {
 				if (member instanceof Person) {
 					Person person = (Person) member;
 					
 					if (!person.isDeclaredDead()) {
 						if (!person.getPhysicalCondition().hasSeriousMedicalProblems()) {
-							person.addMissionExperience(missionID, 5);
+							person.addMissionExperience(missionID, 3);
 						}
 						else
 							// Note : there is a minor penalty for those who are sick 
 							// and thus unable to fully function during the mission
-							person.addMissionExperience(missionID, 2.5);
+							person.addMissionExperience(missionID, 3);
 						
 						if (person.equals(startingMember)) {
-							person.addMissionExperience(missionID, 2.5);
+							// The mission lead receive extra bonus
+							person.addMissionExperience(missionID, 3);
+							// Add a leadership point to the mission lead
+							person.getNaturalAttributeManager().adjustAttribute(NaturalAttributeType.LEADERSHIP, 1);	
 						}
 					}
 				}
@@ -733,69 +888,90 @@ public abstract class Mission implements Serializable {
 	/**
 	 * Finalizes the mission. String reason Reason for ending mission. Mission can
 	 * override this to perform necessary finalizing operations.
+	 * 
+	 * @param reason
 	 */
-	public void endMission(String reason) {
-//		 if (!(this instanceof RescueSalvageVehicle)) {
-//		 returnHome();
-//		 goToNearestSettlement();
-//		 }
+	public void endMission() {
+		Vehicle v = startingMember.getVehicle();
+		// Unregister the vehicle
+		if (v != null)
+			v.correctVehicleReservation();	
+		
+		LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+				"[" + startingMember.getLocationTag().getLocale() + "] " + startingMember.getName() 
+				+ " ended " + this + " in Mission.");
 
 		// Add mission experience score
-		addMissionScore(reason);
+		addMissionScore();
 		
 		// Note: !done is very important to keep !
 		if (!done) {
-			// !reason.equals(USER_ABORTED_MISSION)
-			// reason.equals(SUCCESSFULLY_ENDED_CONSTRUCTION) 
-			// reason.equals(SUCCESSFULLY_DISEMBARKED)
-			// reason.equals(USER_ABORTED_MISSION)
-
 			// TODO : there can be custom reason such as "Equipment EVA Suit 12 cannot be
 			// loaded in rover Rahu" with mission name 'Trade With Camp Bradbury'
-
-			LogConsolidated.log(logger, Level.INFO, 3000, sourceName,
-					"[" + startingMember.getLocationTag().getQuickLocation() + "] " + startingMember.getName()
-							+ " ended the " + missionName + " mission. Reason : " + reason + ".",
-					null);
-
+	
 			done = true; // Note: done = true is very important to keep !
-			fireMissionUpdate(MissionEventType.END_MISSION_EVENT);
+//			fireMissionUpdate(MissionEventType.END_MISSION_EVENT);
 			// logger.info("done firing End_Mission_Event");
-
-			// Deregister the vehicle
-			if (startingMember.getVehicle() != null)
-				startingMember.getVehicle().correctVehicleReservation();
 			
-			if (members != null) {
-				if (!members.isEmpty()) {
-					LogConsolidated.log(logger, Level.INFO, 3000, sourceName,
-							"[" + startingMember.getLocationTag().getQuickLocation()
-									+ "] Disbanding mission member(s) : " + members,
-							null);
-					Iterator<MissionMember> i = members.iterator();
-					while (i.hasNext()) {
-						removeMember(i.next());
-
+		}
+		
+		else {
+			LogConsolidated.log(logger, Level.INFO, 500, sourceName,
+				"[" + startingMember.getLocationTag().getLocale() + "] " + startingMember.getName()
+						+ " ended the " + missionName + " with the following status flag(s) :");
+		
+			for (int i=0; i< missionStatus.size(); i++) {
+				LogConsolidated.log(logger, Level.INFO, 500, sourceName, 
+						"[" + startingMember.getLocationTag().getLocale() + "] Status Report -> (" 
+						+ (i+1) + "). " + missionStatus.get(i).getName() + ".");
+			}
+		}
+		
+		if (haveMissionStatus(MissionStatus.MISSION_ACCOMPLISHED)) {
+			if (this instanceof VehicleMission) {
+				setPhase(VehicleMission.COMPLETED);
+			}
+			setPhaseDescription(
+					Msg.getString("Mission.phase.completed.description")); // $NON-NLS-1$
+		}
+		
+		else {
+			
+			if (v != null) {
+				if (((Rover)v).getCrewNum() != 0 || !v.getInventory().isEmpty(false)) {
+					addPhase(VehicleMission.DISEMBARKING);
+					setPhase(VehicleMission.DISEMBARKING);
+				}
+				
+				if (v.getSettlement() != null) {
+					// The members are leaving the vehicle
+					if (members != null && !members.isEmpty()) { 
+						LogConsolidated.log(logger, Level.INFO, 500, sourceName,
+								"[" + startingMember.getLocationTag().getLocale()
+										+ "] " + startingMember + " disbanded mission member(s) : " + members);
+						Iterator<MissionMember> i = members.iterator();
+						while (i.hasNext()) {
+							removeMember(i.next());
+						}
 					}
 				}
 			}
 			
-
-
-		} else
-			LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-					"[" + startingMember.getLocationTag().getQuickLocation() + "] " + startingMember.getName()
-							+ " is ending the " + missionName + ". Reason : '" + reason + "'",
-					null);
-		
+			String s = "";
+			for (MissionStatus ms : missionStatus) {
+				s += ms.getName();
+			}
+			
+			setPhaseDescription(
+					Msg.getString("Mission.phase.aborted.description", s)); // $NON-NLS-1$
+		}
 		
 		// Proactively call removeMission to update the list in MissionManager right away
 //		missionManager.removeMission(this); // not legit ! will crash the mission tab in monitor tool
 	}
 
 	/**
-	 * Adds a new task for a person in the mission. Task may be not assigned if it
-	 * is effort-driven and person is too ill to perform it.
+	 * Checks if a person has any issues in starting a new task 
 	 * 
 	 * @param person the person to assign to the task
 	 * @param task   the new task to be assigned
@@ -810,7 +986,7 @@ public abstract class Mission implements Serializable {
 		}
 
 		if (canPerformTask) {
-			person.getMind().getTaskManager().addTask(task);
+			person.getMind().getTaskManager().addTask(task, false);
 		}
 
 		return canPerformTask;
@@ -868,7 +1044,7 @@ public abstract class Mission implements Serializable {
 	 * 
 	 * @return true if all have dangerous medical problems
 	 */
-	protected final boolean hasDangerousMedicalProblemsAllCrew() {
+	public final boolean hasDangerousMedicalProblemsAllCrew() {
 		boolean result = true;
 		for (MissionMember member : members) {
 			if (member instanceof Person) {
@@ -895,7 +1071,7 @@ public abstract class Mission implements Serializable {
 	 * 
 	 * @return true if emergency affecting all.
 	 */
-	protected boolean hasEmergencyAllCrew() {
+	public boolean hasEmergencyAllCrew() {
 		return hasDangerousMedicalProblemsAllCrew();
 	}
 
@@ -904,11 +1080,11 @@ public abstract class Mission implements Serializable {
 	 * 
 	 * @param startingMember the mission member starting the mission.
 	 */
-	protected void recruitMembersForMission(MissionMember startingMember) {
+	protected boolean recruitMembersForMission(MissionMember startingMember) {
 
 		// Get all people qualified for the mission.
 		Collection<Person> qualifiedPeople = new ConcurrentLinkedQueue<Person>();
-		Iterator<Person> i = Simulation.instance().getUnitManager().getPeople().iterator();
+		Iterator<Person> i = unitManager.getPeople().iterator();
 		while (i.hasNext()) {
 			Person person = i.next();
 			if (isCapableOfMission(person)) {
@@ -916,12 +1092,41 @@ public abstract class Mission implements Serializable {
 			}
 		}
 
+		int pop = startingMember.getAssociatedSettlement().getNumCitizens();
+		int max = 0;
+		
+		if (pop < 4)
+			max = 1;
+		else if (pop >= 4 && pop < 7)
+			max = 2;
+		else if (pop >= 7 && pop < 10)
+			max = 3;
+		else if (pop >= 10 && pop < 14)
+			max = 4;
+		else if (pop >= 14 && pop < 18)
+			max = 5;
+		else if (pop >= 18 && pop < 23)
+			max = 6;
+		else if (pop >= 23 && pop < 29)
+			max = 7;
+		else if (pop >= 29)
+			max = 8;
+		
+		// 50% tendency to have 1 less person
+		int rand = RandomUtil.getRandomInt(1);
+		if (rand == 1) {
+			if (max >= 5)
+			max--;
+		}
+		
 		// Recruit the most qualified and most liked people first.
 		while (qualifiedPeople.size() > 0) {
 			double bestPersonValue = 0D;
 			Person bestPerson = null;
 			Iterator<Person> j = qualifiedPeople.iterator();
-			while (j.hasNext() && (getMembersNumber() < missionCapacity)) {
+			while (j.hasNext() 
+					&& (getMembersNumber() < missionCapacity)
+					&& (getMembersNumber() < max)) {
 				Person person = j.next();
 				// Determine the person's mission qualification.
 				double qualification = getMissionQualification(person) * 100D;
@@ -929,7 +1134,6 @@ public abstract class Mission implements Serializable {
 				// Determine how much the recruiter likes the person.
 				double likability = 50D;
 				if (startingMember instanceof Person) {
-					RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
 					likability = relationshipManager.getOpinionOfPerson((Person) startingMember, person);
 				}
 
@@ -949,15 +1153,14 @@ public abstract class Mission implements Serializable {
 				break;
 			}
 		}
-		/*
-		 * // Recruit robots qualified for the mission. Iterator <Robot> k =
-		 * Simulation.instance().getUnitManager().getRobots().iterator(); while
-		 * (k.hasNext() && (getMembersNumber() < missionCapacity)) { Robot robot =
-		 * k.next(); if (isCapableOfMission(robot)) { robot.setMission(this); } }
-		 */
+
 		if (getMembersNumber() < minMembers) {
-			endMission("Not enough members");
+			addMissionStatus(MissionStatus.NOT_ENOUGH_MEMBERS);
+			endMission();
+			return false;
 		}
+		
+		return true;
 	}
 
 	/**
@@ -970,9 +1173,6 @@ public abstract class Mission implements Serializable {
 		if (isCapableOfMission(recruitee)) {
 			// Get mission qualification modifier.
 			double qualification = getMissionQualification(recruitee) * 100D;
-
-			RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
-
 			// Get the recruitee's social opinion of the recruiter.
 			double recruiterLikability = 50D;
 			if (recruiter instanceof Person) {
@@ -1000,10 +1200,12 @@ public abstract class Mission implements Serializable {
 			if (RandomUtil.lessThanRandPercent(recruitmentChance)) {
 				recruitee.setMission(this);
 
-				if (recruitee instanceof Person) {
-					((Person) recruitee).setShiftType(ShiftType.ON_CALL);
-				}
-				// robot cannot be a recruitee
+				// NOTE: do not set his shift to ON_CALL until after the mission plan has been approved
+//				if (recruitee instanceof Person) {
+//					((Person) recruitee).setShiftType(ShiftType.ON_CALL);
+//				}
+				
+				// Note : robot cannot be a recruitee
 				// else if (recruitee instanceof Robot) {
 				// ((Robot) recruitee).getTaskSchedule().setShiftType("None");
 				// }
@@ -1040,20 +1242,20 @@ public abstract class Mission implements Serializable {
 				result = true;
 			}
 		} else if (member instanceof Robot) {
-			Robot robot = (Robot) member;
-
-			// Make sure robot isn't already on a mission.
-			boolean onMission = (robot.getBotMind().getMission() != null);
-
-			// Make sure robot doesn't have a malfunction.
-			boolean hasMalfunction = robot.getMalfunctionManager().hasMalfunction();
-
-			// Check if robot is qualified to join the mission.
-			boolean isQualified = (getMissionQualification(robot) > 0D);
-
-			if (!onMission && !hasMalfunction && isQualified) {
-				result = true;
-			}
+//			Robot robot = (Robot) member;
+//
+//			// Make sure robot isn't already on a mission.
+//			boolean onMission = (robot.getBotMind().getMission() != null);
+//
+//			// Make sure robot doesn't have a malfunction.
+//			boolean hasMalfunction = robot.getMalfunctionManager().hasMalfunction();
+//
+//			// Check if robot is qualified to join the mission.
+//			boolean isQualified = (getMissionQualification(robot) > 0D);
+//
+//			if (!onMission && !hasMalfunction && isQualified) {
+//				result = true;
+//			}
 		}
 
 		return result;
@@ -1112,7 +1314,7 @@ public abstract class Mission implements Serializable {
 			// Get base result for job modifier.
 			Job job = person.getMind().getJob();
 			if (job != null) {
-				result *= 5 * job.getJoinMissionProbabilityModifier(this.getClass());
+				result = result + 2 * result * job.getJoinMissionProbabilityModifier(this.getClass());
 			}
 			
 		} else if (member instanceof Robot) {
@@ -1124,7 +1326,6 @@ public abstract class Mission implements Serializable {
 				result = job.getJoinMissionProbabilityModifier(this.getClass());
 			}
 		}
-//        }
 
 		return result;
 	}
@@ -1167,7 +1368,7 @@ public abstract class Mission implements Serializable {
 	 * Gets the number and types of equipment needed for the mission.
 	 * 
 	 * @param useBuffer use time buffers in estimation if true.
-	 * @return map of equipment class and Integer number.
+	 * @return map of equipment types and number.
 	 */
 	public abstract Map<Integer, Integer> getEquipmentNeededForRemainingMission(boolean useBuffer);
 
@@ -1190,7 +1391,11 @@ public abstract class Mission implements Serializable {
 		Iterator<MissionMember> i = members.iterator();
 		while (i.hasNext()) {
 			MissionMember member = i.next();
-			member.setAssociatedSettlement(settlement);
+//			member.setAssociatedSettlement(settlement.getIdentifier());
+			if (member instanceof Person) {
+				Person p = (Person) member;
+				settlement.addACitizen(p);
+			}
 		}
 	}
 
@@ -1204,43 +1409,66 @@ public abstract class Mission implements Serializable {
 
 		Coordinates result = null;
 
-		if (getMembersNumber() > 0) {
-			MissionMember member = (MissionMember) members.toArray()[0];
-			result = member.getCoordinates();
+//		if (getMembersNumber() > 0) {
+//			MissionMember member = (MissionMember) members.toArray()[0];
+//			result = member.getCoordinates();
+			
+		if (startingMember != null)	{
+			Person p = (Person)startingMember;
+			if (p.isInSettlement())
+				result = p.getSettlement().getCoordinates();
+				
+			else if (p.isInVehicle() && p.getVehicle() != null)
+				result = p.getVehicle().getCoordinates();
+			
+			else
+				result = p.getCoordinates();
+			
 		} else {
 			StringBuilder s = new StringBuilder();
 			String missionName = this.toString();
 			if (missionName.toLowerCase().contains("mission")) {
 				if (phase != null) {
-					s.append("Anyone can do ").append(phase).append(" for a ").append(missionName).append("?");
+					s.append("Error : no crew members on the ").append(phase).append(" phase in ")
+					.append(missionName).append(" (").append(fullMissionDesignation).append(").");
 				}
 				else {
-					int rand = RandomUtil.getRandomInt(2);
+					s.append("Error : no crew members for ");
+					
+//					int rand = RandomUtil.getRandomInt(2);
 					String theInitial = missionName.substring(0);
 					if (Conversion.isVowel(theInitial))
-						s.append(EXPRESSIONS[rand]).append("an ").append(missionName).append("?");
+						s.append("an ");
 					else
-						s.append(EXPRESSIONS[rand]).append("a ").append(missionName).append("?");
+						s.append("a ");
+						
+					s.append(missionName).append(" (").append(fullMissionDesignation).append(").");
 				}
 			}
 			
 			else {
 				if (phase != null) {
-					s.append("Anyone can do ").append(phase).append(" for a ").append(missionName).append(MISSION).append("?");
+					s.append("Error : no crew members on the ").append(phase).append(" phase in ")
+						.append(missionName).append(MISSION_SUFFIX).append(" (").append(fullMissionDesignation).append(").");
 				}
 				else {
-					int rand = RandomUtil.getRandomInt(2);
+					s.append("Error : no crew members for ");
+					
+//					int rand = RandomUtil.getRandomInt(2);
 					String theInitial = missionName.substring(0);
 					if (Conversion.isVowel(theInitial))
-						s.append(EXPRESSIONS[rand]).append("an ").append(missionName).append(MISSION).append("?");
+						s.append("an ");
 					else
-						s.append(EXPRESSIONS[rand]).append("a ").append(missionName).append(MISSION).append("?");
+						s.append("a ");
+				
+					s.append(missionName).append(MISSION_SUFFIX).append(" (").append(fullMissionDesignation).append(").");
 				}
 			}
 			
-			LogConsolidated.log(logger, Level.INFO, 2000, sourceName, s.toString(), null);
+			LogConsolidated.log(logger, Level.INFO, 0, sourceName, s.toString());
 		}
 
+//		System.out.println("   p is at " + result);
 		return result;
 	}
 
@@ -1254,11 +1482,10 @@ public abstract class Mission implements Serializable {
 		int result = 0;
 
 		if (settlement == null)
-			result = 0;
-		// throw new NullPointerException();
+			logger.severe("Settlement is null");
 
 		else {
-			result = settlement.getInventory().findNumUnitsOfClass(EVASuit.class);
+			result = settlement.getInventory().findNumEVASuits(false, false);
 
 			// Leave one suit for settlement use.
 			if (result > 0) {
@@ -1269,34 +1496,47 @@ public abstract class Mission implements Serializable {
 	}
 
 	/**
-	 * Request approval from the commander of the settlement for the mission.
+	 * Request review for the mission.
 	 * 
-	 * @param member the mission member currently performing the mission.
+	 * @param member the mission lead.
 	 */	
-	protected void requestApprovalPhase(MissionMember member) {	
+	protected void requestReviewPhase(MissionMember member) {	
 		Person p = (Person)member;
 		
-		if (!approved && plan == null) {			
-//			System.out.println(p.getName()+ "'s" + this.getDescription() + " is going to make a plan.");
-			plan = new MissionPlanning(this, p.getName(), p.getRole().getType());
+		if (plan == null) {			
+			plan = new MissionPlanning(this, p.getName(), p.getRole().getType());		
+			LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + p.getLocationTag().getLocale() + "] " 
+					+ p.getRole().getType() + " " + p.getName() 
+					+ " was requesting approval for " + getDescription() + ".");
+
+			 missionManager.requestMissionApproving(plan);
+		}
+		
+		else if (plan != null) {
+			if (plan.getStatus() == PlanType.NOT_APPROVED) {
+//				logger.info(this + " was not approved.");
+				addMissionStatus(MissionStatus.MISSION_NOT_APPROVED);
+				endMission();
+			}
 			
-			LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + p.getSettlement().getName() + "] " 
-					+ p.getName() + " (" + p.getRole().getType() 
-					+ ") is requesting approval for " + getDescription() + ".", null);
+			else if (plan.getStatus() == PlanType.APPROVED) {
+				
+				fullMissionDesignation = createFullDesignation(p);
+				
+				LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + p.getLocationTag().getLocale() + "] " 
+						+ p.getRole().getType() + " " + p.getName() 
+						+ " was getting"// the rover " + startingMember.getVehicle() 
+						+ " ready to embark on " + getDescription());
 
-			 Simulation.instance().getMissionManager().requestMissionApproval(plan);
-		}
-		
-		else if (plan != null && plan.getStatus() == PlanType.NOT_APPROVED) {
-			endMission(MISSION_NOT_APPROVED);
-		}
-		
-		if (approved || plan.getStatus() == PlanType.APPROVED) {
-			LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + p.getSettlement().getName() + "] " 
-					+ p.getName() + " (" + p.getRole().getType() 
-					+ ")'s " + getDescription() + " is preparing to embark.", null);
-
-			setPhaseEnded(true);
+				if (!(this instanceof TravelMission)) {
+					// Set the members' work shift to on-call to get ready
+					for (MissionMember m : members) {
+	//					Person pp = (Person) m;
+						 ((Person) m).setShiftType(ShiftType.ON_CALL);
+					}
+				}
+				setPhaseEnded(true);
+			}
 		}
 	}
 
@@ -1334,6 +1574,146 @@ public abstract class Mission implements Serializable {
 	 */
 	public Person getStartingMember() {
 		return (Person)startingMember;
+	}
+	
+	public String getFullMissionDesignation() {
+		return fullMissionDesignation;
+	}
+
+	/**
+	 * Creates the mission designation string for this mission
+	 * 
+	 * @param person the mission lead 
+	 * @return
+	 */
+	public String createFullDesignation(Person person) {	
+		return Conversion.getInitials(getDescription().replaceAll("with", "").trim()) + " " 
+				+ missionManager.getMissionDesignationString(person.getAssociatedSettlement().getName());
+	}
+	
+	public void setReservedVehicle(String name) {
+		vehicleReserved = name;
+	}
+	
+	public String getReservedVehicle() {
+		return vehicleReserved;
+	}
+	
+	public List<MissionStatus> getMissionStatus() {
+		return missionStatus;
+	}
+	
+	/**
+	 * Checks if this mission has already been tagged with this mission status
+	 * 
+	 * @param status
+	 * @return
+	 */
+	public boolean haveMissionStatus(MissionStatus status) {
+		if (missionStatus.contains(status))
+			return true;
+		else
+			return false;
+	}
+	
+	/**
+	 * Check if the rover has mission status that prompts to turn on the beacon to ask for help 
+	 * 
+	 * @return
+	 */
+	public boolean needHelp() {
+		if (missionStatus.contains(MissionStatus.NOT_ENOUGH_RESOURCES)
+				|| missionStatus.contains(MissionStatus.NO_METHANE)
+				|| missionStatus.contains(MissionStatus.UNREPAIRABLE_MALFUNCTION)
+				|| missionStatus.contains(MissionStatus.NO_EMERGENCY_SETTLEMENT_DESTINATION_FOUND)
+				|| missionStatus.contains(MissionStatus.MEDICAL_EMERGENCY)
+				|| missionStatus.contains(MissionStatus.REQUEST_RESCUE)
+				)
+			return true;
+		else
+			return false;
+	}
+	
+	/**
+	 * Add a new mission status
+	 * 
+	 * @param status
+	 */
+	public void addMissionStatus(MissionStatus status) {
+		if (!missionStatus.contains(status)) {
+			missionStatus.add(status);
+			LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + startingMember.getAssociatedSettlement() + "] "
+					+ startingMember.getName() + "'s "
+					+ this + " was just being tagged with '" + status.getName() + "'.");
+		}
+		else
+			LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName, "[" + startingMember.getAssociatedSettlement() + "] "
+					+ startingMember.getName() + "'s "
+					+ this + " has already been tagged with '" + status.getName() + "'");
+	}
+	
+	public int getPriority() {
+		return priority;
+	}
+	
+	
+	public Vehicle getVehicle() {
+		if (this instanceof VehicleMission) {
+			return ((VehicleMission)this).getVehicle();
+		}
+//		else if (this instanceof BuildingConstructionMission) {
+//			return ((BuildingConstructionMission)this).getVehicle();
+//		}
+		return null;	
+	}
+	
+	
+	public boolean equals(Object obj) {
+		if (this == obj) return true;
+		if (obj == null) return false;
+		if (this.getClass() != obj.getClass()) return false;
+		Mission m = (Mission) obj;
+		return this.missionType == m.getMissionType()
+				&& this.startingMember.equals(m.getStartingMember())
+				&& this.identifier == m.getIdentifier();
+	}
+
+	/**
+	 * Gets the hash code for this object.
+	 * 
+	 * @return hash code.
+	 */
+	public int hashCode() {
+		int hashCode = (int)(1 + identifier);
+		hashCode *= missionType.hashCode();
+		hashCode *= startingMember.hashCode();
+		return hashCode;
+	}
+	
+	/**
+	 * Reloads instances after loading from a saved sim
+	 * 
+	 * @param si {@link Simulation}
+	 * @param c {@link MarsClock}
+	 * @param e {@link HistoricalEventManager}
+	 * @param u {@link UnitManager}
+	 * @param s {@link ScientificStudyManager}
+	 * @param sf {@link SurfaceFeatures}
+	 * @param m {@link MissionManager}
+	 */
+	public static void initializeInstances(Simulation si, MarsClock c, HistoricalEventManager e, 
+			UnitManager u, ScientificStudyManager s, SurfaceFeatures sf, 
+			MissionManager m, RelationshipManager r, PersonConfig pc, CreditManager cm) {
+		sim = si;
+		marsClock = c;		
+		eventManager = e;
+		unitManager = u;
+		scientificManager = s;
+		surfaceFeatures = sf;
+		missionManager = m;
+		personConfig = pc;
+		relationshipManager = r;
+		creditManager = cm;
 	}
 	
 	/**

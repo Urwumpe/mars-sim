@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PerformMathematicalModeling.java
- * @version 3.1.0 2017-09-05
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -17,9 +17,11 @@ import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.core.science.ScientificStudyManager;
@@ -30,7 +32,6 @@ import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.Research;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
-import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
@@ -94,10 +95,10 @@ implements ResearchScientificStudy, Serializable {
             
             else {
             	LogConsolidated.log(logger, Level.INFO, 5000, sourceName, 
-            		"[" + person.getLocationTag().getQuickLocation() + "] " 
+            		"[" + person.getLocationTag().getLocale() + "] " 
             			+ person + NO_LAB_SLOT, null);
             	endTask();
-            	person.getMind().getTaskManager().clearTask();
+//            	person.getMind().getTaskManager().clearTask();
             	//person.getMind().getTaskManager().getNewTask();
             }
             
@@ -109,7 +110,7 @@ implements ResearchScientificStudy, Serializable {
         else {
         	//LogConsolidated.log(logger, Level.INFO, 5000, sourceName, person + " can't find a research collaboration.", null);
         	endTask();
-        	person.getMind().getTaskManager().clearTask();
+//        	person.getMind().getTaskManager().clearTask();
         	//person.getMind().getTaskManager().getNewTask();
         }
 
@@ -121,7 +122,7 @@ implements ResearchScientificStudy, Serializable {
     }
 
     @Override
-    protected FunctionType getLivingFunction() {
+    public FunctionType getLivingFunction() {
         return FunctionType.RESEARCH;
     }
 
@@ -174,7 +175,7 @@ implements ResearchScientificStudy, Serializable {
         for (ScientificStudy collabStudy :  manager.getOngoingCollaborativeStudies(person)) {
             if (ScientificStudy.RESEARCH_PHASE.equals(collabStudy.getPhase()) &&
                     !collabStudy.isCollaborativeResearchCompleted(person)) {
-                ScienceType collabScience = collabStudy.getCollaborativeResearchers().get(person);
+                ScienceType collabScience = collabStudy.getCollaborativeResearchers().get(person.getIdentifier());
                 if (mathematics == collabScience) {
                     possibleStudies.add(collabStudy);
                 }
@@ -314,7 +315,7 @@ implements ResearchScientificStudy, Serializable {
                 Building labBuilding = ((Research) lab).getBuilding();
 
                 // Walk to lab building.
-                walkToActivitySpotInBuilding(labBuilding, false);
+                walkToTaskSpecificActivitySpotInBuilding(labBuilding, false);
 
                 lab.addResearcher();
                 malfunctions = labBuilding.getMalfunctionManager();
@@ -343,7 +344,7 @@ implements ResearchScientificStudy, Serializable {
         int academicAptitude = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
         newPoints += newPoints * ((double) academicAptitude - 50D) / 100D;
         newPoints *= getTeachingExperienceModifier();
-        person.getMind().getSkillManager().addExperience(ScienceType.MATHEMATICS.getSkill(), newPoints);
+        person.getSkillManager().addExperience(ScienceType.MATHEMATICS.getSkill(), newPoints, time);
     }
 
     @Override
@@ -355,8 +356,8 @@ implements ResearchScientificStudy, Serializable {
 
     @Override
     public int getEffectiveSkillLevel() {
-        //SkillManager manager = person.getMind().getSkillManager();
-        return person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MATHEMATICS);
+        //SkillManager manager = person.getSkillManager();
+        return person.getSkillManager().getEffectiveSkillLevel(SkillType.MATHEMATICS);
     }
 
     /**
@@ -383,8 +384,8 @@ implements ResearchScientificStudy, Serializable {
 
         // If research assistant, modify by assistant's effective skill.
         if (hasResearchAssistant()) {
-            //SkillManager manager = researchAssistant.getMind().getSkillManager();
-            int assistantSkill = researchAssistant.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.MATHEMATICS);
+            //SkillManager manager = researchAssistant.getSkillManager();
+            int assistantSkill = researchAssistant.getSkillManager().getEffectiveSkillLevel(SkillType.MATHEMATICS);
             if (mathematicsSkill > 0) {
                 modelingTime *= 1D + ((double) assistantSkill / (double) mathematicsSkill);
             }
@@ -424,16 +425,6 @@ implements ResearchScientificStudy, Serializable {
 
         // Check if research in study is completed.
         boolean isPrimary = study.getPrimaryResearcher().equals(person);
-        if (isPrimary) {
-            if (study.isPrimaryResearchCompleted()) {
-                endTask();
-            }
-        }
-        else {
-            if (study.isCollaborativeResearchCompleted(person)) {
-                endTask();
-            }
-        }
 
         // Check if person is in a moving rover.
         //if (inMovingRover(person)) {
@@ -453,6 +444,29 @@ implements ResearchScientificStudy, Serializable {
             study.addCollaborativeResearchWorkTime(person, modelingTime);
         }
 
+        if (isPrimary) {
+            if (study.isPrimaryResearchCompleted()) {
+    			LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + person.getLocationTag().getLocale() + "] "
+    					+ person.getName() + " just spent " 
+    					+ Math.round(study.getPrimaryResearchWorkTimeCompleted() *10.0)/10.0
+    					+ " millisols in completing the mathematical modeling" 
+    					+ " in a primary research in " + study.getScience().getName() 
+    					+ " in " + person.getLocationTag().getImmediateLocation());	
+                endTask();
+            }
+        }
+        else {
+            if (study.isCollaborativeResearchCompleted(person)) {
+    			LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + person.getLocationTag().getLocale() + "] "
+    					+ person.getName() + " just spent " 
+    					+ Math.round(study.getCollaborativeResearchWorkTimeCompleted(person) *10.0)/10.0
+    					+ " millisols in performing a collaborative study on mathematical modeling  " 
+    					+ " in " + study.getScience().getName() 
+    					+ " in " + person.getLocationTag().getImmediateLocation());	
+                endTask();
+            }
+        }
+        
         // Add experience
         addExperience(modelingTime);
 
@@ -460,32 +474,6 @@ implements ResearchScientificStudy, Serializable {
         //checkForAccident(time);
 
         return 0D;
-    }
-
-    /**
-     * Checks if the person is in a moving vehicle.
-     * @param person the person.
-     * @return true if person is in a moving vehicle.
-     */
-    public static boolean inMovingRover(Person person) {
-
-        boolean result = false;
-
-        if (person.isInVehicle()) {
-            Vehicle vehicle = person.getVehicle();
-            if (vehicle.getStatus() == StatusType.MOVING) {
-                result = true;
-            }
-            else if (vehicle.getStatus() == StatusType.TOWED) {
-                Vehicle towingVehicle = vehicle.getTowingVehicle();
-                if (towingVehicle.getStatus() == StatusType.MOVING ||
-                        towingVehicle.getStatus() == StatusType.TOWED) {
-                    result = false;
-                }
-            }
-        }
-
-        return result;
     }
 
     @Override

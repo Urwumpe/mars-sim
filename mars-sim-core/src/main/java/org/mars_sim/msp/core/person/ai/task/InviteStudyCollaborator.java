@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * InviteStudyCollaborator.java
- * @version 3.1.0 2017-09-13
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -11,20 +11,20 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.LocationSituation;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.social.Relationship;
-import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.core.science.ScientificStudyUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -45,6 +45,9 @@ implements Serializable {
 
     /** default logger. */
     private static Logger logger = Logger.getLogger(InviteStudyCollaborator.class.getName());
+    
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			 logger.getName().length());
 
     /** Task name */
     private static final String NAME = Msg.getString(
@@ -72,8 +75,7 @@ implements Serializable {
     public InviteStudyCollaborator(Person person) {
         super(NAME, person, false, true, STRESS_MODIFIER, true, DURATION);
 
-        ScientificStudyManager manager = Simulation.instance().getScientificStudyManager();
-        study = manager.getOngoingPrimaryStudy(person);
+        study = scientificStudyManager.getOngoingPrimaryStudy(person);
         if (study != null) {
 
             // Determine best invitee.
@@ -83,18 +85,18 @@ implements Serializable {
 
                 // If person is in a settlement, try to find an administration building.
                 boolean adminWalk = false;
-                if (person.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
+                if (person.isInSettlement()) {
                     Building adminBuilding = getAvailableAdministrationBuilding(person);
                     if (adminBuilding != null) {
                         // Walk to administration building.
-                        walkToActivitySpotInBuilding(adminBuilding, false);
+                        walkToTaskSpecificActivitySpotInBuilding(adminBuilding, false);
                         adminWalk = true;
                     }
                 }
 
                 if (!adminWalk) {
 
-                    if (person.getLocationSituation() == LocationSituation.IN_VEHICLE) {
+                    if (person.isInVehicle()) {
                         // If person is in rover, walk to passenger activity spot.
                         if (person.getVehicle() instanceof Rover) {
                             walkToPassengerActivitySpotInRover((Rover) person.getVehicle(), false);
@@ -130,7 +132,7 @@ implements Serializable {
 
         Building result = null;
 
-        if (person.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
+        if (person.isInSettlement()) {
             BuildingManager manager = person.getSettlement().getBuildingManager();
             List<Building> administrationBuildings = manager.getBuildings(FunctionType.ADMINISTRATION);
             administrationBuildings = BuildingManager.getNonMalfunctioningBuildings(administrationBuildings);
@@ -147,7 +149,7 @@ implements Serializable {
     }
 
     @Override
-    protected FunctionType getLivingFunction() {
+    public FunctionType getLivingFunction() {
         return FunctionType.ADMINISTRATION;
     }
 
@@ -168,7 +170,7 @@ implements Serializable {
 
             // Modify based on invitee level in job science.
             SkillType skill = jobScience.getSkill();
-            int skillLevel = invitee.getMind().getSkillManager().getEffectiveSkillLevel(skill);
+            int skillLevel = invitee.getSkillManager().getEffectiveSkillLevel(skill);
             inviteeValue += skillLevel;
 
             // Modify based on invitee achievement in job science.
@@ -183,13 +185,13 @@ implements Serializable {
             inviteeValue += (totalAchievement / 10D);
 
             // Modify based on study researcher's personal opinion of invitee.
-            RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
+//            RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
             double opinion = relationshipManager.getOpinionOfPerson(study.getPrimaryResearcher(), invitee);
             inviteeValue *= (opinion / 100D);
 
             // Modify based on current number of studies researcher is currently collaborating on.
-            ScientificStudyManager studyManager = Simulation.instance().getScientificStudyManager();
-            int numCollaborativeStudies = studyManager.getOngoingCollaborativeStudies(invitee).size();
+//            ScientificStudyManager studyManager = Simulation.instance().getScientificStudyManager();
+            int numCollaborativeStudies = scientificStudyManager.getOngoingCollaborativeStudies(invitee).size();
             inviteeValue /= (numCollaborativeStudies + 1D);
 
             // Modify based on if researcher and primary researcher are at same settlement.
@@ -225,7 +227,7 @@ implements Serializable {
             study.addInvitedResearcher(invitee);
 
             // Check if existing relationship between primary researcher and invitee.
-            RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
+//            RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
             if (!relationshipManager.hasRelationship(person, invitee)) {
                 // Add new communication meeting relationship.
                 relationshipManager.addRelationship(person, invitee, Relationship.COMMUNICATION_MEETING);
@@ -235,8 +237,9 @@ implements Serializable {
             Relationship relationship = relationshipManager.getRelationship(invitee, person);
             double currentOpinion = relationship.getPersonOpinion(invitee);
             relationship.setPersonOpinion(invitee, currentOpinion + 10D);
-
-            logger.fine(person.getName() + " inviting " + invitee.getName() +
+            LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+					"[" + person.getLocationTag().getLocale() + "] " + person
+					+ " was inviting " + invitee.getName() +
                     " to collaborate in " + study.toString());
         }
 
@@ -255,19 +258,20 @@ implements Serializable {
         newPoints *= getTeachingExperienceModifier();
 
         SkillType skillName = study.getScience().getSkill();
-        person.getMind().getSkillManager().addExperience(skillName, newPoints);
+        person.getSkillManager().addExperience(skillName, newPoints, time);
     }
 
     @Override
     public List<SkillType> getAssociatedSkills() {
         List<SkillType> skills = new ArrayList<SkillType>(1);
-        skills.add(study.getScience().getSkill());
+        if (study != null) 
+        	skills.add(study.getScience().getSkill());
         return skills;
     }
 
     @Override
     public int getEffectiveSkillLevel() {
-        SkillManager manager = person.getMind().getSkillManager();
+        SkillManager manager = person.getSkillManager();
         SkillType skillName = study.getScience().getSkill();
         return manager.getEffectiveSkillLevel(skillName);
     }

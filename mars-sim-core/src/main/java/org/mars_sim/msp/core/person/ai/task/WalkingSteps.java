@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * WalkingSteps.java
- * @version 3.1.0 2017-01-21
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 
@@ -51,7 +51,7 @@ implements Serializable {
 	/**
 	 * constructor 1.
 	 */
-	public WalkingSteps(Person person, double xLoc, double yLoc, LocalBoundedObject interiorObject) {
+	public WalkingSteps(Person person, double xLoc, double yLoc, double zLoc, LocalBoundedObject interiorObject) {
         this.person = person;
 
         // Initialize data members.
@@ -60,10 +60,16 @@ implements Serializable {
         
         // Determine initial walk state.
         WalkState initialWalkState = determineInitialWalkState(person);
-
+        if (initialWalkState == null)  {
+        	logger.severe("initialWalkState : " + initialWalkState);
+        	return;
+        }
         // Determine destination walk state.
         WalkState destinationWalkState = determineDestinationWalkState(xLoc, yLoc, interiorObject);
-
+        if (destinationWalkState == null) {
+        	logger.severe("destinationWalkState : " + destinationWalkState);
+        	return;
+        }
         // Determine walking steps to destination.
         determineWalkingSteps(initialWalkState, destinationWalkState);
     }
@@ -71,7 +77,7 @@ implements Serializable {
 	/**
 	 * constructor 2.
 	 */
-	public WalkingSteps(Robot robot, double xLoc, double yLoc, LocalBoundedObject interiorObject) {
+	public WalkingSteps(Robot robot, double xLoc, double yLoc, double zLoc, LocalBoundedObject interiorObject) {
         this.robot = robot;
 
         // Initialize data members.
@@ -155,26 +161,62 @@ implements Serializable {
         WalkState result = null;
 
         // Determine initial walk state based on person's location situation.
-        if (person.isInSettlement()) {
+        if (person.isOutside()) {
+
+            result = new WalkState(WalkState.OUTSIDE_LOC);
+            
+			LogConsolidated.log(logger, Level.FINER, 4000, sourceName,
+					"[" 
+					+ person.getLocationTag().getLocale()
+//					+ person.getLocationStateType().getName() 
+					+ "] "  + person.getName() +
+                    " is having WalkState.OUTSIDE_LOC");
+        }
+        else if (person.isInSettlement()) {
 
             Building building = person.getBuildingLocation();//BuildingManager.getBuilding(person);
+            
             if (building == null) {
-                return null;
+    			LogConsolidated.log(logger, Level.WARNING, 4000, sourceName,
+    					"[" 
+    					+ person.getLocationTag().getLocale()
+//    					+ person.getLocationStateType().getName() 
+    					+ "] " + person.getName() +
+                        " is inside the settlement but isn't in a building");
+            	return null;
             }
 
             result = new WalkState(WalkState.BUILDING_LOC);
             result.building = building;
+            
+			LogConsolidated.log(logger, Level.FINER, 4000, sourceName,
+					"[" 
+					+ person.getLocationTag().getLocale()
+					+ "] " 
+					+ person.getName()
+                    + " (" + person.getLocationStateType().getName() + ")"
+                    + " in " + building
+					+ " (WalkState : BUILDING_LOC)."
+					);
 
-            if (!LocalAreaUtil.checkLocationWithinLocalBoundedObject(person.getXLocation(),
-                    person.getYLocation(), building)) {
-
-    			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName, 		
-    					"[" + person.getSettlement() + "] " + person.getName() + " has invalid walk start location. (" +
-                        person.getXLocation() + ", " + person.getYLocation() + ") is not within " 
-            					+ building, null);
-                //throw new IllegalStateException(person.getName() + " has invalid walk start location. (" +
-                //    person.getXLocation() + ", " + person.getYLocation() + ") is not within building " + building);
-            }
+//			// TODO: why is checkLocationWithinLocalBoundedObject() troublesome ?
+//            if (!LocalAreaUtil.checkLocationWithinLocalBoundedObject(person.getXLocation(),
+//                    person.getYLocation(), building)) {
+//
+//    			LogConsolidated.log(Level.WARNING, 0, sourceName, 		
+//// 				throw new IllegalStateException(
+//    					"[" 
+//    					+ person.getLocationTag().getLocale() 
+//    					+ "] " 
+//    					+ person.getName() 
+//    					+ " (" + person.getLocationStateType().getName() + ")"
+//    					+ " has invalid walk start loc @ (" +
+//                        Math.round(person.getXLocation()*10.0)/10.0 + ", " 
+// 						+ Math.round(person.getYLocation()*10.0)/10.0 
+// 						+ "). Should have been within " + building + " in " + person.getSettlement());
+// 				
+//            	return null;
+//            }
         }
         else if (person.isInVehicle()) {
 
@@ -183,29 +225,58 @@ implements Serializable {
             if (vehicle instanceof Rover) {
                 result = new WalkState(WalkState.ROVER_LOC);
                 result.rover = (Rover) vehicle;
-
-                if (!LocalAreaUtil.checkLocationWithinLocalBoundedObject(person.getXLocation(),
-                        person.getYLocation(), vehicle)) {
-                	// 2016-12-12 java.lang.IllegalStateException: Ralph Radske has invalid walk start location. (-52.43904870061289, 53.26900723773019) is not within vehicle Spirit II
-        			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
-        				"[" + vehicle + "] " + person.getName() + " has invalid walk start location. (" +
-                        person.getXLocation() + ", " + person.getYLocation() + ") is not within the vehicle.", null);
-                    //throw new IllegalStateException(person.getName() + " has invalid walk start location. (" +
-                    //       person.getXLocation() + ", " + person.getYLocation() + ") is not within vehicle " + vehicle);
-                }
+                
+    			LogConsolidated.log(logger, Level.FINER, 4000, sourceName,
+    					"[" 
+    					+ person.getLocationTag().getLocale()
+    					+ "] " 
+    					+ person.getName()
+                        + " (" + person.getLocationStateType().getName() + ")"
+                        + " in " + vehicle
+    					+ " (WalkState : ROVER_LOC)."
+    					);
+    			
+//                if (!LocalAreaUtil.checkLocationWithinLocalBoundedObject(person.getXLocation(),
+//                        person.getYLocation(), vehicle)) {
+//                	
+//        			LogConsolidated.log(Level.SEVERE, 5_000, sourceName,
+////        			throw new IllegalStateException(		
+//        					"[" 
+//        					+ person.getLocationTag().getLocale()
+////        					+ person.getLocationStateType().getName() 
+//        					+ "] " 
+//        				+ person.getName() + " was supposed to be inside " + vehicle 
+//        				+ " but had an invalid location at (" 
+//        				+ Math.round(person.getXLocation()*10.0)/10.0 + ", " 
+//        				+ Math.round(person.getYLocation()*10.0)/10.0 + ").");
+//        			return null;
+//                }
             }
             else {
                 result = new WalkState(WalkState.OUTSIDE_LOC);
+  
+    			LogConsolidated.log(logger, Level.FINER, 4000, sourceName,
+    					"[" 
+    					+ person.getLocationTag().getLocale()
+    					+ "] " 
+    					+ person.getName()
+                        + " (" + person.getLocationStateType().getName() + ")"
+    					+ " (WalkState : OUTSIDE_LOC)."
+    					);
             }
         }
-        else if (person.isOutside()) {
-
-            result = new WalkState(WalkState.OUTSIDE_LOC);
-        }
+        
         else {
-			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
-					"[" + person.getLocationStateType().getName() + "] " + person.getName() +
-                    " is in an invalid location situation for walking task " , null);
+        	
+			LogConsolidated.log(logger, Level.WARNING, 4000, sourceName,
+					"[" 
+					+ person.getLocationTag().getLocale()
+					+ "] " 
+					+ person.getName()
+                    + " (" + person.getLocationStateType().getName() + ")"
+					+ " (invalid WalkState)."
+					);
+			
             //throw new IllegalStateException(person.getName() +
             //        " is in an invalid location situation for walking task: " + locationSituation);
         }
@@ -234,22 +305,22 @@ implements Serializable {
             result = new RobotWalkState(RobotWalkState.BUILDING_LOC);
             result.building = building;
 
-            if (!LocalAreaUtil.checkLocationWithinLocalBoundedObject(robot.getXLocation(),
+            if (!LocalAreaUtil.isLocationWithinLocalBoundedObject(robot.getXLocation(),
                     robot.getYLocation(), building)) {
             	LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
             			"[" + robot.getSettlement() + "] " + robot.getName() + " has invalid walk start location. (" +
-                        robot.getXLocation() + ", " + robot.getYLocation() + ") is not within building " + building, null);
+                        robot.getXLocation() + ", " + robot.getYLocation() + ") is not within building " + building);
                 //throw new IllegalStateException(robot.getName() + " has invalid walk start location. (" +
                 //    robot.getXLocation() + ", " + robot.getYLocation() + ") is not within building " + building);
             }
         }
 
-//        else if (robot.isInVehicle()) {//LocationSituation.IN_VEHICLE == locationSituation) {
+//        else if (robot.isInVehicle()) {
 //
 //            Vehicle vehicle = robot.getVehicle();
 //
 //            if (vehicle instanceof Rover) {
-//                result = new WalkState(WalkState.ROVER_LOC);
+//                result = new RobotWalkState(RobotWalkState.ROVER_LOC);
 //                result.rover = (Rover) vehicle;
 //
 //                if (!LocalAreaUtil.checkLocationWithinLocalBoundedObject(robot.getXLocation(),
@@ -259,18 +330,18 @@ implements Serializable {
 //                }
 //            }
 //            else {
-//                result = new WalkState(WalkState.OUTSIDE_LOC);
+//                result = new RobotWalkState(RobotWalkState.OUTSIDE_LOC);
 //            }
 //        }
-//        else if (LocationSituation.OUTSIDE == locationSituation) {
+//        else if (robot.isOutside()) {
 //
-//            result = new WalkState(WalkState.OUTSIDE_LOC);
+//            result = new RobotWalkState(RobotWalkState.OUTSIDE_LOC);
 //        }
 
         else {
         	LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
         			"[" + robot.getLocationStateType().getName() + "] " + robot.getName() +
-                    " is in an invalid location situation for walking task ", null);
+                    " is in an invalid location situation for walking task.");
             //throw new IllegalStateException(robot.getName() +
             //        " is in an invalid location situation for walking task: " + locationSituation);
         }
@@ -301,17 +372,17 @@ implements Serializable {
             result = new WalkState(WalkState.BUILDING_LOC);
             result.building = building;
 
-            if (!LocalAreaUtil.checkLocationWithinLocalBoundedObject(xLoc, yLoc, building)) {
+            if (!LocalAreaUtil.isLocationWithinLocalBoundedObject(xLoc, yLoc, building)) {
             	if (person != null)
-            		LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
+            		LogConsolidated.log(logger, Level.SEVERE, 4000, sourceName,
             			"[" + person.getSettlement() + "] " + person +		
     					" has an invalid walk destination location. (" +
-                        xLoc + ", " + yLoc + ") is not within building " + building, null);
+                        xLoc + ", " + yLoc + ") is not within building " + building);
             	else if (robot != null)
-        			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
+        			LogConsolidated.log(logger, Level.SEVERE, 4000, sourceName,
                 			"[" + robot.getSettlement() + "] " + robot +		
         					" has an invalid walk destination location. (" +
-                            xLoc + ", " + yLoc + ") is not within building " + building, null);
+                            xLoc + ", " + yLoc + ") is not within building " + building);
                 //throw new IllegalStateException("Invalid walk destination location. (" +
                 //    xLoc + ", " + yLoc + ") is not within building " + building);
             }
@@ -323,17 +394,17 @@ implements Serializable {
 	            result = new WalkState(WalkState.ROVER_LOC);
 	            result.rover = rover;
 	
-	            if (!LocalAreaUtil.checkLocationWithinLocalBoundedObject(xLoc, yLoc, rover)) {
+	            if (!LocalAreaUtil.isLocationWithinLocalBoundedObject(xLoc, yLoc, rover)) {
 	            	if (person != null)
 	            		LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
 	            			"[" + person.getSettlement() + "] " + person +		
 	    					" has an invalid walk destination location. (" +
-	                        xLoc + ", " + yLoc + ") is not within rover " + rover, null);
+	                        xLoc + ", " + yLoc + ") is not within rover " + rover);
 	            	else if (robot != null)
 	        			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
 	                			"[" + robot.getSettlement() + "] " + robot +		
 	        					" has an invalid walk destination location. (" +
-	                            xLoc + ", " + yLoc + ") is not within rover " + rover, null);
+	                            xLoc + ", " + yLoc + ") is not within rover " + rover);
 	                //throw new IllegalStateException("Invalid walk destination location. (" +
 	                //    xLoc + ", " + yLoc + ") is not within rover " + rover);
 	            }
@@ -368,13 +439,13 @@ implements Serializable {
             result = new RobotWalkState(RobotWalkState.BUILDING_LOC);
             result.building = building;
 
-            if (!LocalAreaUtil.checkLocationWithinLocalBoundedObject(xLoc, yLoc, building)) {
+            if (!LocalAreaUtil.isLocationWithinLocalBoundedObject(xLoc, yLoc, building)) {
         			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
                 			"[" + robot.getSettlement() + "] " + robot +		
         					" has an invalid walk destination location. (" +
-                            xLoc + ", " + yLoc + ") is not within building " + building, null);
-                //throw new IllegalStateException("Invalid walk destination location. (" +
-                //    xLoc + ", " + yLoc + ") is not within building " + building);
+                            xLoc + ", " + yLoc + ") is not within building " + building);
+//                throw new IllegalStateException("Invalid walk destination location. (" +
+//                    xLoc + ", " + yLoc + ") is not within building " + building);
             }
         }
 //        else if (interiorObject instanceof Rover) {
@@ -386,7 +457,7 @@ implements Serializable {
 //	
 //	            if (!LocalAreaUtil.checkLocationWithinLocalBoundedObject(xLoc, yLoc, rover)) {
 //
-//	        			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
+//	        			LogConsolidated.log(Level.SEVERE, 5000, sourceName,
 //	                			"[" + robot.getSettlement() + "] " + robot +		
 //	        					" has an invalid walk destination location. (" +
 //	                            xLoc + ", " + yLoc + ") is not within rover " + rover, null);
@@ -436,6 +507,9 @@ implements Serializable {
 	            case WalkState.OUTSIDE_LOC:     determineOutsideWalkingSteps(initialWalkState,
 	                    destinationWalkState);
 	                                            break;
+	            case WalkState.LADDER_LOC:		determineLadderWalkingSteps(initialWalkState,
+	                    destinationWalkState);
+	                                            break;                                
 	            default:                        throw new IllegalArgumentException("Invalid walk state type: " +
 	                    initialWalkState.stateType);
 	        }
@@ -566,7 +640,7 @@ implements Serializable {
 
         Building initialBuilding = initialWalkState.building;
         Building destinationBuilding = destinationWalkState.building;
-        Settlement settlement = initialBuilding.getBuildingManager().getSettlement();
+        Settlement settlement = initialBuilding.getSettlement();
 
         // Check if two buildings have walkable path.
         if (settlement.getBuildingConnectorManager().hasValidPath(initialBuilding, destinationBuilding)) {
@@ -583,15 +657,15 @@ implements Serializable {
             if (airlock == null) {
                 canWalkAllSteps = false;
                 if (person != null)
-        			LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
+        			LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
         					"[" + person.getSettlement() + "] " + person.getName()
                 		+ " in " + person.getBuildingLocation().getNickName()
-                		+ " cannot find walkable airlock from building interior to building interior.", null);
+                		+ " cannot find walkable airlock from building interior to building interior.");
                 else if (robot != null)
-                	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
+                	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
         					"[" + robot.getSettlement() + "] " + robot.getName()
                     		+ " in " + robot.getBuildingLocation().getNickName()
-                    		+ " cannot find walkable airlock from building interior to building interior.", null);
+                    		+ " cannot find walkable airlock from building interior to building interior.");
 
                 return;
             }
@@ -625,7 +699,7 @@ implements Serializable {
 
         Building initialBuilding = initialWalkState.building;
         Building destinationBuilding = destinationWalkState.building;
-        Settlement settlement = initialBuilding.getBuildingManager().getSettlement();
+        Settlement settlement = initialBuilding.getSettlement();
 
         // Check if two buildings have walkable path.
         if (settlement.getBuildingConnectorManager().hasValidPath(initialBuilding, destinationBuilding)) {
@@ -646,7 +720,7 @@ implements Serializable {
 
         Building initialBuilding = initialWalkState.building;
         Rover destinationRover = destinationWalkState.rover;
-        Settlement settlement = initialBuilding.getBuildingManager().getSettlement();
+        Settlement settlement = initialBuilding.getSettlement();
 
         // Check if rover is parked in garage or outside.
         Building garageBuilding = BuildingManager.getBuilding(destinationRover);
@@ -675,15 +749,15 @@ implements Serializable {
             if (airlock == null) {
                 canWalkAllSteps = false;
                 if (person != null)
-                	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
+                	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
         					"[" + person.getSettlement() + "] " + person.getName()
                 		+ " in " + person.getBuildingLocation().getNickName()
-                		+ " cannot find walkable airlock from building interior to building interior.", null);
+                		+ " cannot find walkable airlock from building interior to building interior.");
                 else if (robot != null)
-                	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
+                	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
         					"[" + robot.getSettlement() + "] " + robot.getName()
                     		+ " in " + robot.getBuildingLocation().getNickName()
-                    		+ " cannot find walkable airlock from building interior to building interior.", null);
+                    		+ " cannot find walkable airlock from building interior to building interior.");
                return;
             }
 
@@ -716,23 +790,25 @@ implements Serializable {
             WalkState destinationWalkState) {
 
         Building initialBuilding = initialWalkState.building;
-        Settlement settlement = initialBuilding.getBuildingManager().getSettlement();
+        Settlement settlement = initialBuilding.getSettlement();
 
         // Find closest walkable airlock to destination.
         Airlock airlock = settlement.getClosestWalkableAvailableAirlock(initialBuilding,
                 destinationWalkState.xLoc, destinationWalkState.yLoc);
         if (airlock == null) {
             canWalkAllSteps = false;
-            if (person != null)
-            	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
+            if (person != null) {
+            	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
     					"[" + person.getSettlement() + "] " + person.getName()
             		+ " in " + person.getBuildingLocation().getNickName()
-            		+ " cannot find walkable airlock from building interior to building interior.", null);
-            else if (robot != null)
-            	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
+            		+ " cannot find walkable airlock from building interior to building interior.");
+            }
+            else if (robot != null) {
+            	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
     					"[" + robot.getSettlement() + "] " + robot.getName()
                 		+ " in " + robot.getBuildingLocation().getNickName()
-                		+ " cannot find walkable airlock from building interior to building interior.", null);
+                		+ " cannot find walkable airlock from building interior to building interior.");
+            }
            return;
         }
 
@@ -979,7 +1055,7 @@ implements Serializable {
 
         Airlock airlock = initialWalkState.airlock;
         Building destinationBuilding = destinationWalkState.building;
-        Settlement settlement = destinationBuilding.getBuildingManager().getSettlement();
+        Settlement settlement = destinationBuilding.getSettlement();
 
         // Check if airlock is for a building or a rover.
         if (airlock.getEntity() instanceof Building) {
@@ -1048,7 +1124,7 @@ implements Serializable {
             if (garageBuilding != null) {
 
                 // Check if garage building has a walkable interior path from airlock building.
-                Settlement settlement = airlockBuilding.getBuildingManager().getSettlement();
+                Settlement settlement = airlockBuilding.getSettlement();
                 if (settlement.getBuildingConnectorManager().hasValidPath(airlockBuilding, garageBuilding)) {
 
                     // Add settlement interior walk step.
@@ -1188,7 +1264,7 @@ implements Serializable {
             Building airlockBuilding = (Building) airlock.getEntity();
 
             // Check if valid interior walking path between airlock building and destination building.
-            Settlement settlement = airlockBuilding.getBuildingManager().getSettlement();
+            Settlement settlement = airlockBuilding.getSettlement();
             if (settlement.getBuildingConnectorManager().hasValidPath(airlockBuilding, destinationBuilding)) {
 
                 // Create enter airlock walk step.
@@ -1229,23 +1305,26 @@ implements Serializable {
                     // Cannot walk to destination building.
                     canWalkAllSteps = false;
 
-                    if (person != null)
-                    	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
-            					"[" + person.getLocationTag().getQuickLocation()  + "] " + person.getName()
+                    if (person != null) {
+                    	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
+            					"[" + person.getLocationTag().getLocale()  + "] " + person.getName()
             					+ " in " + person.getBuildingLocation().getNickName()
-                        		+ " cannot find walkable airlock from building airlock exterior to building interior.", null);
-                    else if (robot != null)
-                    	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
-            					"[" + robot.getLocationTag().getQuickLocation()  + "] " + robot.getName()
+                        		+ " cannot find walkable airlock from building airlock exterior to building interior.");
+                    }
+                    else if (robot != null) {
+                    	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
+            					"[" + robot.getLocationTag().getLocale()  + "] " + robot.getName()
                         		+ " in " + robot.getBuildingLocation().getNickName()
-                        		+ " cannot find walkable airlock from building airlock exterior to building interior.", null);
-
+                        		+ " cannot find walkable airlock from building airlock exterior to building interior.");
+                    }
+                    
+                    return;
                 }
             }
         }
         else if (airlock.getEntity() instanceof Rover) {
 
-            Settlement settlement = destinationBuilding.getBuildingManager().getSettlement();
+            Settlement settlement = destinationBuilding.getSettlement();
 
             // Determine closest airlock to destination building.
             Airlock destinationAirlock = settlement.getClosestWalkableAvailableAirlock(destinationBuilding,
@@ -1271,15 +1350,15 @@ implements Serializable {
                 canWalkAllSteps = false;
                 
                 if (person != null)
-                	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
-        					"[" + person.getLocationTag().getQuickLocation() + "] " + person.getName()
+                	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
+        					"[" + person.getLocationTag().getLocale() + "] " + person.getName()
         					+ " in " + person.getBuildingLocation().getNickName()
-                    		+ " cannot find walkable airlock from rover airlock exterior to building interior.", null);
+                    		+ " cannot find walkable airlock from rover airlock exterior to building interior.");
                 else if (robot != null)
-                	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
-        					"[" + robot.getLocationTag().getQuickLocation()  + "] " + robot.getName()
+                	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
+        					"[" + robot.getLocationTag().getLocale()  + "] " + robot.getName()
                     		+ " in " + robot.getBuildingLocation().getNickName()
-                    		+ " cannot find walkable airlock from rover airlock exterior to building interior.", null);
+                    		+ " cannot find walkable airlock from rover airlock exterior to building interior.");
                 
             }
         }
@@ -1303,7 +1382,7 @@ implements Serializable {
         Building garageBuilding = BuildingManager.getBuilding(destinationRover);
         if (garageBuilding != null) {
 
-            Settlement settlement = garageBuilding.getBuildingManager().getSettlement();
+            Settlement settlement = garageBuilding.getSettlement();
             Airlock destinationAirlock = settlement.getClosestWalkableAvailableAirlock(garageBuilding,
                     initialWalkState.xLoc, initialWalkState.yLoc);
             if (destinationAirlock != null) {
@@ -1345,15 +1424,15 @@ implements Serializable {
                 canWalkAllSteps = false;
            
                 if (person != null)
-                	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
-        					"[" + person.getLocationTag().getQuickLocation() + "] " + person.getName()
+                	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
+        					"[" + person.getLocationTag().getLocale() + "] " + person.getName()
         					+ " in " + person.getBuildingLocation().getNickName()
-                    		+ " cannot find walkable airlock from airlock exterior to rover in garage.", null);
+                    		+ " cannot find walkable airlock from airlock exterior to rover in garage.");
                 else if (robot != null)
-                	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
-        					"[" + robot.getLocationTag().getQuickLocation() + "] " + robot.getName()
+                	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
+        					"[" + robot.getLocationTag().getLocale() + "] " + robot.getName()
                     		+ " in " + robot.getBuildingLocation().getNickName()
-                    		+ " cannot find walkable airlock from airlock exterior to rover in garage.", null);
+                    		+ " cannot find walkable airlock from airlock exterior to rover in garage.");
                 
             }
         }
@@ -1440,7 +1519,7 @@ implements Serializable {
             WalkState destinationWalkState) {
 
         Building destinationBuilding = destinationWalkState.building;
-        Settlement settlement = destinationBuilding.getBuildingManager().getSettlement();
+        Settlement settlement = destinationBuilding.getSettlement();
 
         // Determine closest airlock to destination building.
         Airlock destinationAirlock = settlement.getClosestWalkableAvailableAirlock(destinationBuilding,
@@ -1464,20 +1543,18 @@ implements Serializable {
 
             // Cannot walk to destination building.
             canWalkAllSteps = false;
-            logger.severe("Cannot find walkable airlock from outside to building interior.");
+//            logger.severe("Cannot find walkable airlock from outside to building interior.");
             
             if (person != null)
-            	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
-    					"[" + person.getLocationTag().getQuickLocation() + "] " + person.getName()
+            	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
+    					"[" + person.getLocationTag().getLocale() + "] " + person.getName()
     					+ " in " + person.getBuildingLocation().getNickName()
-                		+ " cannot find walkable airlock from outside to building interior.", null);
+                		+ " cannot find walkable airlock from outside to building interior.");
             else if (robot != null)
-            	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
-    					"[" + robot.getLocationTag().getQuickLocation() + "] " + robot.getName()
+            	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
+    					"[" + robot.getLocationTag().getLocale() + "] " + robot.getName()
                 		+ " in " + robot.getBuildingLocation().getNickName()
-                		+ " cannot find walkable airlock from outside to building interior.", null);
-            
-            
+                		+ " cannot find walkable airlock from outside to building interior.");    
         }
     }
 
@@ -1495,7 +1572,7 @@ implements Serializable {
         Building garageBuilding = BuildingManager.getBuilding(destinationRover);
         if (garageBuilding != null) {
 
-            Settlement settlement = garageBuilding.getBuildingManager().getSettlement();
+            Settlement settlement = garageBuilding.getSettlement();
             Airlock destinationAirlock = settlement.getClosestWalkableAvailableAirlock(garageBuilding,
                     initialWalkState.xLoc, initialWalkState.yLoc);
             if (destinationAirlock != null) {
@@ -1519,15 +1596,15 @@ implements Serializable {
                 canWalkAllSteps = false;
                 
                 if (person != null)
-                	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
-        					"[" + person.getLocationTag().getQuickLocation() + "] " + person.getName()
+                	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
+        					"[" + person.getLocationTag().getLocale() + "] " + person.getName()
         					+ " in " + person.getBuildingLocation().getNickName()
-                    		+ " cannot find walkable airlock from outside to rover in garage.", null);
+                    		+ " cannot find walkable airlock from outside to rover in garage.");
                 else if (robot != null)
-                	LogConsolidated.log(logger, Level.WARNING, 10000, sourceName,
-        					"[" + robot.getLocationTag().getQuickLocation()  + "] " + robot.getName()
+                	LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
+        					"[" + robot.getLocationTag().getLocale()  + "] " + robot.getName()
                     		+ " in " + robot.getBuildingLocation().getNickName()
-                    		+ " cannot find walkable airlock from outside to rover in garage.", null);
+                    		+ " cannot find walkable airlock from outside to rover in garage.");
                 
             }
         }
@@ -1562,6 +1639,29 @@ implements Serializable {
         createWalkExteriorStep(destinationWalkState.xLoc, destinationWalkState.yLoc);
     }
 
+    /**
+     * Determine the walking steps in climbing up and down the ladder of a multi-level building
+     * 
+     * @param initialWalkState the initial walk state.
+     * @param destinationWalkState the destination walk state.
+     */
+    private void determineLadderWalkingSteps(WalkState initialWalkState,
+            WalkState destinationWalkState) {
+
+        Building destinationBuilding = destinationWalkState.building;
+//        Settlement settlement = destinationBuilding.getSettlement();
+
+        if (destinationBuilding.isAHabOrHub()) {
+        	
+//        	createClimbUpStep(destinationWalkState.xLoc, destinationWalkState.yLoc, destinationWalkState.zLoc,
+//                    destinationBuilding);
+//        	
+//        	createClimbDownStep(destinationWalkState.xLoc, destinationWalkState.yLoc, destinationWalkState.zLoc,
+//                    destinationBuilding);
+        }
+  
+    }
+    
     /**
      * Create a rover interior walking step.
      * @param destXLoc the destination X location.
@@ -1604,6 +1704,60 @@ implements Serializable {
     }
 
     /**
+     * Create a climb up step.
+     * 
+     * @param destXLoc the destination X location.
+     * @param destYLoc the destination Y location.
+     * @param destZLoc the destination Z location.
+     * @param destinationBuilding the destination building.
+     */
+    private void createClimbUpStep(double destXLoc, double destYLoc, double destZLoc,
+            Building destinationBuilding) {
+       if (person != null) {
+           WalkStep walkStep = new WalkStep(WalkStep.UP_LADDER);
+           walkStep.xLoc = destXLoc;
+           walkStep.yLoc = destYLoc;
+           walkStep.zLoc = destZLoc;
+           walkStep.building = destinationBuilding;
+           walkingSteps.add(walkStep);        	
+        }
+        else if (robot != null ){
+//            RobotWalkStep walkStep = new RobotWalkStep(RobotWalkStep.UP_LADDER);
+//            walkStep.xLoc = destXLoc;
+//            walkStep.yLoc = destYLoc;
+//            walkStep.building = destinationBuilding;
+//            robotWalkingSteps.add(walkStep);       	
+        }
+    }
+    
+    /**
+     * Create a climb up step.
+     * 
+     * @param destXLoc the destination X location.
+     * @param destYLoc the destination Y location.
+     * @param destZLoc the destination Z location.
+     * @param destinationBuilding the destination building.
+     */
+    private void createClimbDownStep(double destXLoc, double destYLoc, double destZLoc,
+            Building destinationBuilding) {
+       if (person != null) {
+           WalkStep walkStep = new WalkStep(WalkStep.DOWN_LADDER);
+           walkStep.xLoc = destXLoc;
+           walkStep.yLoc = destYLoc;
+           walkStep.zLoc = destZLoc;
+           walkStep.building = destinationBuilding;
+           walkingSteps.add(walkStep);        	
+        }
+        else if (robot != null ){
+//            RobotWalkStep walkStep = new RobotWalkStep(RobotWalkStep.UP_LADDER);
+//            walkStep.xLoc = destXLoc;
+//            walkStep.yLoc = destYLoc;
+//            walkStep.building = destinationBuilding;
+//            robotWalkingSteps.add(walkStep);       	
+        }
+    }
+    
+    /**
      * Create an exterior walking step.
      * @param destXLoc the destination X location.
      * @param destYLoc the destination Y location.
@@ -1638,6 +1792,7 @@ implements Serializable {
         walkingSteps.add(enterAirlockStep);
     }
 
+    
     /**
      * Inner class for representing a walking state.
      */
@@ -1649,11 +1804,14 @@ implements Serializable {
         private static final int EXTERIOR_AIRLOCK = 2;
         private static final int ROVER_LOC = 3;
         private static final int OUTSIDE_LOC = 4;
-
+        private static final int LADDER_LOC = 5;
+        
         // Data members
         private int stateType;
         private double xLoc;
         private double yLoc;
+        private double zLoc;
+        
         private Building building;
         private Rover rover;
         private Airlock airlock;
@@ -1679,11 +1837,15 @@ implements Serializable {
         static final int ENTER_AIRLOCK = 4;
         static final int ENTER_GARAGE_ROVER = 5;
         static final int EXIT_GARAGE_ROVER = 6;
-
+        static final int UP_LADDER = 7;
+        static final int DOWN_LADDER = 8;
+        
         // Data members
         int stepType;
         double xLoc;
         double yLoc;
+        double zLoc;
+        
         Building building;
         Rover rover;
         Airlock airlock;

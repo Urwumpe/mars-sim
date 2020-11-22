@@ -1,0 +1,20 @@
+{
+	"subject": "Botany",
+	"topics": [
+			{"topic": "Airborne Droplets & Irrigations"},
+			{"topic": "Buildup of Biomass"},			
+			{"topic": "CO2 Fixations"},
+			{"topic": "Crop Yield"},
+			{"topic": "Martian Photosynthetic Activities"},
+			{"topic": "Martian Plastids & Pigments"},
+			{"topic": "Nucleic Acid & Clay"},
+			{"topic": "Proteins, Coenzymes & Histidine"},
+			{"topic": "Organic Energy Transducers"},
+ 			{"topic": "Oxygen Content"},
+ 			{"topic": "Tolerance Level of Arsenic in Plants"},			 
+			{"topic": "Plant Physiology"},
+			{"topic": "Primordial Soup"},
+			{"topic": "Solar Irradiation"},
+			{"topic": "Toxicity of Martian Regolith"}
+	]
+}

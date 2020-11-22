@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RecordActivityMeta.java
- * @version 3.1.0 2018-06-09
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -12,11 +12,13 @@ import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.RoleType;
 import org.mars_sim.msp.core.person.ai.job.JobType;
+import org.mars_sim.msp.core.person.ai.role.RoleType;
 import org.mars_sim.msp.core.person.ai.task.RecordActivity;
-import org.mars_sim.msp.core.person.ai.task.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * Meta task for the RecordActivity task.
@@ -44,23 +46,42 @@ public class RecordActivityMeta implements MetaTask, Serializable {
 
     @Override
     public double getProbability(Person person) {
-
-         double result = 0D;
+    	
+    	// Do not allow to record activity outside for now
+    	if (person.isOutside())
+    		return 0;
+    	
+    	double result = 0D;
       
         // Probability affected by the person's stress and fatigue.
         PhysicalCondition condition = person.getPhysicalCondition();
+        double fatigue = condition.getFatigue();
+        double stress = condition.getStress();
+        double hunger = condition.getHunger();
         
-        if (JobType.getJobType(person.getMind().getJob().getName(person.getGender())) == JobType.getJobType(REPORTER)) {
+        if (fatigue > 1500 || stress > 75 || hunger > 750)
+        	return 0;
         
-        	result += 300D;
-        	
+        if (JobType.getJobType(person.getMind().getJob().getName(person.getGender())) == JobType.getJobType(REPORTER)) {      
+        	result += RandomUtil.getRandomDouble(200);
         }
         
+        double pref = person.getPreference().getPreferenceScore(this);
+         
+      	result = result + result * pref/6D;
+        
+   
+        
+
+        // Modify if operation is the person's favorite activity.
+        if (person.getFavorite().getFavoriteActivity() == FavoriteType.OPERATION) {
+            result *= 1.25D;
+        }
         if (person.isInside()) {
                     
-            if (condition.getFatigue() < 1200D || condition.getStress() < 75D || condition.getHunger() < 750D) {
+            if (fatigue < 1200D || stress < 75D || hunger < 750D) {
             	
-            	result -= (condition.getFatigue()/150D + condition.getStress()/15D + condition.getHunger()/150);
+            	result -= (fatigue/50 + stress/15 + hunger/50);
             }
             
             // TODO: what drives a person go to a particular building ? 
@@ -68,8 +89,8 @@ public class RecordActivityMeta implements MetaTask, Serializable {
     	}
         
         else {
-            if (condition.getFatigue() < 600D && condition.getStress() < 25D|| condition.getHunger() < 500D) {
-            	result -= (condition.getFatigue()/100D + condition.getStress()/10D + condition.getHunger()/100);
+            if (fatigue < 600D && stress< 25D|| hunger < 500D) {
+            	result -= (fatigue/100 + stress/10 + hunger/50);
             }
             else
             	result = 0;
@@ -78,16 +99,13 @@ public class RecordActivityMeta implements MetaTask, Serializable {
         // Effort-driven task modifier.
         result *= person.getPerformanceRating();
 
-        // Modify if operation is the person's favorite activity.
-        if (person.getFavorite().getFavoriteActivity() == FavoriteType.OPERATION) {
-            result *= 1.25D;
-        }
-
+        result *= .5 * person.getAssociatedSettlement().getGoodsManager().getTourismFactor();
+        
         if (result > 0) {
             RoleType roleType = person.getRole().getType();
 
             if (roleType != null && roleType == RoleType.PRESIDENT)
-            	result -= 400D;
+            	result -= 300D;
             
         	else if (roleType == RoleType.MAYOR)
             	result -= 200D;
@@ -109,11 +127,6 @@ public class RecordActivityMeta implements MetaTask, Serializable {
             	result -= 10D;
             }
         }
-        
-        if (result > 0)
-         	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
-
-        result *= person.getAssociatedSettlement().getGoodsManager().getTourismFactor();
         
         if (result < 0) result = 0;
 		        

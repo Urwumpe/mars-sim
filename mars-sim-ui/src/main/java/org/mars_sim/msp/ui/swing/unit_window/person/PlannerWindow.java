@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PlannerWindow.java
- * @version 3.1.0 2017-03-19
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 
@@ -19,6 +19,7 @@ import java.awt.event.ActionListener;
 import java.text.DecimalFormat;
 import java.util.List;
 
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JInternalFrame;
@@ -31,14 +32,13 @@ import javax.swing.JTextField;
 import javax.swing.WindowConstants;
 import javax.swing.event.InternalFrameEvent;
 import javax.swing.event.InternalFrameListener;
-import javax.swing.plaf.basic.BasicComboBoxRenderer;
 import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.TaskSchedule;
-import org.mars_sim.msp.core.person.TaskSchedule.OneActivity;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule.OneActivity;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
@@ -49,6 +49,7 @@ import org.mars_sim.msp.ui.swing.tool.TableStyle;
 /**
  * The window for planning future activities.
  */
+@SuppressWarnings("serial")
 public class PlannerWindow
 extends JInternalFrame
 implements InternalFrameListener, ActionListener {
@@ -202,7 +203,7 @@ implements InternalFrameListener, ActionListener {
 	@Override
 	public void internalFrameClosing(InternalFrameEvent e) {
 		// TODO Auto-generated method stub
-		tabPanelSchedule.setViewer(null);
+//		tabPanelSchedule.setViewer(null);
 		//System.out.println("internalFrameClosing()");
 	}
 
@@ -210,7 +211,7 @@ implements InternalFrameListener, ActionListener {
 	@Override
 	public void internalFrameClosed(InternalFrameEvent e) {
 		// TODO Auto-generated method stub
-		tabPanelSchedule.setViewer(null);
+//		tabPanelSchedule.setViewer(null);
 		//System.out.println("internalFrameClosed()");
 	}
 
@@ -248,7 +249,7 @@ implements InternalFrameListener, ActionListener {
 		// Update if necessary.
 	}
 
-	class PromptComboBoxRenderer extends BasicComboBoxRenderer {
+	class PromptComboBoxRenderer extends DefaultListCellRenderer {
 
 		private static final long serialVersionUID = 1L;
 		private String prompt;
@@ -267,12 +268,15 @@ implements InternalFrameListener, ActionListener {
 			}
 
 			@Override
-		    public Component getListCellRendererComponent(JList list, Object value,
+		    public Component getListCellRendererComponent(JList<?> list, Object value,
 		            int index, boolean isSelected, boolean cellHasFocus) {
-		        JComponent result = (JComponent)super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+//		        JComponent result = (JComponent)super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
 		        //Component component = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+		        Component c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+				
 		        //component.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
-				if (value == null) {
+				
+		        if (value == null) {
 					setText( prompt );
 					//this.setForeground(Color.orange);
 			        //this.setBackground(new Color(184,134,11));
@@ -282,19 +286,19 @@ implements InternalFrameListener, ActionListener {
 				setText(" Sol " + value);
 
 				if (isSelected) {
-					result.setForeground(new Color(184,134,11));
-			        result.setBackground(Color.orange);
+					c.setForeground(new Color(184,134,11));
+			        c.setBackground(Color.orange);
 
 		          // unselected, and not the DnD drop location
 		        } else {
-		        	  result.setForeground(new Color(184,134,11));
-		        	  result.setBackground(new Color(255,229,204)); //pale yellow (255,229,204)
+		        	  c.setForeground(new Color(184,134,11));
+		        	  c.setBackground(new Color(255,229,204)); //pale yellow (255,229,204)
 				      //Color(184,134,11)) brown
 		        }
 
 		        //result.setOpaque(false);
 
-		        return result;
+		        return c;
 		    }
 	}
 

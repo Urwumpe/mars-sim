@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * StatusType.java
- * @version 3.1.0 2017-10-20
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  *
  */
@@ -17,7 +17,10 @@ public enum StatusType {
 	MOVING 				(Msg.getString("StatusType.moving")), //$NON-NLS-1$
 	PARKED 				(Msg.getString("StatusType.parked")), //$NON-NLS-1$
 	STUCK				(Msg.getString("StatusType.stuck")), //$NON-NLS-1$
-	TOWED 				(Msg.getString("StatusType.towed")); //$NON-NLS-1$	
+	TOWED 				(Msg.getString("StatusType.towed")), //$NON-NLS-1$	
+	TOWING 				(Msg.getString("StatusType.towing")), //$NON-NLS-1$	
+	OUT_OF_FUEL 		(Msg.getString("StatusType.outOfFuel")) //$NON-NLS-1$
+	;
 	
 	private String name;
 

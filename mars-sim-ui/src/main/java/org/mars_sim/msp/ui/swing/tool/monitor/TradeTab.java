@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TradeTab.java
-  * @version 3.1.0 2017-09-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -20,9 +20,14 @@ import org.mars_sim.msp.ui.swing.NumberCellRenderer;
  * This class represents a table of trade good values at settlements displayed
  * within the Monitor Window.
  */
+@SuppressWarnings("serial")
 public class TradeTab
 extends TableTab
 implements UnitManagerListener {
+	
+	/** The minimum number of decimal places to be displayed. */
+	private static final int NUM_DIGITS = 2;
+			
 	/**
 	 * constructor.
 	 * @param window {@link MonitorWindow} the containing window.
@@ -31,8 +36,8 @@ implements UnitManagerListener {
 		// Use TableTab constructor
 		super(window, new TradeTableModel(), true, false, MonitorWindow.TRADE_ICON);
 
-		// Override default cell renderer for format double values.
-		table.setDefaultRenderer(Double.class, new NumberCellRenderer(2));
+		// Override default cell renderer for formatting double values.
+		table.setDefaultRenderer(Double.class, new NumberCellRenderer(NUM_DIGITS, true));
 
 		// Add as unit manager listener.
 		Simulation.instance().getUnitManager().addUnitManagerListener(this);
@@ -59,7 +64,6 @@ implements UnitManagerListener {
 				}
 			}
 		}
-
 	}
 
 	/**

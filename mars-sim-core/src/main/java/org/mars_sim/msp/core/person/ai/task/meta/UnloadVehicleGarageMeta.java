@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * UnloadVehicleGarageMeta.java
- * @version 3.1.0 2017-10-23
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -12,14 +12,16 @@ import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.FavoriteType;
-import org.mars_sim.msp.core.person.LocationSituation;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.job.Job;
-import org.mars_sim.msp.core.person.ai.task.Task;
 import org.mars_sim.msp.core.person.ai.task.UnloadVehicleGarage;
+import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.ai.job.Deliverybot;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * Meta task for the UnloadVehicleGarage task.
@@ -53,6 +55,15 @@ public class UnloadVehicleGarageMeta implements MetaTask, Serializable {
 
         if (person.isInSettlement()) {
         	
+            // Probability affected by the person's stress and fatigue.
+            PhysicalCondition condition = person.getPhysicalCondition();
+            double fatigue = condition.getFatigue();
+            double stress = condition.getStress();
+            double hunger = condition.getHunger();
+            
+            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            	return 0;
+            
 	    	Settlement settlement = person.getSettlement();
 	  
             // Check all vehicle missions occurring at the settlement.
@@ -67,10 +78,7 @@ public class UnloadVehicleGarageMeta implements MetaTask, Serializable {
                 e.printStackTrace(System.err);
             }
             
-            // 2015-06-07 Added Preference modifier
-            if (result > 0)
-            	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
-            
+            if (result <= 0) result = 0;
 
             // Effort-driven task modifier.
             result *= person.getPerformanceRating();
@@ -84,9 +92,13 @@ public class UnloadVehicleGarageMeta implements MetaTask, Serializable {
 
             // Modify if operations is the person's favorite activity.
             if (person.getFavorite().getFavoriteActivity() == FavoriteType.OPERATION) {
-                result *= 2D;
+                result += RandomUtil.getRandomInt(1, 20);
             }
 
+            // Added Preference modifier
+            if (result > 0)
+            	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
+          
             if (result < 0) result = 0;
             
         }
@@ -105,7 +117,7 @@ public class UnloadVehicleGarageMeta implements MetaTask, Serializable {
         double result = 0D;
 
         if (robot.getBotMind().getRobotJob() instanceof Deliverybot)
-	        if (robot.getLocationSituation() == LocationSituation.IN_SETTLEMENT) {
+	        if (robot.isInSettlement()) {
 
 	            // Check all vehicle missions occurring at the settlement.
 	            try {

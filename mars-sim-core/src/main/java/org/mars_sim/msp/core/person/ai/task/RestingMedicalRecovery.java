@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RestingMedicalRecovery.java
- * @version 3.1.0 2017-10-21
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -17,6 +17,8 @@ import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -49,11 +51,13 @@ public class RestingMedicalRecovery extends Task implements Serializable {
     private static final TaskPhase RESTING = new TaskPhase(Msg.getString(
             "Task.phase.restingInBed")); //$NON-NLS-1$
 
+	private static final int MAX_FATIGUE = 1500;
+	
     /** Maximum resting duration (millisols) */
     private static final double RESTING_DURATION = 300D;
 
     /** The stress modified per millisol. */
-    private static final double STRESS_MODIFIER = -1.2D;
+    private static final double STRESS_MODIFIER = -2D;
 
     // Data members
     private MedicalAid medicalAid;
@@ -235,6 +239,9 @@ public class RestingMedicalRecovery extends Task implements Serializable {
             HealthProblem problem = i.next();
             if (problem.getRecovering() && problem.requiresBedRest()) {
                 problem.addBedRestRecoveryTime(time);
+    			LogConsolidated.flog(Level.FINE, 20_000, sourceName, "[" + person.getLocationTag().getLocale() + "] "
+    					+ person.getName() + " was taking a medical leave and resting "
+    					+ " in " + person.getLocationTag().getImmediateLocation());	
                 if (!problem.isCured()) {
                     remainingBedRest = true;
                 }
@@ -243,11 +250,16 @@ public class RestingMedicalRecovery extends Task implements Serializable {
 
         // If person has no more health problems requiring bed rest, end task.
         if (!remainingBedRest) {
+			LogConsolidated.flog(Level.FINE, 0, sourceName, "[" + person.getLocationTag().getLocale() + "] "
+					+ person.getName() + " ended the medical leave.");
             endTask();
         }
 
         // Reduce person's fatigue due to bed rest.
         double newFatigue = person.getPhysicalCondition().getFatigue() - (3D * time);
+        if (newFatigue > MAX_FATIGUE) {
+            newFatigue = MAX_FATIGUE;
+        }
         if (newFatigue < 0D) {
             newFatigue = 0D;
         }
@@ -262,7 +274,7 @@ public class RestingMedicalRecovery extends Task implements Serializable {
     }
 
     @Override
-    protected FunctionType getLivingFunction() {
+    public FunctionType getLivingFunction() {
         return FunctionType.MEDICAL_CARE;
     }
 

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ResupplyDetailPanel.java
- * @version 3.1.0 2017-11-21
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.resupply;
@@ -19,8 +19,7 @@ import java.util.Vector;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-
-
+import javax.swing.JTable;
 import javax.swing.SpringLayout;
 import javax.swing.SwingUtilities;
 import javax.swing.border.TitledBorder;
@@ -39,18 +38,17 @@ import org.mars_sim.msp.core.structure.BuildingTemplate;
 import org.mars_sim.msp.core.time.ClockListener;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.MasterClock;
-import org.mars_sim.msp.ui.javafx.MainScene;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
 import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
+import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
 
 /**
  * A panel showing a selected resupply mission details.
@@ -75,7 +73,7 @@ implements ClockListener, HistoricalEventListener {
 	private static MasterClock masterClock;
 	
 	private MainDesktopPane desktop;
-	private MainScene mainScene;
+//	private MainScene mainScene;
 	
 //	private double timeCache = 0;
 	private int solsToArrival = -1;
@@ -89,11 +87,11 @@ implements ClockListener, HistoricalEventListener {
 		super();
 
 		this.desktop = desktop;
-		this.mainScene = desktop.getMainScene();
+//		this.mainScene = desktop.getMainScene();
 		
-		currentTime = Simulation.instance().getMasterClock().getMarsClock();
 		masterClock = Simulation.instance().getMasterClock();
-		
+		currentTime = masterClock.getMarsClock();
+	
 		// Initialize data members.
 		resupply = null;
 
@@ -190,7 +188,7 @@ implements ClockListener, HistoricalEventListener {
 		SpringUtilities.makeCompactGrid(springPane,
 		                                6, 2, //rows, cols
 		                                20, 5,        //initX, initY
-		                                20, 1);       //xPad, yPad
+		                                20, 2);       //xPad, yPad
 
 
 		// Create the outer supply panel.
@@ -365,7 +363,7 @@ implements ClockListener, HistoricalEventListener {
 			}
 
 			// Create table
-			WebTable buildingTable = new WebTable(tableModel);
+			JTable buildingTable = new ZebraJTable(tableModel);
 			TableStyle.setTableStyle(buildingTable);
 			buildingTable.setAutoCreateRowSorter(true);
 			buildingTable.setCellSelectionEnabled(false);
@@ -440,7 +438,7 @@ implements ClockListener, HistoricalEventListener {
 			}
 
 			// Create table
-			WebTable vehicleTable = new WebTable(tableModel);
+			JTable vehicleTable = new ZebraJTable(tableModel);
 			TableStyle.setTableStyle(vehicleTable);
 			vehicleTable.setAutoCreateRowSorter(true);
 			vehicleTable.setCellSelectionEnabled(false);
@@ -501,7 +499,7 @@ implements ClockListener, HistoricalEventListener {
 			}
 
 			// Create table
-			WebTable equipmentTable = new WebTable(tableModel);
+			JTable equipmentTable = new ZebraJTable(tableModel);
 			TableStyle.setTableStyle(equipmentTable);
 			equipmentTable.setAutoCreateRowSorter(true);
 			equipmentTable.setCellSelectionEnabled(false);
@@ -565,7 +563,7 @@ implements ClockListener, HistoricalEventListener {
 			}
 
 			// Create table
-			WebTable resourcesTable = new WebTable(tableModel);
+			JTable resourcesTable = new ZebraJTable(tableModel);
 			TableStyle.setTableStyle(resourcesTable);
 			resourcesTable.setAutoCreateRowSorter(true);
 			resourcesTable.setCellSelectionEnabled(false);
@@ -629,7 +627,7 @@ implements ClockListener, HistoricalEventListener {
 			}
 
 			// Create table
-			WebTable partsTable = new WebTable(tableModel);
+			JTable partsTable = new ZebraJTable(tableModel);
 			TableStyle.setTableStyle(partsTable);
 			partsTable.setAutoCreateRowSorter(true);
 			partsTable.setAutoCreateRowSorter(true);
@@ -654,7 +652,7 @@ implements ClockListener, HistoricalEventListener {
 	private void updateTimeToArrival() {
 		String timeArrival = "---";
 		solsToArrival = -1;
-		MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
+//		MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
 		double timeDiff = MarsClock.getTimeDiff(resupply.getArrivalDate(), currentTime);
 		if (timeDiff > 0D) {
 			solsToArrival = (int) Math.abs(timeDiff / 1000D);
@@ -713,21 +711,8 @@ implements ClockListener, HistoricalEventListener {
 	
 	@Override
 	public void uiPulse(double time) {
-		if (mainScene != null) {
-			if (!mainScene.isMinimized() && mainScene.isMainTabOpen() && desktop.isToolWindowOpen(ResupplyWindow.NAME)) {
-//				timeCache += time;
-//				if (timeCache > PERIOD_IN_MILLISOLS * time) {
-					updateArrival();
-//					timeCache = 0;
-//				}
-			}
-		}
-		else if (desktop.isToolWindowOpen(ResupplyWindow.NAME)) {
-//			timeCache += time;
-//			if (timeCache > PERIOD_IN_MILLISOLS * time) {
-				updateArrival();
-//				timeCache = 0;
-//			}
+		if (desktop.isToolWindowOpen(ResupplyWindow.NAME)) {
+			updateArrival();
 		}	
 	}
 	
@@ -742,8 +727,8 @@ implements ClockListener, HistoricalEventListener {
 	 */
 	public void destroy() {
 		resupply = null;
-		Simulation.instance().getEventManager().removeListener(this);
-		Simulation.instance().getMasterClock().removeClockListener(this);
+//		Simulation.instance().getEventManager().removeListener(this);
+//		Simulation.instance().getMasterClock().removeClockListener(this);
 
 		destinationValueLabel = null;
 		stateValueLabel = null;
@@ -756,8 +741,7 @@ implements ClockListener, HistoricalEventListener {
 		masterClock = null;
 		
 		desktop = null;
-		mainScene = null;
-		
+
 	}
 	
 }

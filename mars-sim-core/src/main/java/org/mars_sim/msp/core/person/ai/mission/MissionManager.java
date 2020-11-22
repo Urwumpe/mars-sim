@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MissionManager.java
- * @version 3.1.0 2017-09-14
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission;
@@ -9,18 +9,23 @@ package org.mars_sim.msp.core.person.ai.mission;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.GameManager;
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.GameManager.GameMode;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.mission.meta.MetaMission;
 import org.mars_sim.msp.core.person.ai.mission.meta.MetaMissionUtil;
+import org.mars_sim.msp.core.person.ai.role.RoleType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
@@ -39,68 +44,126 @@ public class MissionManager implements Serializable {
 
 	/** default logger. */
 	private static transient Logger logger = Logger.getLogger(MissionManager.class.getName());
-
-//	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-//			logger.getName().length());
-
-	private static final int MAX_SOLS = 10;
-	private static final double PERCENT_PER_SCORE = 20D;
+	private static String loggerName = logger.getName();
+	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
 	
-	/** Current missions in the simulation. */
-	private List<Mission> missions;
-
-	private Map<Integer, List<MissionPlanning>> historicalMissions;
+	private static final int MAX_NUM_PLANS = 100;
 	
+	private static final double PERCENT_PER_SCORE = 10D;
+	/** static mission identifier */
+	private int missionIdentifer;
+
 	/** Mission listeners. */
 	private transient List<MissionManagerListener> listeners;
 
 	// Cache variables.
 	private transient double totalProbCache;
-
+	
+	/** The currently on-going missions in the simulation. */
+	private List<Mission> onGoingMissions;
+	/** A history of mission plans by sol. */
+	private Map<Integer, List<MissionPlanning>> historicalMissions;
+	
 	// Transient members
 	private transient MarsClock personTimeCache;
-	private transient MarsClock robotTimeCache;
 	private transient Map<MetaMission, Double> missionProbCache;
 	private transient Map<MetaMission, Double> robotMissionProbCache;
 	
-	private transient MarsClock marsClock;
-	
 	private static List<String> missionNames;
+	private static Map<String, Integer> settlementID;
+	
+	// Note : MissionManager is instantiated before MarsClock
+	// Need to call setMarsClock() right after MarsClock is initialized
+	private static MarsClock marsClock;
+	private static UnitManager unitManager = Simulation.instance().getUnitManager();
 
+	static {
+		/**
+		 * Creates an array of all missions
+		 */
+		missionNames = Arrays.asList(
+					AreologyFieldStudy.DEFAULT_DESCRIPTION,
+					BiologyFieldStudy.DEFAULT_DESCRIPTION,
+					CollectIce.DEFAULT_DESCRIPTION,
+					CollectRegolith.DEFAULT_DESCRIPTION,
+					EmergencySupply.DEFAULT_DESCRIPTION,
+					
+					Exploration.DEFAULT_DESCRIPTION,
+					MeteorologyFieldStudy.DEFAULT_DESCRIPTION,
+					Mining.DEFAULT_DESCRIPTION,
+					RescueSalvageVehicle.DEFAULT_DESCRIPTION,
+					Trade.DEFAULT_DESCRIPTION,
+					
+					TravelToSettlement.DEFAULT_DESCRIPTION,
+					
+					BuildingConstructionMission.DEFAULT_DESCRIPTION, 
+					BuildingSalvageMission.DEFAULT_DESCRIPTION
+			);
+		}
+	
+	
 	/**
 	 * Constructor.
 	 */
 	public MissionManager() {
 		// Initialize cache values.
 		personTimeCache = null;
-		robotTimeCache = null;
 		totalProbCache = 0D;
-		//marsClock = Simulation.instance().getMasterClock().getMarsClock(); // null at the start of the sim
 		
-		createMissionArray();
 		// Initialize data members
-		missions = new ArrayList<Mission>(0);
+		missionIdentifer = 0;
+		onGoingMissions = new CopyOnWriteArrayList<>();
 		historicalMissions = new HashMap<>();
-		listeners = Collections.synchronizedList(new ArrayList<MissionManagerListener>(0));
-		missionProbCache = new HashMap<MetaMission, Double>(MetaMissionUtil.getMetaMissions().size());
-		robotMissionProbCache = new HashMap<MetaMission, Double>(MetaMissionUtil.getRobotMetaMissions().size());
+		settlementID = new HashMap<>();
+		listeners = new CopyOnWriteArrayList<>();//Collections.synchronizedList(new ArrayList<MissionManagerListener>(0));
+		missionProbCache = new HashMap<MetaMission, Double>(MetaMissionUtil.getNumMetaMissions());
+		robotMissionProbCache = new HashMap<MetaMission, Double>();
 	}
 
-	private void createMissionArray() {
-		missionNames = Arrays.asList(
-				AreologyStudyFieldMission.DEFAULT_DESCRIPTION,
-				BiologyStudyFieldMission.DEFAULT_DESCRIPTION,
-				BuildingConstructionMission.DEFAULT_DESCRIPTION, 
-				BuildingSalvageMission.DEFAULT_DESCRIPTION,
-				CollectIce.DEFAULT_DESCRIPTION,
-				CollectRegolith.DEFAULT_DESCRIPTION,
-				EmergencySupplyMission.DEFAULT_DESCRIPTION,
-				Exploration.DEFAULT_DESCRIPTION,
-				Mining.DEFAULT_DESCRIPTION,
-				RescueSalvageVehicle.DEFAULT_DESCRIPTION,
-				Trade.DEFAULT_DESCRIPTION,
-				TravelToSettlement.DEFAULT_DESCRIPTION
-		);
+	/**
+	 * Must be synchronised to prevent duplicate ids being assigned via different
+	 * threads.
+	 * 
+	 * @return
+	 */
+	private synchronized int getNextIdentifier() {
+		return missionIdentifer++;
+	}
+	
+//	public static int getSettlementID(String name) {
+//		return getSettlementID(name);
+//	}
+	
+	public static int getSettlementID(String name) {
+		if (settlementID.containsKey(name)) {
+			return settlementID.get(name);			
+		}
+		else {
+			int size = settlementID.size();
+			settlementID.put(name, size);
+			
+			return size;
+		}
+	}
+	
+	public String getMissionDesignationString(String settlementName) {
+		return padZeros(getSettlementID(settlementName)+"", 2) + "-" + padZeros(getNextIdentifier()+"", 3);
+	}
+	
+	public static String padZeros(String s, int numDigital) {
+		String value = "";
+		int size = s.length();
+		int numZeros = numDigital-size;
+		if (numZeros > 0) {
+			for (int i=0; i< numDigital-size; i++)
+				value += "0";
+			value += s;
+		}
+		
+		else 
+			value = "" + s;
+		
+		return value;
 	}
 	
 	
@@ -112,7 +175,7 @@ public class MissionManager implements Serializable {
 	public void addListener(MissionManagerListener newListener) {
 
 		if (listeners == null) {
-			listeners = Collections.synchronizedList(new ArrayList<MissionManagerListener>());
+			listeners = new CopyOnWriteArrayList<>();//Collections.synchronizedList(new ArrayList<MissionManagerListener>());
 		}
 
 		if (!listeners.contains(newListener)) {
@@ -128,7 +191,7 @@ public class MissionManager implements Serializable {
 	public void removeListener(MissionManagerListener oldListener) {
 
 		if (listeners == null) {
-			listeners = Collections.synchronizedList(new ArrayList<MissionManagerListener>());
+			listeners = new CopyOnWriteArrayList<>();//Collections.synchronizedList(new ArrayList<MissionManagerListener>());
 		}
 
 		if (listeners.contains(oldListener)) {
@@ -144,7 +207,7 @@ public class MissionManager implements Serializable {
 	public int getNumActiveMissions() {
 		// Remove inactive missions.
 		//cleanMissions();
-		return missions.size();
+		return onGoingMissions.size();
 	}
 
 	/**
@@ -155,8 +218,25 @@ public class MissionManager implements Serializable {
 	public List<Mission> getMissions() {
 //		// Remove inactive missions.
 //		//cleanMissions();
-		if (missions != null)
-			return new ArrayList<Mission>(missions);
+		if (onGoingMissions != null) {
+			if (GameManager.mode == GameMode.COMMAND) {
+				List<Mission> missions = new ArrayList<Mission>();
+				if (unitManager == null)
+					unitManager = Simulation.instance().getUnitManager();
+				Iterator<Mission> i = onGoingMissions.iterator();
+				while (i.hasNext()) {
+					Mission m = i.next(); 
+					if (m.getAssociatedSettlement().equals(unitManager.getCommanderSettlement()))
+						missions.add(m);
+				}
+				
+				return missions;
+			}
+			else {
+				return new ArrayList<Mission>(onGoingMissions);
+			}
+
+		}			
 //			return missions;
 		else
 			return new ArrayList<Mission>();
@@ -171,7 +251,7 @@ public class MissionManager implements Serializable {
 	 */
 	public Mission getMission(MissionMember member) {
 		Mission result = null;
-		for (Mission tempMission : missions) {
+		for (Mission tempMission : onGoingMissions) {
 			if (tempMission.hasMember(member)) {
 				result = tempMission;
 			}
@@ -180,6 +260,23 @@ public class MissionManager implements Serializable {
 		return result;
 	}
 
+	/**
+	 * Gets the mission a given person is a member of. If member isn't a part of any
+	 * mission, return null.
+	 * 
+	 * @param member the member.
+	 * @return mission for that member
+	 */
+	public boolean hasMission(MissionMember member) {
+		for (Mission tempMission : onGoingMissions) {
+			if (tempMission.hasMember(member)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+	
 //	/*
 //	 * Prepares the task for recording in the task schedule
 //	 * @param newTask
@@ -237,12 +334,12 @@ public class MissionManager implements Serializable {
 			throw new IllegalArgumentException("newMission is null");
 		}
 
-		if (!missions.contains(newMission)) {
-			missions.add(newMission);
+		if (!onGoingMissions.contains(newMission)) {
+			onGoingMissions.add(newMission);
 
 			// Update listeners.
 			if (listeners == null) {
-				listeners = Collections.synchronizedList(new ArrayList<MissionManagerListener>());
+				listeners = new CopyOnWriteArrayList<>();//Collections.synchronizedList(new ArrayList<MissionManagerListener>());
 			}
 
 			synchronized (listeners) {
@@ -254,7 +351,7 @@ public class MissionManager implements Serializable {
 
 			// recordMission(newMission);
 
-			logger.finer("MissionManager: Added new mission - " + newMission.getName());
+			logger.fine("Added a new '" + newMission.getName() + "' mission.");
 		}
 	}
 
@@ -265,22 +362,23 @@ public class MissionManager implements Serializable {
 	 */
 	public void removeMission(Mission oldMission) {
 
-		if (missions.contains(oldMission)) {
-			missions.remove(oldMission);
+		if (onGoingMissions.contains(oldMission)) {
+			onGoingMissions.remove(oldMission);
 
+			oldMission.fireMissionUpdate(MissionEventType.END_MISSION_EVENT);
+					
 			// Update listeners.
-			if (listeners == null) {
-				listeners = Collections.synchronizedList(new ArrayList<MissionManagerListener>());
-			}
-
-			synchronized (listeners) {
-				Iterator<MissionManagerListener> i = listeners.iterator();
-				while (i.hasNext()) {
-					i.next().removeMission(oldMission);
+			if (listeners != null) {
+//				listeners = new CopyOnWriteArrayList<>();//Collections.synchronizedList(new ArrayList<MissionManagerListener>());
+				synchronized (listeners) {
+					Iterator<MissionManagerListener> i = listeners.iterator();
+					while (i.hasNext()) {
+						i.next().removeMission(oldMission);
+					}
 				}
 			}
 
-			logger.finer("MissionManager: Removed old mission - " + oldMission.getName());
+			logger.fine("Removing an old '" + oldMission.getName() + "' mission.");
 		}
 	}
 
@@ -325,7 +423,11 @@ public class MissionManager implements Serializable {
 
 		if (totalProbability == 0D) {
 			//throw new IllegalStateException(person + " has zero total mission probability weight.");
-			logger.log(Level.WARNING, person + " has zero total mission probability weight.");
+			logger.log(Level.FINEST, person + " has zero total mission probability weight. No mission selected.");
+			// Clear time cache.
+			personTimeCache = null;
+			
+			return null;
 		}
 
 		// Get a random number from 0 to the total probability weight.
@@ -337,7 +439,7 @@ public class MissionManager implements Serializable {
 		while (i.hasNext() && (selectedMetaMission == null)) {
 			MetaMission metaMission = i.next();
 			double probWeight = missionProbCache.get(metaMission);
-			if (r <= probWeight) {
+			if (r <= probWeight && probWeight != 0) {
 				selectedMetaMission = metaMission;
 			} else {
 				r -= probWeight;
@@ -409,12 +511,12 @@ public class MissionManager implements Serializable {
 	 */
 	public int numParticularMissions(String mName, Settlement settlement) {
 		int num = 0;
-		List<Mission> m1 = getMissions();
+		List<Mission> m1 = onGoingMissions;
 		if (!m1.isEmpty()) {		
 			Iterator<Mission> i = m1.iterator();
 			while (i.hasNext()) {
 				Mission m = i.next();
-				if (!m.isDone() && m.getName().equals(mName)
+				if (!m.isDone() && mName.equalsIgnoreCase(m.getName())
 						&& settlement == m.getAssociatedSettlement()) {
 					num++;
 				}
@@ -436,20 +538,31 @@ public class MissionManager implements Serializable {
 			throw new IllegalArgumentException("settlement is null");
 		}
 
-		List<Mission> m0 = new ArrayList<Mission>();
-		List<Mission> m1 = getMissions();
-		if (!m1.isEmpty()) {		
-			Iterator<Mission> i = m1.iterator();
-			while (i.hasNext()) {
-				Mission m = i.next();
-				if (!m.isDone() 
-						&& settlement == m.getAssociatedSettlement()) {
-					m0.add(m);
+		List<Mission> result = new ArrayList<Mission>();		
+		Iterator<Mission> i = getMissions().iterator();
+		while (i.hasNext()) {
+			Mission m = i.next();
+			if (m instanceof VehicleMission
+					&& !result.contains(m)) {
+				VehicleMission v = (VehicleMission)m;
+				if (!v.isDone() 
+						&& settlement == v.getAssociatedSettlement()) {
+					result.add(v);
+				}
+			}
+			else if (m instanceof BuildingConstructionMission
+					&& !result.contains(m)) {
+				BuildingConstructionMission b = (BuildingConstructionMission)m;
+				if (!b.isDone() 
+						&& settlement == b.getAssociatedSettlement()) {
+					result.add(b);
 				}
 			}
 		}
 
-		return m0;
+//		System.out.println("Type of Missions : " + result);
+			
+		return result;
 	}
 
 	/**
@@ -466,14 +579,14 @@ public class MissionManager implements Serializable {
 		}
 		
 		List<Mission> m0 = new ArrayList<Mission>();
-		List<Mission> m1 = getMissions();
+		List<Mission> m1 = onGoingMissions;
 		if (!m1.isEmpty()) {		
 			Iterator<Mission> i = m1.iterator();
 			while (i.hasNext()) {
 				Mission m = i.next();
 				if (!m.isDone() 
-						&& (settlement == m.getAssociatedSettlement())
-						&& !m.isApproved()
+						&& settlement.getName().equalsIgnoreCase(m.getAssociatedSettlement().getName())
+//						&& !m.isApproved()
 						&& m.getPlan() != null
 						&& m.getPlan().getStatus() == PlanType.PENDING) {
 					m0.add(m);
@@ -549,19 +662,54 @@ public class MissionManager implements Serializable {
 	 * Remove missions that are already completed.
 	 */
 	private void cleanMissions() {
-		int index = 0;
-		
-		if (missions != null) { // for passing maven test
-			while (index < missions.size()) {
-				Mission tempMission = missions.get(index);
-				if ((tempMission == null) || tempMission.isDone() 
-						|| (tempMission.getPlan() != null && tempMission.getPlan().getStatus() == PlanType.NOT_APPROVED)) {
-					removeMission(tempMission);
-				} else {
-					index++;
+		int index = 0;		
+		if (onGoingMissions != null && !onGoingMissions.isEmpty()) { 
+			// Check if onGoingMissions is null for passing maven test
+			while (index < onGoingMissions.size()) {
+				Mission m = onGoingMissions.get(index);
+				List<MissionStatus> mss = m.getMissionStatus();
+				if (mss != null && !mss.isEmpty()) {
+					for (MissionStatus ms: mss) {
+	//					MissionStatus reason = m.getReason().toLowerCase();
+						if (// ms == null
+		//						|| m.isDone() 
+		//						|| !m.isApproved() // initially it's not approved until it passes the approval phase
+								m.getPlan() == null
+								|| m.getPhase() == null
+								|| ms == MissionStatus.DESTINATION_IS_NULL								
+								|| ms == MissionStatus.USER_ABORTED_MISSION
+								|| ms == MissionStatus.NO_RESERVABLE_VEHICLES
+								|| ms == MissionStatus.LUV_ATTACHMENT_PARTS_NOT_LOADABLE				
+								|| ms == MissionStatus.LUV_NOT_AVAILABLE
+								|| ms == MissionStatus.LUV_NOT_RETRIEVED
+								|| ms == MissionStatus.NO_AVAILABLE_VEHICLES
+								|| ms == MissionStatus.NO_EXPLORATION_SITES
+								|| ms == MissionStatus.EVA_SUIT_CANNOT_BE_LOADED
+								|| ms == MissionStatus.MINING_SITE_NOT_BE_DETERMINED
+								|| ms == MissionStatus.NEW_CONSTRUCTION_STAGE_NOT_DETERMINED
+								|| ms == MissionStatus.NO_TRADING_SETTLEMENT							
+//								|| ms.getName().toLowerCase().contains("no ")
+//								|| ms.getName().toLowerCase().contains("not ")
+								|| (m.getPlan() != null && m.getPlan().getStatus() == PlanType.NOT_APPROVED)
+								) {
+							removeMission(m);
+						} 
+					}
 				}
+				
+				index++;
 			}
 		}
+//		if (missions != null) {
+//			int size = missions.size();
+//			for (int i=0; i<size; i++) {
+//				Mission m = missions.get(i);
+//				if (m == null || m.isDone() 
+//						|| (m.getPlan() != null && m.getPlan().getStatus() == PlanType.NOT_APPROVED)) {
+//					removeMission(m);
+//				}
+//			}
+//		}
 	}
 
 	/**
@@ -571,7 +719,7 @@ public class MissionManager implements Serializable {
 	 */
 	private void calculateProbability(Person person) {
 		if (missionProbCache == null) {
-			missionProbCache = new HashMap<MetaMission, Double>(MetaMissionUtil.getMetaMissions().size());
+			missionProbCache = new HashMap<MetaMission, Double>(MetaMissionUtil.getNumMetaMissions());
 		}
 
 		// Clear total probabilities.
@@ -587,13 +735,15 @@ public class MissionManager implements Serializable {
 				totalProbCache += probability;
 			} else {
 				missionProbCache.put(metaMission, 0D);
-				logger.severe(person.getName() + " bad mission probability: " + metaMission.getName() + " probability: "
+				logger.severe(person.getName() + " had bad mission probability on " + metaMission.getName() + " probability: "
 						+ probability);
 			}
+//			if (probability > 0)
+//				System.out.println(person + " " + metaMission.getName() + " is " + probability);
 		}
 
 		// Set the time cache to the current time.
-		personTimeCache = (MarsClock) Simulation.instance().getMasterClock().getMarsClock().clone();
+		personTimeCache = (MarsClock) marsClock.clone();
 	}
 
 //	/**
@@ -625,7 +775,7 @@ public class MissionManager implements Serializable {
 //		}
 //
 //		// Set the time cache to the current time.
-//		robotTimeCache = (MarsClock) Simulation.instance().getMasterClock().getMarsClock().clone();
+//		robotTimeCache = (MarsClock) marsClock.clone();
 //
 //	}
 
@@ -636,9 +786,7 @@ public class MissionManager implements Serializable {
 	 * @return true if cache should be used.
 	 */
 	private boolean useCache(Person person) {
-		// if (currentTime == null)
-		MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
-		return currentTime.equals(personTimeCache);// && (person == personCache);
+		return marsClock.equals(personTimeCache);
 	}
 
 //	/**
@@ -671,13 +819,19 @@ public class MissionManager implements Serializable {
 	/**
 	 * Adds a mission plan
 	 * 
-	 * @param {{@link MissionPlanning}
+	 * @param plan {@link MissionPlanning}
 	 */
 	public void addMissionPlanning(MissionPlanning plan) {
-//		if (marsClock == null)
-		marsClock = Simulation.instance().getMasterClock().getMarsClock();
+		if (marsClock == null)
+			logger.info("marsClock is null");
 		int mSol = marsClock.getMissionSol();
-
+		
+		Person p = plan.getMission().getStartingMember();
+		
+		LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+				"[" + p.getLocale() + "] On Sol " 
+				+ mSol + ", " + p.getName() + " put together a mission plan.");
+		
 		if (historicalMissions.containsKey(mSol)) {
 			List<MissionPlanning> plans = historicalMissions.get(mSol);
 			plans.add(plan);
@@ -688,10 +842,12 @@ public class MissionManager implements Serializable {
 			historicalMissions.put(mSol, plans);
 			
 			// Keep only the last x # of sols of mission plans
-			if (mSol > MAX_SOLS && historicalMissions.size() > MAX_SOLS) {
-				historicalMissions.get(mSol-MAX_SOLS);
+			if (mSol > MAX_NUM_PLANS && historicalMissions.size() > MAX_NUM_PLANS) {
+				historicalMissions.get(mSol-MAX_NUM_PLANS);
 			}
 		}
+		
+//		logger.info("Done addMissionPlanning()");
 	}
 	
 	
@@ -700,7 +856,8 @@ public class MissionManager implements Serializable {
 	 * 
 	 * @param mission
 	 */
-	public void requestMissionApproval(MissionPlanning plan) {
+	public void requestMissionApproving(MissionPlanning plan) {
+//		logger.info(plan.getMission().getStartingMember() + " was supposed to call requestMissionApproval()");
 		addMissionPlanning(plan);
 	}
 	
@@ -711,28 +868,30 @@ public class MissionManager implements Serializable {
 	 * @param person
 	 * @param status
 	 */
-	public void approveMissionPlan(MissionPlanning missionPlan, Person person, PlanType status) {
-		
+	public void approveMissionPlan(MissionPlanning missionPlan, Person person, PlanType newStatus) {
+//		logger.info(person + " was at approveMissionPlan()");
 		for (int mSol : historicalMissions.keySet()) {
 			List<MissionPlanning> plans = historicalMissions.get(mSol);
 			for (MissionPlanning mp : plans) {
 				if (mp == missionPlan) {
-					mp.setReviewedBy(person.getName());
-					mp.setReviewedRole(person.getRole().getType());
-					mp.setStatus(status);
+					mp.setApproved(person);
+//					mp.setStatus(status);
 					if (mp.getStatus() == PlanType.PENDING) {
-						if (status == PlanType.APPROVED) {
+						if (newStatus == PlanType.APPROVED) {
 							mp.setStatus(PlanType.APPROVED);
 							mp.getMission().setApproval(true);
+//							mp.getMission().setPhase();
 						}
-						else if (status == PlanType.NOT_APPROVED) {
+						else if (newStatus == PlanType.NOT_APPROVED) {
 							mp.setStatus(PlanType.NOT_APPROVED);
 							mp.getMission().setApproval(false);
-							// Remove this mission from the current mission list
-							removeMission(mp.getMission());
+//							mp.getMission().setPhase();
+							// Do NOT remove this on-going mission from the current mission list
+//							removeMission(mp.getMission());
 						}
+//						mp.getMission().fireMissionUpdate(MissionEventType.PHASE_EVENT, mp.getMission().getPhaseDescription());
 					}
-					break;
+					return;
 				}
 			}
 		}
@@ -745,16 +904,47 @@ public class MissionManager implements Serializable {
 	 * @param person
 	 * @param status
 	 */
-	public void scoreMissionPlan(MissionPlanning missionPlan, double newScore) {
-		
+	public void scoreMissionPlan(MissionPlanning missionPlan, double newScore, Person reviewer) {
+		double weight = 1D;
+		RoleType role = reviewer.getRole().getType();
 		for (int mSol : historicalMissions.keySet()) {
 			List<MissionPlanning> plans = historicalMissions.get(mSol);
 			for (MissionPlanning mp : plans) {
-				if (mp == missionPlan && mp.getStatus() == PlanType.PENDING) {
+				if (mp == missionPlan) {// && mp.getStatus() == PlanType.PENDING) {
 					double percent = mp.getPercentComplete();
-					mp.setPercentComplete(percent + PERCENT_PER_SCORE);
+					
+					if (role == RoleType.COMMANDER)
+						weight = 2.5;
+					else if (role == RoleType.SUB_COMMANDER
+							|| role == RoleType.CHIEF_OF_MISSION_PLANNING)
+						weight = 2D;
+					else if (role == RoleType.CHIEF_OF_AGRICULTURE
+							|| role == RoleType.CHIEF_OF_ENGINEERING
+							|| role == RoleType.CHIEF_OF_LOGISTICS_N_OPERATIONS
+							|| role == RoleType.CHIEF_OF_SAFETY_N_HEALTH
+							|| role == RoleType.CHIEF_OF_SCIENCE
+							|| role == RoleType.CHIEF_OF_SUPPLY_N_RESOURCES
+							|| role == RoleType.MISSION_SPECIALIST)
+						weight = 1.5;
+					else
+						weight = 1;
+					double totalPercent = percent + weight * PERCENT_PER_SCORE;
+					if (totalPercent > 100)
+						totalPercent = 100;
+					mp.setPercentComplete(totalPercent);
 					double score = mp.getScore();
-					mp.setScore(score + newScore);
+					mp.setScore(score + weight * newScore);
+					
+					LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+							"[" + mp.getMission().getStartingMember().getLocationTag().getLocale() + "] " 
+							+ mp.getMission().getStartingMember().getName() 
+							+ "'s " + mp.getMission().getDescription() 
+							+ " mission planning cumulative score : " + Math.round(mp.getScore()*10.0)/10.0 
+							+ " (" + mp.getPercentComplete() + "% review completed)");
+							
+					mp.setReviewedBy(reviewer.getName());
+					mp.getMission().setPhaseDescription(mp.getMission().getPhaseDescription());
+//					mp.getMission().fireMissionUpdate(MissionEventType.PHASE_DESCRIPTION_EVENT, mp.getMission().getPhaseDescription());
 					break;
 				}
 			}
@@ -769,23 +959,39 @@ public class MissionManager implements Serializable {
 		return id;
 	}
 	
+	public Map<Integer, List<MissionPlanning>> getHistoricalMissions() {
+		return historicalMissions;
+	}
+	
+	/**
+	 * Gets a list of all mission names
+	 */
+	public static List<String> getMissionNames() {
+		return missionNames;
+	}
+	
+	public static void initializeInstances(MarsClock clock) {
+		marsClock = clock;
+	}
+	
 	/**
 	 * Prepare object for garbage collection.
 	 */
 	public void destroy() {
 		// take care to avoid null exceptions
-		if (missions != null) {
-			missions.clear();
-			missions = null;
+		if (onGoingMissions != null) {
+			onGoingMissions.clear();
+			onGoingMissions = null;
 		}
 		if (listeners != null) {
 			listeners.clear();
 			listeners = null;
 		}
 
+		marsClock = null;
 		// personCache = null;
 		personTimeCache = null;
-		robotTimeCache = null;
+//		robotTimeCache = null;
 		if (missionProbCache != null) {
 			missionProbCache.clear();
 			missionProbCache = null;

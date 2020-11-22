@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PerformLaboratoryExperiment.java
- * @version 3.07 2015-01-06
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -11,19 +11,21 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
-import org.mars_sim.msp.core.person.NaturalAttributeType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.core.structure.Lab;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingException;
@@ -48,6 +50,9 @@ implements ResearchScientificStudy, Serializable {
     /** default logger. */
     private static Logger logger = Logger.getLogger(PerformLaboratoryExperiment.class.getName());
 
+	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
+			 logger.getName().length());
+	
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.performLaboratoryExperiment"); //$NON-NLS-1$
@@ -70,9 +75,7 @@ implements ResearchScientificStudy, Serializable {
     private MalfunctionManager malfunctions;
     /** The research assistant. */
     private Person researchAssistant;
-
-    private static ScientificStudyManager studyManager;
-    
+ 
     /**
      * Constructor.
      * @param person the person performing the task.
@@ -94,22 +97,22 @@ implements ResearchScientificStudy, Serializable {
                     addPersonToLab();
                 }
                 else {
-                    logger.info("lab could not be determined.");
+                    logger.warning("The lab could not be determined.");
                     endTask();
                 }
             }
             else {
-                logger.info("science could not be determined");
+                logger.warning("The science of a study could not be determined");
                 endTask();
             }
         }
         else {
-            logger.info("study could not be determined");
+            logger.warning("The study could not be determined");
             endTask();
         }
 
         // Check if person is in a moving rover.
-        if (inMovingRover(person)) {
+        if (Vehicle.inMovingRover(person)) {
             endTask();
         }
 
@@ -119,7 +122,7 @@ implements ResearchScientificStudy, Serializable {
     }
 
     @Override
-    protected FunctionType getLivingFunction() {
+    public FunctionType getLivingFunction() {
         return FunctionType.RESEARCH;
     }
 
@@ -133,8 +136,10 @@ implements ResearchScientificStudy, Serializable {
         experimentalSciences.add(ScienceType.BOTANY);
         experimentalSciences.add(ScienceType.BIOLOGY);
         experimentalSciences.add(ScienceType.CHEMISTRY);
+        experimentalSciences.add(ScienceType.ENGINEERING);
         experimentalSciences.add(ScienceType.PHYSICS);
         experimentalSciences.add(ScienceType.MEDICINE);
+        experimentalSciences.add(ScienceType.METEOROLOGY);
         return experimentalSciences;
     }
 
@@ -169,10 +174,7 @@ implements ResearchScientificStudy, Serializable {
         List<ScienceType> experimentalSciences = getExperimentalSciences();
 
         // Add primary study if appropriate science and in research phase.
-        //ScientificStudyManager manager = Simulation.instance().getScientificStudyManager();
-        if (studyManager == null)
-        	studyManager = Simulation.instance().getScientificStudyManager();
-        ScientificStudy primaryStudy = studyManager.getOngoingPrimaryStudy(person);
+        ScientificStudy primaryStudy = scientificStudyManager.getOngoingPrimaryStudy(person);
         if (primaryStudy != null) {
             if (ScientificStudy.RESEARCH_PHASE.equals(primaryStudy.getPhase()) &&
                     !primaryStudy.isPrimaryResearchCompleted()) {
@@ -191,12 +193,12 @@ implements ResearchScientificStudy, Serializable {
         }
 
         // Add all collaborative studies with appropriate sciences and in research phase.
-        Iterator<ScientificStudy> i = studyManager.getOngoingCollaborativeStudies(person).iterator();
+        Iterator<ScientificStudy> i = scientificStudyManager.getOngoingCollaborativeStudies(person).iterator();
         while (i.hasNext()) {
             ScientificStudy collabStudy = i.next();
             if (ScientificStudy.RESEARCH_PHASE.equals(collabStudy.getPhase()) &&
                     !collabStudy.isCollaborativeResearchCompleted(person)) {
-                ScienceType collabScience = collabStudy.getCollaborativeResearchers().get(person);
+                ScienceType collabScience = collabStudy.getCollaborativeResearchers().get(person.getIdentifier());
                 if (experimentalSciences.contains(collabScience)) {
                     // Check that local lab is available for collaboration study science.
                     Lab lab = getLocalLab(person, collabScience);
@@ -229,8 +231,8 @@ implements ResearchScientificStudy, Serializable {
         if (study.getPrimaryResearcher().equals(researcher)) {
             result = study.getScience();
         }
-        else if (study.getCollaborativeResearchers().containsKey(researcher)) {
-            result = study.getCollaborativeResearchers().get(researcher);
+        else if (study.getCollaborativeResearchers().containsKey(researcher.getIdentifier())) {
+            result = study.getCollaborativeResearchers().get(researcher.getIdentifier());
         }
 
         return result;
@@ -276,7 +278,7 @@ implements ResearchScientificStudy, Serializable {
             Map<Building, Double> labBuildingProbs = BuildingManager.getBestRelationshipBuildings(
                     person, labBuildings);
             Building building = RandomUtil.getWeightedRandomObject(labBuildingProbs);
-            result = (Research) building.getFunction(FunctionType.RESEARCH);
+            result = building.getResearch();
         }
 
         return result;
@@ -364,7 +366,7 @@ implements ResearchScientificStudy, Serializable {
                 Building labBuilding = ((Research) lab).getBuilding();
 
                 // Walk to lab building.
-                walkToActivitySpotInBuilding(labBuilding, false);
+                walkToTaskSpecificActivitySpotInBuilding(labBuilding, false);
 
                 lab.addResearcher();
                 malfunctions = labBuilding.getMalfunctionManager();
@@ -393,7 +395,7 @@ implements ResearchScientificStudy, Serializable {
         newPoints += newPoints * ((double) academicAptitude - 50D) / 100D;
         newPoints *= getTeachingExperienceModifier();
         SkillType scienceSkill = science.getSkill();
-        person.getMind().getSkillManager().addExperience(scienceSkill, newPoints);
+        person.getSkillManager().addExperience(scienceSkill, newPoints, time);
     }
 
     /**
@@ -420,7 +422,7 @@ implements ResearchScientificStudy, Serializable {
 
         // If research assistant, modify by assistant's effective skill.
         if (hasResearchAssistant()) {
-            SkillManager manager = researchAssistant.getMind().getSkillManager();
+            SkillManager manager = researchAssistant.getSkillManager();
             int assistantSkill = manager.getEffectiveSkillLevel(science.getSkill());
             if (scienceSkill > 0) {
                 researchTime *= 1D + ((double) assistantSkill / (double) scienceSkill);
@@ -441,7 +443,7 @@ implements ResearchScientificStudy, Serializable {
     @Override
     public int getEffectiveSkillLevel() {
         SkillType scienceSkill = science.getSkill();
-        SkillManager manager = person.getMind().getSkillManager();
+        SkillManager manager = person.getSkillManager();
         return manager.getEffectiveSkillLevel(scienceSkill);
     }
 
@@ -474,21 +476,10 @@ implements ResearchScientificStudy, Serializable {
             endTask();
         }
 
-        // Check if research in study is completed.
-        boolean isPrimary = study.getPrimaryResearcher().equals(person);
-        if (isPrimary) {
-            if (study.isPrimaryResearchCompleted()) {
-                endTask();
-            }
-        }
-        else {
-            if (study.isCollaborativeResearchCompleted(person)) {
-                endTask();
-            }
-        }
+
 
         // Check if person is in a moving rover.
-        if (inMovingRover(person)) {
+        if (Vehicle.inMovingRover(person)) {
             endTask();
         }
 
@@ -498,6 +489,7 @@ implements ResearchScientificStudy, Serializable {
 
         // Add research work time to study.
         double researchTime = getEffectiveResearchTime(time);
+        boolean isPrimary = study.getPrimaryResearcher().equals(person);
         if (isPrimary) {
             study.addPrimaryResearchWorkTime(researchTime);
         }
@@ -505,6 +497,29 @@ implements ResearchScientificStudy, Serializable {
             study.addCollaborativeResearchWorkTime(person, researchTime);
         }
 
+        // Check if research in study is completed.
+        if (isPrimary) {
+            if (study.isPrimaryResearchCompleted()) {
+    			LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + person.getLocationTag().getLocale() + "] "
+    					+ person.getName() + " just spent " 
+    					+ Math.round(study.getPrimaryResearchWorkTimeCompleted() *10.0)/10.0
+    					+ " millisols in performing primary lab experiments" 
+    					+ " in " + study.getScience().getName() 
+    					+ " in " + person.getLocationTag().getImmediateLocation());	
+                endTask();
+            }
+        }
+        else {
+            if (study.isCollaborativeResearchCompleted(person)) {
+    			LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + person.getLocationTag().getLocale() + "] "
+    					+ person.getName() + " just spent " 
+    					+ Math.round(study.getCollaborativeResearchWorkTimeCompleted(person) *10.0)/10.0
+    					+ " millisols in performing collaborative lab experiments" 
+    					+ " in " + study.getScience().getName() 
+    					+ " in " + person.getLocationTag().getImmediateLocation());	           		
+                endTask();
+            }
+        }
         // Add experience
         addExperience(researchTime);
 
@@ -524,7 +539,7 @@ implements ResearchScientificStudy, Serializable {
 
         // Science skill modification.
         SkillType scienceSkill = science.getSkill();
-        int skill = person.getMind().getSkillManager().getEffectiveSkillLevel(scienceSkill);
+        int skill = person.getSkillManager().getEffectiveSkillLevel(scienceSkill);
         if (skill <= 3) {
             chance *= (4 - skill);
         }
@@ -559,32 +574,6 @@ implements ResearchScientificStudy, Serializable {
             	}
             }
         }
-    }
-
-    /**
-     * Checks if the person is in a moving vehicle.
-     * @param person the person.
-     * @return true if person is in a moving vehicle.
-     */
-    public static boolean inMovingRover(Person person) {
-
-        boolean result = false;
-
-        if (person.isInVehicle()) {
-            Vehicle vehicle = person.getVehicle();
-            if (vehicle.getStatus() == StatusType.MOVING) {
-                result = true;
-            }
-            else if (vehicle.getStatus() == StatusType.TOWED) {
-                Vehicle towingVehicle = vehicle.getTowingVehicle();
-                if (towingVehicle.getStatus() == StatusType.MOVING ||
-                        towingVehicle.getStatus() == StatusType.TOWED) {
-                    result = false;
-                }
-            }
-        }
-
-        return result;
     }
 
     @Override
@@ -624,6 +613,15 @@ implements ResearchScientificStudy, Serializable {
     public void setResearchAssistant(Person researchAssistant) {
         this.researchAssistant = researchAssistant;
     }
+    
+//	/**
+//	 * Reloads instances after loading from a saved sim
+//	 * 
+//	 * @param {{@link ScientificStudyManager}
+//	 */
+//	public static void initializeInstances(ScientificStudyManager s) {
+//		scientificStudyManager = s;
+//	}
 
     @Override
     public void destroy() {

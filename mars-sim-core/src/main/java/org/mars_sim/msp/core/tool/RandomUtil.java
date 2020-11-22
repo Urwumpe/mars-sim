@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RandomUtil.java
- * @version 3.1.0 2017-08-31
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.tool;
@@ -35,7 +35,7 @@ public final class RandomUtil {
 	// XorShift1024StarRandom();
 
 	// Add two implementation of SIMD-oriented Fast Mersenne Twister PNRG in java.
-	// Note 1: they are not compatible with standard java.util.Randrom's methods,
+	// Note 1: they are not compatible with standard java.util.Random's methods,
 	// require seeding and re-mapping of methods
 	// Note 2: other PRNG in the MT family can be found at
 	// https://github.com/zwxadz/SFMT-for-Java
@@ -102,7 +102,19 @@ public final class RandomUtil {
 	}
 
 	/**
-	 * Returns a random double number under Gaussian ("normally") distributed with
+	 * Returns a random double number from 0 to the ceiling number given.
+	 * 
+	 * @param ceiling the maximum number result
+	 * @return the random number
+	 */
+	public static double getRandomDouble(double base, double ceiling) {
+		if (ceiling < base)
+			throw new IllegalArgumentException(Msg.getString("RandomUtil.log.ceilingMustGreaterBase")); //$NON-NLS-1$
+		return random.nextDouble() * ceiling - random.nextDouble() * base;
+	}
+	
+	/**
+	 * Returns a random double number (-infi to +infi) under Gaussian ("normally") distributed with
 	 * mean 0.0 and standard deviation 1.0 from this random number generator's
 	 * sequence
 	 * 

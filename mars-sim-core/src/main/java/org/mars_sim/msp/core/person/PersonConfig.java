@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PersonConfig.java
- * @version 3.1.0 2017-01-24
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person;
@@ -13,11 +13,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.jdom.Document;
-import org.jdom.Element;
-import org.mars_sim.msp.core.Msg;
+import org.jdom2.Document;
+import org.jdom2.Element;
 import org.mars_sim.msp.core.reportingAuthority.ReportingAuthorityType;
-import org.mars_sim.msp.core.terminal.Commander;
 
 /**
  * Provides configuration information about people units. Uses a JDOM document
@@ -28,121 +26,114 @@ public class PersonConfig implements Serializable {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	// private static Logger logger =
-	// Logger.getLogger(PersonConfig.class.getName());
-
-	public static final int SIZE_OF_CREW = 4;
-	public static final int ALPHA_CREW = 0;;
-
-	// Add a list of crew
-	private List<Crew> roster = new ArrayList<>();
+	// private static Logger logger = Logger.getLogger(PersonConfig.class.getName());
 
 	// Element names
-	private static final String LAST_NAME_LIST = "last-name-list";
-	private static final String FIRST_NAME_LIST = "first-name-list";
-	private static final String LAST_NAME = "last-name";
-	private static final String FIRST_NAME = "first-name";
-	private static final String PERSON_NAME_LIST = "person-name-list";
-	private static final String PERSON_NAME = "person-name";
+	private final String LAST_NAME_LIST = "last-name-list";
+	private final String FIRST_NAME_LIST = "first-name-list";
+	private final String LAST_NAME = "last-name";
+	private final String FIRST_NAME = "first-name";
+	private final String PERSON_NAME_LIST = "person-name-list";
+	private final String PERSON_NAME = "person-name";
 
-	private static final String GENDER = "gender";
+	private final String GENDER = "gender";
 
-	private static final String SPONSOR = "sponsor";
-	private static final String COUNTRY = "country";
+	private final String SPONSOR = "sponsor";
+	private final String COUNTRY = "country";
 
-	private static final String LOW_O2_RATE = "low-activity-metaboic-load-o2-consumption-rate";
-	private static final String NOMINAL_O2_RATE = "nominal-activity-metaboic-load-o2-consumption-rate";
-	private static final String HIGH_O2_RATE = "high-activity-metaboic-load-o2-consumption-rate";
+	/** The base carrying capacity (kg) of a person. */
+	private final String BASE_CAPACITY = "base-carrying-capacity";
+	private final String AVERAGE_TALL_HEIGHT = "average-tall-height";//176.5;
+	private final String AVERAGE_SHORT_HEIGHT = "average-short-height";//162.5;
+//	private final static String AVERAGE_HEIGHT = "average_height"; // 169.5;// (AVERAGE_TALL_HEIGHT + AVERAGE_SHORT_HEIGHT)/2D;
 
-	private static final String CO2_EXPELLED_RATE = "co2-expelled-rate";
-
-	private static final String WATER_CONSUMPTION_RATE = "water-consumption-rate";
-	private static final String WATER_USAGE_RATE = "water-usage-rate";
-	private static final String GREY_TO_BLACK_WATER_RATIO = "grey-to-black-water-ratio";
-
-	private static final String FOOD_CONSUMPTION_RATE = "food-consumption-rate";
-	private static final String DESSERT_CONSUMPTION_RATE = "dessert-consumption-rate";
-
-	private static final String OXYGEN_DEPRIVATION_TIME = "oxygen-deprivation-time";
-	private static final String WATER_DEPRIVATION_TIME = "water-deprivation-time";
-	private static final String FOOD_DEPRIVATION_TIME = "food-deprivation-time";
-
-	private static final String DEHYDRATION_START_TIME = "dehydration-start-time";
-	private static final String STARVATION_START_TIME = "starvation-start-time";
-
-	private static final String MIN_AIR_PRESSURE = "min-air-pressure";
-	private static final String DECOMPRESSION_TIME = "decompression-time";
-	private static final String MIN_TEMPERATURE = "min-temperature";
-	private static final String MAX_TEMPERATURE = "max-temperature";
-	private static final String FREEZING_TIME = "freezing-time";
-	private static final String STRESS_BREAKDOWN_CHANCE = "stress-breakdown-chance";
-	private static final String HIGH_FATIGUE_COLLAPSE = "high-fatigue-collapse-chance";
-
-	private static final String GENDER_MALE_PERCENTAGE = "gender-male-percentage";
-	private static final String PERSONALITY_TYPES = "personality-types";
-	private static final String MBTI = "mbti";
-	private static final String PERSONALITY_TYPE = "personality-type";
-
-	private static final String PERSONALITY_TRAIT_LIST = "personality-trait-list";
-	private static final String PERSONALITY_TRAIT = "personality-trait";
-
-	private static final String PERSON_LIST = "person-list";
-	private static final String PERSON = "person";
-
-	private static final String CREW = "crew";
-	private static final String NAME = "name";
-	private static final String SETTLEMENT = "settlement";
-	private static final String JOB = "job";
-	private static final String NATURAL_ATTRIBUTE_LIST = "natural-attribute-list";
-	private static final String NATURAL_ATTRIBUTE = "natural-attribute";
-	private static final String TYPE = "type";
-	private static final String VALUE = "value";
-	private static final String SKILL_LIST = "skill-list";
-	private static final String SKILL = "skill";
-	private static final String LEVEL = "level";
-	private static final String RELATIONSHIP_LIST = "relationship-list";
-	private static final String RELATIONSHIP = "relationship";
-	private static final String OPINION = "opinion";
-	private static final String PERCENTAGE = "percentage";
-
-	private static final String MAIN_DISH = "favorite-main-dish";
-	private static final String SIDE_DISH = "favorite-side-dish";
-
-	private static final String DESSERT = "favorite-dessert";
-	private static final String ACTIVITY = "favorite-activity";
-
-	// for 3 types of metabolic loads
-	private double[] o2ConsumptionRate = new double[] { 0, 0, 0 };
-	// for water, dessert, food
-	private double[] consumptionRates = new double[] { 0, 0, 0 };
-	// for grey2BlackWaterRatio, gender ratio
-	private double[] ratio = new double[] { 0, 0 };
-	// for stress breakdown and high fatigue collapse chance
-	private double[] chance = new double[] { 0, 0 };
-	// for various time values
-	private double[] time = new double[] { 0, 0, 0, 0, 0, 0, 0 };
-	// for min and max temperature
-	private double[] temperature = new double[] { 0, 0 };
-
-	private double waterUsage = 0;
-
-	private double pressure = 0;
-
-	private Document personDoc;
-	private Element root;
-
-	private Map<String, Double> personalityDistribution;
-
-	private List<String> personNameList;
-	private List<String> countries;
-	private List<String> ESAcountries;
-	private List<String> sponsors;
-	private List<String> longSponsors;
+	private final String AVERAGE_HIGH_WEIGHT = "average-high-weight";// 68.5;
+	private final String AVERAGE_LOW_WEIGHT = "average-low-weight";
+//	private	final static String AVERAGE_WEIGHT = "average_low_weight"; //62.85;
 	
-	private List<Map<Integer, List<String>>> lastNames;
-	private List<Map<Integer, List<String>>> firstNames;
+	private final String LOW_O2_RATE = "low-activity-metaboic-load-o2-consumption-rate";
+	private final String NOMINAL_O2_RATE = "nominal-activity-metaboic-load-o2-consumption-rate";
+	private final String HIGH_O2_RATE = "high-activity-metaboic-load-o2-consumption-rate";
 
-	private Commander commander;
+	private final String CO2_EXPELLED_RATE = "co2-expelled-rate";
+
+	private final String WATER_CONSUMPTION_RATE = "water-consumption-rate";
+	private final String WATER_USAGE_RATE = "water-usage-rate";
+	private final String GREY_TO_BLACK_WATER_RATIO = "grey-to-black-water-ratio";
+
+	private final String FOOD_CONSUMPTION_RATE = "food-consumption-rate";
+	private final String DESSERT_CONSUMPTION_RATE = "dessert-consumption-rate";
+
+	private final String OXYGEN_DEPRIVATION_TIME = "oxygen-deprivation-time";
+	private final String WATER_DEPRIVATION_TIME = "water-deprivation-time";
+	private final String FOOD_DEPRIVATION_TIME = "food-deprivation-time";
+
+	private final String DEHYDRATION_START_TIME = "dehydration-start-time";
+	private final String STARVATION_START_TIME = "starvation-start-time";
+
+	private final String MIN_AIR_PRESSURE = "min-air-pressure";
+	private final String MIN_O2_PARTIAL_PRESSURE = "min-o2-partial-pressure";
+	
+	private final String MIN_TEMPERATURE = "min-temperature";
+	private final String MAX_TEMPERATURE = "max-temperature";
+	
+	private final String DECOMPRESSION_TIME = "decompression-time";
+	private final String FREEZING_TIME = "freezing-time";
+	
+	private final String STRESS_BREAKDOWN_CHANCE = "stress-breakdown-chance";
+	private final String HIGH_FATIGUE_COLLAPSE = "high-fatigue-collapse-chance";
+
+	private final String GENDER_MALE_PERCENTAGE = "gender-male-percentage";
+	
+	private final String PERSONALITY_TYPES = "personality-types";
+	private final String MBTI = "mbti";
+
+	private final String TYPE = "type";
+	private final String VALUE = "value";
+
+	private final String PERCENTAGE = "percentage";
+
+	/** The base load-carrying capacity. */
+	private transient double baseCap = -1;
+	/** The upper and lower height. */
+	private transient double[] height = new double[] {-1, -1};
+	/** The high and lor weight. */
+	private transient double[] weight = new double[] {-1, -1};
+	/** The 3 types of metabolic loads. */
+	private transient double[] o2ConsumptionRate = new double[] {-1, -1, -1};
+	/** The consumption rate for water, dessert, food. */
+	private transient double[] consumptionRates = new double[] {-1, -1, -1};
+	/** The grey2BlackWaterRatio and the gender ratio. */
+	private transient double[] ratio = new double[] {-1, -1};
+	/** The stress breakdown and high fatigue collapse chance. */
+	private transient double[] chance = new double[] {-1, -1};
+	/** Various time values. */
+	private transient double[] time = new double[] {-1, -1, -1, -1, -1, -1, -1};
+	/** The min and max temperature. */
+	private transient double[] temperature = new double[] {-1, -1};
+	/** The average rate of water usage [kg/sol]. */
+	private transient double waterUsage = -1;
+	/** The min air pressure [kPa]. */
+	private transient double pressure = -1;
+	/** The min o2 partial pressure [kPa]. */
+	private transient double o2pressure = -1;
+	/** The co2 expulsion rate [kg/sol]. */
+	private transient double co2Rate = -1;
+	/** The document object. */
+	private transient Document personDoc;
+	/** The personality distribution map. */
+	private transient Map<String, Double> personalityDistribution;
+	/** The lists. */
+	private transient List<String> personNameList;
+	private transient List<String> allCountries;
+	private transient List<String> ESACountries;
+	private transient List<String> sponsors;
+	private transient List<String> longSponsors;
+	
+	private transient List<Map<Integer, List<String>>> lastNames;
+	private transient List<Map<Integer, List<String>>> firstNames;
+
+	private transient Commander commander;
 
 	/**
 	 * Constructor
@@ -150,14 +141,8 @@ public class PersonConfig implements Serializable {
 	 * @param personDoc the person config DOM document.
 	 */
 	public PersonConfig(Document personDoc) {
-		// logger.info("PersonConfig's constructor is on " +
-		// Thread.currentThread().getName());
-
-		commander = new Commander();
-
 		this.personDoc = personDoc;
-
-		root = personDoc.getRootElement();
+		commander = new Commander();
 
 		getPersonNameList();
 		retrieveLastNameList();
@@ -176,8 +161,7 @@ public class PersonConfig implements Serializable {
 
 		if (personNameList == null) {
 			personNameList = new ArrayList<String>();
-			root = personDoc.getRootElement();
-			Element personNameEl = root.getChild(PERSON_NAME_LIST);
+			Element personNameEl = personDoc.getRootElement().getChild(PERSON_NAME_LIST);
 			List<Element> personNames = personNameEl.getChildren(PERSON_NAME);
 
 			for (Element nameElement : personNames) {
@@ -187,29 +171,6 @@ public class PersonConfig implements Serializable {
 
 		return personNameList;
 	}
-
-	/**
-	 * Gets a list of first names for settlers.
-	 * 
-	 * @return List of first names.
-	 * @throws Exception if first names could not be found.
-	 */
-//	public List<String> getFirstNameList() {
-//
-//		if (nameList == null) {
-//			nameList = new ArrayList<String>();
-//			//Element root = personDoc.getRootElement();
-//			Element personNameList = root.getChild(FIRST_NAME_LIST);
-//			List<Element> personNames = personNameList.getChildren(FIRST_NAME);
-//
-//			for (Element nameElement : personNames) {
-//				nameList.add(nameElement.getAttributeValue(VALUE));
-//			}
-//		}
-//
-//		//System.out.println("done with getFirstNameList()");
-//		return nameList;
-//	}
 
 	/**
 	 * Retrieves a list of settlers' last names by sponsors and by countries.
@@ -223,7 +184,7 @@ public class PersonConfig implements Serializable {
 			lastNames = new ArrayList<Map<Integer, List<String>>>();
 
 			List<List<String>> sponsors = new ArrayList<>();
-			for (int i = 0; i < 7; i++) {
+			for (int i = 0; i < 9; i++) {
 				List<String> list = new ArrayList<String>();
 				sponsors.add(list);
 			}
@@ -235,8 +196,7 @@ public class PersonConfig implements Serializable {
 				countries.add(countryList);
 			}
 
-			// Element root = personDoc.getRootElement();
-			Element lastNameEl = root.getChild(LAST_NAME_LIST);
+			Element lastNameEl = personDoc.getRootElement().getChild(LAST_NAME_LIST);
 			List<Element> lastNamesList = lastNameEl.getChildren(LAST_NAME);
 
 			for (Element nameElement : lastNamesList) {
@@ -251,22 +211,22 @@ public class PersonConfig implements Serializable {
 				else if (ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.CSA
 						|| ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.CSA_L)
 					sponsors.get(1).add(name);
-				else if (ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.ESA
-						|| ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.ESA_L)
-					sponsors.get(2).add(name);
 				else if (ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.ISRO
 						|| ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.ISRO_L)
-					sponsors.get(3).add(name);
+					sponsors.get(2).add(name);
 				else if (ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.JAXA
 						|| ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.JAXA_L)
-					sponsors.get(4).add(name);
+					sponsors.get(3).add(name);
 				else if (ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.NASA
 						|| ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.NASA_L)
-					sponsors.get(5).add(name);
+					sponsors.get(4).add(name);
 				else if (ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.RKA
 						|| ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.RKA_L)
+					sponsors.get(5).add(name);
+				else if (ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.ESA
+						|| ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.ESA_L)
 					sponsors.get(6).add(name);
-				else if (ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.MARS_SOCIETY
+				else if (ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.MS
 						|| ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.MARS_SOCIETY_L)
 					sponsors.get(7).add(name);
 				else if (ReportingAuthorityType.getType(sponsor) == ReportingAuthorityType.SPACEX
@@ -294,6 +254,7 @@ public class PersonConfig implements Serializable {
 				 * Luxembourg, The Netherlands, Norway, Poland, Portugal, Romania, Spain,
 				 * Sweden, Switzerland and the United Kingdom.
 				 */
+				
 				else if (country.equals("Austria"))
 					countries.get(6).add(name);
 				else if (country.equals("Belgium"))
@@ -344,7 +305,7 @@ public class PersonConfig implements Serializable {
 			Map<Integer, List<String>> lastNamesBySponsor = new HashMap<>();
 			Map<Integer, List<String>> lastNamesByCountry = new HashMap<>();
 
-			for (int i = 0; i < 7; i++) {
+			for (int i = 0; i < 9; i++) {
 				lastNamesBySponsor.put(i, sponsors.get(i));
 			}
 
@@ -374,18 +335,18 @@ public class PersonConfig implements Serializable {
 			firstNames = new ArrayList<Map<Integer, List<String>>>();
 
 			List<List<String>> malesBySponsor = new ArrayList<>();
-			for (int i = 0; i < 7; i++) {
+			for (int i = 0; i < 9; i++) {
 				List<String> list = new ArrayList<String>();
 				malesBySponsor.add(list);
 			}
 
 			List<List<String>> femalesBySponsor = new ArrayList<>();
-			for (int i = 0; i < 7; i++) {
+			for (int i = 0; i < 9; i++) {
 				List<String> list = new ArrayList<String>();
 				femalesBySponsor.add(list);
 			}
 
-			// 2017-01-21 Added lists for countries
+			// Add lists for countries
 			List<List<String>> malesByCountry = new ArrayList<>();
 			for (int i = 0; i < 28; i++) {
 				List<String> countryList = new ArrayList<String>();
@@ -398,9 +359,7 @@ public class PersonConfig implements Serializable {
 				femalesByCountry.add(countryList);
 			}
 
-			// List<String> nameList = new ArrayList<String>();
-			// Element root = personDoc.getRootElement();
-			Element firstNameEl = root.getChild(FIRST_NAME_LIST);
+			Element firstNameEl = personDoc.getRootElement().getChild(FIRST_NAME_LIST);
 			List<Element> firstNamesList = firstNameEl.getChildren(FIRST_NAME);
 
 			for (Element nameElement : firstNamesList) {
@@ -418,20 +377,20 @@ public class PersonConfig implements Serializable {
 					else if (sponsor.contains("CSA"))// && type[i] == ReportingAuthorityType.CSA)
 						malesBySponsor.get(1).add(name);
 
-					else if (sponsor.contains("ESA"))// && type[i] == ReportingAuthorityType.ESA)
-						malesBySponsor.get(2).add(name);
-
 					else if (sponsor.contains("ISRO"))// && type[i] == ReportingAuthorityType.ISRO)
+						malesBySponsor.get(2).add(name);
+					
+					else if (sponsor.contains("JAXA"))// && type[i] == ReportingAuthorityType.JAXA)
 						malesBySponsor.get(3).add(name);
 
-					else if (sponsor.contains("JAXA"))// && type[i] == ReportingAuthorityType.JAXA)
+					else if (sponsor.contains("NASA"))// && type[i] == ReportingAuthorityType.NASA)
 						malesBySponsor.get(4).add(name);
 
-					else if (sponsor.contains("NASA"))// && type[i] == ReportingAuthorityType.NASA)
+					else if (sponsor.contains("RKA"))// && type[i] == ReportingAuthorityType.RKA)
 						malesBySponsor.get(5).add(name);
 
-					else if (sponsor.contains("RKA"))// && type[i] == ReportingAuthorityType.RKA)
-						malesBySponsor.get(6).add(name);
+					else if (sponsor.contains("ESA"))// && type[i] == ReportingAuthorityType.ESA)
+						malesBySponsor.get(5).add(name);
 
 					else if (sponsor.contains("Mars Society")
 							|| sponsor.contains("MS"))// && type[i] == ReportingAuthorityType.NASA)
@@ -514,19 +473,19 @@ public class PersonConfig implements Serializable {
 					else if (sponsor.contains("CSA"))// && type[i] == ReportingAuthorityType.CSA)
 						femalesBySponsor.get(1).add(name);
 
-					else if (sponsor.contains("ESA"))// && type[i] == ReportingAuthorityType.ESA)
+					else if (sponsor.contains("ISRO"))// && type[i] == ReportingAuthorityType.ISRO)
 						femalesBySponsor.get(2).add(name);
 
-					else if (sponsor.contains("ISRO"))// && type[i] == ReportingAuthorityType.ISRO)
+					else if (sponsor.contains("JAXA"))// && type[i] == ReportingAuthorityType.JAXA)
 						femalesBySponsor.get(3).add(name);
 
-					else if (sponsor.contains("JAXA"))// && type[i] == ReportingAuthorityType.JAXA)
+					else if (sponsor.contains("NASA"))// && type[i] == ReportingAuthorityType.NASA)
 						femalesBySponsor.get(4).add(name);
 
-					else if (sponsor.contains("NASA"))// && type[i] == ReportingAuthorityType.NASA)
+					else if (sponsor.contains("RKA"))// && type[i] == ReportingAuthorityType.RKA)
 						femalesBySponsor.get(5).add(name);
 
-					else if (sponsor.contains("RKA"))// && type[i] == ReportingAuthorityType.RKA)
+					else if (sponsor.contains("ESA"))// && type[i] == ReportingAuthorityType.ESA)
 						femalesBySponsor.get(6).add(name);
 
 					else if (sponsor.contains("Mars Society")
@@ -640,9 +599,7 @@ public class PersonConfig implements Serializable {
 	public ReportingAuthorityType getMarsSocietySponsor(String name) {
 		ReportingAuthorityType type = null;
 
-		// Element root = personDoc.getRootElement();
-
-		Element personNameList = root.getChild(PERSON_NAME_LIST);
+		Element personNameList = personDoc.getRootElement().getChild(PERSON_NAME_LIST);
 		List<Element> personNames = personNameList.getChildren(PERSON_NAME);
 		for (Element nameElement : personNames) {
 			String personName = nameElement.getAttributeValue(VALUE);
@@ -650,29 +607,9 @@ public class PersonConfig implements Serializable {
 			if (personName.equals(name)) {
 				sponsor = nameElement.getAttributeValue(SPONSOR);
 
-//				if (sponsor.equals("CNSA"))
-//					type = ReportingAuthorityType.CNSA;
-//
-//				else if (sponsor.equals("CSA"))
-//					type = ReportingAuthorityType.CSA;
-//
-//				else if (sponsor.equals("ESA"))
-//					type = ReportingAuthorityType.ESA;
-//
-//				else if (sponsor.equals("ISRO"))
-//					type = ReportingAuthorityType.ISRO;
-//
-//				else if (sponsor.equals("JAXA"))
-//					type = ReportingAuthorityType.JAXA;
-
 				if (sponsor.contains("Mars Society") || sponsor.contains("MS"))
-					type = ReportingAuthorityType.MARS_SOCIETY;
+					type = ReportingAuthorityType.MS;
 
-//				else if (sponsor.equals("NASA"))
-//					type = ReportingAuthorityType.NASA;
-//
-//				else if (sponsor.equals("RKA"))
-//					type = ReportingAuthorityType.RKA;
 			}
 
 		}
@@ -687,12 +624,10 @@ public class PersonConfig implements Serializable {
 	 * @return {@link GenderType} the gender of the person name
 	 * @throws Exception if person names could not be found.
 	 */
-	@SuppressWarnings("unchecked")
 	public GenderType getPersonGender(String name) {
 		GenderType result = GenderType.UNKNOWN;
 
-		// Element root = personDoc.getRootElement();
-		Element personNameList = root.getChild(PERSON_NAME_LIST);
+		Element personNameList = personDoc.getRootElement().getChild(PERSON_NAME_LIST);
 		List<Element> personNames = personNameList.getChildren(PERSON_NAME);
 		for (Element nameElement : personNames) {
 			String personName = nameElement.getAttributeValue(VALUE);
@@ -702,6 +637,88 @@ public class PersonConfig implements Serializable {
 
 		return result;
 	}
+	
+	/**
+	 * Gets the base load capacity of a person.
+	 * 
+	 * @return capacity in kg
+	 */
+	public double getBaseCapacity() {
+		if (baseCap >= 0)
+			return baseCap;
+		else {
+			baseCap = getValueAsDouble(BASE_CAPACITY);
+			return baseCap;
+		}
+	}
+	
+	
+	/**
+	 * Gets the upper average height of a person.
+	 * 
+	 * @return height in cm
+	 */
+	public double getTallAverageHeight() {
+		double r = height[0];
+		if (r >= 0)
+			return r;
+		else {
+			r = getValueAsDouble(AVERAGE_TALL_HEIGHT);
+			height[0] = r;
+			return r;
+		}
+	}
+	
+	/**
+	 * Gets the lower average height of a person.
+	 * 
+	 * @return height in cm
+	 */
+	public double getShortAverageHeight() {
+		double r = height[1];
+		if (r >= 0)
+			return r;
+		else {
+			r = getValueAsDouble(AVERAGE_SHORT_HEIGHT);
+			height[1] = r;
+			return r;
+		}
+	}
+	
+	
+	
+	
+	/**
+	 * Gets the high average weight of a person.
+	 * 
+	 * @return weight in kg
+	 */
+	public double getHighAverageWeight() {
+		double r = weight[0];
+		if (r >= 0)
+			return r;
+		else {
+			r = getValueAsDouble(AVERAGE_HIGH_WEIGHT);
+			weight[0] = r;
+			return r;
+		}
+	}
+	
+	/**
+	 * Gets the low average weight of a person.
+	 * 
+	 * @return weight in kg
+	 */
+	public double getLowAverageWeight() {
+		double r = weight[1];
+		if (r >= 0)
+			return r;
+		else {
+			r = getValueAsDouble(AVERAGE_LOW_WEIGHT);
+			weight[1] = r;
+			return r;
+		}
+	}
 
 	/**
 	 * Gets the nominal oxygen consumption rate.
@@ -710,11 +727,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if consumption rate could not be found.
 	 */
 	public double getNominalO2ConsumptionRate() {
-		if (o2ConsumptionRate[1] != 0)
-			return o2ConsumptionRate[1];
+		double r = o2ConsumptionRate[1];
+		if (r >= 0)
+			return r;
 		else {
-			o2ConsumptionRate[1] = getValueAsDouble(NOMINAL_O2_RATE);
-			return o2ConsumptionRate[1];
+			r = getValueAsDouble(NOMINAL_O2_RATE);
+			o2ConsumptionRate[1] = r;
+			return r;
 		}
 	}
 
@@ -725,11 +744,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if consumption rate could not be found.
 	 */
 	public double getLowO2ConsumptionRate() {
-		if (o2ConsumptionRate[0] != 0)
-			return o2ConsumptionRate[0];
+		double r = o2ConsumptionRate[0];
+		if (r >= 0)
+			return r;
 		else {
-			o2ConsumptionRate[0] = getValueAsDouble(LOW_O2_RATE);
-			return o2ConsumptionRate[0];
+			r = getValueAsDouble(LOW_O2_RATE);
+			o2ConsumptionRate[0] = r;
+			return r;
 		}
 	}
 
@@ -740,11 +761,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if consumption rate could not be found.
 	 */
 	public double getHighO2ConsumptionRate() {
-		if (o2ConsumptionRate[2] != 0)
-			return o2ConsumptionRate[2];
+		double r = o2ConsumptionRate[2];
+		if (r >= 0)
+			return r;
 		else {
-			o2ConsumptionRate[2] = getValueAsDouble(HIGH_O2_RATE);
-			return o2ConsumptionRate[2];
+			r = getValueAsDouble(HIGH_O2_RATE);
+			o2ConsumptionRate[2] = r;
+			return r;
 		}
 	}
 
@@ -755,11 +778,11 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if consumption rate could not be found.
 	 */
 	public double getCO2ExpelledRate() {
-		if (o2ConsumptionRate[2] != 0)
-			return o2ConsumptionRate[2];
+		if (co2Rate >= 0)
+			return co2Rate;
 		else {
-			o2ConsumptionRate[2] = getValueAsDouble(CO2_EXPELLED_RATE);
-			return o2ConsumptionRate[2];
+			co2Rate = getValueAsDouble(CO2_EXPELLED_RATE);
+			return co2Rate;
 		}
 	}
 
@@ -770,11 +793,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if consumption rate could not be found.
 	 */
 	public double getWaterConsumptionRate() {
-		if (consumptionRates[0] != 0)
-			return consumptionRates[0];
+		double r = consumptionRates[0];
+		if (r >= 0)
+			return r;
 		else {
-			consumptionRates[0] = getValueAsDouble(WATER_CONSUMPTION_RATE);
-			return consumptionRates[0];
+			r = getValueAsDouble(WATER_CONSUMPTION_RATE);
+			consumptionRates[0] = r;
+			return r;
 		}
 	}
 
@@ -785,7 +810,7 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if usage rate could not be found.
 	 */
 	public double getWaterUsageRate() {
-		if (waterUsage != 0)
+		if (waterUsage >= 0)
 			return waterUsage;
 		else {
 			waterUsage = getValueAsDouble(WATER_USAGE_RATE);
@@ -800,11 +825,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if the ratio could not be found.
 	 */
 	public double getGrey2BlackWaterRatio() {
-		if (ratio[0] != 0)
-			return ratio[0];
+		double r = ratio[0];
+		if (r >= 0)
+			return r;
 		else {
-			ratio[0] = getValueAsDouble(GREY_TO_BLACK_WATER_RATIO);
-			return ratio[0];
+			r = getValueAsDouble(GREY_TO_BLACK_WATER_RATIO);
+			ratio[0] = r;
+			return r;
 		}
 	}
 
@@ -815,11 +842,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if consumption rate could not be found.
 	 */
 	public double getFoodConsumptionRate() {
-		if (consumptionRates[2] != 0)
-			return consumptionRates[2];
+		double r = consumptionRates[2];
+		if (r >= 0)
+			return r;
 		else {
-			consumptionRates[2] = getValueAsDouble(FOOD_CONSUMPTION_RATE);
-			return consumptionRates[2];
+			r = getValueAsDouble(FOOD_CONSUMPTION_RATE);
+			consumptionRates[2] = r;
+			return r;
 		}
 	}
 
@@ -830,11 +859,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if consumption rate could not be found.
 	 */
 	public double getDessertConsumptionRate() {
-		if (consumptionRates[1] != 0)
-			return consumptionRates[1];
+		double r = consumptionRates[1];
+		if (r >= 0)
+			return r;
 		else {
-			consumptionRates[1] = getValueAsDouble(DESSERT_CONSUMPTION_RATE);
-			return consumptionRates[1];
+			r = getValueAsDouble(DESSERT_CONSUMPTION_RATE);
+			consumptionRates[1] = r;
+			return r;
 		}
 	}
 
@@ -845,11 +876,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if oxygen deprivation time could not be found.
 	 */
 	public double getOxygenDeprivationTime() {
-		if (time[0] != 0)
-			return time[0];
+		double r = time[0];
+		if (r >= 0)
+			return r;
 		else {
-			time[0] = getValueAsDouble(OXYGEN_DEPRIVATION_TIME);
-			return time[0];
+			r = getValueAsDouble(OXYGEN_DEPRIVATION_TIME);
+			time[0] = r;
+			return r;
 		}
 	}
 
@@ -860,11 +893,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if water deprivation time could not be found.
 	 */
 	public double getWaterDeprivationTime() {
-		if (time[1] != 0)
-			return time[1];
+		double r = time[1];
+		if (r >= 0)
+			return r;
 		else {
-			time[1] = getValueAsDouble(WATER_DEPRIVATION_TIME);
-			return time[1];
+			r = getValueAsDouble(WATER_DEPRIVATION_TIME);
+			time[1] = r;
+			return r;
 		}
 	}
 
@@ -875,11 +910,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if dehydration start time could not be found.
 	 */
 	public double getDehydrationStartTime() {
-		if (time[2] != 0)
-			return time[2];
+		double r = time[2];
+		if (r >= 0)
+			return r;
 		else {
-			time[2] = getValueAsDouble(DEHYDRATION_START_TIME);
-			return time[2];
+			r = getValueAsDouble(DEHYDRATION_START_TIME);
+			time[2] = r;
+			return r;
 		}
 	}
 
@@ -890,11 +927,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if food deprivation time could not be found.
 	 */
 	public double getFoodDeprivationTime() {
-		if (time[3] != 0)
-			return time[3];
+		double r = time[3];
+		if (r >= 0)
+			return r;
 		else {
-			time[3] = getValueAsDouble(FOOD_DEPRIVATION_TIME);
-			return time[3];
+			r = getValueAsDouble(FOOD_DEPRIVATION_TIME);
+			time[3] = r;
+			return r;
 		}
 	}
 
@@ -905,29 +944,46 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if starvation start time could not be found.
 	 */
 	public double getStarvationStartTime() {
-		if (time[4] != 0)
-			return time[4];
+		double r = time[4];
+		if (r >= 0)
+			return r;
 		else {
-			time[4] = getValueAsDouble(STARVATION_START_TIME);
-			return time[4];
+			r = getValueAsDouble(STARVATION_START_TIME);
+			time[4] = r;
+			return r;
 		}
 	}
 
 	/**
-	 * Gets the required air pressure.
+	 * Gets the minimum air pressure.
 	 * 
 	 * @return air pressure in kPa.
 	 * @throws Exception if air pressure could not be found.
 	 */
 	public double getMinAirPressure() {
-		if (pressure != 0)
+		if (pressure >= 0)
 			return pressure;
 		else {
 			pressure = getValueAsDouble(MIN_AIR_PRESSURE);
 			return pressure;
 		}
 	}
-			
+		
+	/**
+	 * Gets the absolute minimum oxygen partial pressure of a spacesuit.
+	 * 
+	 * @return partial pressure in kPa.
+	 * @throws Exception if air pressure could not be found.
+	 */
+	public double getMinSuitO2Pressure() {
+		if (o2pressure >= 0)
+			return o2pressure;
+		else {
+			o2pressure = getValueAsDouble(MIN_O2_PARTIAL_PRESSURE);
+			return o2pressure;
+		}
+	}
+	
 	/**
 	 * Gets the max decompression time a person can survive.
 	 * 
@@ -935,11 +991,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if decompression time could not be found.
 	 */
 	public double getDecompressionTime() {
-		if (time[5] != 0)
-			return time[5];
+		double r = time[5];
+		if (r >= 0)
+			return r;
 		else {
-			time[5] = getValueAsDouble(DECOMPRESSION_TIME);
-			return time[5];
+			r = getValueAsDouble(DECOMPRESSION_TIME);
+			time[5] = r;
+			return r;
 		}
 	}
 
@@ -950,11 +1008,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if min temperature cannot be found.
 	 */
 	public double getMinTemperature() {
-		if (temperature[0] != 0)
-			return temperature[0];
+		double r = temperature[0];
+		if (r >= 0)
+			return r;
 		else {
-			temperature[0] = getValueAsDouble(MIN_TEMPERATURE);
-			return temperature[0];
+			r = getValueAsDouble(MIN_TEMPERATURE);
+			temperature[0] = r;
+			return r;
 		}
 	}
 
@@ -965,11 +1025,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if max temperature cannot be found.
 	 */
 	public double getMaxTemperature() {
-		if (temperature[1] != 0)
-			return temperature[1];
+		double r = temperature[1];
+		if (r >= 0)
+			return r;
 		else {
-			temperature[1] = getValueAsDouble(MAX_TEMPERATURE);
-			return temperature[1];
+			r = getValueAsDouble(MAX_TEMPERATURE);
+			temperature[1] = r;
+			return r;
 		}
 	}
 
@@ -980,11 +1042,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if freezing time could not be found.
 	 */
 	public double getFreezingTime() {
-		if (time[6] != 0)
-			return time[6];
+		double r = time[6];
+		if (r >= 0)
+			return r;
 		else {
-			time[6] = getValueAsDouble(FREEZING_TIME);
-			return time[6];
+			r = getValueAsDouble(FREEZING_TIME);
+			time[6] = r;
+			return r;
 		}
 	}
 
@@ -996,11 +1060,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if stress breakdown time could not be found.
 	 */
 	public double getStressBreakdownChance() {
-		if (chance[0] != 0)
-			return chance[0];
+		double r = chance[0];
+		if (r >= 0)
+			return r;
 		else {
-			chance[0] = getValueAsDouble(STRESS_BREAKDOWN_CHANCE);
-			return chance[0];
+			r = getValueAsDouble(STRESS_BREAKDOWN_CHANCE);
+			chance[0] = r;
+			return r;
 		}
 	}
 
@@ -1011,11 +1077,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if collapse time could not be found.
 	 */
 	public double getHighFatigueCollapseChance() {
-		if (chance[1] != 0)
-			return chance[1];
+		double r = chance[1];
+		if (r >= 0)
+			return r;
 		else {
-			chance[1] = getValueAsDouble(HIGH_FATIGUE_COLLAPSE);
-			return chance[1];
+			r = getValueAsDouble(HIGH_FATIGUE_COLLAPSE);
+			chance[1] = r;
+			return r;
 		}
 	}
 
@@ -1026,11 +1094,13 @@ public class PersonConfig implements Serializable {
 	 * @throws Exception if gender ratio could not be found.
 	 */
 	public double getGenderRatio() {
-		if (ratio[1] != 0)
-			return ratio[1];
+		double r = ratio[1];
+		if (r >= 0)
+			return r;
 		else {
-			ratio[1] = getValueAsDouble(GENDER_MALE_PERCENTAGE) / 100D;
-			return ratio[1];
+			r = getValueAsDouble(GENDER_MALE_PERCENTAGE) / 100D;
+			ratio[1] = r;
+			return r;
 		}
 	}
 
@@ -1045,8 +1115,7 @@ public class PersonConfig implements Serializable {
 	public double getPersonalityTypePercentage(String personalityType) {
 		double result = 0D;
 
-		// Element root = personDoc.getRootElement();
-		Element personalityTypeList = root.getChild(PERSONALITY_TYPES);
+		Element personalityTypeList = personDoc.getRootElement().getChild(PERSONALITY_TYPES);
 		List<Element> personalityTypes = personalityTypeList.getChildren(MBTI);
 
 		for (Element mbtiElement : personalityTypes) {
@@ -1077,398 +1146,37 @@ public class PersonConfig implements Serializable {
 	 */
 	// Relocate createPersonalityDistribution() from MBTI to here
 	public void createPersonalityDistribution() {
-
-		personalityDistribution = new HashMap<String, Double>(16);
-
-//		try {
-		personalityDistribution.put("ISTP", getPersonalityTypePercentage("ISTP"));
-		personalityDistribution.put("ISTJ", getPersonalityTypePercentage("ISTJ"));
-		personalityDistribution.put("ISFP", getPersonalityTypePercentage("ISFP"));
-		personalityDistribution.put("ISFJ", getPersonalityTypePercentage("ISFJ"));
-		personalityDistribution.put("INTP", getPersonalityTypePercentage("INTP"));
-		personalityDistribution.put("INTJ", getPersonalityTypePercentage("INTJ"));
-		personalityDistribution.put("INFP", getPersonalityTypePercentage("INFP"));
-		personalityDistribution.put("INFJ", getPersonalityTypePercentage("INFJ"));
-		personalityDistribution.put("ESTP", getPersonalityTypePercentage("ESTP"));
-		personalityDistribution.put("ESTJ", getPersonalityTypePercentage("ESTJ"));
-		personalityDistribution.put("ESFP", getPersonalityTypePercentage("ESFP"));
-		personalityDistribution.put("ESFJ", getPersonalityTypePercentage("ESFJ"));
-		personalityDistribution.put("ENTP", getPersonalityTypePercentage("ENTP"));
-		personalityDistribution.put("ENTJ", getPersonalityTypePercentage("ENTJ"));
-		personalityDistribution.put("ENFP", getPersonalityTypePercentage("ENFP"));
-		personalityDistribution.put("ENFJ", getPersonalityTypePercentage("ENFJ"));
-//		}
-//		catch (Exception e) {
-//			throw new Exception("PersonalityType.loadPersonalityTypes(): unable to load a personality type.");
-//		}
-
-		Iterator<String> i = personalityDistribution.keySet().iterator();
-		double count = 0D;
-		while (i.hasNext())
-			count += personalityDistribution.get(i.next());
-		if (count != 100D)
-			throw new IllegalStateException(
-					"PersonalityType.loadPersonalityTypes(): percentages don't add up to 100%. (total: " + count + ")");
-
-	}
-
-	/**
-	 * Gets the number of people configured for the simulation.
-	 * 
-	 * @return number of people.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public int getNumberOfConfiguredPeople() {
-		// Element root = personDoc.getRootElement();
-		Element personList = root.getChild(PERSON_LIST);
-		List<String> personNodes = personList.getChildren(PERSON);
-		if (personNodes != null)
-			return personNodes.size();
-		else
-			return 0;
-	}
-
-	/**
-	 * Get person's crew designation
-	 * 
-	 * @param index the person's index.
-	 * @return name or null if none.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public int getCrew(int index) {
-		// retrieve the person's crew designation
-		String crewString = getValueAsString(index, CREW);
-
-		if (crewString == null) {
-			throw new IllegalStateException("The crew designation of a person is null");
-
-		} else {
-
-			boolean oldCrew = false;
-
-			Iterator<Crew> i = roster.iterator();
-			while (i.hasNext()) {
-				Crew crew = i.next();
-				// if the name does not exist, create a new crew with this name
-				if (crewString.equals(crew.getName())) {
-					oldCrew = true;
-					// add a new member
-					// Member m = new Member();
-					crew.add(new Member());
-					break;
-				}
-			}
-
-			// if this is crew name doesn't exist
-			if (!oldCrew) {
-				Crew c = new Crew(crewString);
-				c.add(new Member());
-				roster.add(c);
-			}
-
-//			System.out.println("crewString : " + crewString + " crew size : " + roster.size());
-
-			return roster.size() - 1;
-		}
-
-	}
-
-	/**
-	 * Gets the configured person's name.
-	 * 
-	 * @param index the person's index.
-	 * @return name or null if none.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public String getConfiguredPersonName(int index, int crew_id) {
-		// System.out.println("roster.get(crew_id) : " + roster.get(crew_id));
-		// System.out.println("roster.get(crew_id).getTeam().get(index) : " +
-		// roster.get(crew_id).getTeam().get(index));
-		// System.out.println("name : " +
-		// roster.get(crew_id).getTeam().get(index).getName());
-//		System.out.println("roster.size : " + roster.size());
-
-		if (roster.get(crew_id) != null) {
-			if (roster.get(crew_id).getTeam().get(index).getName() != null) {
-				return roster.get(crew_id).getTeam().get(index).getName();
-			} else {
-				return getValueAsString(index, NAME);
-			}
-
-		} else {
-			return getValueAsString(index, NAME);
+		if (personalityDistribution == null) {
+			personalityDistribution = new HashMap<String, Double>(16);
+	
+			personalityDistribution.put("ISTP", getPersonalityTypePercentage("ISTP"));
+			personalityDistribution.put("ISTJ", getPersonalityTypePercentage("ISTJ"));
+			personalityDistribution.put("ISFP", getPersonalityTypePercentage("ISFP"));
+			personalityDistribution.put("ISFJ", getPersonalityTypePercentage("ISFJ"));
+			personalityDistribution.put("INTP", getPersonalityTypePercentage("INTP"));
+			personalityDistribution.put("INTJ", getPersonalityTypePercentage("INTJ"));
+			personalityDistribution.put("INFP", getPersonalityTypePercentage("INFP"));
+			personalityDistribution.put("INFJ", getPersonalityTypePercentage("INFJ"));
+			personalityDistribution.put("ESTP", getPersonalityTypePercentage("ESTP"));
+			personalityDistribution.put("ESTJ", getPersonalityTypePercentage("ESTJ"));
+			personalityDistribution.put("ESFP", getPersonalityTypePercentage("ESFP"));
+			personalityDistribution.put("ESFJ", getPersonalityTypePercentage("ESFJ"));
+			personalityDistribution.put("ENTP", getPersonalityTypePercentage("ENTP"));
+			personalityDistribution.put("ENTJ", getPersonalityTypePercentage("ENTJ"));
+			personalityDistribution.put("ENFP", getPersonalityTypePercentage("ENFP"));
+			personalityDistribution.put("ENFJ", getPersonalityTypePercentage("ENFJ"));
+	
+	
+			Iterator<String> i = personalityDistribution.keySet().iterator();
+			double count = 0D;
+			while (i.hasNext())
+				count += personalityDistribution.get(i.next());
+			if (count != 100D)
+				throw new IllegalStateException(
+						"PersonalityType.loadPersonalityTypes(): percentages don't add up to 100%. (total: " + count + ")");
 		}
 	}
 
-	/**
-	 * Gets the configured person's gender.
-	 * 
-	 * @param index the person's index.
-	 * @return {@link GenderType} or null if not found.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public GenderType getConfiguredPersonGender(int index, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getGender() != null)
-			return GenderType.valueOfIgnoreCase(roster.get(crew_id).getTeam().get(index).getGender());// alphaCrewGender.get(index))
-																										// ;
-		else
-			return GenderType.valueOfIgnoreCase(getValueAsString(index, GENDER));
-	}
-
-	/**
-	 * Gets the configured person's MBTI personality type.
-	 * 
-	 * @param index the person's index.
-	 * @return four character string for MBTI ex. "ISTJ". Return null if none.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public String getConfiguredPersonPersonalityType(int index, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getMBTI() != null)
-			return roster.get(crew_id).getTeam().get(index).getMBTI();// alphaCrewPersonality.get(index) ;
-		else
-			return getValueAsString(index, PERSONALITY_TYPE);
-	}
-
-	/**
-	 * Gets the configured person's job.
-	 * 
-	 * @param index the person's index.
-	 * @return the job name or null if none.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public String getConfiguredPersonJob(int index, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getJob() != null)
-			return roster.get(crew_id).getTeam().get(index).getJob();// alphaCrewJob.get(index) ;
-		else
-			return getValueAsString(index, JOB);
-	}
-
-	/**
-	 * Gets the configured person's country.
-	 * 
-	 * @param index the person's index.
-	 * @return the job name or null if none.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public String getConfiguredPersonCountry(int index, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getCountry() != null)
-			return roster.get(crew_id).getTeam().get(index).getCountry();// alphaCrewJob.get(index) ;
-		else
-			return getValueAsString(index, COUNTRY);
-	}
-
-	/**
-	 * Gets the configured person's sponsor.
-	 * 
-	 * @param index the person's index.
-	 * @return the job name or null if none.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public String getConfiguredPersonSponsor(int index, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getSponsor() != null)
-			return roster.get(crew_id).getTeam().get(index).getSponsor();// alphaCrewJob.get(index) ;
-		else
-			return getValueAsString(index, SPONSOR);
-	}
-
-	/**
-	 * Gets the configured person's starting settlement.
-	 * 
-	 * @param index the person's index.
-	 * @return the settlement name or null if none.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public String getConfiguredPersonDestination(int index, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getDestination() != null)
-			return roster.get(crew_id).getTeam().get(index).getDestination();// alphaCrewDestination.get(index);
-		else
-			return getValueAsString(index, SETTLEMENT);
-	}
-
-	/**
-	 * Sets the name of a member of the alpha crew
-	 * 
-	 * @param index
-	 * @param name
-	 */
-	public void setPersonName(int index, String value, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getName() == null)
-			roster.get(crew_id).getTeam().get(index).setName(value);// alphaCrewName = new
-																	// ArrayList<String>(SIZE_OF_CREW);
-
-		// if (alphaCrewName.size() == SIZE_OF_CREW) {
-		// alphaCrewName.set(index, value);
-		// } else
-		// alphaCrewName.add(value);
-
-	}
-
-	/**
-	 * Sets the personality of a member of the alpha crew
-	 * 
-	 * @param index
-	 * @param personality
-	 */
-	public void setPersonPersonality(int index, String value, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getMBTI() == null)
-			roster.get(crew_id).getTeam().get(index).setMBTI(value);
-
-		// if (alphaCrewPersonality == null)
-		// alphaCrewPersonality = new ArrayList<String>(SIZE_OF_CREW);
-		// if (alphaCrewPersonality.size() == SIZE_OF_CREW) {
-		// alphaCrewPersonality.set(index, value);
-		// } else
-		// alphaCrewPersonality.add(value);
-	}
-
-	/**
-	 * Sets the gender of a member of the alpha crew
-	 * 
-	 * @param index
-	 * @param gender
-	 */
-	public void setPersonGender(int index, String value, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getGender() == null)
-			roster.get(crew_id).getTeam().get(index).setGender(value);
-
-		// if (alphaCrewGender == null)
-		// alphaCrewGender = new ArrayList<String>(SIZE_OF_CREW);
-		// if (alphaCrewGender.size() == SIZE_OF_CREW) {
-		// alphaCrewGender.set(index, value);
-		// } else
-		// alphaCrewGender.add(value);
-	}
-
-	/**
-	 * Sets the job of a member of the alpha crew
-	 * 
-	 * @param index
-	 * @param job
-	 */
-	public void setPersonJob(int index, String value, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getJob() == null)
-			roster.get(crew_id).getTeam().get(index).setJob(value);
-
-		// if (alphaCrewJob == null)
-		// alphaCrewJob = new ArrayList<String>(SIZE_OF_CREW);
-		// if (alphaCrewJob.size() == SIZE_OF_CREW) {
-		// alphaCrewJob.set(index, value);
-		// } else
-		// alphaCrewJob.add(value);
-	}
-
-	/**
-	 * Sets the country of a member of the alpha crew
-	 * 
-	 * @param index
-	 * @param country
-	 */
-	public void setPersonCountry(int index, String value, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getCountry() == null)
-			roster.get(crew_id).getTeam().get(index).setCountry(value);
-	}
-
-	/**
-	 * Sets the sponsor of a member of the alpha crew
-	 * 
-	 * @param index
-	 * @param sponsor
-	 */
-	public void setPersonSponsor(int index, String value, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getSponsor() == null)
-			roster.get(crew_id).getTeam().get(index).setSponsor(value);
-	}
-
-	/**
-	 * Sets the destination of a member of the alpha crew
-	 * 
-	 * @param index
-	 * @param destination
-	 */
-	public void setPersonDestination(int index, String value, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getDestination() == null)
-			roster.get(crew_id).getTeam().get(index).setDestination(value);
-
-		// if (alphaCrewDestination == null)
-		// alphaCrewDestination = new ArrayList<String>(SIZE_OF_CREW);
-		// if (alphaCrewDestination.size() == SIZE_OF_CREW) {
-		// alphaCrewDestination.set(index, value);
-		// } else
-		// alphaCrewDestination.add(value);
-	}
-
-	/**
-	 * Gets a map of the configured person's natural attributes.
-	 * 
-	 * @param index the person's index.
-	 * @return map of natural attributes (empty map if not found).
-	 * @throws Exception if error in XML parsing.
-	 */
-	public Map<String, Integer> getNaturalAttributeMap(int index) {
-		Map<String, Integer> result = new HashMap<String, Integer>();
-		// Element root = personDoc.getRootElement();
-		Element personList = root.getChild(PERSON_LIST);
-		Element personElement = (Element) personList.getChildren(PERSON).get(index);
-		List<Element> naturalAttributeListNodes = personElement.getChildren(NATURAL_ATTRIBUTE_LIST);
-
-		if ((naturalAttributeListNodes != null) && (naturalAttributeListNodes.size() > 0)) {
-			Element naturalAttributeList = naturalAttributeListNodes.get(0);
-			int attributeNum = naturalAttributeList.getChildren(NATURAL_ATTRIBUTE).size();
-
-			for (int x = 0; x < attributeNum; x++) {
-				Element naturalAttributeElement = (Element) naturalAttributeList.getChildren(NATURAL_ATTRIBUTE).get(x);
-				String name = naturalAttributeElement.getAttributeValue(NAME);
-				Integer value = new Integer(naturalAttributeElement.getAttributeValue(VALUE));
-				result.put(name, value);
-			}
-		}
-		return result;
-	}
-
-	/**
-	 * Gets a map of the configured person's traits according to the Big Five Model.
-	 * 
-	 * @param index the person's index.
-	 * @return map of Big Five Model (empty map if not found).
-	 * @throws Exception if error in XML parsing.
-	 */
-	public Map<String, Integer> getBigFiveMap(int index) {
-		Map<String, Integer> result = new HashMap<String, Integer>();
-		// Element root = personDoc.getRootElement();
-		Element personList = root.getChild(PERSON_LIST);
-		Element personElement = (Element) personList.getChildren(PERSON).get(index);
-		List<Element> listNodes = personElement.getChildren(PERSONALITY_TRAIT_LIST);
-
-		if ((listNodes != null) && (listNodes.size() > 0)) {
-			Element list = listNodes.get(0);
-			int attributeNum = list.getChildren(PERSONALITY_TRAIT).size();
-
-			for (int x = 0; x < attributeNum; x++) {
-				Element naturalAttributeElement = (Element) list.getChildren(PERSONALITY_TRAIT).get(x);
-				String name = naturalAttributeElement.getAttributeValue(NAME);
-				Integer value = new Integer(naturalAttributeElement.getAttributeValue(VALUE));
-				// System.out.println(name + " : " + value);
-				result.put(name, value);
-			}
-		}
-		return result;
-	}
-
-	/**
-	 * Gets the value of an element as a String
-	 * 
-	 * @param an element
-	 * 
-	 * @param an index
-	 * 
-	 * @return a String
-	 */
-	private String getValueAsString(int index, String param) {
-		// Element root = personDoc.getRootElement();
-		Element personList = root.getChild(PERSON_LIST);
-		Element personElement = (Element) personList.getChildren(PERSON).get(index);
-		return personElement.getAttributeValue(param);
-	}
 
 	/**
 	 * Gets the value of an element as a double
@@ -1478,236 +1186,116 @@ public class PersonConfig implements Serializable {
 	 * @return a double
 	 */
 	private double getValueAsDouble(String child) {
-		// Element root = personDoc.getRootElement();
-		Element element = root.getChild(child);
+		Element element = personDoc.getRootElement().getChild(child);
 		String str = element.getAttributeValue(VALUE);
+//		System.out.println("str : " + str);
 		return Double.parseDouble(str);
 	}
 
-	/**
-	 * Gets a map of the configured person's skills.
-	 * 
-	 * @param index the person's index.
-	 * @return map of skills (empty map if not found).
-	 * @throws Exception if error in XML parsing.
-	 */
-	public Map<String, Integer> getSkillMap(int index) {
-		Map<String, Integer> result = new HashMap<String, Integer>();
-		// Element root = personDoc.getRootElement();
-		// Change the people.xml element from "person-list" to
-		// "alpha-team"
-		Element personList = root.getChild(PERSON_LIST);
-		Element personElement = (Element) personList.getChildren(PERSON).get(index);
-		List<Element> skillListNodes = personElement.getChildren(SKILL_LIST);
-		if ((skillListNodes != null) && (skillListNodes.size() > 0)) {
-			Element skillList = skillListNodes.get(0);
-			int skillNum = skillList.getChildren(SKILL).size();
-			for (int x = 0; x < skillNum; x++) {
-				Element skillElement = (Element) skillList.getChildren(SKILL).get(x);
-				String name = skillElement.getAttributeValue(NAME);
-				Integer level = new Integer(skillElement.getAttributeValue(LEVEL));
-				result.put(name, level);
-			}
-		}
-		return result;
-	}
-
-	/**
-	 * Gets a map of the configured person's relationships.
-	 * 
-	 * @param index the person's index.
-	 * @return map of relationships (key: person name, value: opinion (0 - 100))
-	 *         (empty map if not found).
-	 * @throws Exception if error in XML parsing.
-	 */
-	public Map<String, Integer> getRelationshipMap(int index) {
-		Map<String, Integer> result = new HashMap<String, Integer>();
-		// Element root = personDoc.getRootElement();
-		Element personList = root.getChild(PERSON_LIST);
-		Element personElement = (Element) personList.getChildren(PERSON).get(index);
-		List<Element> relationshipListNodes = personElement.getChildren(RELATIONSHIP_LIST);
-		if ((relationshipListNodes != null) && (relationshipListNodes.size() > 0)) {
-			Element relationshipList = relationshipListNodes.get(0);
-			int relationshipNum = relationshipList.getChildren(RELATIONSHIP).size();
-			for (int x = 0; x < relationshipNum; x++) {
-				Element relationshipElement = (Element) relationshipList.getChildren(RELATIONSHIP).get(x);
-				String personName = relationshipElement.getAttributeValue(PERSON_NAME);
-				Integer opinion = new Integer(relationshipElement.getAttributeValue(OPINION));
-				result.put(personName, opinion);
-			}
-		}
-		return result;
-	}
-
-	/**
-	 * Gets the configured person's favorite main dish.
-	 * 
-	 * @param index the person's index.
-	 * @return the name of the favorite main dish name or null if none.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public String getFavoriteMainDish(int index, int crew_id) {
-
-		if (roster.get(crew_id).getTeam().get(index).getMainDish() != null)
-			return roster.get(crew_id).getTeam().get(index).getMainDish();
-		else
-			return getValueAsString(index, MAIN_DISH);
-	}
-
-	/**
-	 * Gets the configured person's favorite side dish.
-	 * 
-	 * @param index the person's index.
-	 * @return the name of the favorite side dish name or null if none.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public String getFavoriteSideDish(int index, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getSideDish() != null)
-			return roster.get(crew_id).getTeam().get(index).getSideDish();
-		else
-			return getValueAsString(index, SIDE_DISH);
-	}
-
-	/**
-	 * Gets the configured person's favorite dessert.
-	 * 
-	 * @param index the person's index.
-	 * @return the name of the favorite dessert name or null if none.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public String getFavoriteDessert(int index, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getDessert() != null)
-			return roster.get(crew_id).getTeam().get(index).getDessert();
-		else
-			return getValueAsString(index, DESSERT);
-	}
-
-	/**
-	 * Gets the configured person's favorite activity.
-	 * 
-	 * @param index the person's index.
-	 * @return the name of the favorite activity name or null if none.
-	 * @throws Exception if error in XML parsing.
-	 */
-	public String getFavoriteActivity(int index, int crew_id) {
-		if (roster.get(crew_id).getTeam().get(index).getActivity() != null)
-			return roster.get(crew_id).getTeam().get(index).getActivity();
-		else
-			return getValueAsString(index, ACTIVITY);
-	}
 
 	/**
 	 * Create country list
 	 * 
 	 * @return
 	 */
-	public List<String> createCountryList() {
+	public List<String> createAllCountryList() {
 
-		if (countries == null) {
-			countries = new ArrayList<>();
+		if (allCountries == null) {
+			allCountries = new ArrayList<>();
 
-			countries.add("China"); // 0
-			countries.add("Canada"); // 1
-			countries.add("India"); // 2
-			countries.add("Japan"); // 3
-			countries.add("USA"); // 4
-			countries.add("Russia"); // 5
+			allCountries.add("China"); // 0
+			allCountries.add("Canada"); // 1
+			allCountries.add("India"); // 2
+			allCountries.add("Japan"); // 3
+			allCountries.add("USA"); // 4
+			allCountries.add("Russia"); // 5
 
-			countries.addAll(createESACountryList());
+			allCountries.addAll(createESACountryList()); // 6
 
 		}
 
-		return countries;
+		return allCountries;
 	}
 
 	public String getCountry(int id) {
-		if (countries == null) {
-			countries = createCountryList();
+		if (allCountries == null) {
+			allCountries = createAllCountryList();
 		}
-		return countries.get(id);
+		return allCountries.get(id);
 	}
 
 	/**
-	 * Create ESA country list
+	 * Gets the country number from its name
+	 * 
+	 * @param country
+	 * @return
+	 */
+	public int getCountryNum(String country) {
+		if (allCountries == null) {
+			allCountries = createAllCountryList();
+		}
+		for (int i = 0; i < allCountries.size(); i++) {
+			if (allCountries.get(i).equalsIgnoreCase(country))
+				return i;
+		}
+		
+		return -1;
+	}
+	
+	/**
+	 * Create ESA 22 country list
 	 * 
 	 * @return
 	 */
 	public List<String> createESACountryList() {
 
-		if (ESAcountries == null) {
-			ESAcountries = new ArrayList<>();
+		if (ESACountries == null) {
+			ESACountries = new ArrayList<>();
 
-			ESAcountries.add("Austria");
-			ESAcountries.add("Belgium");
-			ESAcountries.add("Czech Republic");
-			ESAcountries.add("Denmark");
-			ESAcountries.add("Estonia");
-			ESAcountries.add("Finland");
-			ESAcountries.add("France");
-			ESAcountries.add("Germany");
-			ESAcountries.add("Greece");
-			ESAcountries.add("Hungary");
-			ESAcountries.add("Ireland");
-			ESAcountries.add("Italy");
-			ESAcountries.add("Luxembourg");
-			ESAcountries.add("The Netherlands");
-			ESAcountries.add("Norway");
-			ESAcountries.add("Poland");
-			ESAcountries.add("Portugal");
-			ESAcountries.add("Romania");
-			ESAcountries.add("Spain");
-			ESAcountries.add("Sweden");
-			ESAcountries.add("Switzerland");
-			ESAcountries.add("UK");
+			ESACountries.add("Austria");
+			ESACountries.add("Belgium");
+			ESACountries.add("Czech Republic");
+			ESACountries.add("Denmark");
+			ESACountries.add("Estonia");
+			
+			ESACountries.add("Finland");
+			ESACountries.add("France");
+			ESACountries.add("Germany");
+			ESACountries.add("Greece");
+			ESACountries.add("Hungary");
+			
+			ESACountries.add("Ireland");
+			ESACountries.add("Italy");
+			ESACountries.add("Luxembourg");
+			ESACountries.add("The Netherlands");
+			ESACountries.add("Norway");
+			
+			ESACountries.add("Poland");
+			ESACountries.add("Portugal");
+			ESACountries.add("Romania");
+			ESACountries.add("Spain");
+			ESACountries.add("Sweden");
+			
+			ESACountries.add("Switzerland");
+			ESACountries.add("UK");
 
 		}
 
-		return ESAcountries;
+		return ESACountries;
 	}
 
-	public int getCountryID(String country) {
-		return countries.indexOf(country);
+	/**
+	 * Computes the country id. If none, return -1.
+	 * 
+	 * @param country
+	 * @return
+	 */
+	public int computeCountryID(String country) {
+		if (allCountries.contains(country))
+			return allCountries.indexOf(country);
+		else 
+			return -1;
 	}
-
-//	public String convert2Sponsor(int id) {
-//
-//		if (id == 0) {
-//			return Msg.getString("ReportingAuthorityType.CNSA");
-//		} else if (id == 1) {
-//			return Msg.getString("ReportingAuthorityType.CSA");
-//		} else if (id == 2) {
-//			return Msg.getString("ReportingAuthorityType.ISRO");
-//		} else if (id == 3) {
-//			return Msg.getString("ReportingAuthorityType.JAXA");
-//		} else if (id == 4) {
-//			return Msg.getString("ReportingAuthorityType.NASA");
-//		} else if (id == 5) {
-//			return Msg.getString("ReportingAuthorityType.RKA");
-//		} else {
-//			return Msg.getString("ReportingAuthorityType.ESA");
-//		}
-//
-//	}
-
-//	public String getSponsorFromCountry(String c) {
-//
-//		if (c.equalsIgnoreCase("China")) {
-//			return Msg.getString("ReportingAuthorityType.CNSA");
-//		} else if (c.equalsIgnoreCase("Canada")) {
-//			return Msg.getString("ReportingAuthorityType.CSA");
-//		} else if (c.equalsIgnoreCase("India")) {
-//			return Msg.getString("ReportingAuthorityType.ISRO");
-//		} else if (c.equalsIgnoreCase("Japan")) {
-//			return Msg.getString("ReportingAuthorityType.JAXA");
-//		} else if (c.equalsIgnoreCase("USA")) {
-//			return Msg.getString("ReportingAuthorityType.NASA");
-//		} else if (c.equalsIgnoreCase("Russia")) {
-//			return Msg.getString("ReportingAuthorityType.RKA");
-//		} else {
-//			return Msg.getString("ReportingAuthorityType.ESA");
-//		}
-//
-//	}
 
 	/**
 	 * Create sponsor list
@@ -1719,15 +1307,15 @@ public class PersonConfig implements Serializable {
 		if (longSponsors == null) {
 			longSponsors = new ArrayList<>();
 
-			longSponsors.add(Msg.getString("ReportingAuthorityType.long.CNSA"));
-			longSponsors.add(Msg.getString("ReportingAuthorityType.long.CSA"));
-			longSponsors.add(Msg.getString("ReportingAuthorityType.long.ISRO"));
-			longSponsors.add(Msg.getString("ReportingAuthorityType.long.JAXA"));
-			longSponsors.add(Msg.getString("ReportingAuthorityType.long.MarsSociety"));
-			longSponsors.add(Msg.getString("ReportingAuthorityType.long.NASA"));
-			longSponsors.add(Msg.getString("ReportingAuthorityType.long.RKA"));
-			longSponsors.add(Msg.getString("ReportingAuthorityType.long.ESA"));
-
+			longSponsors.add(ReportingAuthorityType.CNSA_L.getName());
+			longSponsors.add(ReportingAuthorityType.CSA_L.getName());
+			longSponsors.add(ReportingAuthorityType.ISRO_L.getName());
+			longSponsors.add(ReportingAuthorityType.JAXA_L.getName());
+			longSponsors.add(ReportingAuthorityType.NASA_L.getName());
+			longSponsors.add(ReportingAuthorityType.RKA_L.getName());
+			longSponsors.add(ReportingAuthorityType.ESA_L.getName());
+			longSponsors.add(ReportingAuthorityType.MARS_SOCIETY_L.getName());
+			longSponsors.add(ReportingAuthorityType.SPACEX_L.getName());
 		}
 
 		return longSponsors;
@@ -1743,33 +1331,19 @@ public class PersonConfig implements Serializable {
 		if (sponsors == null) {
 			sponsors = new ArrayList<>();
 
-			sponsors.add(Msg.getString("ReportingAuthorityType.CNSA"));
-			sponsors.add(Msg.getString("ReportingAuthorityType.CSA"));
-			sponsors.add(Msg.getString("ReportingAuthorityType.ISRO"));
-			sponsors.add(Msg.getString("ReportingAuthorityType.JAXA"));
-			sponsors.add(Msg.getString("ReportingAuthorityType.MS"));
-			sponsors.add(Msg.getString("ReportingAuthorityType.NASA"));
-			sponsors.add(Msg.getString("ReportingAuthorityType.RKA"));
-			sponsors.add(Msg.getString("ReportingAuthorityType.ESA"));
-
+			sponsors.add(ReportingAuthorityType.CNSA.getName());
+			sponsors.add(ReportingAuthorityType.CSA.getName());
+			sponsors.add(ReportingAuthorityType.ISRO.getName());
+			sponsors.add(ReportingAuthorityType.JAXA.getName());
+			sponsors.add(ReportingAuthorityType.NASA.getName());
+			sponsors.add(ReportingAuthorityType.RKA.getName());
+			sponsors.add(ReportingAuthorityType.ESA.getName());
+			sponsors.add(ReportingAuthorityType.MS.getName());
+			sponsors.add(ReportingAuthorityType.SPACEX.getName());
 		}
 
 		return sponsors;
 	}
-
-//	/**
-//	 * Gets a list of last names by sponsors and by countries
-//	 */
-//	public List<Map<Integer, List<String>>> getLastNames() {
-//		return lastNames;
-//	}
-
-//	/**
-//	 * Gets a list of first names by sponsors and by countries
-//	 */
-//	public List<Map<Integer, List<String>>> getFirstNames() {
-//		return firstNames;
-//	}
 
 	/**
 	 * Get the Commander's profile
@@ -1785,7 +1359,24 @@ public class PersonConfig implements Serializable {
 	 * Prepare object for garbage collection.
 	 */
 	public void destroy() {
+		height = null;
+		weight = null;
+		o2ConsumptionRate = null;
+		consumptionRates = null;
+		ratio = null;
+		chance = null;
+		time = null;
+		temperature = null;
 		personDoc = null;
+		personalityDistribution = null;
+		personNameList = null;
+		allCountries = null;
+		ESACountries = null;
+		sponsors = null;
+		longSponsors = null;
+		lastNames = null;
+		firstNames = null;
+		commander = null;
 		if (personNameList != null) {
 			personNameList.clear();
 			personNameList = null;

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Member.java
- * @version 3.1.0 2017-01-24
+ * @version 3.1.2 2020-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person;
@@ -18,13 +18,16 @@ public class Member implements Serializable {
 
 //    private static Logger logger = Logger.getLogger(Member.class.getName());
 
+    private String crewName;
 	private String name; 
 	private String gender;
+	private String age; 
 	private String mbti; 
 	private String job;
 	private String country; 
 	private String sponsor;
 	private String destination;
+	
 	private String mainDish;
 	private String sideDish;
 	private String dessert;
@@ -34,12 +37,20 @@ public class Member implements Serializable {
 	public Member() {
 	}
 
+	public void setCrewName(String value) {
+		crewName = value;
+	}
+	
 	public void setName(String value) {
 		name = value;
 	}
 	
 	public void setGender(String value) {
 		gender = value;
+	}
+	
+	public void setAge(String value) {
+		age = value;
 	}
 	
 	public void setMBTI(String value) {
@@ -58,7 +69,6 @@ public class Member implements Serializable {
 		sponsor = value;
 	} 
 
-	
 	public void setDestination(String value) {
 		destination = value;
 	}
@@ -66,6 +76,7 @@ public class Member implements Serializable {
 	public void setMainDish(String value) {
 		mainDish = value;
 	}
+	
 	public void setSideDish(String value) {
 		sideDish = value;
 	}
@@ -78,13 +89,20 @@ public class Member implements Serializable {
 		activity = value;
 	}
 
-
+	public String getCrewName() {
+		return crewName;
+	} 
+	
 	public String getName() {
 		return name;
 	} 
 	
 	public String getGender() {
 		return gender;
+	}
+	
+	public String getAge() {
+		return age;
 	}
 	
 	public String getMBTI() {
@@ -122,7 +140,5 @@ public class Member implements Serializable {
 	public String getActivity() {
 		return activity;
 	}
-
-	
 	
 }

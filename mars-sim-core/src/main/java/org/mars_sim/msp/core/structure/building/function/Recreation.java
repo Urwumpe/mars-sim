@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Recreation.java
- * @version 3.1.0 2017-10-15
+ * @version 3.1.2 2020-09-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -9,10 +9,8 @@ package org.mars_sim.msp.core.structure.building.function;
 import java.io.Serializable;
 import java.util.Iterator;
 
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.BuildingException;
 
 /**
@@ -30,7 +28,6 @@ implements Serializable {
     // Data members
     private int populationSupport;
 
-    private static BuildingConfig config;
     /**
      * Constructor.
      * @param building the building this function is for.
@@ -40,11 +37,10 @@ implements Serializable {
         super(FUNCTION, building);
 
         // Populate data members.
-        config = SimulationConfig.instance().getBuildingConfiguration();
-        populationSupport = config.getRecreationPopulationSupport(building.getBuildingType());
+        populationSupport = buildingConfig.getRecreationPopulationSupport(building.getBuildingType());
 
         // Load activity spots
-        loadActivitySpots(config.getRecreationActivitySpots(building.getBuildingType()));
+        loadActivitySpots(buildingConfig.getRecreationActivitySpots(building.getBuildingType()));
     }
 
     /**
@@ -72,9 +68,9 @@ implements Serializable {
         }
 
         if (!newBuilding) {
-        	if (config == null)
-        		config = SimulationConfig.instance().getBuildingConfiguration();
-            supply -= config.getRecreationPopulationSupport(buildingName);
+//        	if (buildingConfig == null)
+//        		buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
+            supply -= buildingConfig.getRecreationPopulationSupport(buildingName);
             if (supply < 0D) supply = 0D;
         }
 
@@ -128,4 +124,9 @@ implements Serializable {
 		// TODO Auto-generated method stub
 		return 0;
 	}
+
+	@Override
+	public void destroy() {
+	}
+	
 }
