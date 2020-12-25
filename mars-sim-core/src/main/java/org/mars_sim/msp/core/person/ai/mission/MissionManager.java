@@ -7,12 +7,11 @@
 package org.mars_sim.msp.core.person.ai.mission;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -22,12 +21,16 @@ import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.GameManager.GameMode;
+import org.mars_sim.msp.core.data.DataLogger;
+import org.mars_sim.msp.core.data.SolListDataLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.mission.meta.MetaMission;
 import org.mars_sim.msp.core.person.ai.mission.meta.MetaMissionUtil;
 import org.mars_sim.msp.core.person.ai.role.RoleType;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.Vehicle;
@@ -37,7 +40,7 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
  * <br>
  * The simulation has only one mission manager.
  */
-public class MissionManager implements Serializable {
+public class MissionManager implements Serializable, Temporal {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -47,8 +50,6 @@ public class MissionManager implements Serializable {
 	private static String loggerName = logger.getName();
 	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
 	
-	private static final int MAX_NUM_PLANS = 100;
-	
 	private static final double PERCENT_PER_SCORE = 10D;
 	/** static mission identifier */
 	private int missionIdentifer;
@@ -56,25 +57,16 @@ public class MissionManager implements Serializable {
 	/** Mission listeners. */
 	private transient List<MissionManagerListener> listeners;
 
-	// Cache variables.
-	private transient double totalProbCache;
 	
 	/** The currently on-going missions in the simulation. */
 	private List<Mission> onGoingMissions;
 	/** A history of mission plans by sol. */
-	private Map<Integer, List<MissionPlanning>> historicalMissions;
-	
-	// Transient members
-	private transient MarsClock personTimeCache;
-	private transient Map<MetaMission, Double> missionProbCache;
-	private transient Map<MetaMission, Double> robotMissionProbCache;
+	private SolListDataLogger<MissionPlanning> historicalMissions;
 	
 	private static List<String> missionNames;
 	private static Map<String, Integer> settlementID;
 	
 	// Note : MissionManager is instantiated before MarsClock
-	// Need to call setMarsClock() right after MarsClock is initialized
-	private static MarsClock marsClock;
 	private static UnitManager unitManager = Simulation.instance().getUnitManager();
 
 	static {
@@ -106,18 +98,13 @@ public class MissionManager implements Serializable {
 	 * Constructor.
 	 */
 	public MissionManager() {
-		// Initialize cache values.
-		personTimeCache = null;
-		totalProbCache = 0D;
-		
+			
 		// Initialize data members
 		missionIdentifer = 0;
 		onGoingMissions = new CopyOnWriteArrayList<>();
-		historicalMissions = new HashMap<>();
-		settlementID = new HashMap<>();
+		historicalMissions = new SolListDataLogger<>(5);
+		settlementID = new ConcurrentHashMap<>();
 		listeners = new CopyOnWriteArrayList<>();//Collections.synchronizedList(new ArrayList<MissionManagerListener>(0));
-		missionProbCache = new HashMap<MetaMission, Double>(MetaMissionUtil.getNumMetaMissions());
-		robotMissionProbCache = new HashMap<MetaMission, Double>();
 	}
 
 	/**
@@ -220,7 +207,7 @@ public class MissionManager implements Serializable {
 //		//cleanMissions();
 		if (onGoingMissions != null) {
 			if (GameManager.mode == GameMode.COMMAND) {
-				List<Mission> missions = new ArrayList<Mission>();
+				List<Mission> missions = new CopyOnWriteArrayList<Mission>();
 				if (unitManager == null)
 					unitManager = Simulation.instance().getUnitManager();
 				Iterator<Mission> i = onGoingMissions.iterator();
@@ -233,13 +220,13 @@ public class MissionManager implements Serializable {
 				return missions;
 			}
 			else {
-				return new ArrayList<Mission>(onGoingMissions);
+				return new CopyOnWriteArrayList<Mission>(onGoingMissions);
 			}
 
 		}			
 //			return missions;
 		else
-			return new ArrayList<Mission>();
+			return new CopyOnWriteArrayList<Mission>();
 	}
 
 	/**
@@ -369,7 +356,7 @@ public class MissionManager implements Serializable {
 					
 			// Update listeners.
 			if (listeners != null) {
-//				listeners = new CopyOnWriteArrayList<>();//Collections.synchronizedList(new ArrayList<MissionManagerListener>());
+//				listeners = new CopyOnWriteCopyOnWriteArrayList<>();//Collections.synchronizedList(new ArrayList<MissionManagerListener>());
 				synchronized (listeners) {
 					Iterator<MissionManagerListener> i = listeners.iterator();
 					while (i.hasNext()) {
@@ -383,29 +370,6 @@ public class MissionManager implements Serializable {
 	}
 
 	/**
-	 * Determines the total probability weight for available potential missions for
-	 * a given person.
-	 * 
-	 * @param person the given person
-	 * @return total probability weight
-	 */
-	public double getTotalMissionProbability(Person person) {
-		// If cache is not current, calculate the probabilities.
-		if (!useCache(person)) {
-			calculateProbability(person);
-		}
-		return totalProbCache;
-	}
-
-//	public double getTotalMissionProbability(Robot robot) {
-//		// If cache is not current, calculate the probabilities.
-//		if (!useCache(robot)) {
-//			calculateProbability(robot);
-//		}
-//		return totalProbCache;
-//	}
-
-	/**
 	 * Gets a new mission for a person based on potential missions available.
 	 * 
 	 * @param person person to find the mission for
@@ -413,31 +377,43 @@ public class MissionManager implements Serializable {
 	 */
 	public Mission getNewMission(Person person) {
 		Mission result = null;
-		// If cache is not current, calculate the probabilities.
-		if (!useCache(person)) {
-			calculateProbability(person);
-		}
-
+		
+		// Probably must be calculated as a local otherwise method is not threadsafe using a shared cache
+		ConcurrentHashMap<MetaMission, Double> missionProbCache = new ConcurrentHashMap<MetaMission, Double>(MetaMissionUtil.getNumMetaMissions());
+		
 		// Get a random number from 0 to the total weight
-		double totalProbability = getTotalMissionProbability(person);
+		double totalProbCache = 0D;
 
-		if (totalProbability == 0D) {
+		// Determine probabilities.
+		for (MetaMission metaMission : MetaMissionUtil.getMetaMissions()) {
+			double probability = metaMission.getProbability(person);
+			if ((probability >= 0D) && (!Double.isNaN(probability)) && (!Double.isInfinite(probability))) {
+				missionProbCache.put(metaMission, probability);
+				totalProbCache += probability;
+			} else {
+				missionProbCache.put(metaMission, 0D);
+				logger.severe(person.getName() + " had bad mission probability on " + metaMission.getName() + " probability: "
+						+ probability);
+			}
+//			if (probability > 0)
+//				System.out.println(person + " " + metaMission.getName() + " is " + probability);
+		}	
+
+		if (totalProbCache == 0D) {
 			//throw new IllegalStateException(person + " has zero total mission probability weight.");
 			logger.log(Level.FINEST, person + " has zero total mission probability weight. No mission selected.");
-			// Clear time cache.
-			personTimeCache = null;
 			
 			return null;
 		}
 
 		// Get a random number from 0 to the total probability weight.
-		double r = RandomUtil.getRandomDouble(totalProbability);
+		double r = RandomUtil.getRandomDouble(totalProbCache);
 
 		// Determine which mission is selected.
 		MetaMission selectedMetaMission = null;
-		Iterator<MetaMission> i = missionProbCache.keySet().iterator();
-		while (i.hasNext() && (selectedMetaMission == null)) {
-			MetaMission metaMission = i.next();
+		Iterator<MetaMission> m = missionProbCache.keySet().iterator();
+		while (m.hasNext() && (selectedMetaMission == null)) {
+			MetaMission metaMission = m.next();
 			double probWeight = missionProbCache.get(metaMission);
 			if (r <= probWeight && probWeight != 0) {
 				selectedMetaMission = metaMission;
@@ -453,54 +429,9 @@ public class MissionManager implements Serializable {
 		// Construct the mission
 		result = selectedMetaMission.constructInstance(person);
 
-		// Clear time cache.
-		personTimeCache = null;
-
 		return result;
 	}
 
-//	public Mission getNewMission(Robot robot) {
-//		Mission result = null;
-//		// If cache is not current, calculate the probabilities.
-//		if (!useCache(robot)) {
-//			calculateProbability(robot);
-//		}
-//
-//		// Get a random number from 0 to the total weight
-//		double totalProbability = getTotalMissionProbability(robot);
-//
-//		if (totalProbability == 0D) {
-//			throw new IllegalStateException(robot +
-//					" has zero total mission probability weight.");
-//		}
-//
-//		// Get a random number from 0 to the total probability weight.
-//		double r = RandomUtil.getRandomDouble(totalProbability);
-//
-//		// Determine which mission is selected.
-//		MetaMission selectedMetaMission = null;
-//		for (MetaMission mm : robotMissionProbCache.keySet()) {
-//			double probWeight = robotMissionProbCache.get(mm);
-//			if (r <= probWeight) {
-//				selectedMetaMission = mm;
-//			}
-//			else {
-//				r -= probWeight;
-//			}
-//		}
-//
-//		if (selectedMetaMission == null) {
-//			throw new IllegalStateException(robot + " could not determine a new mission.");
-//		}
-//
-//		// Construct the mission
-//		result = selectedMetaMission.constructInstance(robot);
-//
-//		// Clear time cache.
-//		robotTimeCache = null;
-//
-//		return result;
-//	}
 
 	/**
 	 * Gets the number of particular missions that are active
@@ -538,7 +469,7 @@ public class MissionManager implements Serializable {
 			throw new IllegalArgumentException("settlement is null");
 		}
 
-		List<Mission> result = new ArrayList<Mission>();		
+		List<Mission> result = new CopyOnWriteArrayList<Mission>();		
 		Iterator<Mission> i = getMissions().iterator();
 		while (i.hasNext()) {
 			Mission m = i.next();
@@ -578,7 +509,7 @@ public class MissionManager implements Serializable {
 			throw new IllegalArgumentException("settlement is null");
 		}
 		
-		List<Mission> m0 = new ArrayList<Mission>();
+		List<Mission> m0 = new CopyOnWriteArrayList<Mission>();
 		List<Mission> m1 = onGoingMissions;
 		if (!m1.isEmpty()) {		
 			Iterator<Mission> i = m1.iterator();
@@ -700,120 +631,19 @@ public class MissionManager implements Serializable {
 				index++;
 			}
 		}
-//		if (missions != null) {
-//			int size = missions.size();
-//			for (int i=0; i<size; i++) {
-//				Mission m = missions.get(i);
-//				if (m == null || m.isDone() 
-//						|| (m.getPlan() != null && m.getPlan().getStatus() == PlanType.NOT_APPROVED)) {
-//					removeMission(m);
-//				}
-//			}
-//		}
 	}
 
-	/**
-	 * Calculates and caches the probabilities.
-	 * 
-	 * @param person the person to check for.
-	 */
-	private void calculateProbability(Person person) {
-		if (missionProbCache == null) {
-			missionProbCache = new HashMap<MetaMission, Double>(MetaMissionUtil.getNumMetaMissions());
-		}
-
-		// Clear total probabilities.
-		totalProbCache = 0D;
-
-		// Determine probabilities.
-		Iterator<MetaMission> i = MetaMissionUtil.getMetaMissions().iterator();
-		while (i.hasNext()) {
-			MetaMission metaMission = i.next();
-			double probability = metaMission.getProbability(person);
-			if ((probability >= 0D) && (!Double.isNaN(probability)) && (!Double.isInfinite(probability))) {
-				missionProbCache.put(metaMission, probability);
-				totalProbCache += probability;
-			} else {
-				missionProbCache.put(metaMission, 0D);
-				logger.severe(person.getName() + " had bad mission probability on " + metaMission.getName() + " probability: "
-						+ probability);
-			}
-//			if (probability > 0)
-//				System.out.println(person + " " + metaMission.getName() + " is " + probability);
-		}
-
-		// Set the time cache to the current time.
-		personTimeCache = (MarsClock) marsClock.clone();
-	}
-
-//	/**
-//	 * Calculates and caches the probabilities.
-//	 * 
-//	 * @param robot the robot to check for.
-//	 */
-//	private void calculateProbability(Robot robot) {
-//		if (robotMissionProbCache == null) {
-//			robotMissionProbCache = new HashMap<MetaMission, Double>(MetaMissionUtil.getRobotMetaMissions().size());
-//		}
-//
-//		// Clear total probabilities.
-//		totalProbCache = 0D;
-//
-//		// Determine probabilities.
-//		Iterator<MetaMission> i = MetaMissionUtil.getRobotMetaMissions().iterator();
-//		while (i.hasNext()) {
-//			MetaMission metaMission = i.next();
-//			double probability = metaMission.getProbability(robot);
-//			if ((probability >= 0D) && (!Double.isNaN(probability)) && (!Double.isInfinite(probability))) {
-//				robotMissionProbCache.put(metaMission, probability);
-//				totalProbCache += probability;
-//			} else {
-//				robotMissionProbCache.put(metaMission, 0D);
-//				logger.severe(robot.getName() + " bad mission probability: " + metaMission.getName() + " probability: "
-//						+ probability);
-//			}
-//		}
-//
-//		// Set the time cache to the current time.
-//		robotTimeCache = (MarsClock) marsClock.clone();
-//
-//	}
-
-	/**
-	 * Checks if task probability cache should be used.
-	 * 
-	 * @param the person to check for.
-	 * @return true if cache should be used.
-	 */
-	private boolean useCache(Person person) {
-		return marsClock.equals(personTimeCache);
-	}
-
-//	/**
-//	 * Checks if task probability cache should be used.
-//	 * 
-//	 * @param the robot to check for.
-//	 * @return true if cache should be used.
-//	 */
-//	private boolean useCache(Robot robot) {
-//		// if (currentTime == null)
-//		MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
-//		return currentTime.equals(robotTimeCache);// && (robot == robotCache);
-//	}
-
+	
 	/**
 	 * Updates mission based on passing time.
 	 * 
-	 * @param time amount of time passing (millisols)
+	 * @param pulse Simulation time has advanced
 	 */
-	public void timePassing(double time) {
-		// Remove inactive missions
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
+		// Remove inactivemissions
 		cleanMissions();
-		
-//		Iterator<Mission> i = missions.iterator();
-//		while (i.hasNext()) {
-//			i.next().timePassing(time);
-//		}
+		return true;
 	}
 
 	/**
@@ -822,32 +652,13 @@ public class MissionManager implements Serializable {
 	 * @param plan {@link MissionPlanning}
 	 */
 	public void addMissionPlanning(MissionPlanning plan) {
-		if (marsClock == null)
-			logger.info("marsClock is null");
-		int mSol = marsClock.getMissionSol();
 		
 		Person p = plan.getMission().getStartingMember();
 		
 		LogConsolidated.log(logger, Level.INFO, 0, sourceName,
 				"[" + p.getLocale() + "] On Sol " 
-				+ mSol + ", " + p.getName() + " put together a mission plan.");
-		
-		if (historicalMissions.containsKey(mSol)) {
-			List<MissionPlanning> plans = historicalMissions.get(mSol);
-			plans.add(plan);
-		}
-		else {
-			List<MissionPlanning> plans = new ArrayList<>();
-			plans.add(plan);
-			historicalMissions.put(mSol, plans);
-			
-			// Keep only the last x # of sols of mission plans
-			if (mSol > MAX_NUM_PLANS && historicalMissions.size() > MAX_NUM_PLANS) {
-				historicalMissions.get(mSol-MAX_NUM_PLANS);
-			}
-		}
-		
-//		logger.info("Done addMissionPlanning()");
+				+ historicalMissions.getCurrentSol() + ", " + p.getName() + " put together a mission plan.");
+		historicalMissions.addData(plan);
 	}
 	
 	
@@ -869,31 +680,23 @@ public class MissionManager implements Serializable {
 	 * @param status
 	 */
 	public void approveMissionPlan(MissionPlanning missionPlan, Person person, PlanType newStatus) {
-//		logger.info(person + " was at approveMissionPlan()");
-		for (int mSol : historicalMissions.keySet()) {
-			List<MissionPlanning> plans = historicalMissions.get(mSol);
-			for (MissionPlanning mp : plans) {
-				if (mp == missionPlan) {
-					mp.setApproved(person);
-//					mp.setStatus(status);
-					if (mp.getStatus() == PlanType.PENDING) {
-						if (newStatus == PlanType.APPROVED) {
-							mp.setStatus(PlanType.APPROVED);
-							mp.getMission().setApproval(true);
-//							mp.getMission().setPhase();
-						}
-						else if (newStatus == PlanType.NOT_APPROVED) {
-							mp.setStatus(PlanType.NOT_APPROVED);
-							mp.getMission().setApproval(false);
-//							mp.getMission().setPhase();
-							// Do NOT remove this on-going mission from the current mission list
-//							removeMission(mp.getMission());
-						}
-//						mp.getMission().fireMissionUpdate(MissionEventType.PHASE_EVENT, mp.getMission().getPhaseDescription());
-					}
-					return;
-				}
+
+		missionPlan.setApproved(person);
+//		missionPlan.setStatus(status);
+		if (missionPlan.getStatus() == PlanType.PENDING) {
+			if (newStatus == PlanType.APPROVED) {
+				missionPlan.setStatus(PlanType.APPROVED);
+				missionPlan.getMission().setApproval(true);
+//				mp.getMission().setPhase();
 			}
+			else if (newStatus == PlanType.NOT_APPROVED) {
+				missionPlan.setStatus(PlanType.NOT_APPROVED);
+				missionPlan.getMission().setApproval(false);
+//				missionPlan.getMission().setPhase();
+				// Do NOT remove this on-going mission from the current mission list
+//				removeMission(missionPlan.getMission());
+			}
+//			missionPlan.getMission().fireMissionUpdate(MissionEventType.PHASE_EVENT, missionPlan.getMission().getPhaseDescription());
 		}
 	}
 
@@ -907,48 +710,44 @@ public class MissionManager implements Serializable {
 	public void scoreMissionPlan(MissionPlanning missionPlan, double newScore, Person reviewer) {
 		double weight = 1D;
 		RoleType role = reviewer.getRole().getType();
-		for (int mSol : historicalMissions.keySet()) {
-			List<MissionPlanning> plans = historicalMissions.get(mSol);
-			for (MissionPlanning mp : plans) {
-				if (mp == missionPlan) {// && mp.getStatus() == PlanType.PENDING) {
-					double percent = mp.getPercentComplete();
-					
-					if (role == RoleType.COMMANDER)
-						weight = 2.5;
-					else if (role == RoleType.SUB_COMMANDER
-							|| role == RoleType.CHIEF_OF_MISSION_PLANNING)
-						weight = 2D;
-					else if (role == RoleType.CHIEF_OF_AGRICULTURE
-							|| role == RoleType.CHIEF_OF_ENGINEERING
-							|| role == RoleType.CHIEF_OF_LOGISTICS_N_OPERATIONS
-							|| role == RoleType.CHIEF_OF_SAFETY_N_HEALTH
-							|| role == RoleType.CHIEF_OF_SCIENCE
-							|| role == RoleType.CHIEF_OF_SUPPLY_N_RESOURCES
-							|| role == RoleType.MISSION_SPECIALIST)
-						weight = 1.5;
-					else
-						weight = 1;
-					double totalPercent = percent + weight * PERCENT_PER_SCORE;
-					if (totalPercent > 100)
-						totalPercent = 100;
-					mp.setPercentComplete(totalPercent);
-					double score = mp.getScore();
-					mp.setScore(score + weight * newScore);
-					
-					LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-							"[" + mp.getMission().getStartingMember().getLocationTag().getLocale() + "] " 
-							+ mp.getMission().getStartingMember().getName() 
-							+ "'s " + mp.getMission().getDescription() 
-							+ " mission planning cumulative score : " + Math.round(mp.getScore()*10.0)/10.0 
-							+ " (" + mp.getPercentComplete() + "% review completed)");
-							
-					mp.setReviewedBy(reviewer.getName());
-					mp.getMission().setPhaseDescription(mp.getMission().getPhaseDescription());
-//					mp.getMission().fireMissionUpdate(MissionEventType.PHASE_DESCRIPTION_EVENT, mp.getMission().getPhaseDescription());
-					break;
-				}
-			}
+
+		double percent = missionPlan.getPercentComplete();
+		switch (role) {
+			case COMMANDER:
+					weight = 2.5; break;
+			case SUB_COMMANDER:
+			case CHIEF_OF_MISSION_PLANNING:
+				weight = 2D; break;
+			case CHIEF_OF_AGRICULTURE:
+			case CHIEF_OF_ENGINEERING:
+			case CHIEF_OF_LOGISTICS_N_OPERATIONS:
+			case CHIEF_OF_SAFETY_N_HEALTH:
+			case CHIEF_OF_SCIENCE:
+			case CHIEF_OF_SUPPLY_N_RESOURCES:
+			case MISSION_SPECIALIST:
+				weight = 1.5;  break;
+			default:
+				weight = 1; break;
 		}
+
+		double totalPercent = percent + weight * PERCENT_PER_SCORE;
+		if (totalPercent > 100)
+			totalPercent = 100;
+		missionPlan.setPercentComplete(totalPercent);
+		double score = missionPlan.getScore();
+		missionPlan.setScore(score + weight * newScore);
+		
+		LogConsolidated.log(logger, Level.INFO, 0, sourceName,
+				"[" + missionPlan.getMission().getStartingMember().getLocationTag().getLocale() + "] " 
+				+ missionPlan.getMission().getStartingMember().getName() 
+				+ "'s " + missionPlan.getMission().getDescription() 
+				+ " mission planning cumulative score : " + Math.round(missionPlan.getScore()*10.0)/10.0 
+				+ " (" + missionPlan.getPercentComplete() + "% review completed)");
+				
+		missionPlan.setReviewedBy(reviewer.getName());
+		missionPlan.getMission().setPhaseDescription(missionPlan.getMission().getPhaseDescription());
+//					mp.getMission().fireMissionUpdate(MissionEventType.PHASE_DESCRIPTION_EVENT, mp.getMission().getPhaseDescription());
+
 	}
 
 	public static int matchMissionID(String name) {
@@ -960,7 +759,7 @@ public class MissionManager implements Serializable {
 	}
 	
 	public Map<Integer, List<MissionPlanning>> getHistoricalMissions() {
-		return historicalMissions;
+		return historicalMissions.getHistory();
 	}
 	
 	/**
@@ -969,11 +768,7 @@ public class MissionManager implements Serializable {
 	public static List<String> getMissionNames() {
 		return missionNames;
 	}
-	
-	public static void initializeInstances(MarsClock clock) {
-		marsClock = clock;
-	}
-	
+
 	/**
 	 * Prepare object for garbage collection.
 	 */
@@ -988,17 +783,17 @@ public class MissionManager implements Serializable {
 			listeners = null;
 		}
 
-		marsClock = null;
+		//marsClock = null;
 		// personCache = null;
-		personTimeCache = null;
+		//personTimeCache = null;
 //		robotTimeCache = null;
-		if (missionProbCache != null) {
-			missionProbCache.clear();
-			missionProbCache = null;
-		}
-		if (robotMissionProbCache != null) {
-			robotMissionProbCache.clear();
-			robotMissionProbCache = null;
-		}
+//		if (missionProbCache != null) {
+//			missionProbCache.clear();
+//			missionProbCache = null;
+//		}
+//		if (robotMissionProbCache != null) {
+//			robotMissionProbCache.clear();
+//			robotMissionProbCache = null;
+//		}
 	}
 }

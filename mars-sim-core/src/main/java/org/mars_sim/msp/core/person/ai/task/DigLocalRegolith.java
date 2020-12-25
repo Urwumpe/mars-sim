@@ -174,9 +174,9 @@ implements Serializable {
         time = super.performMappedPhase(time);
 
         if (getPhase() == null) {
-        	LogConsolidated.log(logger, Level.INFO, 1_000, sourceName, 
-        			"[" + person.getLocationTag().getLocale() +  "] " +
-        					person.getName() + " phase is null.");
+//        	LogConsolidated.log(logger, Level.WARNING, 1_000, sourceName, 
+//        			"[" + person.getLocationTag().getLocale() +  "] " +
+//        					person.getName() + " phase is null.");
             return 0;//throw new IllegalArgumentException("Task phase is null");
         }
         else if (COLLECT_REGOLITH.equals(getPhase())) {
@@ -480,7 +480,7 @@ implements Serializable {
             double settlementCap = sInv.getAmountResourceRemainingCapacity(
                     regolithID, false, false);
             
-            if (sInv != null) {
+            if (bag != null && sInv != null) {
 	            // Try to store regolith in settlement.
             	if (reg1 > settlementCap) {
             		reg1 = settlementCap;

@@ -7,16 +7,17 @@
 package org.mars_sim.msp.core.structure.building.function;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Inventory;
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.equipment.Equipment;
@@ -42,6 +43,7 @@ import org.mars_sim.msp.core.structure.building.BuildingException;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.goods.Good;
 import org.mars_sim.msp.core.structure.goods.GoodsUtil;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 import org.mars_sim.msp.core.vehicle.Rover;
@@ -58,25 +60,22 @@ public class Manufacture extends Function implements Serializable {
 
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(Manufacture.class.getName());
-
-	private static final FunctionType FUNCTION = FunctionType.MANUFACTURE;
+	private static String loggerName = logger.getName();
+	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
 
 	private static final double PROCESS_MAX_VALUE = 100D;
 
 	public static final String LASER_SINTERING_3D_PRINTER = ItemResourceUtil.LASER_SINTERING_3D_PRINTER;
 
 	private static int printerID = ItemResourceUtil.printerID;
-	
+
 	// Data members.
-	private int solCache = 0;
 	private int techLevel;
 	private int numPrintersInUse;
 	private final int numMaxConcurrentProcesses;
 
 	private List<ManufactureProcess> processes;
 	private List<SalvageProcess> salvages;
-
-	private Building building;
 
 	
 	/**
@@ -87,20 +86,17 @@ public class Manufacture extends Function implements Serializable {
 	 */
 	public Manufacture(Building building) {
 		// Use Function constructor.
-		super(FUNCTION, building);
-
-		this.building = building;
+		super(FunctionType.MANUFACTURE, building);
 
 		techLevel = buildingConfig.getManufactureTechLevel(building.getBuildingType());
 		numMaxConcurrentProcesses = buildingConfig.getManufactureConcurrentProcesses(building.getBuildingType());
-
+		numPrintersInUse = numMaxConcurrentProcesses;
+		
 		// Load activity spots
 		loadActivitySpots(buildingConfig.getManufactureActivitySpots(building.getBuildingType()));
 
-		processes = new ArrayList<ManufactureProcess>();
-		salvages = new ArrayList<SalvageProcess>();
-
-		// checkNumPrinter = true;
+		processes = new CopyOnWriteArrayList<ManufactureProcess>();
+		salvages = new CopyOnWriteArrayList<SalvageProcess>();
 	}
 
 	/**
@@ -128,7 +124,7 @@ public class Manufacture extends Function implements Serializable {
 		int highestExistingTechLevel = 0;
 		boolean removedBuilding = false;
 		BuildingManager buildingManager = settlement.getBuildingManager();
-		Iterator<Building> j = buildingManager.getBuildings(FUNCTION).iterator();
+		Iterator<Building> j = buildingManager.getBuildings(FunctionType.MANUFACTURE).iterator();
 		while (j.hasNext()) {
 			Building building = j.next();
 			if (!newBuilding && building.getBuildingType().equalsIgnoreCase(buildingName) && !removedBuilding) {
@@ -212,16 +208,6 @@ public class Manufacture extends Function implements Serializable {
 		return techLevel;
 	}
 
-//	/**
-//	 * Gets the supporting manufacturing processes by the
-//	 * building.
-//	 * 
-//	 * @return supporting concurrent processes.
-//	 */
-//	public int getSupportingProcesses() {
-//		return numPrintersInUse;
-//	}
-
 	/**
 	 * Gets the maximum concurrent manufacturing processes supported by the
 	 * building.
@@ -232,8 +218,6 @@ public class Manufacture extends Function implements Serializable {
 		return numMaxConcurrentProcesses;
 	}
 
-	
-	
 	/**
 	 * Gets the current total number of manufacturing and salvage processes happening in this
 	 * building.
@@ -263,9 +247,28 @@ public class Manufacture extends Function implements Serializable {
 		if (process == null) {
 			throw new IllegalArgumentException("process is null");
 		}
+		
 		if (getCurrentProcesses() >= numPrintersInUse) {
-			throw new IllegalStateException("No space to add new manufacturing process.");
+			LogConsolidated.log(logger, Level.INFO, 20_000, sourceName,
+					"[" + getBuilding().getSettlement() + "] " 
+					+ getBuilding()
+					+ ": " + getCurrentProcesses() + " concurrent processes."
+					+ "");
+			LogConsolidated.log(logger, Level.INFO, 20_000, sourceName,
+					"[" + getBuilding().getSettlement() + "] " 
+					+ getBuilding()
+					+ ": " + numPrintersInUse + " 3D-printer(s) installed for use."
+					+ "");
+			LogConsolidated.log(logger, Level.INFO, 20_000, sourceName,
+					"[" + getBuilding().getSettlement() + "] " 
+					+ getBuilding()
+					+ ": " + (numMaxConcurrentProcesses-numPrintersInUse) 
+					+ " 3D-printer slot(s) available."
+					+ "");
+//			throw new IllegalStateException("No space to add new manufacturing process.");
+			return;
 		}
+		
 		processes.add(process);
 
 		Inventory inv = building.getInventory();
@@ -386,27 +389,31 @@ public class Manufacture extends Function implements Serializable {
 	}
 
 	@Override
-	public void timePassing(double time) {
-
-		checkPrinters();
-
-		List<ManufactureProcess> finishedProcesses = new ArrayList<ManufactureProcess>();
-
-		Iterator<ManufactureProcess> i = processes.iterator();
-		while (i.hasNext()) {
-			ManufactureProcess process = i.next();
-			process.addProcessTime(time);
-
-			if ((process.getProcessTimeRemaining() == 0D) && (process.getWorkTimeRemaining() == 0D)) {
-				finishedProcesses.add(process);
+	public boolean timePassing(ClockPulse pulse) {
+		boolean valid = isValid(pulse);
+		if (valid) {
+			// Check once a sol only
+			checkPrinters(pulse);
+	
+			List<ManufactureProcess> finishedProcesses = new CopyOnWriteArrayList<ManufactureProcess>();
+	
+			Iterator<ManufactureProcess> i = processes.iterator();
+			while (i.hasNext()) {
+				ManufactureProcess process = i.next();
+				process.addProcessTime(pulse.getElapsed());
+	
+				if ((process.getProcessTimeRemaining() == 0D) && (process.getWorkTimeRemaining() == 0D)) {
+					finishedProcesses.add(process);
+				}
+			}
+	
+			// End all processes that are done.
+			Iterator<ManufactureProcess> j = finishedProcesses.iterator();
+			while (j.hasNext()) {
+				endManufacturingProcess(j.next(), false);
 			}
 		}
-
-		// End all processes that are done.
-		Iterator<ManufactureProcess> j = finishedProcesses.iterator();
-		while (j.hasNext()) {
-			endManufacturingProcess(j.next(), false);
-		}
+		return valid;
 	}
 
 	/**
@@ -664,7 +671,7 @@ public class Manufacture extends Function implements Serializable {
 	public void endSalvageProcess(SalvageProcess process, boolean premature) {
 		Settlement settlement = building.getSettlement();
 	
-		Map<Integer, Integer> partsSalvaged = new HashMap<>(0);
+		Map<Integer, Integer> partsSalvaged = new ConcurrentHashMap<>(0);
 
 		if (!premature) {
 			// Produce salvaged parts.
@@ -736,14 +743,13 @@ public class Manufacture extends Function implements Serializable {
 	}
 
 	/**
-	 * Check once a sol if enough 3D printer(s) are supporting the manufacturing
+	 * Check if enough 3D printer(s) are supporting the manufacturing
 	 * processes
+	 * @param pulse 
 	 */
-	public void checkPrinters() {
+	public void checkPrinters(ClockPulse pulse) {
 		// Check only once a day for # of processes that are needed.
-		int solElapsed = marsClock.getMissionSol();
-		if (solCache != solElapsed) {
-			solCache = solElapsed;
+		if (pulse.isNewSol()) {
 			// Gets the available number of printers in storage
 			int numAvailable = building.getInventory().getItemResourceNum(printerID); // b_inv
 			
@@ -751,21 +757,40 @@ public class Manufacture extends Function implements Serializable {
 //					+ "'s supportingProcesses: " + supportingProcesses
 //					+ "   maxProcesses: " + maxProcesses);
 
+			// TODO: create a settler's task to replace printer manually
+			
 			if (numPrintersInUse < numMaxConcurrentProcesses) {
 				int deficit = numMaxConcurrentProcesses - numPrintersInUse;
-				
-				if (numAvailable >= deficit) {
-					numPrintersInUse = numPrintersInUse + deficit;
-					building.getInventory().retrieveItemResources(printerID, deficit);
-				}
-				
-				else if (numAvailable > 0 && deficit > 0) {
-					numPrintersInUse = numPrintersInUse + numAvailable;
-					building.getInventory().retrieveItemResources(printerID, numAvailable);
-				}
-				
-			}
+				LogConsolidated.log(logger, Level.INFO, 1_000, sourceName,
+						"[" + getBuilding().getSettlement() + "] " 
+						+ getBuilding() + " - "
+						+ numAvailable 
+						+ " 3D-printer(s) in stock.");
+				LogConsolidated.log(logger, Level.INFO, 1_000, sourceName,
+						"[" + getBuilding().getSettlement() + "] " 
+						+ getBuilding() + " - "
+						+ numPrintersInUse 
+						+ " 3D-printer(s) in use.");
 
+				if (deficit > 0 && numAvailable > 0) {
+					int size = deficit;
+					if (numAvailable < deficit) {
+						size = numAvailable;
+					}
+					for (int i=0; i<size; i++) {
+						numPrintersInUse++;
+						numAvailable--;
+						building.getInventory().retrieveItemResources(printerID, 1);
+					}
+					
+					LogConsolidated.log(logger, Level.INFO, 1_000, sourceName,
+							"[" + getBuilding().getSettlement() + "] " 
+							+ getBuilding() + " - "
+							+ size 
+							+ " 3D-printer(s) just installed.");
+					
+				}			
+			}
             //TODO: determine when to push for building new 3D printers
 		}
 	}
@@ -799,17 +824,6 @@ public class Manufacture extends Function implements Serializable {
 		return numPrintersInUse;
 	}
 
-	@Override
-	public double getFullHeatRequired() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	@Override
-	public double getPoweredDownHeatRequired() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 
 	@Override
 	public void destroy() {

@@ -7,16 +7,15 @@
 package org.mars_sim.msp.core.malfunction;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -48,8 +47,10 @@ import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.Function;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.MasterClock;
+import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.Conversion;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Vehicle;
@@ -60,7 +61,7 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
  * MockBuilding, or Vehicle). Each building has its own MalfunctionManager
  */
 // TODO: have one single MalfunctionUtility class to handle static methods that are common to all 6 types of units
-public class MalfunctionManager implements Serializable {
+public class MalfunctionManager implements Serializable, Temporal {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -202,7 +203,7 @@ public class MalfunctionManager implements Serializable {
 			
 		timeSinceLastMaintenance = 0D;
 		effectiveTimeSinceLastMaintenance = 0D;
-		scopes = new ArrayList<String>();
+		scopes = new CopyOnWriteArrayList<String>();
 		malfunctions = new CopyOnWriteArrayList<Malfunction>();
 		this.maintenanceWorkTime = maintenanceWorkTime;
 		this.wearLifeTime = wearLifeTime;
@@ -315,7 +316,7 @@ public class MalfunctionManager implements Serializable {
 	 * @return malfunction list
 	 */
 	public List<Malfunction> getMalfunctions() {
-		return new ArrayList<Malfunction>(malfunctions);
+		return new CopyOnWriteArrayList<Malfunction>(malfunctions);
 	}
 
 	/**
@@ -392,7 +393,7 @@ public class MalfunctionManager implements Serializable {
 	 * @return list of malfunctions.
 	 */
 	public List<Malfunction> getGeneralMalfunctions() {
-		List<Malfunction> result = new ArrayList<Malfunction>();
+		List<Malfunction> result = new CopyOnWriteArrayList<Malfunction>();
 		for (Malfunction malfunction : malfunctions) {
 			if (!malfunction.isGeneralRepairDone())
 				result.add(malfunction);
@@ -407,7 +408,7 @@ public class MalfunctionManager implements Serializable {
 	 * @return list of malfunctions.
 	 */
 	public List<Malfunction> getEmergencyMalfunctions() {
-		List<Malfunction> result = new ArrayList<Malfunction>();
+		List<Malfunction> result = new CopyOnWriteArrayList<Malfunction>();
 		for (Malfunction malfunction : malfunctions) {
 			if (!malfunction.isEmergencyRepairDone())
 				result.add(malfunction);
@@ -445,7 +446,7 @@ public class MalfunctionManager implements Serializable {
 	 * @return list of malfunctions.
 	 */
 	public List<Malfunction> getEVAMalfunctions() {
-		List<Malfunction> result = new ArrayList<Malfunction>();
+		List<Malfunction> result = new CopyOnWriteArrayList<Malfunction>();
 		for (Malfunction malfunction : malfunctions) {
 			if (!malfunction.isEVARepairDone())
 				result.add(malfunction);
@@ -888,8 +889,10 @@ public class MalfunctionManager implements Serializable {
 	 * 
 	 * @param time amount of time passing (in millisols)
 	 */
-	public void timePassing(double time) {
-
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
+		double time = pulse.getElapsed();
+		
 		// Check if life support modifiers are still in effect.
 //		setLifeSupportModifiers(time);
 
@@ -904,6 +907,8 @@ public class MalfunctionManager implements Serializable {
 
 		// Add time passing.
 		timeSinceLastMaintenance += time;
+		
+		return true;
 	}
 
 	/**
@@ -1736,7 +1741,7 @@ public class MalfunctionManager implements Serializable {
 	 */
 	private void determineNewMaintenanceParts() {
 		if (partsNeededForMaintenance == null)
-			partsNeededForMaintenance = new HashMap<>();
+			partsNeededForMaintenance = new ConcurrentHashMap<>();
 		partsNeededForMaintenance.clear();
 
 		Iterator<String> i = scopes.iterator();
@@ -1766,8 +1771,8 @@ public class MalfunctionManager implements Serializable {
 	 */
 	public Map<Integer, Integer> getMaintenanceParts() {
 		if (partsNeededForMaintenance == null)
-			partsNeededForMaintenance = new HashMap<>();
-		return new HashMap<>(partsNeededForMaintenance);
+			partsNeededForMaintenance = new ConcurrentHashMap<>();
+		return new ConcurrentHashMap<>(partsNeededForMaintenance);
 	}
 
 	/**
@@ -1839,7 +1844,7 @@ public class MalfunctionManager implements Serializable {
 						standardMaintParts.put(part, list);
 					}
 					else {
-						List<String> list = new ArrayList<>();
+						List<String> list = new CopyOnWriteArrayList<>();
 						list.add(f.getFunctionType().getName());
 						standardMaintParts.put(part, list);
 					}
@@ -1896,14 +1901,6 @@ public class MalfunctionManager implements Serializable {
 	public double getEstimatedNumberOfMaintenancesPerOrbit() {
 		double avgMaintenancesPerOrbit = 0D;
 
-		// Note : the elaborate if-else conditions below is for passing the maven test
-//		if (masterClock == null)
-//			masterClock = sim.getMasterClock();
-//		else {
-//			if (startTime == null)
-//				startTime = masterClock.getInitialMarsTime();
-//			if (currentTime == null)
-//				currentTime = masterClock.getMarsClock();
 
 			double totalTimeMillisols = MarsClock.getTimeDiff(currentTime, masterClock.getInitialMarsTime());
 			double totalTimeOrbits = totalTimeMillisols / 1000D / MarsClock.SOLS_PER_ORBIT_NON_LEAPYEAR;

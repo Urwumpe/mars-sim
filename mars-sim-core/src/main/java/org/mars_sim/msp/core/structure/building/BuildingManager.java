@@ -9,12 +9,11 @@ package org.mars_sim.msp.core.structure.building;
 
 import java.awt.geom.Point2D;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -74,6 +73,7 @@ import org.mars_sim.msp.core.structure.construction.ConstructionManager;
 import org.mars_sim.msp.core.structure.construction.ConstructionSite;
 import org.mars_sim.msp.core.structure.construction.ConstructionStageInfo;
 import org.mars_sim.msp.core.structure.construction.ConstructionUtil;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.tool.AlphanumComparator;
@@ -100,14 +100,14 @@ public class BuildingManager implements Serializable {
 	
 	private transient MarsClock lastVPUpdateTime;
 
-	private transient List<Building> farmsNeedingWorkCache = new ArrayList<>();
+	private transient List<Building> farmsNeedingWorkCache = new CopyOnWriteArrayList<>();
 	private transient List<Building> buildings;
 	private transient List<Building> garages; 
 	
-	private transient Map<String, Double> VPNewCache = new HashMap<String, Double>();
-	private transient Map<String, Double> VPOldCache = new HashMap<String, Double>();
+	private transient Map<String, Double> VPNewCache = new ConcurrentHashMap<String, Double>();
+	private transient Map<String, Double> VPOldCache = new ConcurrentHashMap<String, Double>();
 	private transient Map<FunctionType, List<Building>> buildingFunctionsMap  = new ConcurrentHashMap<FunctionType, List<Building>>();
-	private transient Map<String, Integer> buildingTypeIDMap  = new HashMap<>();
+	private transient Map<String, Integer> buildingTypeIDMap  = new ConcurrentHashMap<>();
 
 	// Data members
 //	private int numBuildings;
@@ -119,8 +119,8 @@ public class BuildingManager implements Serializable {
 	private double probabilityOfImpactPerSQMPerSol;
 	private double wallPenetrationThicknessAL;
 
-	private List<Integer> buildingInts = new ArrayList<>();
-	private List<Integer> garageInts = new ArrayList<>();
+	private List<Integer> buildingInts = new CopyOnWriteArrayList<>();
+	private List<Integer> garageInts = new CopyOnWriteArrayList<>();
 	
 	private static Simulation sim = Simulation.instance();
 	private static SimulationConfig simulationConfig = SimulationConfig.instance();
@@ -169,7 +169,7 @@ public class BuildingManager implements Serializable {
 		unitManager = sim.getUnitManager();
 		
 		// Construct all buildings in the settlement.
-		buildings = new ArrayList<>();
+		buildings = new CopyOnWriteArrayList<>();
 		if (buildingTemplates != null) {
 			Iterator<BuildingTemplate> i = buildingTemplates.iterator();
 			while (i.hasNext()) {
@@ -217,7 +217,7 @@ public class BuildingManager implements Serializable {
 		unitManager = sim.getUnitManager();
 		
 		// Construct all buildings in the settlement.
-		buildings = new ArrayList<Building>();
+		buildings = new CopyOnWriteArrayList<Building>();
 
 		garages = getBuildings(FunctionType.GROUND_VEHICLE_MAINTENANCE);
 		for (Building b: garages) {
@@ -232,10 +232,10 @@ public class BuildingManager implements Serializable {
 	 * Sets up the map for the building functions
 	 */
 	public void setupBuildingFunctionsMap() {
-//		buildingFunctionsMap = new ConcurrentHashMap<FunctionType, List<Building>>(); // HashMap<>();
+//		buildingFunctionsMap = new ConcurrentHashMap<FuConcurrentHashMapype, List<Building>>(); // HashMap<>();
 		List<FunctionType> functions = buildingConfig.getBuildingFunctions();
 		for (FunctionType f : functions) {
-			List<Building> list = new ArrayList<Building>();
+			List<Building> list = new CopyOnWriteArrayList<Building>();
 			for (Building b : buildings) {
 				if (b.hasFunction(f)) {
 					list.add(b);
@@ -347,7 +347,7 @@ public class BuildingManager implements Serializable {
 							list.add(newBuilding);
 					} else {
 						// Starts a new list of building
-						list = new ArrayList<>();
+						list = new CopyOnWriteArrayList<>();
 						list.add(newBuilding);
 					}
 					buildingFunctionsMap.put(ft, list);
@@ -458,7 +458,7 @@ public class BuildingManager implements Serializable {
 	 * @return collection of buildings
 	 */
 	public List<Building> getACopyOfBuildings() {
-		return new ArrayList<Building>(buildings);
+		return new CopyOnWriteArrayList<Building>(buildings);
 	}
 
 	/**
@@ -485,7 +485,7 @@ public class BuildingManager implements Serializable {
 //	 * @return collection of buildings (in their nicknames)
 //	 */
 //	public List<Building> getBuildingsNickNames() {
-//		return new ArrayList<Building>(buildingsNickNames);
+//		return new CopyOnWriteArrayList<Building>(buildingsNickNames);
 //	}
 
 	/**
@@ -588,7 +588,7 @@ public class BuildingManager implements Serializable {
 //    	        .collect(Collectors.toList());
 //
 //    	//List<Building> buildings = getBuildings();
-//    	//List<Building> buildingsWithThermal = new ArrayList<Building>();
+//    	//List<Building> buildingsWithThermal = new CopyOnWriteArrayList<Building>();
 //    	Iterator<Building> i = buildings.iterator();
 //		while (i.hasNext()) {
 //			Building b = i.next();
@@ -768,6 +768,12 @@ public class BuildingManager implements Serializable {
 		}
 	}
 	
+	public Building getABuilding(FunctionType f1, FunctionType f2) {
+		List<Building> list = buildings.stream().filter(b -> b.hasFunction(f1) && b.hasFunction(f2))
+				.collect(Collectors.toList());
+		return list.get(RandomUtil.getRandomInt(list.size()-1));
+	}
+	
 	/**
 	 * Gets the number of the same type of building.
 	 * 
@@ -793,8 +799,8 @@ public class BuildingManager implements Serializable {
 	 * Register beds for everyone in the settlement at the start of the sim
 	 */
 	public void registerBeds() {
-		List<Point2D> beds = new ArrayList<>();
-		Map<Point2D, Building> map = new HashMap<>();
+		List<Point2D> beds = new CopyOnWriteArrayList<>();
+		Map<Point2D, Building> map = new ConcurrentHashMap<>();
 		// Discover a list of beds
 		for (Building b : getBuildings(FunctionType.LIVING_ACCOMMODATIONS)) {
 			LivingAccommodations l = b.getLivingAccommodations();
@@ -830,10 +836,10 @@ public class BuildingManager implements Serializable {
 	 * @param time amount of time passing (in millisols)
 	 * @throws Exception if error.
 	 */
-	public void timePassing(double time) {
+	public boolean timePassing(ClockPulse pulse) {
 
 		if (buildingTypeIDMap == null) {
-			buildingTypeIDMap = new HashMap<>();
+			buildingTypeIDMap = new ConcurrentHashMap<>();
 			createBuildingTypeIDMap();
 		}
 		
@@ -842,16 +848,12 @@ public class BuildingManager implements Serializable {
 			setupBuildingFunctionsMap();
 		}
 		
-		// check for the passing of each day
-		int solElapsed = marsClock.getMissionSol();
 
-		if (solCache != solElapsed) {
+		if (pulse.isNewSol()) {
 
 //			if (solCache == 0) {
 //				registerBeds();
 //			}
-			
-			solCache = solElapsed;
 			
 			// Update the impact probability for each settlement based on the size and speed
 			// of the new meteorite
@@ -862,19 +864,20 @@ public class BuildingManager implements Serializable {
 		}
 		
 		for (Building b : buildings) {
-			b.timePassing(time);
+			b.timePassing(pulse);
 		}
+		return true;
 	}
 
 
-	/**
-	 * Gets a random inhabitable building.
-	 * 
-	 * @return inhabitable building.
-	 */
-	public Building getRandomInhabitableBuilding() {
-		return getBuildings(FunctionType.LIFE_SUPPORT).stream().findAny().orElse(null);
-	}
+//	/**
+//	 * Gets a random inhabitable building.
+//	 * 
+//	 * @return inhabitable building.
+//	 */
+//	public Building getRandomInhabitableBuilding() {
+//		return getBuildings(FunctionType.LIFE_SUPPORT).stream().findAny().orElse(null);
+//	}
 
 	/**
 	 * Gets a random building with an airlock.
@@ -882,8 +885,34 @@ public class BuildingManager implements Serializable {
 	 * @return random building.
 	 */
 	public Building getRandomAirlockBuilding() {
-		return getBuildings(FunctionType.EVA).stream().findAny().orElse(null);
+//		return getBuildings(FunctionType.EVA).stream().findAny().orElse(null);
+		
+		if (buildingFunctionsMap == null) {
+			buildingFunctionsMap = new ConcurrentHashMap<FunctionType, List<Building>>();
+			setupBuildingFunctionsMap();
+		}
+		
+		if (buildingFunctionsMap.containsKey(FunctionType.EVA)) {
+			List<Building> list = buildingFunctionsMap.get(FunctionType.EVA);
+			int num = list.size();
+			if (num > 0)
+				return null;
+			else if (num == 1)
+				return list.get(0);
+				
+			int rand = RandomUtil.getRandomInt(num - 1);
+			return list.get(rand);
+		}
 
+		else {
+			List<Building> list = buildings.stream()
+					.filter(b -> b.hasFunction(FunctionType.EVA)).collect(Collectors.toList());
+
+			buildingFunctionsMap.put(FunctionType.EVA, list);
+			logger.config(FunctionType.EVA + " was not found in buildingFunctionsMap yet. Just added.");
+
+			return list.get(0);
+		}
 	}
 	
 	/**
@@ -895,10 +924,10 @@ public class BuildingManager implements Serializable {
 	 */
 	public static void addToMedicalBuilding(Person p, int settlementID) {
 	
-		Building building = getLeastCrowdedBuildings(
-				unitManager.getSettlementByID(settlementID).getBuildingManager().getBuildings(FunctionType.MEDICAL_CARE, FunctionType.LIFE_SUPPORT)).stream()
-						.findAny().orElse(null);
-
+		Building building = unitManager.getSettlementByID(settlementID)
+				.getBuildingManager()
+				.getABuilding(FunctionType.MEDICAL_CARE, FunctionType.LIFE_SUPPORT);
+	
 		if (building != null) {
 			addPersonOrRobotToBuildingRandomLocation(p, building);
 		} 
@@ -924,14 +953,13 @@ public class BuildingManager implements Serializable {
 		BuildingManager manager = unitManager.getSettlementByID(settlementID).getBuildingManager();
 		if (unit instanceof Person) {
 			person = (Person) unit;
-
-//			Building building = getLeastCrowdedBuildings(
-//					manager.getBuildings(FunctionType.EVA, FunctionType.LIFE_SUPPORT)).stream()
-//							.findAny().orElse(null);
-			Building building = getLeastCrowdedBuildings(
-					manager.getBuildings(FunctionType.LIFE_SUPPORT)).stream()
-							.findAny().orElse(null);
+	
+			List<Building> list = getLeastCrowdedBuildings(manager.getBuildings(FunctionType.LIFE_SUPPORT)
+					.stream().filter(b -> !b.getBuildingType().equals(Building.ASTRONOMY_OBSERVATORY))
+					.collect(Collectors.toList()));
 			
+			Building building = list.get(RandomUtil.getRandomInt(list.size()-1));
+
 			if (building != null) {
 				// Add the person to a random building loc
 				addPersonOrRobotToBuildingRandomLocation(person, building);
@@ -978,7 +1006,7 @@ public class BuildingManager implements Serializable {
 			// Note: if the function is robotic-station, go through the list and remove
 			// hallways
 			// since we don't want robots to stay in a hallway
-			List<Building> validBuildings = new ArrayList<Building>();
+			List<Building> validBuildings = new CopyOnWriteArrayList<Building>();
 			for (Building bldg : functionBuildings) {
 				RoboticStation roboticStation = bldg.getRoboticStation();
 				// remove hallway, tunnel, observatory
@@ -1027,7 +1055,7 @@ public class BuildingManager implements Serializable {
 			}
 
 			else {
-				List<Building> validBuildings1 = new ArrayList<Building>();
+				List<Building> validBuildings1 = new CopyOnWriteArrayList<Building>();
 				List<Building> stations = manager.getBuildings(FunctionType.ROBOTIC_STATION);
 				for (Building bldg : stations) {
 					// remove hallway, tunnel, observatory
@@ -1090,7 +1118,7 @@ public class BuildingManager implements Serializable {
 		
 		else {
 			// Checks if this settlement have open garage space
-			List<VehicleMaintenance> openGarages = new ArrayList<VehicleMaintenance>();
+			List<VehicleMaintenance> openGarages = new CopyOnWriteArrayList<VehicleMaintenance>();
 			for (Building garageBuilding : garages) {
 				VehicleMaintenance garage = garageBuilding.getVehicleMaintenance();
 				if (garage.getCurrentVehicleNumber() < garage.getVehicleCapacity())
@@ -1108,7 +1136,7 @@ public class BuildingManager implements Serializable {
 				
 				LogConsolidated.log(logger, Level.INFO, 30_000, sourceName,
 						"[" + settlement.getName() + "] " +  vehicle.getName() 
-						+ " has just been stowed inside " + getBuilding(vehicle, settlement));
+						+ " had just been stowed inside " + getBuilding(vehicle, settlement) + ".");
 				return true;
 			}
 			
@@ -1270,19 +1298,27 @@ public class BuildingManager implements Serializable {
 	 */
 	public Building getBuildingAtPosition(double xLoc, double yLoc) {
 		// Use Java 8 stream
-		return buildings.stream().filter(b -> LocalAreaUtil.isLocationWithinLocalBoundedObject(xLoc, yLoc, b))
-				.findFirst().orElse(null);// get();
+//		List<Building> list = buildings.stream()
+//				.filter(b -> LocalAreaUtil.isLocationWithinLocalBoundedObject(xLoc, yLoc, b))
+//				.collect(Collectors.toList());
+//		return list.get(RandomUtil.getRandomInt(list.size()-1));
+		
+//		return buildings.stream().filter(b -> LocalAreaUtil.isLocationWithinLocalBoundedObject(xLoc, yLoc, b))
+//				.findFirst().orElse(null);// get();
+		
 //        Building result = null;
-//        //for (Building building : buildings) {
-//        Iterator<Building> i = buildings.iterator();
-//        while (i.hasNext()) {// && (result == null)) {
-//            Building building = i.next();
-//            if (LocalAreaUtil.checkLocationWithinLocalBoundedObject(xLoc, yLoc, building)) {
+        //for (Building building : buildings) {
+        Iterator<Building> i = buildings.iterator();
+        while (i.hasNext()) {// && (result == null)) {
+            Building building = i.next();
+            if (LocalAreaUtil.isLocationWithinLocalBoundedObject(xLoc, yLoc, building)) {
 //                result = building;
-//            }
-//        }
-//
-//        return result;
+//                break;
+                return building;
+            }
+        }
+
+        return null;
 	}
 
 	/**
@@ -1295,7 +1331,7 @@ public class BuildingManager implements Serializable {
 	 *                           function.
 	 */
 	public static List<Building> getUncrowdedBuildings(List<Building> buildingList) {
-//    	List<Building> result = new ArrayList<Building>();
+//    	List<Building> result = new CopyOnWriteArrayList<Building>();
 //        try {
 //            for (Building building : buildingList) {
 //            //Iterator<Building> i = buildingList.iterator();
@@ -1313,7 +1349,8 @@ public class BuildingManager implements Serializable {
 //        }
 //        return result;
 		return buildingList.stream()
-				.filter(b -> ((RoboticStation) b.getFunction(FunctionType.LIFE_SUPPORT)).getAvailableOccupancy() > 0)
+				.filter(b -> ((RoboticStation) b.getFunction(FunctionType.LIFE_SUPPORT))
+				.getAvailableOccupancy() > 0)
 				.collect(Collectors.toList());
 	}
 
@@ -1328,7 +1365,7 @@ public class BuildingManager implements Serializable {
 	 */
 	public static List<Building> getLeastCrowdedBuildings(List<Building> buildingList) {
 
-		List<Building> result = new ArrayList<Building>();
+		List<Building> result = new CopyOnWriteArrayList<Building>();
 
 		// Find least crowded population.
 		int leastCrowded = Integer.MAX_VALUE;
@@ -1384,7 +1421,7 @@ public class BuildingManager implements Serializable {
 
 	public static List<Building> getLeastCrowded4BotBuildings(List<Building> buildingList) {
 
-		List<Building> result = new ArrayList<Building>();
+		List<Building> result = new CopyOnWriteArrayList<Building>();
 
 		// Find least crowded population.
 		int leastCrowded = Integer.MAX_VALUE;
@@ -1419,7 +1456,7 @@ public class BuildingManager implements Serializable {
 	 * @return map of buildings and their probabilities.
 	 */
 	public static Map<Building, Double> getBestRelationshipBuildings(Person person, List<Building> buildingList) {
-		Map<Building, Double> result = new HashMap<Building, Double>(buildingList.size());
+		Map<Building, Double> result = new ConcurrentHashMap<Building, Double>(buildingList.size());
 		// Determine probabilities based on relationships in buildings.
 		for (Building building : buildingList) {
 			if (!building.getBuildingType().equalsIgnoreCase(Building.EVA_AIRLOCK)) {
@@ -1453,7 +1490,7 @@ public class BuildingManager implements Serializable {
 	 */
 	public static List<Building> getChattyBuildings(List<Building> buildingList) {
 
-		List<Building> result = new ArrayList<Building>();
+		List<Building> result = new CopyOnWriteArrayList<Building>();
 		for (Building building : buildingList) {
 			if (!building.getBuildingType().equalsIgnoreCase(Building.EVA_AIRLOCK)) {
 				LifeSupport lifeSupport = building.getLifeSupport();
@@ -1492,7 +1529,7 @@ public class BuildingManager implements Serializable {
 	 * @return list of buildings with valid walking path.
 	 */
 	public static List<Building> getWalkableBuildings(Unit unit, List<Building> buildingList) {
-		List<Building> result = new ArrayList<Building>();
+		List<Building> result = new CopyOnWriteArrayList<Building>();
 		Person person = null;
 		Robot robot = null;
 
@@ -1804,9 +1841,9 @@ public class BuildingManager implements Serializable {
 		String buildingType = type.toLowerCase().trim();
 
 		if (VPNewCache == null)
-			VPNewCache = new HashMap<>();
+			VPNewCache = new ConcurrentHashMap<>();
 		if (VPOldCache == null)
-			VPOldCache = new HashMap<>();
+			VPOldCache = new ConcurrentHashMap<>();
 		
 		// Update building values cache once per Sol.
 		// MarsClock currentTime =
@@ -2037,18 +2074,17 @@ public class BuildingManager implements Serializable {
 	 */
 	public Building getInhabitableBuilding(int id) {
 		// Use Java 8 stream
-		return buildings.stream().filter(b -> b.getInhabitableID() == id).findFirst().orElse(null);// .get();
+//		return buildings.stream().filter(b -> b.getInhabitableID() == id).findFirst().orElse(null);// .get();
 //    	Building result = null;
-//        Iterator<Building> i = buildings.iterator();
-//        while (i.hasNext()) {
-//            Building b = i.next();
-//            if (b.getInhabitable_id() == id) {
-//            	return b;
-//            	//break;
-//            }
-//        }
-//
-//        return result;
+        Iterator<Building> i = buildings.iterator();
+        while (i.hasNext()) {
+            Building b = i.next();
+            if (b.getInhabitableID() == id) {
+            	return b;
+            }
+        }
+
+        return null;
 	}
 
 	/**
@@ -2188,7 +2224,7 @@ public class BuildingManager implements Serializable {
 		List<Building> result = null;
 
 		if (farmsNeedingWorkCache == null)
-			farmsNeedingWorkCache = new ArrayList<>();
+			farmsNeedingWorkCache = new CopyOnWriteArrayList<>();
 		
 		int m = marsClock.getMillisolInt();
 		// Add caching and relocate from TendGreenhouse
@@ -2202,7 +2238,7 @@ public class BuildingManager implements Serializable {
 					getNonMalfunctioningBuildings(getBuildings(FunctionType.FARMING)));
 			// farmBuildings = getNonMalfunctioningBuildings(farmBuildings);
 			// farmBuildings = getLeastCrowdedBuildings(farmBuildings);
-			result = new ArrayList<Building>();
+			result = new CopyOnWriteArrayList<Building>();
 			for (Building b : farmBuildings) {
 				Farming farm = b.getFarming();
 				if (farm.requiresWork()) {
@@ -2366,11 +2402,11 @@ public class BuildingManager implements Serializable {
 	 * Reconstruct the building lists after loading from a saved sim
 	 */
 	public void reinit() {
-		buildings = new ArrayList<>();
+		buildings = new CopyOnWriteArrayList<>();
 		for (Integer i : buildingInts) {
 			buildings.add(unitManager.getBuildingByID(i));
 		}
-		garages = new ArrayList<>();
+		garages = new CopyOnWriteArrayList<>();
 		for (Integer i : garageInts) {
 			garages.add(unitManager.getBuildingByID(i));
 		}

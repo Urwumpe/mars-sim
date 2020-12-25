@@ -25,6 +25,7 @@ import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.BuildingException;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
 
 /**
@@ -42,10 +43,8 @@ implements Lab, Serializable {
 	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
 			logger.getName().length());
 	
-    private static final FunctionType FUNCTION = FunctionType.RESEARCH;
-
 	private static final int NUM_INSPECTIONS = 2;
-
+	
     private int techLevel;
     private int researcherCapacity = 0;
     private int researcherNum = 0;
@@ -57,8 +56,6 @@ implements Lab, Serializable {
     private Map<String, Integer> tissueCultureMap;
     //private List<String> tissueCultureList;
     
-    private Building building;
-    
 
     /**
      * Constructor.
@@ -66,7 +63,7 @@ implements Lab, Serializable {
      */
     public Research(Building building) {
         // Use Function constructor
-        super(FUNCTION, building);
+        super(FunctionType.RESEARCH, building);
 
         setupTissueCultures();
         
@@ -102,7 +99,7 @@ implements Lab, Serializable {
             double researchSupply = 0D;
             boolean removedBuilding = false;
 
-            List<Building> b_list = settlement.getBuildingManager().getBuildings(FUNCTION);
+            List<Building> b_list = settlement.getBuildingManager().getBuildings(FunctionType.RESEARCH);
             for (Building building : b_list) {
                 if (!newBuilding && building.getBuildingType().equalsIgnoreCase(buildingName) && !removedBuilding) {
                     removedBuilding = true;
@@ -125,7 +122,7 @@ implements Lab, Serializable {
 
             int techLevel = buildingConfig.getResearchTechLevel(buildingName);
             int labSize = buildingConfig.getResearchCapacity(buildingName);
-            double buildingResearchSupply = techLevel * labSize;
+            int buildingResearchSupply = techLevel * labSize;
 
             result += buildingResearchSupply * existingResearchValue;
         }
@@ -213,7 +210,7 @@ implements Lab, Serializable {
         if (researcherNum < 0) {
             researcherNum = 0;
             Settlement s = building.getSettlement();
-			LogConsolidated.flog(Level.SEVERE, 5000, sourceName,
+			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
 					"[" + s + "] "
 					+ building + "'s lab has no researchers.");
 //            throw new IllegalStateException("Lab is already empty of researchers.");
@@ -225,38 +222,20 @@ implements Lab, Serializable {
      * @param time amount of time passing (in millisols)
      * @throws BuildingException if error occurs.
      */
-    public void timePassing(double time) {
-    	
-	    // check for the passing of each day
-	    int solElapsed = marsClock.getMissionSol();
-	    if (solCache != solElapsed) {
-			solCache = solElapsed;
-			
-			for (String s : tissueCultureMap.keySet()) {
-				tissueCultureMap.put(s, 0);
+    @Override
+    public boolean timePassing(ClockPulse pulse) {
+		boolean valid = isValid(pulse);
+		if (valid) {
+			if (pulse.isNewSol()) {
+				for (String s : tissueCultureMap.keySet()) {
+					tissueCultureMap.put(s, 0);
+				}
 			}
-
 		}
-    	
+		return valid;
     }
 
-    /**
-     * Gets the amount of power required when function is at full power.
-     * @return power (kW)
-     */
-    public double getFullPowerRequired() {
-        return 0D;
-    }
-
-    /**
-     * Gets the amount of power required when function is at power down level.
-     * @return power (kW)
-     */
-    public double getPoweredDownPowerRequired() {
-        return 0D;
-    }
-
-    public void setupTissueCultures() {
+    private void setupTissueCultures() {
        	tissueCultureMap = new HashMap<>();
 
 //        Set<AmountResource> tissues = SimulationConfig.instance().getResourceConfiguration().getTissueCultures();
@@ -310,18 +289,6 @@ implements Lab, Serializable {
     }
 
 
-	@Override
-	public double getFullHeatRequired() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	@Override
-	public double getPoweredDownHeatRequired() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-	
 	   @Override
 	    public void destroy() {
 	        super.destroy();

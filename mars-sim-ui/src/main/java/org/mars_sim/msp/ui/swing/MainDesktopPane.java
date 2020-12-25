@@ -50,6 +50,7 @@ import org.mars_sim.msp.core.UnitManagerEventType;
 import org.mars_sim.msp.core.UnitManagerListener;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.time.ClockListener;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.ui.astroarts.OrbitViewer;
@@ -505,9 +506,11 @@ public class MainDesktopPane extends JDesktopPane
 	 * @return the tool window
 	 */
 	public ToolWindow getToolWindow(String toolName) {
-
-		return toolWindows.stream().filter(i -> toolName.equals(i.getToolName())).findAny().orElse(null);
-
+		for (ToolWindow w: toolWindows) {
+			if (toolName.equals(w.getToolName()))
+				return w;
+		}
+		return null;
 	}
 
 	/**
@@ -1358,8 +1361,8 @@ public class MainDesktopPane extends JDesktopPane
 	}
 
 	@Override
-	public void clockPulse(double time) {
-		if (time > 0) {
+	public void clockPulse(ClockPulse pulse) {
+		if (pulse.getElapsed() > 0) {
 			// Increments the Earth and Mars clock labels.
 			mainWindow.incrementClocks();
 		}

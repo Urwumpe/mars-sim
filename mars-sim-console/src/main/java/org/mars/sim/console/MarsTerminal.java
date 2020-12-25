@@ -38,6 +38,7 @@ import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.GameManager;
 import org.mars_sim.msp.core.GameManager.GameMode;
 import org.mars_sim.msp.core.time.ClockListener;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MasterClock;
 
 public class MarsTerminal extends SwingTextTerminal implements ClockListener {
@@ -167,7 +168,7 @@ public class MarsTerminal extends SwingTextTerminal implements ClockListener {
 		            printf("Exiting the Simulation..." + System.lineSeparator());
 		            Simulation sim = Simulation.instance();
 		        	sim.endSimulation(); 
-		    		sim.getSimExecutor().shutdownNow();
+//		    		sim.getSimExecutor().shutdownNow();
 		    		if (sim.getMasterClock() != null)
 		    			sim.getMasterClock().exitProgram();
 //		    		logger.info("Exiting the Simulation.");
@@ -358,7 +359,7 @@ public class MarsTerminal extends SwingTextTerminal implements ClockListener {
 //    }
 
 	@Override
-	public void clockPulse(double time) {
+	public void clockPulse(ClockPulse pulse) {
 		// TODO Auto-generated method stub
 		
 	}

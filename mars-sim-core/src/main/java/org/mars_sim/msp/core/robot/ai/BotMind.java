@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
@@ -19,26 +19,27 @@ import org.mars_sim.msp.core.person.ai.task.utils.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.ai.job.RobotJob;
 import org.mars_sim.msp.core.robot.ai.task.BotTaskManager;
-import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.ClockPulse;
+import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * The BotMind class represents a robot's mind. It keeps track of missions and
  * tasks which the robot is involved.
  */
-public class BotMind implements Serializable {
+public class BotMind implements Serializable, Temporal {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
 	private static Logger logger = Logger.getLogger(BotMind.class.getName());
-
+	private static String loggerName = logger.getName();
+	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	
 	// Data members
 	/** Is the job locked so another can't be chosen? */
 	private boolean jobLock;
-	/** The cache for msol. */
-	private int msolCache = -1;
 	
 	/** The robot owning this mind. */
 	private Robot robot = null;
@@ -55,8 +56,7 @@ public class BotMind implements Serializable {
 	
 
 //	private static MissionManager missionManager;
-	private static Simulation sim;
-	private static MarsClock marsClock;
+
 
 	/**
 	 * Constructor 1.
@@ -71,9 +71,6 @@ public class BotMind implements Serializable {
 //		mission = null;
 		robotJob = null;
 		jobLock = false;
-
-		sim = Simulation.instance();
-		marsClock = sim.getMasterClock().getMarsClock();
 
 		// Define the boundary in Sense-Act-Plan (Robot control methodology
 		// 1. Sense - gather information using the sensors
@@ -103,11 +100,12 @@ public class BotMind implements Serializable {
 	 * @param time the time passing (millisols)
 	 * @throws Exception if error.
 	 */
-	public void timePassing(double time) {
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
 
 		if (botTaskManager != null) {
 			// Take action as necessary.
-			takeAction(time);
+			takeAction(pulse.getElapsed());
 		}
 		
 //	    if (missionManager != null)
@@ -123,7 +121,7 @@ public class BotMind implements Serializable {
 //		        	setRobotJob(JobManager.getNewRobotJob(robot), false);
 //		        }
 //		}
-
+		return true;
 	}
 
 	/**
@@ -132,7 +130,7 @@ public class BotMind implements Serializable {
 	 * @param time time in millisols
 	 * @throws Exception if error during action.
 	 */
-	public void takeAction(double time) {
+	private void takeAction(double time) {
 		boolean hasActiveTask = botTaskManager.hasActiveTask();
 		// Perform a task if the robot has one, or determine a new task/mission.
 		if (hasActiveTask) {
@@ -268,7 +266,7 @@ public class BotMind implements Serializable {
 	public void getNewAction(boolean tasks) {
 		// Get probability weights from tasks, missions and active missions.
 		double taskWeights = 0D;
-		double missionWeights = 0D;
+//		double missionWeights = 0D;
 
 		// Determine sum of weights based on given parameters
 		double weightSum = 0D;
@@ -280,12 +278,11 @@ public class BotMind implements Serializable {
 
 		if ((weightSum <= 0D) || (Double.isNaN(weightSum)) || (Double.isInfinite(weightSum))) {
 			try {
-				TimeUnit.MILLISECONDS.sleep(1000L);
+				TimeUnit.MILLISECONDS.sleep(100L);
 			} catch (InterruptedException e) {
-				logger.severe("BotMind.getNewAction() " + robot.getName() + " has weight sum of " + weightSum);
+//				logger.severe("BotMind.getNewAction() " + robot.getName() + " has weight sum of " + weightSum);
 				e.printStackTrace();
 			}
-
 		}
 
 		// Select randomly across the total weight sum.
@@ -298,27 +295,20 @@ public class BotMind implements Serializable {
 
 				if (newTask != null)
 					botTaskManager.addTask(newTask);
-				else
-					logger.severe(robot + " : newTask is null ");
+//				else
+//					logger.severe(robot + "'s newTask is null.");
 
 				return;
+				
 			} else {
 				rand -= taskWeights;
 			}
 		}
 
 		// If reached this point, no task or mission has been found.
-		logger.severe(robot.getName() + " couldn't determine new action - taskWeights: " + taskWeights
-				+ ", missionWeights: " + missionWeights);
-	}
-
-	/**
-	 * Reloads instances after loading from a saved sim
-	 * 
-	 * @param clock
-	 */
-	public static void initializeInstances(MarsClock clock) {
-		marsClock = clock;
+//		LogConsolidated.log(logger, Level.SEVERE, 20_000, sourceName,
+//				robot.getName() + " could not determine a new task (taskWeights: " 
+//					+ taskWeights + ").");
 	}
 	
 	public void reinit() {

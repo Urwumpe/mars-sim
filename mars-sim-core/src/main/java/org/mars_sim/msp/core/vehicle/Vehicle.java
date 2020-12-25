@@ -30,6 +30,8 @@ import org.mars_sim.msp.core.LocalBoundedObject;
 import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitEventType;
+import org.mars_sim.msp.core.data.MSolDataItem;
+import org.mars_sim.msp.core.data.MSolDataLogger;
 import org.mars_sim.msp.core.location.LocationStateType;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
@@ -67,6 +69,8 @@ import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.Indoor;
 import org.mars_sim.msp.core.structure.building.function.SystemType;
+import org.mars_sim.msp.core.time.ClockPulse;
+import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
@@ -75,7 +79,7 @@ import org.mars_sim.msp.core.tool.RandomUtil;
  * a specific type of vehicle.
  */
 public abstract class Vehicle extends Unit
-		implements Malfunctionable, Salvagable, Indoor, LocalBoundedObject, Serializable {
+		implements Malfunctionable, Salvagable, Temporal, Indoor, LocalBoundedObject, Serializable {
 
 	private static final long serialVersionUID = 1L;
 
@@ -198,7 +202,7 @@ public abstract class Vehicle extends Unit
 	/** List of status types. */
 	private Set<StatusType> statusTypes;
 	/** The vehicle's status log. */
-	private Map<Integer, Map<Integer, List<StatusType>>> vehicleLog = new HashMap<>();
+	private MSolDataLogger<Set<StatusType>> vehicleLog = new MSolDataLogger<Set<StatusType>>(5);
 	
 	/** The malfunction manager for the vehicle. */
 	protected MalfunctionManager malfunctionManager; 
@@ -671,26 +675,6 @@ public abstract class Vehicle extends Unit
 	 */
 	public String printStatusTypes() {
 		return statusTypes.toString();
-		
-//		String s = "";
-//		int size = statusTypes.size();
-//		if (size == 0)
-//			return s;
-//		else {
-//			List<StatusType> list = new ArrayList<StatusType>(statusTypes);
-//			if (size == 1) {
-//				s = list.get(0).getName();
-//			}
-//			else if (size > 1) {
-//				for (int i=0; i<size; i++) {
-//					s += list.get(i).getName();
-//					if (i != size - 1)
-//						s += ", ";
-//				}
-//			}
-//		}
-//
-//		return s.trim();
 	}
 	
 	/**
@@ -815,37 +799,12 @@ public abstract class Vehicle extends Unit
 	 * 
 	 * @param type
 	 */
-	public void writeLog() {
-		int today = marsClock.getMissionSol();
-		int millisols = marsClock.getMillisolInt();
-		
-		Map<Integer, List<StatusType>> eachSol = null;
-		List<StatusType> list = null;
-		
-		if (vehicleLog.containsKey(today)) {
-			eachSol = vehicleLog.get(today);
-					
-			if (eachSol.containsKey(millisols)) {
-				list = eachSol.get(millisols);
-			}
-			else {
-				list = new ArrayList<>();
-			}
-		}
-		
-		else {
-			eachSol = new HashMap<>();
-			list = new ArrayList<>();
-		}
-		
-		list.addAll(statusTypes);
-		eachSol.put(millisols, list);
-		vehicleLog.put(today, eachSol);
-//		System.out.println(getName() + " log's size : " + vehicleLog.size());
+	private void writeLog() {
+		vehicleLog.addDataPoint(new HashSet<>(statusTypes));
 	}
 
-	public Map<Integer, Map<Integer, List<StatusType>>> getVehicleLog() {
-		return vehicleLog;
+	public Map<Integer, List<MSolDataItem<Set<StatusType>>>> getVehicleLog() {
+		return vehicleLog.getHistory();
 	}
 	
 	/**
@@ -948,6 +907,8 @@ public abstract class Vehicle extends Unit
 	public void setSpeed(double speed) {
 		if (speed < 0D)
 			throw new IllegalArgumentException("Vehicle speed cannot be less than 0 km/hr: " + speed);
+		if (Double.isNaN(speed))
+			throw new IllegalArgumentException("Vehicle speed is a NaN");
 		this.speed = speed;
 		fireUnitUpdate(UnitEventType.SPEED_EVENT);
 	}
@@ -1207,20 +1168,24 @@ public abstract class Vehicle extends Unit
 	 * @param time the amount of time passing (millisols)
 	 * @throws Exception if error during time.
 	 */
-	public void timePassing(double time) {
-
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
+		if (!isValid(pulse)) {
+			return false;
+		}
+		
 		// Checks status.
 		checkStatus();
 		
 		if (haveStatusType(StatusType.MOVING)) {
 			// Assume the wear and tear factor is at 100% by being used in a mission
-			malfunctionManager.activeTimePassing(time);
+			malfunctionManager.activeTimePassing(pulse.getElapsed());
 		}
 		
 		// If it's back at a settlement and is NOT in a garage
 		if (getSettlement() != null && !isRoverInAGarage()) {
 			// Assume the wear and tear factor is 75% less by being exposed outdoor
-			malfunctionManager.activeTimePassing(time * .25);
+			malfunctionManager.activeTimePassing(pulse.getElapsed() * .25);
 		}
 		
 		// Make sure reservedForMaintenance is false if vehicle needs no maintenance.
@@ -1232,7 +1197,7 @@ public abstract class Vehicle extends Unit
 		}
 		else {
 			// Note: during maintenance, it doesn't need to be checking for malfunction.
-			malfunctionManager.timePassing(time);
+			malfunctionManager.timePassing(pulse);
 		}
 
 		if (haveStatusType(StatusType.MALFUNCTION)) {
@@ -1262,6 +1227,7 @@ public abstract class Vehicle extends Unit
 //			}
 //			// TODO : will another person take his place as the driver
 //		}
+		return true;
 	}
 
 //	/**

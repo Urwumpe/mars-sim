@@ -9,12 +9,12 @@ package org.mars_sim.msp.core.structure.building.connection;
 import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -93,12 +93,12 @@ public class BuildingConnectorManager implements Serializable {
 		}
 
 		this.settlement = settlement;
-		buildingConnections = Collections.synchronizedSet(new HashSet<BuildingConnector>());
+		buildingConnections = ConcurrentHashMap.newKeySet();
 
 		BuildingManager buildingManager = settlement.getBuildingManager();
 
 		// Create partial building connector list from building connection templates.
-		List<PartialBuildingConnector> partialBuildingConnectorList = new ArrayList<PartialBuildingConnector>();
+		List<PartialBuildingConnector> partialBuildingConnectorList = new CopyOnWriteArrayList<PartialBuildingConnector>();
 		Iterator<BuildingTemplate> i = buildingTemplates.iterator();
 		while (i.hasNext()) {
 			BuildingTemplate buildingTemplate = i.next();
@@ -161,7 +161,7 @@ public class BuildingConnectorManager implements Serializable {
 			PartialBuildingConnector partialConnector = partialBuildingConnectorList.get(0);
 			Point2D.Double partialConnectorLoc = new Point2D.Double(partialConnector.xLocation,
 					partialConnector.yLocation);
-			List<PartialBuildingConnector> validPartialConnectors = new ArrayList<PartialBuildingConnector>();
+			List<PartialBuildingConnector> validPartialConnectors = new CopyOnWriteArrayList<PartialBuildingConnector>();
 			for (int x = 1; x < partialBuildingConnectorList.size(); x++) {
 				PartialBuildingConnector potentialConnector = partialBuildingConnectorList.get(x);
 				if (potentialConnector.building.equals(partialConnector.connectToBuilding)
@@ -269,7 +269,7 @@ public class BuildingConnectorManager implements Serializable {
 	 */
 	public Set<BuildingConnector> getBuildingConnections(Building building1, Building building2) {
 
-		Set<BuildingConnector> result = new HashSet<BuildingConnector>();
+		Set<BuildingConnector> result = ConcurrentHashMap.newKeySet();
 
 		Iterator<BuildingConnector> i = buildingConnections.iterator();
 		while (i.hasNext()) {
@@ -312,7 +312,7 @@ public class BuildingConnectorManager implements Serializable {
 	 */
 	public Set<BuildingConnector> getConnectionsToBuilding(Building building) {
 
-		Set<BuildingConnector> result = new HashSet<BuildingConnector>();
+		Set<BuildingConnector> result = ConcurrentHashMap.newKeySet();
 
 		Iterator<BuildingConnector> i = buildingConnections.iterator();
 		while (i.hasNext()) {

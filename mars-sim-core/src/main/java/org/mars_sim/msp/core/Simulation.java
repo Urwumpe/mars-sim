@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.data.DataLogger;
 import org.mars_sim.msp.core.equipment.Equipment;
 import org.mars_sim.msp.core.events.HistoricalEventManager;
 import org.mars_sim.msp.core.interplanetary.transport.TransportManager;
@@ -100,6 +101,7 @@ import org.mars_sim.msp.core.structure.goods.CreditManager;
 import org.mars_sim.msp.core.structure.goods.GoodsManager;
 import org.mars_sim.msp.core.time.AutosaveScheduler;
 import org.mars_sim.msp.core.time.ClockListener;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.EarthClock;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.MasterClock;
@@ -107,7 +109,6 @@ import org.mars_sim.msp.core.time.SystemDateTime;
 import org.mars_sim.msp.core.time.UpTimer;
 import org.mars_sim.msp.core.tool.CheckSerializedSize;
 import org.mars_sim.msp.core.vehicle.Vehicle;
-
 import org.tukaani.xz.FilterOptions;
 import org.tukaani.xz.LZMA2Options;
 import org.tukaani.xz.XZFormatException;
@@ -126,8 +127,7 @@ public class Simulation implements ClockListener, Serializable {
 	private static final long serialVersionUID = -631308653510974249L;
 
 	private static Logger logger = Logger.getLogger(Simulation.class.getName());
-//	private static String loggerName = logger.getName();
-//	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+
 	public enum SaveType {
 		/** Do not save */
 		NONE, 
@@ -343,6 +343,16 @@ public class Simulation implements ClockListener, Serializable {
 	protected Object readResolve() throws ObjectStreamException {
 		return instance();
 	}
+	
+	/**
+	 * Checks if the simulation is in a state of creating a new simulation or
+	 * loading a saved simulation.
+	 * 
+	 * @return true is simulation is in updating state.
+	 */
+	public boolean isUpdating() {
+		return isUpdating;
+	}
 
 	public void startSimExecutor() {
 //		logger.config("startSimExecutor() is on " + Thread.currentThread().getName());
@@ -353,6 +363,29 @@ public class Simulation implements ClockListener, Serializable {
 		return simExecutor;
 	}
 
+//	/**
+//	 * Executes the SettlementTask on a executor service thread
+//	 */
+//	public void runSettlementTask() {
+////		startSimExecutor();
+//		simExecutor.submit(new SettlementTask());
+//	}
+//	
+//	public class SettlementTask implements Runnable {
+//		
+//		SettlementTask() {
+//		}
+//		
+//		public void run() {
+//			unitManager.startSettlementThread();
+//		}
+//	}
+	
+	/**
+	 * Executes the CreateNewSimTask on a executor service thread
+	 * 
+	 * @param userTimeRatio
+	 */
 	public void runCreateNewSimTask(int userTimeRatio) {
 		startSimExecutor();
 		simExecutor.submit(new CreateNewSimTask(userTimeRatio));
@@ -369,16 +402,6 @@ public class Simulation implements ClockListener, Serializable {
 		public void run() {
 			createNewSimulation(userTimeRatio, false);
 		}
-	}
-	
-	/**
-	 * Checks if the simulation is in a state of creating a new simulation or
-	 * loading a saved simulation.
-	 * 
-	 * @return true is simulation is in updating state.
-	 */
-	public boolean isUpdating() {
-		return isUpdating;
 	}
 
 	/**
@@ -508,7 +531,7 @@ public class Simulation implements ClockListener, Serializable {
 		
 		// Initialize Mars environmental objects
 //		mars.initializeTransientData(); // requires terrain, weather, orbit
-		mars.getWeather().initializeTransientData();
+		Weather.initializeInstances(marsClock, surfaceFeatures, mars.getOrbitInfo());
 		
 		// Initialize units prior to starting the unit manager
 		Unit.initializeInstances(masterClock, marsClock, earthClock, this, mars, null, 
@@ -531,8 +554,16 @@ public class Simulation implements ClockListener, Serializable {
 		Unit.setMarsSurface(marsSurface);
 		Unit.setUnitManager(unitManager);
 		
-//		logger.config("Done with Unit.setUnitManager()");
+		// Gets config file instances
+		simulationConfig = SimulationConfig.instance();
+		BuildingConfig bc = simulationConfig.getBuildingConfiguration();
+		PersonConfig pc = simulationConfig.getPersonConfig();
 		
+//		logger.config("Done with Unit.setUnitManager()");
+		ResourceProcess.initializeInstances(marsClock);
+		Function.initializeInstances(bc, marsClock, pc, surfaceFeatures,
+								     mars.getWeather(), unitManager);
+
 		unitManager.constructInitialUnits(loadSaveSim); // unitManager needs to be on the same thread as masterClock
 		
 //		logger.config("Done with unitManager.constructInitialUnits()");
@@ -549,19 +580,16 @@ public class Simulation implements ClockListener, Serializable {
         // Initialize ManufactureUtil
         new ManufactureUtil();
 		
-		// Gets config file instances
-		simulationConfig = SimulationConfig.instance();
-//		BuildingConfig bc = simulationConfig.getBuildingConfiguration();
-		PersonConfig pc = simulationConfig.getPersonConfig();
+
 	
 		// Set instances for logging
 		LogConsolidated.initializeInstances(marsClock, earthClock);
 
 		// Initialize instances prior to UnitManager initiatiation		
 		MalfunctionFactory.initializeInstances(this, marsClock, unitManager);
-		MissionManager.initializeInstances(marsClock);
 		MalfunctionManager.initializeInstances(masterClock, marsClock, malfunctionFactory, medicalManager, eventManager);
 		RelationshipManager.initializeInstances(unitManager);
+		RadiationExposure.initializeInstances(marsClock);
 //		MedicalManager.initializeInstances();		
 		
 		//  Re-initialize the GameManager
@@ -1039,13 +1067,11 @@ public class Simulation implements ClockListener, Serializable {
 //		logger.config("Done LogConsolidated");
 		
 		// Re-initialize Mars environmental instances
-		Weather.initializeInstances(masterClock, marsClock, mars, surfaceFeatures, orbit, unitManager); // terrain
+		Weather.initializeInstances(marsClock, surfaceFeatures, orbit); // terrain
 
 		OrbitInfo.initializeInstances(marsClock, earthClock);	
 		
 		SurfaceFeatures.initializeInstances(masterClock, mars, this, weather, orbit, missionManager);  // sunDirection, landmarks
-
-		DustStorm.initializeInstances(weather);
 			
 //		logger.config("Done DustStorm");
 		
@@ -1058,13 +1084,15 @@ public class Simulation implements ClockListener, Serializable {
 		
 		// Re-initialize static class
 		MalfunctionFactory.initializeInstances(this, marsClock, unitManager);
-		MissionManager.initializeInstances(marsClock);
 //		MedicalManager.justReloaded();
 		
 		// Re-initialize units prior to starting the unit manager
 		Unit.initializeInstances(masterClock, marsClock, earthClock, this, mars, marsSurface, weather, surfaceFeatures, missionManager);	
 		Unit.setUnitManager(unitManager);
 		
+		// Re-initialize Building function related class
+		Function.initializeInstances(bc, marsClock, pc, surfaceFeatures, weather, unitManager);
+
 //		logger.config("Done Unit");
 		
 		// Update/reset the identifier count for each type of units 
@@ -1078,7 +1106,7 @@ public class Simulation implements ClockListener, Serializable {
 
 		RelationshipManager.initializeInstances(unitManager);
 		MalfunctionManager.initializeInstances(masterClock, marsClock, malfunctionFactory, medicalManager, eventManager);
-		TransportManager.initializeInstances(marsClock, eventManager);
+		TransportManager.initializeInstances(eventManager);
 		ScientificStudyManager.initializeInstances(marsClock, unitManager);
 		ScientificStudy.initializeInstances(marsClock, unitManager);
 		ScientificStudyUtil.initializeInstances(relationshipManager, unitManager);
@@ -1092,35 +1120,32 @@ public class Simulation implements ClockListener, Serializable {
 		SalvageValues.initializeInstances(unitManager);
 			
 		// Re-initialize Person/Robot related class
-		BotMind.initializeInstances(marsClock);
 		CircadianClock.initializeInstances(marsClock);
-		Mind.initializeInstances(marsClock, missionManager, relationshipManager);		
+		Mind.initializeInstances(missionManager, relationshipManager);		
 		PhysicalCondition.initializeInstances(this, masterClock, marsClock, medicalManager);
-		RadiationExposure.initializeInstances(masterClock, marsClock);
+		RadiationExposure.initializeInstances(marsClock);
 		Role.initializeInstances(marsClock);
 		TaskManager.initializeInstances(marsClock, missionManager);
-		TaskSchedule.initializeInstances(marsClock);
 		HealthProblem.initializeInstances(medicalManager, eventManager);
 		
 //		logger.config("Done HealthProblem");
 
 		// Re-initialize Structure related class
-		Building.initializeInstances(bc, unitManager);
+		Building.initializeInstances(bc);
 		BuildingManager.initializeInstances(this, masterClock, marsClock, bc, eventManager, relationshipManager, unitManager);
 		Settlement.initializeInstances(unitManager);		// loadDefaultValues()
 		ChainOfCommand.initializeInstances(marsClock, unitManager);
 		GoodsManager.initializeInstances(this, marsClock, missionManager, unitManager, pc);
 			
 		// Re-initialize Building function related class
-		Function.initializeInstances(bc, masterClock, marsClock, pc, mars, surfaceFeatures, weather, unitManager);
-		Cooking.initializeInstances(); // prepareOilMenu()
-		Farming.initializeInstances();  // cropConfig
+//		Function.initializeInstances(bc, masterClock, marsClock, pc, mars, surfaceFeatures, weather, unitManager);
+//		Farming.initializeInstances();  // cropConfig
 
 //		logger.config("Done Farming");
 		
 		// Miscs.
-		CompositionOfAir.initializeInstances(masterClock, marsClock, pc, unitManager);
-		Crop.initializeInstances(masterClock, marsClock, surfaceFeatures, unitManager);
+		CompositionOfAir.initializeInstances(pc, unitManager);
+		Crop.initializeInstances(surfaceFeatures, unitManager);
 		HeatSource.initializeInstances(mars, surfaceFeatures, orbit, weather);
 		Malfunction.initializeInstances();
 		PowerSource.initializeInstances(mars, surfaceFeatures, orbit, weather);
@@ -1690,10 +1715,19 @@ public class Simulation implements ClockListener, Serializable {
 		logger.log(Level.CONFIG, "Exiting the simulation. Good Bye !");
 //		defaultLoad = false;
 		instance().stop();
+		// Ends the clock listener executor in master clock
 		if (masterClock != null)
 			masterClock.endClockListenerExecutor();
-		if (clockThreadExecutor != null)
+		// Ends the clock thread
+		if (clockThreadExecutor != null) {
 			clockThreadExecutor.shutdownNow();
+//			clockThreadExecutor.awaitTermination(250, TimeUnit.MILLISECONDS);
+		}
+		// Ends the unitmanager's executor thread pools
+		unitManager.endSimulation();
+		// Ends the simulation executor
+		if (simExecutor != null)
+			simExecutor.shutdown();
 	}
 
 	public void endMasterClock() {
@@ -1942,44 +1976,19 @@ public class Simulation implements ClockListener, Serializable {
 	 * @param time amount of time passing (in millisols)
 	 */
 	@Override
-	public void clockPulse(double time) {
-		if (doneInitializing && ut != null && !clockOnPause && !masterClock.isPaused() && time > Double.MIN_VALUE) {
+	public void clockPulse(ClockPulse pulse) {
+		if (doneInitializing && !clockOnPause) {
+			// Refresh all Data loggers; this can be refactored later to a Manager class
+			DataLogger.changeTime(pulse);
+			mars.timePassing(pulse);
 
-			ut.updateTime();
+			missionManager.timePassing(pulse);
 
-//			if (debug) {
-//				logger.fine(Msg.getString("Simulation.log.clockPulseMars", //$NON-NLS-1$
-//						ut.getUptime(), mars.toString()));
-//			}
-			mars.timePassing(time);
-			ut.updateTime();
+			unitManager.timePassing(pulse);
 
-//			if (debug) {
-//				logger.fine(Msg.getString("Simulation.log.clockPulseMissionManager", //$NON-NLS-1$
-//						masterClock.getUpTimer().getUptime(), missionManager.toString()));
-//			}
-			missionManager.timePassing(time);
-			ut.updateTime();
+			scientificStudyManager.timePassing(pulse);
 
-//			if (debug) {
-//				logger.fine(Msg.getString("Simulation.log.clockPulseUnitManager", //$NON-NLS-1$
-//						masterClock.getUpTimer().getUptime(), unitManager.toString()));
-//			}
-			unitManager.timePassing(time);
-			ut.updateTime();
-
-//			if (debug) {
-//				logger.fine(Msg.getString("Simulation.log.clockPulseScientificStudyManager", //$NON-NLS-1$
-//						masterClock.getUpTimer().getUptime(), scientificStudyManager.toString()));
-//			}
-			scientificStudyManager.updateStudies();
-			ut.updateTime();
-
-//			if (debug) {
-//				logger.fine(Msg.getString("Simulation.log.clockPulseTransportManager", //$NON-NLS-1$
-//						masterClock.getUpTimer().getUptime(), transportManager.toString()));
-//			}
-			transportManager.timePassing(time);
+			transportManager.timePassing(pulse);
 		}
 	}
 

@@ -13,8 +13,6 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.text.DecimalFormat;
 import java.util.logging.Level;
@@ -33,12 +31,12 @@ import javax.swing.event.MouseInputAdapter;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.time.ClockListener;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.ClockUtils;
 import org.mars_sim.msp.core.time.EarthClock;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.time.UpTimer;
-import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.JSliderMW;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MainWindow;
@@ -46,13 +44,11 @@ import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.toolWindow.ToolWindow;
 
 import com.alee.extended.label.WebStyledLabel;
-import com.alee.laf.button.WebButton;
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.managers.style.StyleId;
 import com.alee.managers.tooltip.TooltipManager;
 import com.alee.managers.tooltip.TooltipWay;
-//import com.alee.managers.language.data.TooltipWay;
 
 /**
  * The TimeWindow is a tool window that displays the current Martian and Earth
@@ -72,11 +68,11 @@ public class TimeWindow extends ToolWindow implements ClockListener {
 	/** the sleep time label string */
 	public static final String SLEEP_TIME = "Sleep : ";
 	/** the residual time label string */
-	public static final String RESIDUAL_TIME = "Residual Time : ";
+	public static final String MARS_PULSE_TIME = "Simulated Pulse : ";
 	/** the execution time unit */
-	public static final String US = " micro-secs";
+	public static final String MSOL = " millisol";
 	/** the execution time label string */
-	public static final String BASE_TBU = "Base TBU : ";
+	public static final String ACTUAL_RATE = "Actual Rate : ";
 	/** the execution time unit */
 	public static final String MS = " ms";
 	/** the real second label string */	
@@ -118,11 +114,11 @@ public class TimeWindow extends ToolWindow implements ClockListener {
 	/** label for execution time. */
 	private WebLabel execTimeLabel;
 	/** label for base TBU. */
-	private WebLabel baseTBULabel;
+	private WebLabel actualRateLabel;
 	/** label for sleep time. */
 	private WebLabel sleepTimeLabel;
-	/** label for residual time. */
-	private WebLabel residualTimeLabel;
+	/** label for mars simulation time. */
+	private WebLabel marsPulseLabel;
 	/** label for time compression. */	
 	private WebLabel timeCompressionLabel;
 	/** slider for pulse. */
@@ -315,24 +311,24 @@ public class TimeWindow extends ToolWindow implements ClockListener {
 
 		// Create execution time label
 		long execTime = masterClock.getExecutionTime();
-		execTimeLabel = new WebLabel(EXEC + execTime + US, WebLabel.CENTER);
+		execTimeLabel = new WebLabel(EXEC + execTime + MS, WebLabel.CENTER);
 		
-		// Create TBU label
-		double baseTBU = Math.round(masterClock.getBaseTBU()*10.0)/10.0;
-		baseTBULabel = new WebLabel(BASE_TBU + baseTBU + MS, WebLabel.CENTER);
+		// Create current rate label
+		int actualRate = masterClock.getActualRatio();
+		actualRateLabel = new WebLabel(ACTUAL_RATE + actualRate + "x", WebLabel.CENTER);
 		
 		// Create sleep time label
 		long sleepTime = masterClock.getSleepTime();
 		sleepTimeLabel = new WebLabel(SLEEP_TIME + sleepTime + MS, WebLabel.CENTER);
 		
-		// Create residual time label
-		long residualTime = masterClock.getResidualTime();
-		residualTimeLabel = new WebLabel(RESIDUAL_TIME + residualTime + MS, WebLabel.CENTER);
+		// Create pulse time label
+		double pulseTime = masterClock.getMarsPulseTime();
+		marsPulseLabel = new WebLabel(MARS_PULSE_TIME + Math.round(pulseTime * 100.0)/100.0 + MSOL, WebLabel.CENTER);
 				
 		TPSPane.add(execTimeLabel);
-		TPSPane.add(baseTBULabel);
+		TPSPane.add(actualRateLabel);
 		TPSPane.add(sleepTimeLabel);
-		TPSPane.add(residualTimeLabel);
+		TPSPane.add(marsPulseLabel);
 		
 		// Create the pulse pane
 		WebPanel pulsePane = new WebPanel(new BorderLayout());
@@ -376,7 +372,7 @@ public class TimeWindow extends ToolWindow implements ClockListener {
 		int sliderpos = calculateSliderValue(masterClock.getTimeRatio());
 		pulseSlider = new JSliderMW(MIN, MAX, sliderpos);
 		// pulseSlider.setEnabled(false);
-		pulseSlider.setMajorTickSpacing(5);
+		pulseSlider.setMajorTickSpacing(4);
 		pulseSlider.setMinorTickSpacing(1);
 		// activated for custom tick space
 		pulseSlider.setSnapToTicks(true); 
@@ -384,9 +380,13 @@ public class TimeWindow extends ToolWindow implements ClockListener {
 		pulseSlider.addChangeListener(new ChangeListener() {
 			public void stateChanged(ChangeEvent e) {
 				try {
-					setTimeRatioFromSlider(pulseSlider.getValue()); 
-					// Update the two time labels
-					updateTimeLabels();
+					JSliderMW sliderSource = (JSliderMW) e.getSource();
+					if (!sliderSource.getValueIsAdjusting()) {
+						setTimeRatioFromSlider(pulseSlider.getValue()); 
+						
+						// Update the two time labels
+						updateTimeLabels();
+					}
 
 				} catch (Exception e2) {
 					logger.log(Level.SEVERE, e2.getMessage());
@@ -471,19 +471,19 @@ public class TimeWindow extends ToolWindow implements ClockListener {
 		
 		// Create execution time label
 		long execTime = masterClock.getExecutionTime();
-		if (execTimeLabel != null) execTimeLabel.setText(EXEC + execTime + US);		
+		if (execTimeLabel != null) execTimeLabel.setText(EXEC + execTime + MS);		
 		
 		// Create TBU label
-		double baseTBU = Math.round(masterClock.getBaseTBU()*10.0)/10.0;
-		if (baseTBULabel != null) baseTBULabel.setText(BASE_TBU + baseTBU + MS);
+		double actualRate = masterClock.getActualRatio();
+		if (actualRateLabel != null) actualRateLabel.setText(ACTUAL_RATE + actualRate + "x");
 		
 		// Create sleep time label
 		long sleepTime = masterClock.getSleepTime();
 		if (sleepTimeLabel != null) sleepTimeLabel.setText(SLEEP_TIME + sleepTime + MS);
 		
-		// Create residual time label
-		long residualTime = masterClock.getResidualTime();
-		if (residualTimeLabel != null) residualTimeLabel.setText(RESIDUAL_TIME + residualTime + MS);
+		// Create mars pulse label
+		double pulseTime = masterClock.getMarsPulseTime();
+		if (marsPulseLabel != null) marsPulseLabel.setText(MARS_PULSE_TIME + Math.round(pulseTime * 100.0)/100.0 + MSOL);
 		
 		
 	}
@@ -515,7 +515,13 @@ public class TimeWindow extends ToolWindow implements ClockListener {
 	 */
 	public void setTimeRatioSlider(double timeRatio) {
 		int sliderValue = calculateSliderValue(timeRatio);
-		pulseSlider.setValue(sliderValue);
+		int currentSlider = pulseSlider.getValue();
+		if (sliderValue != currentSlider) {
+			// Prevent feedback when setting a new value without user
+			pulseSlider.setValueIsAdjusting(true);
+			pulseSlider.setValue(sliderValue);
+			pulseSlider.setValueIsAdjusting(false);
+		}
 	}
 
 	/**
@@ -687,7 +693,7 @@ public class TimeWindow extends ToolWindow implements ClockListener {
 	}
 
 	@Override
-	public void clockPulse(double time) {
+	public void clockPulse(ClockPulse pulse) {
 		if (desktop.isToolWindowOpen(TimeWindow.NAME)) {
 			// update the fast labels
 			updateFastLabels();

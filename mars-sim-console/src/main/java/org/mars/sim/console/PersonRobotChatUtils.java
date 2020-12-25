@@ -11,7 +11,6 @@ import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 
@@ -330,10 +329,10 @@ public class PersonRobotChatUtils extends ChatUtils {
 			int size = marsClock.getMissionSol();
 			int MAX0 = 5;
 			int MAX1 = 10;
-			for (int i = 0; i < size; i++) {
+			for (int i = 1; i <= size; i++) {
 				double milliSol = personCache.getTaskSchedule().getAirlockTasksTime(i);
+				responseText.append(addWhiteSpacesRightName(i + "", MAX0));
 				if (milliSol > 0) {
-					responseText.append(addWhiteSpacesRightName(i + "", MAX0));
 					String m = Math.round(milliSol * 10.0) / 10.0 + "";
 					responseText.append(addWhiteSpacesRightName(m, MAX1));
 					responseText.append(System.lineSeparator());
@@ -394,7 +393,7 @@ public class PersonRobotChatUtils extends ChatUtils {
 
 			if (personCache != null) {
 				NaturalAttributeManager n_manager = personCache.getNaturalAttributeManager();
-				Hashtable<NaturalAttributeType, Integer> n_attributes = n_manager.getAttributeTable();
+				Map<NaturalAttributeType, Integer> n_attributes = n_manager.getAttributeMap();
 				List<String> attributeList = n_manager.getAttributeList();
 				int max = 20;
 //				String space = "";		
@@ -417,7 +416,7 @@ public class PersonRobotChatUtils extends ChatUtils {
 
 			else if (robotCache != null) {
 				RoboticAttributeManager r_manager = robotCache.getRoboticAttributeManager();
-				Hashtable<RoboticAttributeType, Integer> r_attributes = r_manager.getAttributeTable();
+				Map<RoboticAttributeType, Integer> r_attributes = r_manager.getAttributeMap();
 				List<String> attributeList = r_manager.getAttributeList();
 				int max = 20;
 //				String space = "";		
@@ -742,7 +741,7 @@ public class PersonRobotChatUtils extends ChatUtils {
 				responseText.append("I was assembled in ");
 				responseText.append(robotCache.getBirthDate());
 				responseText.append(" and I'm ");
-				responseText.append(robotCache.updateAge());
+				responseText.append(robotCache.getAge());
 			}
 
 		}
