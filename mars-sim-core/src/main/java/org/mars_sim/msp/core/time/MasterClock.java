@@ -462,7 +462,8 @@ public class MasterClock implements Serializable {
 						calculateSleepTime();
 					}
 					else {
-						logger.info("AddTime not accepted: lastPulse " + tLast);
+						// If on pause or acceptablePulse is false
+//						logger.info("AddTime not accepted: lastPulse " + tLast);
 						sleepTime = maxMilliSecPerPulse;
 					}
 					
@@ -480,9 +481,6 @@ public class MasterClock implements Serializable {
 							} catch (InterruptedException e) {
 								Thread.currentThread().interrupt();
 							}
-						}
-						else {
-							logger.warning("Sleep skipped: too short");
 						}
 					}
 
