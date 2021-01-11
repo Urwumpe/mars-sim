@@ -24,6 +24,10 @@
 		<!-- mapstruct.version>1.1.0.Final</mapstruct.version -->
 		<lwjgl.version>3.2.3</lwjgl.version>
 		<kotlin.version>1.4.10</kotlin.version>
+  <sonar.organization>bevans2000mars</sonar.organization>
+  <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+  <sonar.java.source>11</sonar.java.source>
+
 	</properties>
 
 	<!-- ************************************************************************************************* -->
@@ -36,13 +40,6 @@
 				<role>manager</role>
 			</roles>
 			<timezone>-8</timezone>
-		</developer>
-		<developer>
-			<name>Lars Næsbye Christensen</name>
-			<roles>
-				<role>developer</role>
-			</roles>
-			<timezone>+1</timezone>
 		</developer>
 		<developer>
 			<name>Manny Kung</name>
@@ -65,6 +62,13 @@
 			</roles>
 			<timezone>+2</timezone>
 		</developer>
+		<developer>
+			<name>Barry Evans</name>
+			<roles>
+				<role>developer</role>
+			</roles>
+			<timezone>0</timezone>
+		</developer>		
 	</developers>
 	
 	<!-- ************************************************************************************************* -->
@@ -250,7 +254,18 @@
 						</dependency>
 					</dependencies>
 				</plugin>
-
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+			        <artifactId>maven-war-plugin</artifactId>
+			        <version>3.3.1</version>
+			        <configuration>
+						<archive>
+							<manifest>
+								<addClasspath>true</addClasspath>
+							</manifest>
+						</archive>
+			        </configuration>
+				</plugin>     
 			</plugins>
 		</pluginManagement>
 	</build>
@@ -271,6 +286,11 @@
 					</outputDirectory>
 				</configuration>
 			</plugin>
+			<plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>3.7.0.1746</version>
+            </plugin>
 		</plugins>
 	</reporting>
 	<!-- ************************************************************************************************* -->

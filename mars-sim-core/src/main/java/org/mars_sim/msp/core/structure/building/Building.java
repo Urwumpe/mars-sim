@@ -8,11 +8,11 @@
 package org.mars_sim.msp.core.structure.building;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -20,7 +20,6 @@ import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.LocalBoundedObject;
 import org.mars_sim.msp.core.LogConsolidated;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitManager;
@@ -74,22 +73,23 @@ import org.mars_sim.msp.core.structure.building.function.cooking.Cooking;
 import org.mars_sim.msp.core.structure.building.function.cooking.Dining;
 import org.mars_sim.msp.core.structure.building.function.cooking.PreparingDessert;
 import org.mars_sim.msp.core.structure.building.function.farming.Farming;
+import org.mars_sim.msp.core.time.ClockPulse;
+import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * The Building class is a settlement's building.
  */
 public class Building extends Structure implements Malfunctionable, Indoor, // Comparable<Building>,
-		LocalBoundedObject, InsidePathLocation, Serializable {
+		LocalBoundedObject, InsidePathLocation, Temporal, Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 	// default logger.
 	private static final Logger logger = Logger.getLogger(Building.class.getName());
+	private static String loggerName = logger.getName();
+	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
 
-	private static final String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-			logger.getName().length());
-	
 	public static final String TYPE = SystemType.BUILDING.getName();
 	
 	public static final String GREENHOUSE = "greenhouse";
@@ -179,16 +179,12 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	// Data members
 	/** Unique identifier for this building. */
 	private int identifier;
-	/** The cache for msols. */
-	private int msolCache;
 	/** Unique template id assigned for the settlement template of this building belong. */
 	protected int templateID;
 	/** The inhabitable ID for this building. */
 	protected int inhabitableID = -1;
 	/** The base level for this building. -1 for in-ground, 0 for above-ground. */
 	protected int baseLevel;
-	/** The cache for sol. */
-	private int solCache = 0;
 	
 	/** Unique identifier for the settlement of this building. */
 	protected Integer settlementID;
@@ -254,8 +250,6 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 
 	protected PowerMode powerModeCache;
 	protected HeatMode heatModeCache;
-
-	private static UnitManager unitManager = Simulation.instance().getUnitManager();
 	
 	/**
 	 * Must be synchronised to prevent duplicate ids being assigned via different
@@ -346,6 +340,7 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		this.facing = facing;
 
 		buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
+		
 		malfunctionMeteoriteImpact = MalfunctionFactory
 				.getMeteoriteImpactMalfunction(MalfunctionFactory.METEORITE_IMPACT_DAMAGE);
 
@@ -719,7 +714,7 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	 * @return FunctionType
 	 */
 	public Function getEmptyActivitySpotFunction() {
-		List<Function> goodFunctions = new ArrayList<Function>();
+		List<Function> goodFunctions = new CopyOnWriteArrayList<Function>();
 		// Get the building's functions
 		if (functions == null)
 			functions = determineFunctions();
@@ -744,12 +739,14 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	 * @throws Exception if error in functions.
 	 */
 	private List<Function> determineFunctions() {
-		List<Function> buildingFunctions = new ArrayList<Function>();
+		List<Function> buildingFunctions = new CopyOnWriteArrayList<Function>();
 		// Set<Function> buildingFunctions = new HashSet<Function>();
 		if (buildingType == null) {
 			logger.info("Building : " + this);
 //			logger.info("Type : " + buildingType);
 		}
+		if (buildingConfig == null)
+			buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
 		// Set administration function.
 		if (buildingConfig.hasAdministration(buildingType))
 			buildingFunctions.add(new Administration(this));
@@ -1107,14 +1104,15 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	public double getFullPowerRequired() {
 		double result = basePowerRequirement;
 
+		if (functions == null)
+			functions = determineFunctions();
+
 		// Determine power required for each function.
-		Iterator<Function> i = functions.iterator();
-		while (i.hasNext())
-			result += i.next().getFullPowerRequired();
-
+		for (Function function : functions) {
+			double power = function.getFullPowerRequired();
+			result += power; 
+		}
 		result += powerNeededForEVAheater;
-		// result = result + getFullHeatRequired();
-
 		return result;
 	}
 
@@ -1126,10 +1124,12 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	public double getPoweredDownPowerRequired() {
 		double result = basePowerDownPowerRequirement;
 
+		if (functions == null)
+			functions = determineFunctions();
 		// Determine power required for each function.
-		Iterator<Function> i = functions.iterator();
-		while (i.hasNext())
-			result += i.next().getPoweredDownPowerRequired();
+		for (Function function : functions) {
+			result += function.getPoweredDownPowerRequired();	
+		}
 
 		return result;
 	}
@@ -1214,10 +1214,7 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	 * Sets the building's heat mode.
 	 */
 	public void setHeatMode(HeatMode heatMode) {
-		if (heatModeCache != heatMode) {
-			// if heatModeCache is different from the its last value
-			heatModeCache = heatMode;
-		}
+		heatModeCache = heatMode;
 	}
 
 	/**
@@ -1411,9 +1408,9 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	 * @param {@link BuildingConfig}
 	 * @param {{@link UnitManager}
 	 */
-	public static void initializeInstances(BuildingConfig bc, UnitManager u) {
+	public static void initializeInstances(BuildingConfig bc) {
 		buildingConfig = bc;
-		unitManager = u;
+
 		malfunctionMeteoriteImpact = MalfunctionFactory
 				.getMeteoriteImpactMalfunction(MalfunctionFactory.METEORITE_IMPACT_DAMAGE);
 	}
@@ -1423,10 +1420,11 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	 * 
 	 * @param time amount of time passing (in millisols)
 	 */
-	public void timePassing(double time) {
-		// Check for valid argument.
-//		if (time < 0D)
-//			throw new IllegalArgumentException("Time must be > 0D");
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
+		if (!isValid(pulse)) {
+			return false;
+		}
 
 		// Get the building's functions
 		if (functions == null)
@@ -1434,29 +1432,22 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		
 		// Send time to each building function.
 		for (Function f : functions)
-			f.timePassing(time);
-
-		int msol = marsClock.getMillisolInt();
-
-		if (msolCache != msol) {
-			msolCache = msol;
-
-			// If powered up, active time passing.
-			if (powerModeCache == PowerMode.FULL_POWER)
-				malfunctionManager.activeTimePassing(time);
-			
-			// Update malfunction manager.
-			malfunctionManager.timePassing(time); 
-			
-			int solElapsed = marsClock.getMissionSol();
-			if (solCache != solElapsed) {
-				solCache = solElapsed;
-				// Determine if a meteorite impact will occur within the new sol
-				checkForMeteoriteImpact();
-			}
+			f.timePassing(pulse);
+	
+		// If powered up, active time passing.
+		if (powerModeCache == PowerMode.FULL_POWER)
+			malfunctionManager.activeTimePassing(pulse.getElapsed());
+		
+		// Update malfunction manager.
+		malfunctionManager.timePassing(pulse); 
+		
+		if (pulse.isNewSol()) {
+			// Determine if a meteorite impact will occur within the new sol
+			checkForMeteoriteImpact(pulse);
 		}
 
 		inTransportMode = false;
+		return true;
 	}
 
 	public List<Function> getFunctions() {
@@ -1470,7 +1461,7 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	/*
 	 * Checks for possible meteorite impact for this building
 	 */
-	public void checkForMeteoriteImpact() {
+	private void checkForMeteoriteImpact(ClockPulse pulse) {
 		// check for the passing of each day
 
 		int moment_of_impact = 0;
@@ -1492,10 +1483,11 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		}
 
 		if (isImpactImminent) {
-			int now = marsClock.getMillisolInt();
+			
+			int now = pulse.getMarsTime().getMillisolInt();
 			// Note: at the fastest sim speed, up to ~5 millisols may be skipped.
 			// need to set up detection of the impactTimeInMillisol with a +/- 3 range.
-			int delta = (int) Math.sqrt(Math.sqrt(masterClock.getTimeRatio()));
+			int delta = (int) Math.sqrt(Math.sqrt(pulse.getMasterClock().getTimeRatio()));
 			if (now > moment_of_impact - 2 * delta && now < moment_of_impact + 2 * delta) {
 				LogConsolidated.log(logger, Level.INFO, 0, sourceName,
 						"[" + settlement + "] A meteorite impact over " + nickName + " is imminent.");
@@ -1710,8 +1702,6 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		lifeSupport = null;
 		roboticStation = null;
 		powerGen = null;
-		marsClock = null;
-		masterClock = null;
 		buildingConfig = null;
 		heatModeCache = null;
 		buildingType = null;

@@ -6,11 +6,11 @@
  */
 package org.mars_sim.msp.core.person.ai.task.utils;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.mars_sim.msp.core.person.ai.task.meta.AssistScientificStudyResearcherMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.CompileScientificStudyResultsMeta;
@@ -18,6 +18,7 @@ import org.mars_sim.msp.core.person.ai.task.meta.ConnectWithEarthMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.ConsolidateContainersMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.ConstructBuildingMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.CookMealMeta;
+import org.mars_sim.msp.core.person.ai.task.meta.DayDreamMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.DigLocalIceMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.DigLocalRegolithMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.EatDrinkMeta;
@@ -111,7 +112,7 @@ public class MetaTaskUtil {
 
 		if (allMetaTasks == null) {
 			// 55 tasks in total as of 2016-10-04
-			allMetaTasks = new ArrayList<MetaTask>();
+			allMetaTasks = new CopyOnWriteArrayList<MetaTask>();
 
 			// should initialize any-hour tasks first before other tasks
 			// Note: currently, the 3 lists below have tasks that are mutually exclusive
@@ -141,14 +142,15 @@ public class MetaTaskUtil {
 
 		if (anyHourMetaTasks == null) {
 
-			anyHourMetaTasks = new ArrayList<MetaTask>();
+			anyHourMetaTasks = new CopyOnWriteArrayList<MetaTask>();
 
-			List<MetaTask> tasks = new ArrayList<MetaTask>();
+			List<MetaTask> tasks = new CopyOnWriteArrayList<MetaTask>();
 
 			// May use
 //			Class cls = Class.forName(clsName);
 //			MetaTask mt = cls.getDeclaredConstructor().newInstance()
 			
+			tasks.add(new DayDreamMeta());
 			tasks.add(new EatDrinkMeta());
 			tasks.add(new HaveConversationMeta());
 			tasks.add(new ListenToMusicMeta());
@@ -178,7 +180,7 @@ public class MetaTaskUtil {
 
 		if (dutyHourTasks == null) {
 
-			dutyHourTasks = new ArrayList<MetaTask>();
+			dutyHourTasks = new CopyOnWriteArrayList<MetaTask>();
 
 			dutyHourTasks.addAll(anyHourMetaTasks);
 			dutyHourTasks.addAll(workHourMetaTasks);
@@ -192,9 +194,9 @@ public class MetaTaskUtil {
 
 		if (workHourMetaTasks == null) {
 
-			workHourMetaTasks = new ArrayList<MetaTask>();
+			workHourMetaTasks = new CopyOnWriteArrayList<MetaTask>();
 
-			List<MetaTask> tasks = new ArrayList<MetaTask>();
+			List<MetaTask> tasks = new CopyOnWriteArrayList<MetaTask>();
 
 			// Use set to ensure non-duplicate tasks
 			// TODO: how to get around the need of comparing the new instance of the same class
@@ -257,7 +259,7 @@ public class MetaTaskUtil {
 
 		if (nonDutyHourTasks == null) {
 
-			nonDutyHourTasks = new ArrayList<MetaTask>();
+			nonDutyHourTasks = new CopyOnWriteArrayList<MetaTask>();
 
 			nonDutyHourTasks.addAll(anyHourMetaTasks);
 			nonDutyHourTasks.addAll(nonWorkHourMetaTasks);
@@ -271,9 +273,9 @@ public class MetaTaskUtil {
 
 		if (nonWorkHourMetaTasks == null) {
 
-			nonWorkHourMetaTasks = new ArrayList<MetaTask>();
+			nonWorkHourMetaTasks = new CopyOnWriteArrayList<MetaTask>();
 
-			List<MetaTask> tasks = new ArrayList<MetaTask>();
+			List<MetaTask> tasks = new CopyOnWriteArrayList<MetaTask>();
 
 			tasks.add(new ConnectWithEarthMeta());
 			// tasks.add(new HaveConversationMeta());
@@ -297,7 +299,7 @@ public class MetaTaskUtil {
 
 	private static void initializeRobotMetaTasks() {
 
-		robotMetaTasks = new ArrayList<MetaTask>();
+		robotMetaTasks = new CopyOnWriteArrayList<MetaTask>();
 
 		// Populate robotMetaTasks list with all robotMeta tasks.
 		robotMetaTasks.add(new CookMealMeta());
@@ -340,7 +342,7 @@ public class MetaTaskUtil {
 		// Note : 58 meta tasks so far
 
 		// Return copy of meta task list.
-		// return new ArrayList<MetaTask>(metaTasks);
+		// return new CopyOnWriteArrayList<MetaTask>(metaTasks);
 		return allMetaTasks;
 	}
 
@@ -366,7 +368,7 @@ public class MetaTaskUtil {
 		}
 
 		// Return copy of work hour meta task list.
-//		return new ArrayList<MetaTask>(workHourMetaTasks);
+//		return new CopyOnWriteArrayList<MetaTask>(workHourMetaTasks);
 		return workHourMetaTasks;
 	}
 
@@ -383,7 +385,7 @@ public class MetaTaskUtil {
 		}
 
 		// Return copy of non work hour meta task list.
-//		return new ArrayList<MetaTask>(nonWorkHourMetaTasks);
+//		return new CopyOnWriteArrayList<MetaTask>(nonWorkHourMetaTasks);
 		return nonWorkHourMetaTasks;
 	}
 
@@ -400,7 +402,7 @@ public class MetaTaskUtil {
 		}
 
 		// Return copy of all hour meta task list.
-		// return new ArrayList<MetaTask>(anyHourTasks);
+		// return new CopyOnWriteArrayList<MetaTask>(anyHourTasks);
 		return anyHourMetaTasks;
 	}
 
@@ -456,7 +458,7 @@ public class MetaTaskUtil {
 		}
 
 		// Return copy of meta task list.
-//		return new ArrayList<MetaTask>(robotMetaTasks);
+//		return new CopyOnWriteArrayList<MetaTask>(robotMetaTasks);
 		return robotMetaTasks;
 	}
 

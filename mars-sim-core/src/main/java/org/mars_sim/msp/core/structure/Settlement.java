@@ -9,17 +9,16 @@ package org.mars_sim.msp.core.structure;
 
 import java.awt.geom.Point2D;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -34,6 +33,7 @@ import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.data.SolMetricDataLogger;
 import org.mars_sim.msp.core.equipment.Equipment;
 import org.mars_sim.msp.core.location.LocationStateType;
 import org.mars_sim.msp.core.mars.DustStorm;
@@ -65,22 +65,17 @@ import org.mars_sim.msp.core.person.ai.mission.RoverMission;
 import org.mars_sim.msp.core.person.ai.mission.Trade;
 import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
-import org.mars_sim.msp.core.person.ai.mission.meta.BuildingConstructionMissionMeta;
-import org.mars_sim.msp.core.person.ai.mission.meta.CollectIceMeta;
-import org.mars_sim.msp.core.person.ai.mission.meta.CollectRegolithMeta;
 import org.mars_sim.msp.core.person.ai.task.EatDrink;
 import org.mars_sim.msp.core.person.ai.task.HaveConversation;
 import org.mars_sim.msp.core.person.ai.task.Maintenance;
 import org.mars_sim.msp.core.person.ai.task.Read;
 import org.mars_sim.msp.core.person.ai.task.Relax;
 import org.mars_sim.msp.core.person.ai.task.Repair;
-import org.mars_sim.msp.core.person.ai.task.meta.ConstructBuildingMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.MaintenanceEVAMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.MaintenanceMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.RepairEVAMalfunctionMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.RepairMalfunctionMeta;
 import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule;
 import org.mars_sim.msp.core.person.health.RadiationExposure;
 import org.mars_sim.msp.core.reportingAuthority.CNSAMissionControl;
 import org.mars_sim.msp.core.reportingAuthority.CSAMissionControl;
@@ -103,13 +98,16 @@ import org.mars_sim.msp.core.structure.building.connection.BuildingConnector;
 import org.mars_sim.msp.core.structure.building.connection.BuildingConnectorManager;
 import org.mars_sim.msp.core.structure.building.function.EVA;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
+import org.mars_sim.msp.core.structure.building.function.LivingAccommodations;
 import org.mars_sim.msp.core.structure.building.function.PowerMode;
 import org.mars_sim.msp.core.structure.building.function.Storage;
 import org.mars_sim.msp.core.structure.building.function.farming.Crop;
 import org.mars_sim.msp.core.structure.construction.ConstructionManager;
 import org.mars_sim.msp.core.structure.goods.GoodsManager;
 import org.mars_sim.msp.core.structure.goods.GoodsUtil;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 import org.mars_sim.msp.core.vehicle.Rover;
@@ -120,7 +118,7 @@ import org.mars_sim.msp.core.vehicle.VehicleType;
  * The Settlement class represents a settlement unit on virtual Mars. It
  * contains information related to the state of the settlement.
  */
-public class Settlement extends Structure implements Serializable, LifeSupportInterface, Objective {
+public class Settlement extends Structure implements Serializable, Temporal, LifeSupportInterface, Objective {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -227,9 +225,9 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	}
 	
 	/** The settlement's resource statistics. */
-	private transient Map<Integer, Map<Integer, List<Double>>> resourceStat = new HashMap<>();
+	private transient Map<Integer, Map<Integer, List<Double>>> resourceStat = new ConcurrentHashMap<>();
 	/** The settlement's map of adjacent buildings. */
-	private transient Map<Building, List<Building>> adjacentBuildingMap = new HashMap<>();
+	private transient Map<Building, List<Building>> adjacentBuildingMap = new ConcurrentHashMap<>();
 	/** The settlement's list of citizens. */
 	private Collection<Person> citizens = new ConcurrentLinkedQueue<Person>();
 	/** The settlement's list of owned robots. */
@@ -396,11 +394,11 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	/** The settlement's achievement in scientific fields. */
 	private Map<ScienceType, Double> scientificAchievement;
 	/** The settlement's water consumption in kitchen when preparing/cleaning meal and dessert. */
-	private Map<Integer, Map<Integer, Double>> waterConsumption;
+	private SolMetricDataLogger<WaterUseType> waterConsumption;
 	/** The settlement's daily output (resources produced). */
-	private Map<Integer, Map<Integer, Double>> dailyResourceOutput;
+	private SolMetricDataLogger<Integer> dailyResourceOutput;
 	/** The settlement's daily labor hours output. */
-	private Map<Integer, Map<Integer, Double>> dailyLaborTime;
+	private SolMetricDataLogger<Integer> dailyLaborTime;
 
 	private Map<Integer, Boolean> allowTradeMissionSettlements;
 	
@@ -418,11 +416,6 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	private static MaintenanceEVAMeta maintenanceEVAMeta;
 	private static RepairMalfunctionMeta repairMalfunctionMeta;
 	private static RepairEVAMalfunctionMeta repairEVAMalfunctionMeta;
-
-	private static ConstructBuildingMeta constructBuildingMeta;
-	private static BuildingConstructionMissionMeta buildingConstructionMissionMeta;
-	private static CollectRegolithMeta collectRegolithMeta;
-	private static CollectIceMeta collectIceMeta;
 
 	private static SettlementConfig settlementConfig = SimulationConfig.instance().getSettlementConfiguration();
 	private static PersonConfig personConfig = SimulationConfig.instance().getPersonConfig();
@@ -589,18 +582,13 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 		maintenanceEVAMeta = new MaintenanceEVAMeta();
 		repairMalfunctionMeta = new RepairMalfunctionMeta();
 		repairEVAMalfunctionMeta = new RepairEVAMalfunctionMeta();
-		constructBuildingMeta = new ConstructBuildingMeta();
-
-		buildingConstructionMissionMeta = new BuildingConstructionMissionMeta();
-		collectRegolithMeta = new CollectRegolithMeta();
-		collectIceMeta = new CollectIceMeta();
 
 		int size = missionsDisable.length;
 		for (int i=0; i<size; i++) {
 			missionsDisable[i] = false;
 		}
 		
-		allowTradeMissionSettlements = new HashMap<Integer, Boolean>(); 
+		allowTradeMissionSettlements = new ConcurrentHashMap<Integer, Boolean>(); 
 		
 	}
 
@@ -677,7 +665,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 		thermalSystem = new ThermalSystem(this);
 //		logger.config("Done ThermalSystem()");
 		// Initialize scientific achievement.
-		scientificAchievement = new HashMap<ScienceType, Double>(0);
+		scientificAchievement = new ConcurrentHashMap<ScienceType, Double>(0);
 		// Add chain of command
 		chainOfCommand = new ChainOfCommand(this);
 //		logger.config("Done ChainOfCommand()");
@@ -697,15 +685,15 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 //				+ " (based upon the '" + template + "' Template).", null);
 
 		// initialize the missionScores list
-		missionScores = new ArrayList<>();
+		missionScores = new CopyOnWriteArrayList<>();
 		missionScores.add(200D);
 
 		// Create the water consumption map
-		waterConsumption = new ConcurrentHashMap<>();
+		waterConsumption = new SolMetricDataLogger<>(MAX_NUM_SOLS);
 		// Create the daily output map
-		dailyResourceOutput = new ConcurrentHashMap<>();
+		dailyResourceOutput = new SolMetricDataLogger<>(MAX_NUM_SOLS);
 		// Create the daily labor hours map
-		dailyLaborTime = new ConcurrentHashMap<>();
+		dailyLaborTime = new SolMetricDataLogger<>(MAX_NUM_SOLS);
 //		logger.config("Done initialize()");
 	}
 
@@ -775,12 +763,12 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	 * 
 	 * @return a map
 	 */
-	public Map<Building, List<Building>> createBuildingConnectionMap() {
+	public Map<Building, List<Building>> createAdjacentBuildingMap() {
 //		adjacentBuildingMap.clear();
 		if (adjacentBuildingMap == null)
-			adjacentBuildingMap = new HashMap<>();
+			adjacentBuildingMap = new ConcurrentHashMap<>();
 		for (Building b : buildingManager.getBuildings()) {
-			List<Building> connectors = createAdjacentBuildingConnectors(b);
+			List<Building> connectors = createAdjacentBuildings(b);
 			// if (b == null)
 			// System.out.println("b = null");
 			adjacentBuildingMap.put(b, connectors);
@@ -797,19 +785,19 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	 */
 	public List<Building> getBuildingConnectors(Building building) {
 		if (!adjacentBuildingMap.containsKey(building))
-			adjacentBuildingMap = createBuildingConnectionMap();
+			adjacentBuildingMap = createAdjacentBuildingMap();
 
 		return adjacentBuildingMap.get(building);
 	}
 
 	/**
-	 * Creates a list of building connectors attached to this building
+	 * Creates a list of adjacent buildings attached to this building
 	 * 
 	 * @param building
-	 * @return a list of building connectors
+	 * @return a list of adjacent buildings
 	 */
-	public List<Building> createAdjacentBuildingConnectors(Building building) {
-		List<Building> buildings = new ArrayList<>();
+	public List<Building> createAdjacentBuildings(Building building) {
+		List<Building> buildings = new CopyOnWriteArrayList<>();
 		Set<BuildingConnector> connectors = getConnectionsToBuilding(building);
 		for (BuildingConnector c : connectors) {
 			Building b1 = c.getBuilding1();
@@ -1311,6 +1299,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 		return totalTArea / totalArea;
 	}
 
+	/**
 	public ShiftType getCurrentSettlementShift() {
 
 		int millisols = marsClock.getMillisolInt();
@@ -1344,7 +1333,8 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 		return null;
 
 	}
-
+**/
+	
 	/**
 	 * Reloads instances after loading from a saved sim
 	 * 
@@ -1363,7 +1353,6 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 		double maintEVAScore = maintenanceEVAMeta.getSettlementProbability(this);
 		double repairScore = repairMalfunctionMeta.getSettlementProbability(this);
 		double repairEVAScore = repairEVAMalfunctionMeta.getSettlementProbability(this);
-//		double buildingScore = constructBuildingMeta.getProbability(this);
 
 		LogConsolidated.log(logger, Level.INFO, 0, sourceName,
 				"[" + name + "] MaintenanceMeta Task score : " + Math.round(maintScore * 10.0) / 10.0 + ".");
@@ -1378,32 +1367,22 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 
 	}
 
-//	/**
-//	 * Prints the raw scores of certain tasks
-//	 */
-//	public void printMissionProbability() {
-//		double bConstScore = buildingConstructionMissionMeta.getSettlementProbability(this);
-//		double regolithScore = collectRegolithMeta.getSettlementProbability(this);
-//		double iceScore = collectIceMeta.getSettlementProbability(this);
-//
-//		LogConsolidated.log(Level.INFO, 0, sourceName, "[" + name + "] BuildingConstructionMissionMeta Task score : "
-//				+ Math.round(bConstScore * 10.0) / 10.0 + ".");
-//		LogConsolidated.log(Level.INFO, 0, sourceName,
-//				"[" + name + "] CollectRegolithMeta Task score : " + Math.round(regolithScore * 10.0) / 10.0 + ".");
-//		LogConsolidated.log(Level.INFO, 0, sourceName,
-//				"[" + name + "] CollectIceMeta Task score : " + Math.round(iceScore * 10.0) / 10.0 + ".");
-//	}
-
 	/**
 	 * Perform time-related processes
 	 *
 	 * @param time the amount of time passing (in millisols)
 	 * @throws Exception error during time passing.
 	 */
-	public void timePassing(double time) {
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
+		if (!isValid(pulse)) {
+			return false;
+		}
+		
 		// If settlement is overcrowded, increase inhabitant's stress.
-		// TODO: should the number of robots be accounted for here?
+		// TODbooleanO: should the number of robots be accounted for here?
 
+		double time = pulse.getElapsed();
 		int overCrowding = getIndoorPeopleCount() - getPopulationCapacity();
 		if (overCrowding > 0) {
 			double stressModifier = .1D * overCrowding * time;
@@ -1413,35 +1392,54 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 			}
 		}
 
+		doCropsNeedTending(pulse.getMarsTime());
+		
 		// TODO: what to take into consideration the presence of robots ?
 		// If no current population at settlement for one sol, power down the
 		// building and turn the heat off ?
-
+		
 		if (powerGrid.getPowerMode() != PowerMode.POWER_UP)
 			powerGrid.setPowerMode(PowerMode.POWER_UP);
 		// TODO: check if POWER_UP is necessary
 		// Question: is POWER_UP a prerequisite of FULL_POWER ?
 
-		powerGrid.timePassing(time);
+		powerGrid.timePassing(pulse);
 
-		thermalSystem.timePassing(time);
+		thermalSystem.timePassing(pulse);
 
-		buildingManager.timePassing(time);
+		buildingManager.timePassing(pulse);
 
-		performEndOfDayTasks();
-
+		if (pulse.isNewSol()) {
+			performEndOfDayTasks(pulse.getMarsTime());
+		}
+		
 		// Sample a data point every SAMPLE_FREQ (in millisols)
-		int mInt = marsClock.getMillisolInt();
+		int mInt = pulse.getMarsTime().getMillisolInt();
 
 		// Avoid checking at < 10 or 1000 millisols
 		// due to high cpu util during the change of day
 		if (mInt >= 10 && mInt != 1000) {
-
+		
+			// Initialize tasks at the start of the sim only
+			if (justLoaded) {
+				justLoaded = false;
+				
+				for (Person p : citizens) {
+					// Register each settler a quarter/bed			
+					Building b = getBestAvailableQuarters(p, true);
+					if (b != null)
+						b.getLivingAccommodations().registerSleeper(p, false);
+				}
+				
+				// Initialize the goods manager
+				goodsManager.timePassing(pulse);
+			}
+			
 			// Reduce the recurrent passing score daily to its 90% value
 			minimumPassingScore = minimumPassingScore * .9;
 			
 			// Updates the goods manager 
-			updateGoodsManager(time);
+			updateGoodsManager(pulse);
 
 			int remainder = mInt % CHECK_GOODS;
 			if (remainder == 1) {
@@ -1498,7 +1496,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 
 		// updateRegistry();
 
-		compositionOfAir.timePassing(time);
+		compositionOfAir.timePassing(pulse);
 
 		currentPressure = computeAveragePressure();
 
@@ -1511,14 +1509,109 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 
 			if (numConnectorsCache != numConnectors) {
 				numConnectorsCache = numConnectors;
-				createBuildingConnectionMap();
+				createAdjacentBuildingMap();
 			}
 		} else {
-			createBuildingConnectionMap();
+			createAdjacentBuildingMap();
 		}
-
+	
+		/**
+		 * Construction Sites are passive
+		for (ConstructionSite s : constructionManager.getConstructionSites()) {
+			s.timePassing(time);
+		}
+		*/
+		
+		for (Equipment e : ownedEquipment) {
+			e.timePassing(pulse);
+		}
+		
+		for (Vehicle v : ownedVehicles) {
+			v.timePassing(pulse);
+		}
+		
+		for (Person p : citizens) {
+			p.timePassing(pulse);
+		}
+		/**
+		 * Robots are already updated as Equipment ? Seems not so should Robots be based diretly on a Unit
+		 */
+		for (Robot r : ownedRobots) {
+			r.timePassing(pulse);
+		}
+		return true;
 	}
 
+	/**
+	 * Gets the best available living accommodations building that the person can
+	 * use. Returns null if no living accommodations building is currently
+	 * available.
+	 * 
+	 * @param person   the person
+	 * @param unmarked does the person wants an unmarked(aka undesignated) bed or
+	 *                 not.
+	 * @return a building with available bed(s)
+	 */
+	public static Building getBestAvailableQuarters(Person person, boolean unmarked) {
+
+		Building result = null;
+
+		if (person.isInSettlement()) {
+			// BuildingManager manager = person.getSettlement().getBuildingManager();
+			List<Building> b = person.getSettlement().getBuildingManager()
+					.getBuildings(FunctionType.LIVING_ACCOMMODATIONS);
+			b = BuildingManager.getNonMalfunctioningBuildings(b);
+			b = getQuartersWithEmptyBeds(b, unmarked);
+			if (b.size() == 1) {
+				return b.get(0);
+			}
+			if (b.size() > 0) {
+				b = BuildingManager.getLeastCrowdedBuildings(b);
+			}
+			
+			if (b.size() > 1) {
+				Map<Building, Double> probs = BuildingManager.getBestRelationshipBuildings(person,
+						b);
+				result = RandomUtil.getWeightedRandomObject(probs);
+			}
+			else if (b.size() == 1) {
+				return b.get(0);
+			}
+		}
+
+		return result;
+	}
+
+	/**
+	 * Gets living accommodations with empty beds from a list of buildings with the
+	 * living accommodations function.
+	 * 
+	 * @param buildingList list of buildings with the living accommodations
+	 *                     function.
+	 * @param unmarked     does the person wants an unmarked(aka undesignated) bed
+	 *                     or not.
+	 * @return list of buildings with empty beds.
+	 */
+	private static List<Building> getQuartersWithEmptyBeds(List<Building> buildingList, boolean unmarked) {
+		List<Building> result = new CopyOnWriteArrayList<Building>();
+
+		for (Building building : buildingList) {
+			LivingAccommodations quarters = building.getLivingAccommodations();
+//			boolean notFull = quarters.getNumEmptyActivitySpots() > 0;//quarters.getRegisteredSleepers() < quarters.getBedCap();
+			// Check if an unmarked bed is wanted
+			if (unmarked) {
+				if (quarters.hasAnUnmarkedBed()) {// && notFull) {
+					result.add(building);
+				}
+			}
+//			else if (notFull) {
+//				result.add(building);
+//			}
+		}
+
+		return result;
+	}
+	
 	public void sampleAllResources() {
 
 		for (int i = 0; i < NUM_CRITICAL_RESOURCES; i++) {
@@ -1550,7 +1643,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 		}
 
 		if (resourceStat == null)
-			resourceStat = new HashMap<>();
+			resourceStat = new ConcurrentHashMap<>();
 		if (resourceStat.containsKey(solCache)) {
 			Map<Integer, List<Double>> todayMap = resourceStat.get(solCache);
 
@@ -1562,7 +1655,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 			}
 
 			else {
-				List<Double> list = new ArrayList<>();
+				List<Double> list = new CopyOnWriteArrayList<>();
 				double newAmount = getInventory().getAmountResourceStored(resource, false);
 				list.add(newAmount);
 				todayMap.put(resourceType, list);
@@ -1571,8 +1664,8 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 		}
 
 		else {
-			List<Double> list = new ArrayList<>();
-			Map<Integer, List<Double>> todayMap = new HashMap<>();
+			List<Double> list = new CopyOnWriteArrayList<>();
+			Map<Integer, List<Double>> todayMap = new ConcurrentHashMap<>();
 			double newAmount = getInventory().getAmountResourceStored(resource, false);
 			list.add(newAmount);
 			todayMap.put(resourceType, list);
@@ -1623,27 +1716,6 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 		return average;
 	}
 
-//	 public void updateRegistry() {
-//
-//		 List<SettlementRegistry> settlementList =  MultiplayerClient.getInstance().getSettlementRegistryList();
-//		 int clientID = Integer.parseInt( st.nextToken().trim() );
-//		 
-//		 String template = st.nextToken().trim(); int pop = Integer.parseInt(
-//		 st.nextToken().trim() ); int bots = Integer.parseInt(
-//		 st.nextToken().trim() ); double lat = Double.parseDouble(
-//		 st.nextToken().trim() ); double lo = Double.parseDouble(
-//		 st.nextToken().trim() );
-//		 
-//		 settlementList.forEach( s -> { 
-//			 String pn = s.getPlayerName(); 
-//			 String sn = s.getName(); 
-//		 
-//			 if (pn.equals(playerName) && sn.equals(name))
-//				 s.updateRegistry(playerName, clientID, name, template, pop, bots, lat, lo); 
-//		});
-//	 
-//	 }
-
 	/**
 	 * Provides the daily statistics on inhabitant's food energy intake
 	 */
@@ -1662,42 +1734,28 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	/**
 	 * Provides the daily reports for the settlement
 	 */
-	public void performEndOfDayTasks() {
-		// check for the passing of each day
-		int solElapsed = marsClock.getMissionSol();
-		if (solCache != solElapsed) {
+	private void performEndOfDayTasks(MarsClock marsNow) {
+		int solElapsed = marsNow.getMissionSol();
 
-			// Limit the size of the dailyWaterUsage to x key value pairs
-			if (waterConsumption.size() > MAX_NUM_SOLS)
-				waterConsumption.remove(solElapsed - MAX_NUM_SOLS);
+		// getFoodEnergyIntakeReport();
+		reassignWorkShift();
 
-			// Limit the size of the dailyWaterUsage to x key value pairs
-			if (dailyResourceOutput.size() > MAX_SOLS_DAILY_OUTPUT)
-				dailyResourceOutput.remove(solElapsed - MAX_SOLS_DAILY_OUTPUT);
+		tuneJobDeficit();
 
-//			printTaskProbability();
-//			printMissionProbability();
+		refreshResourceStat();
 
-			// getFoodEnergyIntakeReport();
-			reassignWorkShift();
-
-			tuneJobDeficit();
-
-			refreshResourceStat();
-
-			refreshSleepMap(solElapsed);
+		refreshSleepMap(solElapsed);
 
 //			getSupplyDemandSampleReport(solElapsed);
 
-			refreshSupplyDemandMap(solElapsed);
-
-			solCache = solElapsed;
-		}
+		refreshSupplyDemandMap(solElapsed);
+		
+		solCache = solElapsed;
 	}
 
 	public void refreshResourceStat() {
 		if (resourceStat == null)
-			resourceStat = new HashMap<>();
+			resourceStat = new ConcurrentHashMap<>();
 		// Remove the resourceStat map data from 12 days ago
 		if (resourceStat.size() > RESOURCE_STAT_SOLS)
 			resourceStat.remove(0);
@@ -2026,19 +2084,13 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	 *
 	 * @param time
 	 */
-	private void updateGoodsManager(double time) {
-
-		if (justLoaded) {
-			justLoaded = false;
-			goodsManager.timePassing(time);
-		}
-
-		goodsManagerUpdateTime += time;
+	private void updateGoodsManager(ClockPulse pulse) {
+		goodsManagerUpdateTime += pulse.getElapsed();
 
 		// Randomly update goods manager twice per Sol.
 		double timeThreshold = 250D + RandomUtil.getRandomDouble(250D);
 		if (!goodsManager.isInitialized() || (goodsManagerUpdateTime > timeThreshold)) {
-			goodsManager.timePassing(time);
+			goodsManager.timePassing(pulse);
 			goodsManagerUpdateTime = 0D;
 		}
 	}
@@ -2310,9 +2362,9 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	public Airlock getAirlock(Building currentBuilding, double xLocation, double yLocation) {
 		Airlock result = null;
 
-		List<Building> pressurizedBldgs = new ArrayList<>();
-		List<Building> depressurizedBldgs = new ArrayList<>();
-		List<Building> selectedPool = new ArrayList<>();
+		List<Building> pressurizedBldgs = new CopyOnWriteArrayList<>();
+		List<Building> depressurizedBldgs = new CopyOnWriteArrayList<>();
+		List<Building> selectedPool = new CopyOnWriteArrayList<>();
 		
 		Iterator<Building> i = buildingManager.getBuildings(FunctionType.EVA).iterator();
 		while (i.hasNext()) {
@@ -2666,7 +2718,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	 * @return a list of persons
 	 */
 	public List<Person> returnPersonList(String aName, boolean exactMatch) {
-		List<Person> personList = new ArrayList<>();
+		List<Person> personList = new CopyOnWriteArrayList<>();
 		aName = aName.trim();
 
 		// Checked if "," is presented in "last, first"
@@ -2707,7 +2759,8 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 			}
 		}
 
-		Set<Person> list = new HashSet<>(citizens);
+		Set<Person> list = ConcurrentHashMap.newKeySet();
+		list.addAll(citizens);
 
 		// Add those who are deceased
 		list.addAll(getDeceasedPeople());
@@ -2808,7 +2861,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 //		String first = elements[0];
 //		String[] trailing = Arrays.copyOfRange(elements,1,elements.length);
 		
-		List<Vehicle> vList = new ArrayList<>();
+		List<Vehicle> vList = new CopyOnWriteArrayList<>();
 		Iterator<Vehicle> i = getAllAssociatedVehicles().iterator();
 		while (i.hasNext()) {
 			Vehicle v = i.next();
@@ -2838,7 +2891,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	 *
 	 */
 	public List<Robot> returnRobotList(String aName, boolean exactMatch) {
-		List<Robot> robotList = new ArrayList<>();
+		List<Robot> robotList = new CopyOnWriteArrayList<>();
 		aName = aName.trim();
 		aName = aName.replace(" ", "");
 
@@ -3006,7 +3059,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 //				.filter(v -> v.isReservedForMission())
 //				.collect(Collectors.toList());
 
-		Collection<Vehicle> result = new ArrayList<Vehicle>();
+		Collection<Vehicle> result = new CopyOnWriteArrayList<Vehicle>();
 		Iterator<Mission> i = missionManager.getMissionsForSettlement(this).iterator();
 		while (i.hasNext()) {
 			Mission mission = i.next();
@@ -3070,7 +3123,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	}
 
 	public Collection<Vehicle> getLUVs(int mode) {
-		Collection<Vehicle> LUVs = new ArrayList<Vehicle>();
+		Collection<Vehicle> LUVs = new CopyOnWriteArrayList<Vehicle>();
 
 		if (mode == 0 || mode == 1) {
 			Collection<Vehicle> parked = getParkedVehicles();
@@ -3098,7 +3151,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 
 	public List<Vehicle> getCargoRovers(int mode) {
 
-		List<Vehicle> rovers = new ArrayList<Vehicle>();
+		List<Vehicle> rovers = new CopyOnWriteArrayList<Vehicle>();
 
 		if (mode == 0 || mode == 1) {
 			Collection<Vehicle> parked = getParkedVehicles();
@@ -3130,7 +3183,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	}
 
 	public List<Vehicle> getTransportRovers(int mode) {
-		List<Vehicle> rovers = new ArrayList<Vehicle>();
+		List<Vehicle> rovers = new CopyOnWriteArrayList<Vehicle>();
 
 		if (mode == 0 || mode == 1) {
 			Collection<Vehicle> parked = getParkedVehicles();
@@ -3162,7 +3215,7 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	}
 
 	public List<Vehicle> getExplorerRovers(int mode) {
-		List<Vehicle> rovers = new ArrayList<Vehicle>();
+		List<Vehicle> rovers = new CopyOnWriteArrayList<Vehicle>();
 
 		if (mode == 0 || mode == 1) {
 			Collection<Vehicle> parked = getParkedVehicles();
@@ -4075,31 +4128,31 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	 * @return number of crops.
 	 */
 	public int getCropsNeedingTending() {
-		int result = 0;
+		return cropsNeedingTendingCache;
+	}
+	
+	/**
+	 * Calculate if the crops need tending. Add a buffer of 5 millisol.
+	 * @param now Curretn time
+	 */
+	private void doCropsNeedTending(MarsClock now) {
 
-		int m = marsClock.getMillisolInt();
-		if (millisolCache + 5 >= m) {
-			result = cropsNeedingTendingCache;
-		}
-
-		else {
+		int m = now.getMillisolInt();
+		if (millisolCache + 5 < m) {
 			millisolCache = m;
+			cropsNeedingTendingCache = 0;
 			for (Building b : buildingManager.getBuildings(FunctionType.FARMING)) {
-//				Farming farm = b.getFarming();
 				for (Crop c : b.getFarming().getCrops()) {
 					if (c.requiresWork()) {
-						result++;
+						cropsNeedingTendingCache++;
 					}
 					// if the health condition is below 50%,
 					// need special care
 					if (c.getHealthCondition() < .5)
-						result++;
+						cropsNeedingTendingCache++;
 				}
 			}
-			cropsNeedingTendingCache = result;
 		}
-
-		return result;
 	}
 
 	public int getCropsNeedingTendingCache() {
@@ -4366,71 +4419,28 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	/**
 	 * Records the daily output.
 	 * 
-	 * @param id the resource id of the good
+	 * @param resource the resource id of the good
 	 * @param amount the amount or quantity produced
 	 * @param millisols the labor time
 	 */
-	public void addOutput(Integer id, double amount, double millisols) {
+	public void addOutput(Integer resource, double amount, double millisols) {
 
 		// Record the amount of resource produced
-		Map<Integer, Double> amountMap = null;
-
-		if (dailyResourceOutput.containsKey(solCache)) {
-			amountMap = dailyResourceOutput.get(solCache);
-			if (amountMap.containsKey(id)) {
-				double oldAmt = amountMap.get(id);
-				amountMap.put(id, amount + oldAmt);
-			} else {
-				amountMap.put(id, amount);
-			}
-		} else {
-			amountMap = new ConcurrentHashMap<>();
-			amountMap.put(id, amount);
-		}
-
-		dailyResourceOutput.put(solCache, amountMap);
-
-		// Record the labor hours
-		Map<Integer, Double> laborHrMap = null;
-
-		if (dailyLaborTime.containsKey(solCache)) {
-			laborHrMap = dailyLaborTime.get(solCache);
-			if (laborHrMap.containsKey(id)) {
-				double oldAmt = laborHrMap.get(id);
-				laborHrMap.put(id, millisols + oldAmt);
-			} else {
-				laborHrMap.put(id, millisols);
-			}
-		} else {
-			laborHrMap = new ConcurrentHashMap<>();
-			laborHrMap.put(id, millisols);
-		}
-
-		dailyLaborTime.put(solCache, amountMap);
-
-	}
-
-	/**
-	 * Gets the daily resource output in kg or quantity 
-	 * 
-	 * @param id  the resource id of the good
-	 * @return
-	 */
-	public double getDailyesourceOutput(Integer id) {
-		if (solCache - 1 > 0)
-			return dailyResourceOutput.get(solCache-1).get(id);
-		return 0;
+		dailyResourceOutput.increaseDataPoint(resource, amount);
+		dailyLaborTime.increaseDataPoint(resource, millisols);
 	}
 	
 	/**
 	 * Gets the daily labor time [millisols]
 	 * 
-	 * @param id  the resource id of the good
+	 * @param resource  the resource id of the good
 	 * @return
 	 */
-	public double getDailyLaborTime(Integer id) {
-		if (solCache - 1 > 0)
-			return dailyLaborTime.get(solCache-1).get(id);
+	public double getDailyLaborTime(Integer resource) {
+		Map<Integer, Double> yesterday = dailyLaborTime.getYesterdayData();
+		if (yesterday != null) {
+			return yesterday.get(resource);
+		}
 		return 0;
 	}
 	
@@ -4440,47 +4450,8 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	 * @param type
 	 * @param amount
 	 */
-	public void addWaterConsumption(int type, double amount) {
-		// type = 0 : preparing meal
-		// type = 1 : preparing dessert
-		// type = 2 : cleaning kitchen for meal
-		// type = 3 : cleaning kitchen for dessert
-		Map<Integer, Double> map = null;
-
-		if (waterConsumption.containsKey(solCache)) {
-			map = waterConsumption.get(solCache);
-			if (map.containsKey(type)) {
-				double oldAmt = map.get(type);
-				map.put(type, amount + oldAmt);
-			} else {
-				map.put(type, amount);
-			}
-		} else {
-			map = new ConcurrentHashMap<>();
-			map.put(type, amount);
-		}
-
-		waterConsumption.put(solCache, map);
-	}
-
-	/**
-	 * Gets the total amount consumed
-	 * 
-	 * @param type
-	 * @return
-	 */
-	public Map<Integer, Double> getTotalConsumptionBySol(int type) {
-		Map<Integer, Double> map = new ConcurrentHashMap<>();
-
-		for (Integer sol : waterConsumption.keySet()) {
-			for (Integer t : waterConsumption.get(sol).keySet()) {
-				if (t == type) {
-					map.put(sol, waterConsumption.get(sol).get(t));
-				}
-			}
-		}
-
-		return map;
+	public void addWaterConsumption(WaterUseType type, double amount) {
+		waterConsumption.increaseDataPoint(type, amount);
 	}
 
 	/**
@@ -4489,51 +4460,8 @@ public class Settlement extends Structure implements Serializable, LifeSupportIn
 	 * 
 	 * @return
 	 */
-	public double getDailyUsage(int type) {
-		Map<Integer, Double> map = getTotalConsumptionBySol(type);
-
-		boolean quit = false;
-		int today = solCache;
-		int sol = solCache;
-		double sum = 0;
-		double numSols = 0;
-		double cumulativeWeight = 0.75;
-		double weight = 1;
-
-		while (!quit) {
-			if (map.size() == 0) {
-				quit = true;
-				return 0;
-			}
-
-			else if (map.containsKey(sol)) {
-				if (today == sol) {
-					// If it's getting the today's average, one may
-					// project the full-day usage based on the usage up to this moment
-					weight = .25;
-					sum = sum + map.get(sol) * 1_000D / marsClock.getMillisol() * weight;
-				}
-
-				else {
-					sum = sum + map.get(sol) * weight;
-				}
-			}
-
-			else if (map.containsKey(sol - 1)) {
-				sum = sum + map.get(sol - 1) * weight;
-				sol--;
-			}
-
-			cumulativeWeight = cumulativeWeight + weight;
-			weight = (numSols + 1) / (cumulativeWeight + 1);
-			numSols++;
-			sol--;
-			// Get the last x sols only
-			if (numSols > MAX_NUM_SOLS)
-				quit = true;
-		}
-
-		return sum / cumulativeWeight;
+	public double getDailyWaterUsage(WaterUseType type) {
+		return waterConsumption.getDailyAverage(type);
 	}
 
 	public static void assignBestCandidate(Settlement settlement, Class<? extends Job> jobClass) {// String jobName) {

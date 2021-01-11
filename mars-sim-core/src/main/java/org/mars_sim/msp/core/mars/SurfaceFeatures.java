@@ -7,10 +7,10 @@
 package org.mars_sim.msp.core.mars;
 
 import java.io.Serializable;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Logger;
 
@@ -21,8 +21,10 @@ import org.mars_sim.msp.core.person.ai.mission.Mining;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.MasterClock;
+import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 
@@ -30,7 +32,7 @@ import org.mars_sim.msp.core.tool.RandomUtil;
  * SurfaceFeatures represents the surface terrain and landmarks of the virtual
  * Mars.
  */
-public class SurfaceFeatures implements Serializable {
+public class SurfaceFeatures implements Serializable, Temporal {
 
 	private static final long serialVersionUID = 1L;
 	
@@ -52,12 +54,10 @@ public class SurfaceFeatures implements Serializable {
 
 	private static final double HALF_PI = Math.PI / 2d;
 
-	private static double factor = MEAN_SOLAR_IRRADIANCE * OrbitInfo.SEMI_MAJOR_AXIS * OrbitInfo.SEMI_MAJOR_AXIS;
+	private static final double FACTOR = MEAN_SOLAR_IRRADIANCE * OrbitInfo.SEMI_MAJOR_AXIS * OrbitInfo.SEMI_MAJOR_AXIS;
 
-	private static double opticalDepthStartingValue = 0.2342;
+	private static final double OPTICAL_DEPTH_STARTING = 0.2342;
 
-	// Data members
-	private int solCache;
 	// the integer form of millisol
 	private int msolCache;
 	
@@ -113,22 +113,10 @@ public class SurfaceFeatures implements Serializable {
 		exploredLocations = new CopyOnWriteArrayList<>(); // will need to make sure explored locations are serialized
 //		sites = new ConcurrentHashMap<>();
 		areothermalMap = new AreothermalMap();
-
 		missionManager = sim.getMissionManager();
-
-//		try {
-//			landmarks = simulationConfig.getLandmarkConfiguration().getLandmarkList();
-//		} catch (Exception e) {
-//			throw new IllegalStateException("Landmarks could not be loaded: " + e.getMessage(), e);
-//		}
-
-
-		irradianceCache = new HashMap<>();
-
-		currentIrradiance = new HashMap<>();
-		
-		if (opticalDepthMap == null)
-			opticalDepthMap = new HashMap<>();
+		irradianceCache = new ConcurrentHashMap<>();
+		currentIrradiance = new ConcurrentHashMap<>();
+		opticalDepthMap = new ConcurrentHashMap<>();
 		
 //		double a = OrbitInfo.SEMI_MAJOR_AXIS;
 //		factor = MEAN_SOLAR_IRRADIANCE * a * a;
@@ -242,9 +230,9 @@ public class SurfaceFeatures implements Serializable {
 		// Equation: tau = 0.2342 + 0.2247 * yestersolAirPressureVariation;
 		// the starting value for opticalDepth is 0.2342. See Ref below
 		if (opticalDepthMap.containsKey(location))
-			tau = (opticalDepthMap.get(location) + opticalDepthStartingValue + newTau) / 1.9D;
+			tau = (opticalDepthMap.get(location) + OPTICAL_DEPTH_STARTING + newTau) / 1.9D;
 		else {
-			tau = opticalDepthStartingValue + newTau;
+			tau = OPTICAL_DEPTH_STARTING + newTau;
 		}
 
 		// Reference :
@@ -317,31 +305,45 @@ public class SurfaceFeatures implements Serializable {
 	 * @return solar irradiance (W/m2)
 	 */
 	public double getSolarIrradiance(Coordinates location) {
-
+		if (location == null)
+			return 0;
+		
 		int msol = currentTime.getMillisolInt();
+		
 		if (msolCache != msol) {
 			msolCache = msol;
-			irradianceCache = currentIrradiance;
-			// Clear the current cache value of solar irradiance of all settlements
-			currentIrradiance.clear();
+			
+			if (!currentIrradiance.isEmpty()) {
+				irradianceCache = currentIrradiance;
+				// Clear the current cache value of solar irradiance of all settlements
+				currentIrradiance.clear();
+			}
 //			logger.info("msolCache: " + msolCache + "   msol: " + msol);
-		}
-		
-		double G_h = 0;
-		
-		if (!currentIrradiance.containsKey(location)) {
+			
 			// If location is not in cache, calculate the solar irradiance
-			G_h = calculateSolarIrradiance(location);		
+			double G_h = calculateSolarIrradiance(location);		
 			// Save the value in the cache
 			currentIrradiance.put(location, G_h);
+			
+			return G_h;
 		}
 		
-		else {
-			G_h = currentIrradiance.get(location);
-//			logger.info("3. G_h: " + G_h + "   c: " + location);
+		if (currentIrradiance.containsKey(location)) {
+			Double d = currentIrradiance.get(location);
+			if (d != null)
+				return d.doubleValue();
+			else
+				return 0;
 		}
 		
-		return G_h;
+		else {//if (currentIrradiance.isEmpty()) {
+			// If location is not in cache, calculate the solar irradiance
+			double G_h = calculateSolarIrradiance(location);		
+			// Save the value in the cache
+			currentIrradiance.put(location, G_h);
+			
+			return G_h;
+		}
 	}
 
 	/**
@@ -418,7 +420,7 @@ public class SurfaceFeatures implements Serializable {
 			// Part 3: get the instantaneous radius and semi major axis
 			double r = orbitInfo.getDistanceToSun();
 
-			G_0 = cos_z * factor / r / r;
+			G_0 = cos_z * FACTOR / r / r;
 
 			// if (G_0 <= 0)
 			// G_0 = 0;
@@ -645,14 +647,8 @@ public class SurfaceFeatures implements Serializable {
 	 * @param time time in millisols
 	 * @throws Exception if error during time.
 	 */
-	public void timePassing(double time) {
-
-		// TODO: clear the total solar irradiance map and save data in DailyWeather.
-		// check for the passing of each day
-	    int newSol = currentTime.getMissionSol();
-		if (newSol != solCache) {
-			solCache = newSol;
-		}
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
 
 		// Update any reserved explored locations.
 		Iterator<ExploredLocation> i = exploredLocations.iterator();
@@ -678,6 +674,8 @@ public class SurfaceFeatures implements Serializable {
 				}
 			}
 		}
+		
+		return true;
 	}
 
 //	/**

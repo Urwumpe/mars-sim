@@ -7,14 +7,14 @@
 package org.mars_sim.msp.core.structure.goods;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -87,7 +87,9 @@ import org.mars_sim.msp.core.structure.construction.ConstructionStage;
 import org.mars_sim.msp.core.structure.construction.ConstructionStageInfo;
 import org.mars_sim.msp.core.structure.construction.ConstructionUtil;
 import org.mars_sim.msp.core.structure.construction.ConstructionValues;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.core.vehicle.VehicleConfig;
@@ -97,7 +99,7 @@ import org.mars_sim.msp.core.vehicle.VehicleType;
 /**
  * A manager for computing the values of goods at a settlement.
  */
-public class GoodsManager implements Serializable {
+public class GoodsManager implements Serializable, Temporal {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 12L;
@@ -299,11 +301,11 @@ public class GoodsManager implements Serializable {
 		}
 
 		// Create parts demand cache.
-		partsDemandCache = new HashMap<>(ItemResourceUtil.getItemIDs().size());
+		partsDemandCache = new ConcurrentHashMap<>(ItemResourceUtil.getItemIDs().size());
 
 		// Create vehicle caches.
-		vehicleBuyValueCache = new HashMap<String, Double>();
-		vehicleSellValueCache = new HashMap<String, Double>();
+		vehicleBuyValueCache = new ConcurrentHashMap<String, Double>();
+		vehicleSellValueCache = new ConcurrentHashMap<String, Double>();
 	}
 
 	/**
@@ -398,8 +400,11 @@ public class GoodsManager implements Serializable {
 	 * 
 	 * @param time the amount of time passing (millisols).
 	 */
-	public void timePassing(double time) {
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
 		updateGoodsValues();
+		
+		return true;
 	}
 	
 	/**
@@ -477,7 +482,7 @@ public class GoodsManager implements Serializable {
 	/**
 	 * Updates the values for all the goods at the settlement.
 	 */
-	public void updateGoodsValues() {
+	private void updateGoodsValues() {
 		// Clear parts demand cache.
 		partsDemandCache.clear();
 
@@ -1349,7 +1354,7 @@ public class GoodsManager implements Serializable {
 	 * @return list of resource processes.
 	 */
 	private List<ResourceProcess> getResourceProcesses() {
-		List<ResourceProcess> processes = new ArrayList<ResourceProcess>(0);
+		List<ResourceProcess> processes = new CopyOnWriteArrayList<ResourceProcess>();
 		Iterator<Building> i = settlement.getBuildingManager().getBuildings().iterator();
 		while (i.hasNext()) {
 			Building building = i.next();
@@ -1740,7 +1745,7 @@ public class GoodsManager implements Serializable {
 	private Map<Integer, Double> getAllPrerequisiteConstructionResources(ConstructionStageInfo stage) {
 
 		// Start with all resources required to build stage.
-		Map<Integer, Double> result = new HashMap<Integer, Double>(stage.getResources());
+		Map<Integer, Double> result = new ConcurrentHashMap<Integer, Double>(stage.getResources());
 
 		// Add all resources required to build first prestage, if any.
 		ConstructionStageInfo preStage1 = ConstructionUtil.getPrerequisiteStage(stage);
@@ -1825,7 +1830,7 @@ public class GoodsManager implements Serializable {
 	private Map<Integer, Integer> getAllPrerequisiteConstructionParts(ConstructionStageInfo stage) {
 
 		// Start with all parts required to build stage.
-		Map<Integer, Integer> result = new HashMap<Integer, Integer>(stage.getParts());
+		Map<Integer, Integer> result = new ConcurrentHashMap<Integer, Integer>(stage.getParts());
 
 		// Add parts from first prestage, if any.
 		ConstructionStageInfo preStage1 = ConstructionUtil.getPrerequisiteStage(stage);
@@ -2175,7 +2180,7 @@ public class GoodsManager implements Serializable {
 	 * @return map of parts and their demand.
 	 */
 	private void determineRepairPartsDemand() {
-		Map<Integer, Double> partsProbDemand = new HashMap<>(ItemResourceUtil.getItemIDs().size());
+		Map<Integer, Double> partsProbDemand = new ConcurrentHashMap<>(ItemResourceUtil.getItemIDs().size());
 
 		// Get all malfunctionables associated with settlement.
 		Iterator<Malfunctionable> i = MalfunctionFactory.getAssociatedMalfunctionables(settlement).iterator();
@@ -2232,7 +2237,7 @@ public class GoodsManager implements Serializable {
 	}
 
 	private Map<Integer, Number> getEstimatedOrbitRepairParts(Malfunctionable entity) {
-		Map<Integer, Number> result = new HashMap<>();
+		Map<Integer, Number> result = new ConcurrentHashMap<>();
 
 		MalfunctionManager manager = entity.getMalfunctionManager();
 
@@ -2253,7 +2258,7 @@ public class GoodsManager implements Serializable {
 	}
 
 	private Map<Integer, Number> getOutstandingRepairParts(Malfunctionable entity) {
-		Map<Integer, Number> result = new HashMap<>(0);
+		Map<Integer, Number> result = new ConcurrentHashMap<>(0);
 
 		Iterator<Malfunction> i = entity.getMalfunctionManager().getMalfunctions().iterator();
 		while (i.hasNext()) {
@@ -2273,7 +2278,7 @@ public class GoodsManager implements Serializable {
 	}
 
 	private Map<Integer, Number> getEstimatedOrbitMaintenanceParts(Malfunctionable entity) {
-		Map<Integer, Number> result = new HashMap<>();
+		Map<Integer, Number> result = new ConcurrentHashMap<>();
 
 		MalfunctionManager manager = entity.getMalfunctionManager();
 
@@ -2294,7 +2299,7 @@ public class GoodsManager implements Serializable {
 	}
 
 	private Map<Integer, Number> getOutstandingMaintenanceParts(Malfunctionable entity) {
-		Map<Integer, Number> result = new HashMap<>();
+		Map<Integer, Number> result = new ConcurrentHashMap<>();
 
 		Map<Integer, Integer> maintParts = entity.getMalfunctionManager().getMaintenanceParts();
 		Iterator<Integer> i = maintParts.keySet().iterator();
@@ -2313,7 +2318,7 @@ public class GoodsManager implements Serializable {
 	 * @return map of parts and demand number.
 	 */
 	private Map<Integer, Number> getVehicleAttachmentParts() {
-		Map<Integer, Number> result = new HashMap<>();
+		Map<Integer, Number> result = new ConcurrentHashMap<>();
 
 		// VehicleConfig vehicleConfig = simulationConfig.getVehicleConfiguration();
 		Iterator<Vehicle> i = settlement.getAllAssociatedVehicles().iterator();
@@ -2912,10 +2917,10 @@ public class GoodsManager implements Serializable {
 		}
 
 		if (vehicleBuyValueCache == null) {
-			vehicleBuyValueCache = new HashMap<String, Double>();
+			vehicleBuyValueCache = new ConcurrentHashMap<String, Double>();
 		}
 		if (vehicleSellValueCache == null) {
-			vehicleSellValueCache = new HashMap<String, Double>();
+			vehicleSellValueCache = new ConcurrentHashMap<String, Double>();
 		}
 
 		if (useCache) {

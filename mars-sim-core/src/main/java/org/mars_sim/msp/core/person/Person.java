@@ -9,14 +9,14 @@ package org.mars_sim.msp.core.person;
 
 import java.awt.geom.Point2D;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -25,6 +25,7 @@ import org.mars_sim.msp.core.LifeSupportInterface;
 import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitEventType;
+import org.mars_sim.msp.core.data.SolMetricDataLogger;
 import org.mars_sim.msp.core.equipment.EVASuit;
 import org.mars_sim.msp.core.location.LocationStateType;
 import org.mars_sim.msp.core.person.ai.Mind;
@@ -64,7 +65,9 @@ import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.LifeSupport;
 import org.mars_sim.msp.core.structure.building.function.cooking.Cooking;
 import org.mars_sim.msp.core.structure.building.function.cooking.PreparingDessert;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.EarthClock;
+import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Crewable;
 import org.mars_sim.msp.core.vehicle.Medical;
@@ -75,7 +78,7 @@ import org.mars_sim.msp.core.vehicle.VehicleOperator;
  * The Person class represents a person on Mars. It keeps track of everything
  * related to that person and provides information about him/her.
  */
-public class Person extends Unit implements VehicleOperator, MissionMember, Serializable {
+public class Person extends Unit implements VehicleOperator, MissionMember, Serializable, Temporal {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -138,18 +141,12 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	private int day;
 	/** The age of a person */
 	private int age = -1;
-	/** The cache for sol. */
-	private int solCache = 1;
-	
+
 	/** The settlement the person is currently associated with. */
 	private Integer associatedSettlementID = Integer.valueOf(-1);
 	/** The buried settlement if the person has been deceased. */
 	private Integer buriedSettlement = Integer.valueOf(-1);
-	/** The vehicle the person is on. */
-//	private Integer vehicleInt = Integer.valueOf(-1);
 
-	/** The cache for msol1 */
-	private double msolCache = -1D;
 	/** The eating speed of the person [kg/millisol]. */
 	private double eatingSpeed = 0.5 + .1 * RandomUtil.getRandomDouble(1) - .1 * RandomUtil.getRandomDouble(1);
 	/** The height of the person (in cm). */
@@ -225,7 +222,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	/** The EVA suit that the person has donned on. */
 	private EVASuit suit;
 	/** The person's achievement in scientific fields. */
-	private Map<ScienceType, Double> scientificAchievement;
+	private Map<ScienceType, Double> scientificAchievement = new ConcurrentHashMap<ScienceType, Double>();
 	/** The person's paternal chromosome. */
 	private Map<Integer, Gene> paternal_chromosome;
 	/** The person's maternal chromosome. */
@@ -233,9 +230,9 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	/** The person's mission experiences */
 	private Map<Integer, List<Double>> missionExperiences;
 	/** The person's EVA times */
-	private Map<Integer, Map<String, Double>> eVATaskTime;
+	private SolMetricDataLogger<String> eVATaskTime;
 	/** The person's water/oxygen consumption */
-	private Map<Integer, Map<Integer, Double>> consumption;
+	private SolMetricDataLogger<Integer> consumption;
 	/** The person's prior training */
 	private List<TrainingType> trainings;
 	
@@ -374,8 +371,6 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		condition = new PhysicalCondition(this);
 		// Create job history 		
 		jobHistory = new JobHistory(this);
-		// Create the scientific achievement map
-		scientificAchievement = new HashMap<ScienceType, Double>(0);
 		// Create the role
 		role = new Role(this);
 		// Create task schedule
@@ -387,9 +382,9 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		// Create the mission experiences map
 		missionExperiences = new ConcurrentHashMap<>();
 		// Create the EVA hours map
-		eVATaskTime = new ConcurrentHashMap<>();
+		eVATaskTime = new SolMetricDataLogger<String>(MAX_NUM_SOLS);;
 		// Create the consumption map
-		consumption = new ConcurrentHashMap<>();
+		consumption = new SolMetricDataLogger<Integer>(MAX_NUM_SOLS);
 		// Asssume the person is not a preconfigured crew member
 		preConfigured = false;
 	}
@@ -412,8 +407,8 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 * Compute a person's chromosome map
 	 */
 	public void setupChromosomeMap() {
-		paternal_chromosome = new HashMap<>();
-		maternal_chromosome = new HashMap<>();
+		paternal_chromosome = new ConcurrentHashMap<>();
+		maternal_chromosome = new ConcurrentHashMap<>();
 
 		if (bornOnMars) {
 			// TODO: figure out how to account for growing characteristics such as height
@@ -1012,130 +1007,108 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 *
 	 * @param time amount of time passing (in millisols).
 	 */
-	public void timePassing(double time) {
-
-		if (!condition.isDead()) {
-
-			try {
-				// Mental changes with time passing.
-				mind.timePassing(time);
-			} catch (Exception ex) {
-				ex.printStackTrace();
-				LogConsolidated.log(logger, Level.SEVERE, 20_000, sourceName, "[" + getLocale() + "] "
-						+ getName() + "'s Mind was having trouble processing task selection.", ex);
-			}
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
+		if (!isValid(pulse)) {
+			return false;
 		}
 		
-		double msol1 = marsClock.getMillisolOneDecimal();
-
-		if (msolCache != msol1) {
-			msolCache = msol1;
+		if (!condition.isDead()) {
+			taskSchedule.timePassing(pulse);
 			
-			// If Person is dead, then skip
-			if (!condition.isDead() && getLifeSupportType() != null) {// health.getDeathDetails() == null) {
+			// Mental changes with time passing.
+			mind.timePassing(pulse);
+		}
+			
+		// If Person is dead, then skip
+		if (!condition.isDead() && getLifeSupportType() != null) {// health.getDeathDetails() == null) {
 
-				support = getLifeSupportType();
+			support = getLifeSupportType();
 
-				circadian.timePassing(time, support);
-				// Pass the time in the physical condition first as this may result in death.
-				condition.timePassing(time, support);
+			circadian.timePassing(pulse.getElapsed(), support);
+			// Pass the time in the physical condition first as this may result in death.
+			condition.timePassing(pulse, support);
 
-				if (!condition.isDead()) {
+			if (!condition.isDead()) {
 
-//					// Check on the EVA suit donned by the person
-//					if (suit != null) {
-//						suit.getMalfunctionManager().activeTimePassing(time);	
-//						suit.getMalfunctionManager().timePassing(time);
-//					}
+				if (pulse.isNewSol()) {
+					// Update the solCache
+					int currentSol = pulse.getMarsTime().getMissionSol();
 					
-					// check for the passing of each day
-					int solElapsed = marsClock.getMissionSol();
-	
-					if (solCache != solElapsed) {
-						// Update the solCache
-						solCache = solElapsed;
-						
-						if (solElapsed == 1) {
-							// On the first mission sol,
-							// adjust the sleep habit according to the current work shift
-							for (int i=0; i< 15; i++) {
-								int shiftEnd = getTaskSchedule().getShiftEnd();
-								int m = shiftEnd - 20 * (i+1);
-								if (m < 0)
-									m = m + 1000;
-								// suppress sleep during the work shift
-								circadian.updateSleepCycle(m, false);
-								
-								m = shiftEnd + 10 * (i+1);
-								if (m > 1000)
-									m = m - 1000;
-								// encourage sleep after the work shift
-								circadian.updateSleepCycle(m, true);
-							}
+					if (currentSol == 1) {
+						// On the first mission sol,
+						// adjust the sleep habit according to the current work shift
+						for (int i=0; i< 15; i++) {
+							int shiftEnd = getTaskSchedule().getShiftEnd();
+							int m = shiftEnd - 20 * (i+1);
+							if (m < 0)
+								m = m + 1000;
+							// suppress sleep during the work shift
+							circadian.updateSleepCycle(m, false);
 							
-							if (getShiftType() == ShiftType.B) {
-								condition.setFatigue(getFatigue() + RandomUtil.getRandomInt(500));
-							}
-							else if (getShiftType() == ShiftType.Y) {
-								condition.setFatigue(getFatigue() + RandomUtil.getRandomInt(333));
-							}
-							else if (getShiftType() == ShiftType.Z) {
-								condition.setFatigue(getFatigue() + RandomUtil.getRandomInt(667));
-							}
-								
+							m = shiftEnd + 10 * (i+1);
+							if (m > 1000)
+								m = m - 1000;
+							// encourage sleep after the work shift
+							circadian.updateSleepCycle(m, true);
 						}
-						else {
-							// Adjust the sleep habit according to the current work shift
-							for (int i=0; i< 5; i++) {
-								int m = getTaskSchedule().getShiftEnd() + 10 * (i+1);
-								if (m > 1000)
-									m = m - 1000;
-								circadian.updateSleepCycle(m, true);
-							}
+						
+						if (getShiftType() == ShiftType.B) {
+							condition.setFatigue(getFatigue() + RandomUtil.getRandomInt(500));
+						}
+						else if (getShiftType() == ShiftType.Y) {
+							condition.setFatigue(getFatigue() + RandomUtil.getRandomInt(333));
+						}
+						else if (getShiftType() == ShiftType.Z) {
+							condition.setFatigue(getFatigue() + RandomUtil.getRandomInt(667));
+						}
 							
-							// Check if a person's age should be updated
-							age = updateAge();					
-							
-							// Checks if a person has a role
-							if (role.getType() == null)
-								role.obtainNewRole();
-	
-							// Limit the size of the dailyWaterUsage to x key value pairs
-							if (consumption.size() > MAX_NUM_SOLS)
-								consumption.remove(solElapsed - MAX_NUM_SOLS);
-	
-							if (solElapsed % 3 == 0) {
-								// Adjust the shiftChoice once every 3 sols based on sleep hour
-								int bestSleepTime[] = getPreferredSleepHours();
-								taskSchedule.adjustShiftChoice(bestSleepTime);
-							}
-	
-							if (solElapsed % 4 == 0) {
-								// Increment the shiftChoice once every 4 sols
-								taskSchedule.incrementShiftChoice();
-							}
-	
-							if (solElapsed % 7 == 0) {
-								// Normalize the shiftChoice once every week
-								taskSchedule.normalizeShiftChoice();
-							}
+					}
+					else {
+						// Adjust the sleep habit according to the current work shift
+						for (int i=0; i< 5; i++) {
+							int m = getTaskSchedule().getShiftEnd() + 10 * (i+1);
+							if (m > 1000)
+								m = m - 1000;
+							circadian.updateSleepCycle(m, true);
+						}
+						
+						// Check if a person's age should be updated
+						age = updateAge();					
+						
+						// Checks if a person has a role
+						if (role.getType() == null)
+							role.obtainNewRole();
+
+						if (currentSol % 3 == 0) {
+							// Adjust the shiftChoice once every 3 sols based on sleep hour
+							int bestSleepTime[] = getPreferredSleepHours();
+							taskSchedule.adjustShiftChoice(bestSleepTime);
+						}
+
+						if (currentSol % 4 == 0) {
+							// Increment the shiftChoice once every 4 sols
+							taskSchedule.incrementShiftChoice();
+						}
+
+						if (currentSol % 7 == 0) {
+							// Normalize the shiftChoice once every week
+							taskSchedule.normalizeShiftChoice();
 						}
 					}
 				}
 			}
-
-			else if (!isBuried && condition.getDeathDetails() != null
-					&& condition.getDeathDetails().getBodyRetrieved()) {
-
-				if (!declaredDead) {
-					setDeclaredDead();
-					mind.setInactive();
-				}
-			}
 		}
 
-		// final long time1 = System.nanoTime();
-		// logger.info((time1-time0)/1.0e3 + " ms to process " + name);
+		else if (!isBuried && condition.getDeathDetails() != null
+				&& condition.getDeathDetails().getBodyRetrieved()) {
+
+			if (!declaredDead) {
+				setDeclaredDead();
+				mind.setInactive();
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -1268,7 +1241,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	private LifeSupportInterface getLifeSupportType() {
 
 		LifeSupportInterface result = null;
-		List<LifeSupportInterface> lifeSupportUnits = new ArrayList<LifeSupportInterface>();
+		List<LifeSupportInterface> lifeSupportUnits = new CopyOnWriteArrayList<LifeSupportInterface>();
 
 		Settlement settlement = getSettlement();
 		if (settlement != null) {
@@ -1484,6 +1457,8 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 */
 	public double getScientificAchievement(ScienceType science) {
 		double result = 0D;
+		if (science == null)
+			return result;
 		if (scientificAchievement.containsKey(science)) {
 			result = scientificAchievement.get(science);
 		}
@@ -1514,6 +1489,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 			achievementCredit += scientificAchievement.get(science);
 		}
 		scientificAchievement.put(science, achievementCredit);
+//		System.out.println(" Person : " + this + " " + science + " " + achievementCredit);
 	}
 
 	public void setKitchenWithMeal(Cooking kitchen) {
@@ -1543,6 +1519,25 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 		return computeCurrentBuilding();
 	}
 
+	/**
+	 * Checks if the adjacent building is the type of interest
+	 * 
+	 * @param type
+	 * @return
+	 */
+	public boolean isAdjacentBuildingType(String type) {	
+		if (getSettlement() != null) {
+			Building b = computeCurrentBuilding();
+			
+			List<Building> list = getSettlement().createAdjacentBuildings(b);
+			for (Building bb : list) {
+				if (bb.getBuildingType().equals(type))
+					return true;
+			}
+		}
+		return false;
+	}
+	
 	/**
 	 * Computes the building the person is currently located at Returns null if
 	 * outside of a settlement
@@ -1840,7 +1835,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 //			if (scores.size() > 20)
 //				scores.remove(0);
 		} else {
-			List<Double> scores = new ArrayList<>();
+			List<Double> scores = new CopyOnWriteArrayList<>();
 			scores.add(score);
 			missionExperiences.put(id, scores);
 		}
@@ -1859,7 +1854,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 //			missionExperiences.get(id).add(score);
 //		}
 //		else {
-//			List<Double> scores = new ArrayList<>();
+//			List<Double> scores = new CopyOnWriteArrayList<>();
 //			scores.add(score);
 //			missionExperiences.put(id, scores);
 //		}
@@ -1881,22 +1876,7 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 * @param time
 	 */
 	public void addEVATime(String taskName, double time) {
-		Map<String, Double> map = null;
-
-		if (eVATaskTime.containsKey(solCache)) {
-			map = eVATaskTime.get(solCache);
-			if (map.containsKey(taskName)) {
-				double oldTime = map.get(taskName);
-				map.put(taskName, time + oldTime);
-			} else {
-				map.put(taskName, time);
-			}
-		} else {
-			map = new ConcurrentHashMap<>();
-			map.put(taskName, time);
-		}
-
-		eVATaskTime.put(solCache, map);
+		eVATaskTime.increaseDataPoint(taskName, time);
 	}
 
 	/**
@@ -1906,12 +1886,12 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 */
 	public Map<Integer, Double> getTotalEVATaskTimeBySol() {
 		Map<Integer, Double> map = new ConcurrentHashMap<>();
-
-		for (Integer sol : eVATaskTime.keySet()) {
+		Map<Integer, Map<String, Double>> history = eVATaskTime.getHistory();
+		for (Entry<Integer, Map<String, Double>> day : history.entrySet()) {
 			double sum = 0;
-
-			for (String t : eVATaskTime.get(sol).keySet()) {
-				sum += eVATaskTime.get(sol).get(t);
+			int sol = day.getKey();
+			for (Double t : day.getValue().values()) {
+				sum += t;
 			}
 
 			map.put(sol, sum);
@@ -1923,46 +1903,11 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	/**
 	 * Adds the amount consumed.
 	 * 
-	 * @param type
+	 * @param waterID
 	 * @param amount
 	 */
-	public void addConsumptionTime(int type, double amount) {
-		Map<Integer, Double> map = null;
-
-		if (consumption.containsKey(solCache)) {
-			map = consumption.get(solCache);
-			if (map.containsKey(type)) {
-				double oldAmt = map.get(type);
-				map.put(type, amount + oldAmt);
-			} else {
-				map.put(type, amount);
-			}
-		} else {
-			map = new ConcurrentHashMap<>();
-			map.put(type, amount);
-		}
-
-		consumption.put(solCache, map);
-	}
-
-	/**
-	 * Gets the total amount consumed
-	 * 
-	 * @param type
-	 * @return
-	 */
-	public Map<Integer, Double> getTotalConsumptionBySol(int type) {
-		Map<Integer, Double> map = new ConcurrentHashMap<>();
-
-		for (Integer sol : consumption.keySet()) {
-			for (Integer t : consumption.get(sol).keySet()) {
-				if (t == type) {
-					map.put(sol, consumption.get(sol).get(t));
-				}
-			}
-		}
-
-		return map;
+	public void addConsumptionTime(int waterID, double amount) {
+		consumption.increaseDataPoint(waterID, amount);
 	}
 
 	/**
@@ -1971,51 +1916,8 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 * 
 	 * @return
 	 */
-	public double getDailyUsage(int type) {
-		Map<Integer, Double> map = getTotalConsumptionBySol(type);
-
-		boolean quit = false;
-		int today = solCache;
-		int sol = solCache;
-		double sum = 0;
-		double numSols = 0;
-		double cumulativeWeight = 0.75;
-		double weight = 1;
-
-		while (!quit) {
-			if (map.size() == 0) {
-				quit = true;
-				return 0;
-			}
-
-			else if (map.containsKey(sol)) {
-				if (today == sol) {
-					// If it's getting the today's average, one may
-					// project the full-day usage based on the usage up to this moment
-					weight = .25;
-					sum = sum + map.get(sol) * 1_000D / marsClock.getMillisol() * weight;
-				}
-
-				else {
-					sum = sum + map.get(sol) * weight;
-				}
-			}
-
-			else if (map.containsKey(sol - 1)) {
-				sum = sum + map.get(sol - 1) * weight;
-				sol--;
-			}
-
-			cumulativeWeight = cumulativeWeight + weight;
-			weight = (numSols + 1) / (cumulativeWeight + 1);
-			numSols++;
-			sol--;
-			// Get the last x sols only
-			if (numSols > MAX_NUM_SOLS)
-				quit = true;
-		}
-
-		return sum / cumulativeWeight;
+	public double getDailyUsage(Integer type) {
+		return consumption.getDailyAverage(type);
 	}
 
 	public double getEatingSpeed() {
@@ -2117,8 +2019,8 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	 */
 	public void generatePriorTraining() {
 		if (trainings == null) {
-			trainings = new ArrayList<>();
-			List<TrainingType> lists = new ArrayList<>(Arrays.asList(TrainingType.values()));
+			trainings = new CopyOnWriteArrayList<>();
+			List<TrainingType> lists = new CopyOnWriteArrayList<>(Arrays.asList(TrainingType.values()));
 			int size = lists.size();
 			int num = RandomUtil.getRandomRegressionInteger(4);
 			// Guarantee at least one training
@@ -2196,8 +2098,9 @@ public class Person extends Unit implements VehicleOperator, MissionMember, Seri
 	public void caculateWalkSpeedMod() {
 		double mass = getInventory().getTotalInventoryMass(false);
 		double cap = getInventory().getGeneralCapacity();
-		// At full capacity, may still move at 10% 
-		walkSpeedMod = 1.1 - mass/Math.max(cap, SMALL_AMOUNT);
+		// At full capacity, may still move at 10%.
+		// Make sure is doesn't go -ve and there is always some movement
+		walkSpeedMod = 1.1 - Math.min(mass/Math.max(cap, SMALL_AMOUNT), 1D);
 	}
 	
 	public double getWalkSpeedMod() {

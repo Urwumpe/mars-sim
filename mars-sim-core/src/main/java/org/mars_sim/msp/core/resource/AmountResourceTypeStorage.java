@@ -11,11 +11,10 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Storage for types of amount resource.
@@ -63,7 +62,7 @@ class AmountResourceTypeStorage implements Serializable {
 		}
 
 		if (typeCapacities == null) {
-			typeCapacities = new HashMap<Integer, ResourceAmount>();
+			typeCapacities = new ConcurrentHashMap<Integer, ResourceAmount>();
 		}
 
 		if (hasARTypeCapacity(resource)) {
@@ -97,7 +96,7 @@ class AmountResourceTypeStorage implements Serializable {
 		}
 
 		if (typeCapacities == null) {
-			typeCapacities = new HashMap<Integer, ResourceAmount>();
+			typeCapacities = new ConcurrentHashMap<Integer, ResourceAmount>();
 		}
 
 		double existingCapacity = getAmountResourceTypeCapacity(resource);
@@ -331,29 +330,11 @@ class AmountResourceTypeStorage implements Serializable {
 	 * @return set of resources.
 	 */
 	Set<AmountResource> getAllAmountResourcesStored() {
-		Set<AmountResource> set = new HashSet<>();
+		Set<AmountResource> set = ConcurrentHashMap.newKeySet();
 		for (int ar : getAllARStored()) {
 			set.add(ResourceUtil.findAmountResource(ar));
 		}
 		return set;
-
-//        if (amountResourceTypeStored != null) {
-//            result = new HashSet<AmountResource>(amountResourceTypeStored.size());
-//            Iterator<AmountResource> i = amountResourceTypeStored.keySet().iterator();
-//            while (i.hasNext()) {
-//                AmountResource resource = i.next();
-//                if (getAmountResourceTypeStored(resource) > 0D) {
-//                    result.add(resource);
-//                }
-//            }
-//        }
-//        else {
-//            result = new HashSet<AmountResource>(0);
-//        }
-//
-//        
-//        return result;
-
 	}
 
 	/**
@@ -363,10 +344,9 @@ class AmountResourceTypeStorage implements Serializable {
 	 */
 	Set<Integer> getAllARStored() {
 
-		Set<Integer> result = null;
+		Set<Integer> result = ConcurrentHashMap.newKeySet();
 
 		if (typeStored != null) {
-			result = new HashSet<Integer>(typeStored.size());
 			Iterator<Integer> i = typeStored.keySet().iterator();
 			while (i.hasNext()) {
 				Integer resource = i.next();
@@ -374,8 +354,6 @@ class AmountResourceTypeStorage implements Serializable {
 					result.add(resource);
 				}
 			}
-		} else {
-			result = new HashSet<Integer>(0);
 		}
 
 		return result;
@@ -444,7 +422,7 @@ class AmountResourceTypeStorage implements Serializable {
 				totalAmountCacheDirty = true;
 
 				if (typeStored == null) {
-					typeStored = new HashMap<Integer, ResourceAmount>();
+					typeStored = new ConcurrentHashMap<Integer, ResourceAmount>();
 				}
 
 				ResourceAmount stored = getARTypeStoredObject(resource);

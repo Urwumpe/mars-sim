@@ -7,6 +7,7 @@
 package org.mars_sim.msp.core.person.health;
 
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 import java.io.Serializable;
@@ -29,7 +30,7 @@ public class RadioProtectiveAgent extends Medication implements Serializable {
     // Duration (millisols).
     private static final double DURATION = 200D;
     
-    private static String[] agents = new String[] {"Amifostine", "Melatonin", "Genistein"};
+    private static final String[] AGENTS = new String[] {"Amifostine", "Melatonin", "Genistein"};
     
     private List<String> medication_history;
     
@@ -49,11 +50,11 @@ public class RadioProtectiveAgent extends Medication implements Serializable {
     }
     
     @Override
-    public void timePassing(double time) {
-        super.timePassing(time);
+    public boolean timePassing(ClockPulse pulse) {
+        super.timePassing(pulse);
         
         int region = RandomUtil.getRandomInt(2);
-        exposure.reduceDose(region, time * REDUCTION);
-        
+        exposure.reduceDose(region, pulse.getElapsed() * REDUCTION);
+        return true;
     }
 }

@@ -191,7 +191,8 @@ public class TendGreenhouse extends Task implements Serializable {
 	@Override
 	protected double performMappedPhase(double time) {
 		if (getPhase() == null) {
-			throw new IllegalArgumentException("Task phase is null");
+			return 0;
+//			throw new IllegalArgumentException("Task phase is null");
 		} else if (TENDING.equals(getPhase())) {
 			return tendingPhase(time);
 		} else if (INSPECTING.equals(getPhase())) {
@@ -224,7 +225,7 @@ public class TendGreenhouse extends Task implements Serializable {
 		}
 
 		// Check if greenhouse has malfunction.
-		if (greenhouse.getBuilding().getMalfunctionManager().hasMalfunction()) {
+		if (farmBuilding.getMalfunctionManager() != null && farmBuilding.getMalfunctionManager().hasMalfunction()) {
 			endTask();
 			return time;
 		}
@@ -442,7 +443,7 @@ public class TendGreenhouse extends Task implements Serializable {
 		}
 
 		// Modify based on the wear condition.
-		chance *= greenhouse.getBuilding().getMalfunctionManager().getWearConditionAccidentModifier();
+		chance *= farmBuilding.getMalfunctionManager().getWearConditionAccidentModifier();
 
 		if (RandomUtil.lessThanRandPercent(chance * time)) {
 

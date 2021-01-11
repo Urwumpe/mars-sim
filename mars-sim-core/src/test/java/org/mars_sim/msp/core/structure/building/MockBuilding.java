@@ -56,14 +56,18 @@ public class MockBuilding extends Building {
 		setNickName(name);
 		changeName(name);
 		
-		settlementID = (Integer) manager.getSettlement().getIdentifier();
+// SettlementID is done by the superclass		
+//		if (manager == null)
+//			logger.severe("manager = null");
+//		settlementID = (Integer) manager.getSettlement().getIdentifier();
 		
-		sim.getUnitManager().addBuildingID(this);
+		unitManager.addBuildingID(this);
 //		sim.getUnitManager().addUnit(this);
 		
-		if (manager == null)
-			logger.severe("manager = null");
-		
+
+		if (manager == null) {
+			throw new IllegalArgumentException("Bulding manager can not be null");
+		}
 		manager.addMockBuilding(this);
 		 
 //		this.manager = manager;
@@ -81,7 +85,7 @@ public class MockBuilding extends Building {
 		settlementID = (Integer) manager.getSettlement().getIdentifier();
 		
 //		sim.getUnitManager().addBuildingID(this);
-		sim.getUnitManager().addUnit(this);
+		unitManager.addUnit(this);
 
 //		this.manager = manager;
 		malfunctionManager = new MalfunctionManager(this, 0D, 0D);

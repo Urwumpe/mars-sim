@@ -7,9 +7,9 @@
 package org.mars_sim.msp.core.person.ai.mission;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -36,6 +36,7 @@ import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.GroundVehicle;
@@ -67,6 +68,22 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 	public static final MissionPhase INCOMPLETED = new MissionPhase(Msg.getString("Mission.phase.incompleted")); //$NON-NLS-1$
 	
 	// Static members
+	private static final String ROVER_WHEEL = "rover wheel";
+	private static final String ROVER_BATTERY = "rover battery";
+	private static final String LASER = "laser";
+	private static final String STEPPER_MOTOR = "stepper motor"; 
+	private static final String OVEN = "oven";
+	private static final String BLENDER = "blender";
+	private static final String AUTOCLAVE = "autoclave"; 
+	private static final String REFRIGERATOR = "refrigerator"; 
+	private static final String STOVE = "stove"; 
+	private static final String MICROWAVE = "microwave"; 
+	private static final String POLY_ROOFING = "polycarbonate roofing";
+	private static final String LENS = "lens";
+	private static final String FIBERGLASS = "fiberglass"; 
+	private static final String SHEET = "sheet"; 
+	private static final String PRISM = "prism";
+	
 	/** The small insignificant amount of distance in km. */
 	private static final double SMALL_DISTANCE = .1; 
 	
@@ -105,6 +122,11 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 
 	/** Caches */
 	protected Map<Integer, Integer> equipmentNeededCache;
+
+	
+	private transient Map<Integer, Number> cachedParts = null;
+
+	private transient double cachedDistance = -1;
 	
 	protected static TerrainElevation terrainElevation;
 	
@@ -953,7 +975,7 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 	 *         number.
 	 */
 	public Map<Integer, Number> getResourcesNeededForTrip(boolean useMargin, double distance) {
-		Map<Integer, Number> result = new HashMap<Integer, Number>();
+		Map<Integer, Number> result = new ConcurrentHashMap<Integer, Number>();
 		if (vehicle != null) {
 			// Add the methane resource
 			if (getPhase() == null || getPhase().equals(VehicleMission.EMBARKING) || getPhase().equals(VehicleMission.REVIEWING))
@@ -971,72 +993,70 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 	 * @return map of part resources and their number.
 	 */
 	protected Map<Integer, Number> getPartsNeededForTrip(double distance) {
-		Map<Integer, Number> result = new HashMap<Integer, Number>();
+		Map<Integer, Number> result = null;
 
-		// Determine vehicle parts.
+		// Determine vehicle parts. only if there is a change of distance
 		if (vehicle != null) {
-			double drivingTime = getEstimatedTripTime(true, distance);
-			double numberAccidents = drivingTime * OperateVehicle.BASE_ACCIDENT_CHANCE;
-			double numberMalfunctions = numberAccidents * AVERAGE_NUM_MALFUNCTION;
 
-			Map<Integer, Double> parts = vehicle.getMalfunctionManager().getRepairPartProbabilities();
-			
-//			System.out.println(vehicle.getName() + " : " + vehicle.getVehicleType());
-//			for (String s : vehicle.getMalfunctionManager().getScopes()) {
-//				System.out.println(s);
-//			}
-			
-			// TODO: need to figure out why a vehicle's scope would contain the following parts :
-			parts = removeParts(parts, 
-					"laser", 
-					"stepper motor", 
-					"oven", 
-					"blender", 
-					"autoclave", 
-					"refrigerator", 
-					"stove", 
-					"microwave", 
-					"polycarbonate roofing", 
-					"lens",
-					"fiberglass", 
-					"sheet", 
-					"prism");
-			
-			for (Integer part : parts.keySet()) {
-//				String name = ItemResourceUtil.findItemResourceName(part);
-//				System.out.println(name);
-
-//				if (!name.contains("laser") 
-//						&& !name.contains("stepper motor")
-//						&& !name.equalsIgnoreCase("oven")
-//						&& !name.equalsIgnoreCase("blender")
-//						&& !name.equalsIgnoreCase("autoclave")
-//						&& !name.equalsIgnoreCase("refrigerator")
-//						&& !name.equalsIgnoreCase("stove")
-//						&& !name.equalsIgnoreCase("microwave")
-//						&& !name.equalsIgnoreCase("polycarbonate roofing")
-//						&& !name.contains("lens")
-//						&& !name.equalsIgnoreCase("fiberglass")
-//						&& !name.contains("sheet")
-//						&& !name.contains("prism")) {
-					
-					double freq = parts.get(part) * numberMalfunctions * PARTS_NUMBER_MODIFIER;
-					
-					if (vehicle instanceof Rover) { 
-						Integer wheel = ItemResourceUtil.findIDbyItemResourceName("rover wheel");
-						Integer battery = ItemResourceUtil.findIDbyItemResourceName("rover battery");
-						result.put(wheel, 2);
-						result.put(battery, 1);
-//						System.out.println("part name : " + name + " x" + number + " (Rover).");
-					}
-					
+			// If the distance is the same as last time then use the cached value
+			if ((cachedDistance == distance) && (cachedParts != null)) {
+				result = cachedParts;
+			}
+			else {
+				result = new ConcurrentHashMap<Integer, Number>();
+				cachedParts = result;
+				cachedDistance = distance;
+				
+				double drivingTime = getEstimatedTripTime(true, distance);
+				double numberAccidents = drivingTime * OperateVehicle.BASE_ACCIDENT_CHANCE;
+				double numberMalfunctions = numberAccidents * AVERAGE_NUM_MALFUNCTION;
+	
+				Map<Integer, Double> parts = vehicle.getMalfunctionManager().getRepairPartProbabilities();
+	
+				StringBuffer buffer = new StringBuffer();
+	
+				buffer.append(vehicle.getName()).append(" - ").append(vehicle.getVehicleType());
+	
+				// TODO: need to figure out why a vehicle's scope would contain the following parts :
+				parts = removeParts(parts, 
+						LASER, 
+						STEPPER_MOTOR, 
+						OVEN, 
+						BLENDER, 
+						AUTOCLAVE, 
+						REFRIGERATOR, 
+						STOVE, 
+						MICROWAVE, 
+						POLY_ROOFING, 
+						LENS,
+						FIBERGLASS, 
+						SHEET, 
+						PRISM);
+				
+				for (Integer id : parts.keySet()) {
+						
+					double freq = parts.get(id) * numberMalfunctions * PARTS_NUMBER_MODIFIER;					
 					int number = (int) Math.round(freq);
 					if (number > 0) {
-						result.put(part, number);
-//						System.out.println("part name : " + name + " x" + number + ".");
+						result.put(id, number);
+						buffer.append(" ").append(ItemResourceUtil.findItemResourceName(id))
+							  .append(" (id: ").append(id).append(") x").append(number).append("   ");
 					}
-//				}
+				}
+				
+				// Manually override the number of wheel and battery needed for each mission
+				if (vehicle instanceof Rover) { 
+					Integer wheel = ItemResourceUtil.findIDbyItemResourceName(ROVER_WHEEL);
+					Integer battery = ItemResourceUtil.findIDbyItemResourceName(ROVER_BATTERY);
+					result.put(wheel, 2);
+					result.put(battery, 1);
+				}
+
+				logger.info(buffer.toString());
 			}
+		}
+		else {
+			result = new ConcurrentHashMap<Integer, Number>();
 		}
 
 		return result;
@@ -1052,7 +1072,10 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 	 */
 	public Map<Integer, Double> removeParts(Map<Integer, Double> parts, String... names) {
 		for (String n : names) {
-			parts.remove(ItemResourceUtil.findIDbyItemResourceName(n));
+			Object o = ItemResourceUtil.findIDbyItemResourceName(n);
+			if (o != null) {
+				parts.remove(o);
+			}
 		}
 		
 		return parts;
@@ -1355,7 +1378,6 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 	public final double getActualTotalDistanceTravelled() {
 		if (vehicleCache != null) {
 			double dist = vehicleCache.getOdometerMileage() - startingTravelledDistance;
-//			System.out.println("dist : " + (int)dist + "    total : " + (int)vehicle.getTotalDistanceTraveled() + "   starting : " + (int)startingTravelledDistance);
 			if (dist > distanceTravelled) {
 				// Update or record the distance
 				distanceTravelled = dist;
@@ -1388,7 +1410,8 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 	 * 
 	 * @param time the amount of time passing (in millisols)
 	 */
-	public void timePassing(double time) {
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
 		// Add this mission as a vehicle listener (does nothing if already listening to
 		// vehicle).
 		// Note : this is needed so that mission will re-attach itself as a vehicle
@@ -1397,6 +1420,7 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 		if (hasVehicle() && !vehicle.hasUnitListener(this)) {
 			vehicle.addUnitListener(this);
 		}
+		return true;
 	}
 
 	/**
@@ -1469,7 +1493,7 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 	 */
 	public Map<Integer, Integer> getOptionalEquipmentToLoad() {
 
-		Map<Integer, Integer> result = new HashMap<>();
+		Map<Integer, Integer> result = new ConcurrentHashMap<>();
 
 		// Add containers needed for optional amount resources.
 		Map<Integer, Number> optionalResources = getOptionalResourcesToLoad();
@@ -1538,7 +1562,7 @@ public abstract class VehicleMission extends TravelMission implements UnitListen
 //			}
 			
 			else
-				System.out.println("VehicleMission's getOptionalEquipmentToLoad() 3 id : " + id);
+				logger.warning("VehicleMission's getOptionalEquipmentToLoad() 3 id : " + id);
 			
 //			else {
 //				int num = (Integer) optionalResources.get(id);

@@ -573,14 +573,15 @@ public abstract class Airlock implements Serializable {
 	 * Add airlock cycle time.
 	 * 
 	 * @param time cycle time (millisols)
-	 * @return true if cycle time successfully added.
+	 * @return The the time consumed
 	 */
-	public void addTime(double time) {
-//		LogConsolidated.log(logger, Level.FINE, 4000, sourceName, "[" + getLocale() + "] "
-//				+ getEntity() + " was adding time.");
-//		boolean result = false;
+	public double addTime(double time) {
+		double consumed = 0D;
 
 		if (activated) {
+			// Cannot consume more than is needed
+			consumed = Math.min(remainingCycleTime, time);
+			
 			remainingCycleTime -= time;
 			if (remainingCycleTime <= 0D) {
 				// the air cycle has been completed
@@ -597,7 +598,7 @@ public abstract class Airlock implements Serializable {
 //			}
 		}
 
-//		return result;
+		return consumed;
 	}
 	
 	public void setActivated(boolean value) {
@@ -715,7 +716,7 @@ public abstract class Airlock implements Serializable {
 			selected = getPersonByID(id);
 //			LogConsolidated.log(logger, Level.INFO, 4_000, sourceName, "[" + selected.getLocale() + "] "
 //					+ selected + " acted as the airlock operator in " 
-//					+ selected.getLocationTag().getImmediateLocation() + ".");
+//					+ selected.getImmediateLocation() + ".");
 		}
 		
 		else if (size > 1) {
@@ -744,9 +745,9 @@ public abstract class Airlock implements Serializable {
 			
 			operatorID = Integer.valueOf(selectedID);
 			
-			LogConsolidated.log(logger, Level.INFO, 4000, sourceName, "[" + selected.getLocale() + "] "
+			LogConsolidated.log(logger, Level.FINE, 4_000, sourceName, "[" + selected.getLocale() + "] "
 					+ selected + " stepped up becoming the airlock operator in " 
-					+ selected.getLocationTag().getImmediateLocation() + ".");
+					+ selected.getImmediateLocation() + ".");
 		}
 	}
 	
@@ -1000,7 +1001,7 @@ public abstract class Airlock implements Serializable {
 	 * @param id
 	 * @return if the unit is already inside the set or if the unit can be added into the set
 	 */
-	public boolean addSet(Set<Integer> set, Integer id) {
+	private boolean addSet(Set<Integer> set, Integer id) {
 		if (set.size() >= MAX_SLOTS)
 			return false;
 		if (!set.contains(id)) {

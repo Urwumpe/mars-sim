@@ -9,10 +9,10 @@ package org.mars_sim.msp.core.person.ai.task;
 import java.awt.geom.Point2D;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -79,11 +79,7 @@ public class Walk extends Task implements Serializable {
 	// Data members
 	private int walkingStepIndex;
 
-	/** The person performing the task. */
-	// protected Person person;
-	/** The robot performing the task. */
-	// protected Robot robot;
-
+	/** The WalkingSteps instance. */
 	private WalkingSteps walkingSteps;
 
 	private Map<Integer, TaskPhase> walkingStepPhaseMap;
@@ -205,7 +201,7 @@ public class Walk extends Task implements Serializable {
 		String loc = person.getModifiedLoc();
 		
 		if (walkingSteps == null) {
-			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
+			LogConsolidated.log(logger, Level.SEVERE, 4_000, sourceName,
 					"[" + person.getLocale() + "] "
       						+ person + " was " + loc
       						+ " but walking steps could not be determined.");
@@ -226,7 +222,7 @@ public class Walk extends Task implements Serializable {
 		} 
 		
 		else if (!canWalkAllSteps(person, walkingSteps)) {
-			LogConsolidated.log(logger,  Level.SEVERE, 5000, sourceName,
+			LogConsolidated.log(logger,  Level.SEVERE, 4_000, sourceName,
 					"[" + person.getLocale() + "] "
       						+ person + " was " + loc
 					+ " but Valid Walking steps could not be determined.");
@@ -334,7 +330,7 @@ public class Walk extends Task implements Serializable {
 		if (!canWalkAllSteps(person, walkingSteps)) {
 			String loc = person.getModifiedLoc();
 			
-			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
+			LogConsolidated.log(logger, Level.SEVERE, 4_000, sourceName,
 					"[" + person.getLocale() + "] "
       						+ person + " was " + loc
 					+ " and could not find valid walking steps to " + interiorObject);
@@ -369,7 +365,7 @@ public class Walk extends Task implements Serializable {
 
 		// End task if all steps cannot be walked.
 		if (!canWalkAllSteps(robot, walkingSteps)) {
-			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
+			LogConsolidated.log(logger, Level.SEVERE, 4_000, sourceName,
 					"[" + robot.getLocale() + "] "
       						+ robot + " was in " + robot.getModifiedLoc()
       						+ " and could not find valid walking steps to " + interiorObject);
@@ -569,8 +565,7 @@ public class Walk extends Task implements Serializable {
 	 * Populates the walking step phase map.
 	 */
 	private void populateWalkingStepPhaseMap() {
-
-		walkingStepPhaseMap = new HashMap<Integer, TaskPhase>(7);
+		walkingStepPhaseMap = new ConcurrentHashMap<Integer, TaskPhase>(7);
 		walkingStepPhaseMap.put(WalkingSteps.WalkStep.ENTER_AIRLOCK, ENTERING_AIRLOCK);
 		walkingStepPhaseMap.put(WalkingSteps.WalkStep.ENTER_GARAGE_ROVER, ENTERING_ROVER_GARAGE);
 		walkingStepPhaseMap.put(WalkingSteps.WalkStep.EXIT_AIRLOCK, EXITING_AIRLOCK);
@@ -584,8 +579,7 @@ public class Walk extends Task implements Serializable {
 	 * Populates the walking step phase map.
 	 */
 	private void populateRobotWalkingStepPhaseMap() {
-
-		walkingStepPhaseMap = new HashMap<Integer, TaskPhase>(1);
+		walkingStepPhaseMap = new ConcurrentHashMap<Integer, TaskPhase>(1);
 		walkingStepPhaseMap.put(WalkingSteps.WalkStep.SETTLEMENT_INTERIOR_WALK, WALKING_SETTLEMENT_INTERIOR);
 	}
 
@@ -684,7 +678,7 @@ public class Walk extends Task implements Serializable {
 //                    Airlock airlock = step.airlock;
 //                    if (!ExitAirlock.canExitAirlock(robot, airlock)) {
 //                        result = false;
-//                       	LogConsolidated.log(Level.SEVERE, 5000, sourceName,
+//                       	LogConsolidated.log(Level.SEVERE, 4_000, sourceName,
 //                       			robot + " cannot exit airlock at " + airlock.getEntityName(), null);
 //                    }
 //                }
@@ -697,7 +691,7 @@ public class Walk extends Task implements Serializable {
 	@Override
 	protected double performMappedPhase(double time) {
 		if (getPhase() == null) {
-			return time;
+			return 0;
 //            throw new IllegalArgumentException("Task phase is null");
 		} else if (WALKING_SETTLEMENT_INTERIOR.equals(getPhase())) {
 			return walkingSettlementInteriorPhase(time);
@@ -748,7 +742,8 @@ public class Walk extends Task implements Serializable {
 			double x = Math.round(step.xLoc * 100.0) / 100.0;
 			double y = Math.round(step.yLoc * 100.0) / 100.0;
 			Point2D stepLocation = new Point2D.Double(x, y);
-			if (step.building.equals(building) && LocalAreaUtil.areLocationsClose(personLocation, stepLocation)) {
+			
+			if (step.building != null && step.building.equals(building) && LocalAreaUtil.areLocationsClose(personLocation, stepLocation)) {
 				if (walkingStepIndex < (walkingSteps.getWalkingStepsNumber() - 1)) {
 					walkingStepIndex++;
 					// setDescription("Almost arriving at (" + x + ", " + y + ") in " +
@@ -1010,25 +1005,24 @@ public class Walk extends Task implements Serializable {
 					walkingStepIndex++;
 					// setDescription("Walking to (" + xx + ", " + yy + ")");
 					setPhase(getWalkingStepPhase());
-				} else {
-
+				} 
+				else {
 					// setDescription("Arriving at (" + xx + ", " + yy + ")");
 					endTask();
 				}
-			} else {
-				// endTask();
+			} 
+			else {
 				if (person.isOutside()) {
-//					logger.finer(person + " starting walk outside task.");
-					LogConsolidated.log(logger, Level.INFO, 4000, sourceName,
-		      				"[" + person.getLocale() + "] "
-							+ person + " was " + loc
-							+ " and starting WalkOutside task.");
+//					LogConsolidated.log(logger, Level.INFO, 4000, sourceName,
+//		      				"[" + person.getLocale() + "] "
+//							+ person + " was " + loc
+//							+ " and starting WalkOutside task.");
 //					logger.info("Walking exterior from (" + x + ", " + y + ") to (" 
 //							+ xx + ", " + yy + ")");
 					
 					addSubTask(new WalkOutside(person, x, y, xx, yy, true));
-				} else {
-//					logger.severe(person + " is already physically outside.");
+				} 
+				else {
 					LogConsolidated.log(logger, Level.SEVERE, 5_000, sourceName,
 		      				"[" + person.getLocale() + "] "
 							+ person + " was " + loc
@@ -1036,8 +1030,8 @@ public class Walk extends Task implements Serializable {
 					endTask();
 				}
 			}
-
-		} else if (robot != null) {
+		} 
+		else if (robot != null) {
 
 			LogConsolidated.log(logger, Level.FINER, 4000, sourceName,
       				"[" + robot.getLocale() + "] "
@@ -1058,12 +1052,13 @@ public class Walk extends Task implements Serializable {
 					walkingStepIndex++;
 					// setDescription("Walking toward (" + xx + ", " + yy + ")");
 					setPhase(getWalkingStepPhase());
-				} else {
+				} 
+				else {
 					// setDescription("Arriving at (" + xx + ", " + yy + ")");
 					endTask();
 				}
-			} else {
-				// endTask();
+			} 
+			else {
 				if (robot.isOutside()) {
 					
 					LogConsolidated.log(logger, Level.FINER, 4000, sourceName,
@@ -1074,9 +1069,7 @@ public class Walk extends Task implements Serializable {
 					// + yy + ")");
 					addSubTask(new WalkOutside(robot, x, y, xx, yy, true));
 				}
-
 				else {
-
 					LogConsolidated.log(logger, Level.SEVERE, 5_000, sourceName,
 		      				"[" + robot.getLocale() + "] "
 							+ robot + " was in " + robot.getModifiedLoc()
@@ -1109,6 +1102,9 @@ public class Walk extends Task implements Serializable {
 					+ " and in exitingAirlockPhase().");
 			
 			// Check if person has reached the outside of the airlock.
+			if (walkingSteps == null)
+				return 0;
+			
 			WalkingSteps.WalkStep step = walkingSteps.getWalkingStepsList().get(walkingStepIndex);
 			Airlock airlock = step.airlock;
 

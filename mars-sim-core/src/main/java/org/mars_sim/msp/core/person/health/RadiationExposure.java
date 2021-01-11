@@ -25,11 +25,13 @@ import org.mars_sim.msp.core.person.BodyRegionType;
 import org.mars_sim.msp.core.person.EventType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.MasterClock;
+import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
-public class RadiationExposure implements Serializable {
+public class RadiationExposure implements Serializable, Temporal {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -222,7 +224,7 @@ public class RadiationExposure implements Serializable {
 	// https://www.nasa.gov/feature/goddard/real-martians-how-to-protect-astronauts-from-space-radiation-on-mars
 
 	/** Dose equivalent limits in mSv (milliSieverts). */
-	private int[][] DOSE_LIMITS = { { 250, 1000, 1500 }, { 500, 2000, 3000 }, { WHOLE_BODY_DOSE, 4000, 6000 } };
+	private static final int[][] DOSE_LIMITS = { { 250, 1000, 1500 }, { 500, 2000, 3000 }, { WHOLE_BODY_DOSE, 4000, 6000 } };
 
 	/** Randomize dose at the start of the sim when a settler arrives on Mars. */
 	private double[][] dose;
@@ -233,24 +235,12 @@ public class RadiationExposure implements Serializable {
 	private Person person;
 	
 	private static MarsClock marsClock;
-	private static MasterClock masterClock;
 
-	static {
-//		if (Simulation.instance().getMasterClock() != null) { // for passing maven test
-//			masterClock = Simulation.instance().getMasterClock();
-//			marsClock = masterClock.getMarsClock();
-//		}
-	}
 	
 	public RadiationExposure(PhysicalCondition condition) {
 		this.person = condition.getPerson();
 		// this.condition = condition;
 		dose = new double[3][3];
-		
-		if (Simulation.instance().getMasterClock() != null) { // for passing maven test
-			masterClock = Simulation.instance().getMasterClock();
-			marsClock = masterClock.getMarsClock();
-		}
 	}
 
 	public Map<RadiationEvent, Integer> getRadiationEventMap() {
@@ -279,10 +269,8 @@ public class RadiationExposure implements Serializable {
 		else if (bodyRegion == SKIN)
 			region = BodyRegionType.SKIN;
 
-		// if (marsClock == null)
-		// marsClock = Simulation.instance().getMasterClock().getMarsClock();
 
-		RadiationEvent event = new RadiationEvent(marsClock, region, Math.round(amount * 10000.0) / 10000.0);
+		RadiationEvent event = new RadiationEvent(region, Math.round(amount * 10000.0) / 10000.0);
 		eventMap.put(event, solCache);
 
 		return event;
@@ -334,16 +322,16 @@ public class RadiationExposure implements Serializable {
 
 	}
 
-	public int rand(int num) {
+	private int rand(int num) {
 		return RandomUtil.getRandomInt(num);
 	}
 
-	public void timePassing(double time) {
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
 
 		// check for the passing of each day
-		int solElapsed = marsClock.getMissionSol();
-		if (solElapsed != solCache) {
-			solCache = solElapsed;
+		int solCache = marsClock.getMissionSol();
+		if (pulse.isNewSol()) {
 			counter30++;
 			counter360++;
 			// set the boolean
@@ -355,13 +343,13 @@ public class RadiationExposure implements Serializable {
 		// check on the effect of the exposure once a day at between 100 & 110 millisols
 		// Note: at fastest simulation speed, it can skip as much as ~5 millisols
 
-		int msol = marsClock.getMillisolInt();// (int)(marsClock.getMillisol() * masterClock.getTimeRatio());
+		int msol = pulse.getMarsTime().getMillisolInt();// (int)(marsClock.getMillisol() * masterClock.getTimeRatio());
 		if (msol % 17 == 0) {
 			checkExposureLimit();
 			// reset the boolean
 			// isExposureChecked = true;
 		}
-
+		return true;
 	}
 
 	public boolean isSick() {
@@ -607,8 +595,7 @@ public class RadiationExposure implements Serializable {
 	 * @param {@link MasterClock}
 	 * @param {{@link MarsClock}
 	 */
-	public static void initializeInstances(MasterClock c0, MarsClock c1) {
-		masterClock = c0;
+	public static void initializeInstances(MarsClock c1) {
 		marsClock = c1;
 	}
 	

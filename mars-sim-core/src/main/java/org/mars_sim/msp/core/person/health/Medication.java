@@ -9,11 +9,13 @@ package org.mars_sim.msp.core.person.health;
 import java.io.Serializable;
 
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.time.ClockPulse;
+import org.mars_sim.msp.core.time.Temporal;
 
 /**
  * An abstract class representing a medication a person has taken.
  */
-public abstract class Medication implements Serializable, Comparable<Medication> {
+public abstract class Medication implements Serializable, Temporal, Comparable<Medication> {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -32,7 +34,7 @@ public abstract class Medication implements Serializable, Comparable<Medication>
 	 * @param duration the time duration (millisols).
 	 * @param person   the person to be medicated.
 	 */
-	public Medication(String name, double duration, Person person) {
+	protected Medication(String name, double duration, Person person) {
 		this.name = name;
 		this.duration = duration;
 		this.person = person;
@@ -81,10 +83,12 @@ public abstract class Medication implements Serializable, Comparable<Medication>
 	 * 
 	 * @param time amount of time (millisols).
 	 */
-	public void timePassing(double time) {
+	public boolean timePassing(ClockPulse pulse) {
 
 		// Add to time elapsed.
-		timeElapsed += time;
+		timeElapsed += pulse.getElapsed();
+		
+		return true;
 	}
 
 	/**

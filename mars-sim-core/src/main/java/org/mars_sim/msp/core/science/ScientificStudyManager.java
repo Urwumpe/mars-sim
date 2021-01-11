@@ -7,10 +7,10 @@
 package org.mars_sim.msp.core.science;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -21,14 +21,16 @@ import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.GenderType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.Conversion;
 
 /**
  * A class that keeps track of all scientific studies in the simulation.
  */
 public class ScientificStudyManager // extends Thread
-		implements Serializable {
+		implements Serializable, Temporal {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -42,7 +44,6 @@ public class ScientificStudyManager // extends Thread
 	private List<ScientificStudy> studies;
 
 	private static Simulation sim = Simulation.instance();
-	private static MarsClock marsClock = sim.getMasterClock().getMarsClock();
 	private static UnitManager unitManager = sim.getUnitManager();
 	private static ScienceConfig scienceConfig = SimulationConfig.instance().getScienceConfig();
 	
@@ -50,7 +51,7 @@ public class ScientificStudyManager // extends Thread
 	 * Constructor.
 	 */
 	public ScientificStudyManager() {
-		studies = new ArrayList<ScientificStudy>();
+		studies = new CopyOnWriteArrayList<ScientificStudy>();
 	}
 
 	/**
@@ -83,7 +84,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	public List<ScientificStudy> getOngoingStudies() {
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -99,7 +100,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	public List<ScientificStudy> getCompletedStudies() {
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -115,7 +116,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	public List<ScientificStudy> getSuccessfulStudies() {
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -131,7 +132,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	public List<ScientificStudy> getFailedStudies() {
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -147,7 +148,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	public List<ScientificStudy> getCanceledStudies() {
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -200,7 +201,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	public List<ScientificStudy> getCompletedPrimaryStudies(Person researcher) {
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -218,7 +219,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	public List<ScientificStudy> getOngoingCollaborativeStudies(Person researcher) {
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -239,9 +240,9 @@ public class ScientificStudyManager // extends Thread
 		boolean allSubject = false;
 		if (type == null)
 			allSubject = true;
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 
-		List<Person> pList = new ArrayList<>(settlement.getAllAssociatedPeople());
+		List<Person> pList = new CopyOnWriteArrayList<>(settlement.getAllAssociatedPeople());
 
 		for (Person p : pList) {
 			Iterator<ScientificStudy> i = studies.iterator();
@@ -282,7 +283,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	public List<ScientificStudy> getCompletedCollaborativeStudies(Person researcher) {
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -304,9 +305,9 @@ public class ScientificStudyManager // extends Thread
 		if (type == null)
 			allSubject = true;
 		
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 
-		List<Person> pList = new ArrayList<>(settlement.getAllAssociatedPeople());
+		List<Person> pList = new CopyOnWriteArrayList<>(settlement.getAllAssociatedPeople());
 
 		for (Person p : pList) {
 			Iterator<ScientificStudy> i = studies.iterator();
@@ -332,7 +333,7 @@ public class ScientificStudyManager // extends Thread
 		if (type == null)
 			allSubject = true;
 		
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -355,7 +356,7 @@ public class ScientificStudyManager // extends Thread
 		if (type == null)
 			allSubject = true;
 		
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -378,7 +379,7 @@ public class ScientificStudyManager // extends Thread
 		if (type == null)
 			allSubject = true;
 		
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -402,7 +403,7 @@ public class ScientificStudyManager // extends Thread
 		if (type == null)
 			allSubject = true;
 		
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -426,7 +427,7 @@ public class ScientificStudyManager // extends Thread
 		if (type == null)
 			allSubject = true;
 		
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -447,7 +448,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	public List<ScientificStudy> getOpenInvitationStudies(Person collaborativeResearcher) {
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -468,7 +469,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of scientific studies.
 	 */
 	public List<ScientificStudy> getAllStudies(Person researcher) {
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 
 		// Add ongoing primary study.
 		ScientificStudy primaryStudy = getOngoingPrimaryStudy(researcher);
@@ -497,7 +498,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of scientific studies.
 	 */
 	public List<ScientificStudy> getAllStudies(Settlement settlement) {
-		List<ScientificStudy> result = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> result = new CopyOnWriteArrayList<ScientificStudy>();
 
 		// Add any ongoing primary studies.
 		List<ScientificStudy> primaryStudies = getOngoingPrimaryStudies(settlement, null);
@@ -513,7 +514,8 @@ public class ScientificStudyManager // extends Thread
 	/**
 	 * Update all of the studies.
 	 */
-	public void updateStudies() {
+	@Override
+	public boolean timePassing(ClockPulse pulse) {
 		Iterator<ScientificStudy> i = studies.iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
@@ -607,7 +609,7 @@ public class ScientificStudyManager // extends Thread
 						// Check primary researcher downtime.
 						if (!study.isPrimaryResearchCompleted()) {
 							MarsClock lastPrimaryWork = study.getLastPrimaryResearchWorkTime();
-							if ((lastPrimaryWork != null) && MarsClock.getTimeDiff(marsClock,
+							if ((lastPrimaryWork != null) && MarsClock.getTimeDiff(pulse.getMarsTime(),
 									lastPrimaryWork) >study.getPrimaryWorkDownTimeAllowed()) {
 								study.setCompleted(ScientificStudy.CANCELED);
 								LogConsolidated.flog(Level.INFO, 0, sourceName,
@@ -626,7 +628,7 @@ public class ScientificStudyManager // extends Thread
 							if (!study.isCollaborativeResearchCompleted(researcher)) {
 								MarsClock lastCollaborativeWork = study
 										.getLastCollaborativeResearchWorkTime(researcher);
-								if ((lastCollaborativeWork != null) && MarsClock.getTimeDiff(marsClock,
+								if ((lastCollaborativeWork != null) && MarsClock.getTimeDiff(pulse.getMarsTime(),
 										lastCollaborativeWork) > study.getCollaborativeWorkDownTimeAllowed()) {
 									study.removeCollaborativeResearcher(researcher);
 									LogConsolidated.flog(Level.INFO, 0, sourceName,
@@ -673,13 +675,15 @@ public class ScientificStudyManager // extends Thread
 				}
 			}
 		}
+		
+		return true;
 	}
 
 	private void pickTopics(ScientificStudy study) {
 		ScienceType type = study.getScience();
-		List<String> topics = new ArrayList<>();
+		List<String> topics = new CopyOnWriteArrayList<>();
 		topics.add(getTopic(type));
-		study.saveTopics(type, topics);//new ArrayList<String>().add(type.getTopic(type))));
+		study.saveTopics(type, topics);//new CopyOnWriteArrayList<String>().add(type.getTopic(type))));
 	}
 	
 	/**
@@ -938,7 +942,6 @@ public class ScientificStudyManager // extends Thread
 	 */
 	public static void initializeInstances(MarsClock c, UnitManager u) {
 		unitManager = u;
-		marsClock = c;
 	}
 
 	/**
