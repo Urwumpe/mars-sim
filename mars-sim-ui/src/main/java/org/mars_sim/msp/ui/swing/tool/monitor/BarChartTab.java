@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * BarChartTab.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Barry Evans
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -41,6 +41,7 @@ import org.jfree.data.general.AbstractSeriesDataset;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 
+@SuppressWarnings("serial")
 class BarChartTab
 extends MonitorTab {
 
@@ -98,7 +99,7 @@ extends MonitorTab {
 		 * @return Name of the Series.
 		 */
 		public String getSeriesName(int series) {
-			return model.getColumnName(columns[series]);
+			return model.getColumnName(columns[series]);// + "(" + getRowCount() + ")" ; ?
 		}
 
 		/**
@@ -125,12 +126,14 @@ extends MonitorTab {
 		 * of the rows in the model, i.e. the first column.
 		 */
 		private void loadCategories() {
-			categories = new ArrayList<String>(model.getRowCount());
+			categories = new ArrayList<>(model.getRowCount());
 
 			// Iterate the rows and add the value from the first cell.
-			for(int i = 0; i < model.getRowCount(); i++) {
+			for (int i = 0; i < model.getRowCount(); i++) {
 				String value = (String) model.getValueAt(i, 0);
+//				int num = model.getColumnCount();
 				if ((value != null) && (value.length() > MAXLABEL)) {
+					// "(" + num + ") " +
 					value = value.substring(0, MAXLABEL-2) + ".."; //$NON-NLS-1$
 				}
 				categories.add(value);
@@ -144,9 +147,9 @@ extends MonitorTab {
 		 * @param series Series index.
 		 * @return Numeric value of the model cell.
 		 */
-		public Number getValue(int series, String category) {
+		public Object getValue(int series, String category) {
 			int rowId = categories.indexOf(category);
-			return (Number)model.getValueAt(rowId, columns[series]);
+			return model.getValueAt(rowId, columns[series]);
 		}
 
 		/**
@@ -211,7 +214,11 @@ extends MonitorTab {
 		}
 
 		public Number getValue(int row, int column) {
-			return (Number) model.getValueAt(column, columns[row]);
+			Object obj = model.getValueAt(column, columns[row]);
+			if (obj instanceof Number) {
+				return (Number)obj;
+			}
+			return (Number) Double.valueOf((String)obj);
 		}
 
 		public Number getValue(Comparable rowKey, Comparable columnKey) {
@@ -282,7 +289,7 @@ extends MonitorTab {
 	 * @param columns Indexes of columns to display.
 	 */
 	public BarChartTab(MonitorModel model, int []columns) {
-		super(model, false, ImageLoader.getNewIcon(MonitorWindow.BAR_ICON));
+		super(model, false, false, ImageLoader.getNewIcon(MonitorWindow.BAR_ICON));
 
 		String title = model.getName();
 		setName(title);
@@ -290,7 +297,7 @@ extends MonitorTab {
 		barModel = new TableBarDataset(model, columns);
 		chart = ChartFactory.createBarChart(null, null, null, barModel, PlotOrientation.VERTICAL, true, true, false);
 
-		// 2015-10-18 Limits the size of the bar to 35% if there are only very few category
+		// Limits the size of the bar to 35% if there are only very few category
 		//BarRenderer3D renderer = (BarRenderer3D) chart.getCategoryPlot().getRenderer();
 		BarRenderer renderer = (BarRenderer) chart.getCategoryPlot().getRenderer();
 		renderer.setMaximumBarWidth(.1); // set maximum width to 10% of chart
@@ -298,7 +305,7 @@ extends MonitorTab {
 
 		Plot plot = chart.getPlot();
 
-		// 2015-10-18 Adds set the range axis
+		// Adds set the range axis
 		final ValueAxis rangeAxis = ((CategoryPlot) plot).getRangeAxis();//.getRangeAxis();
 		rangeAxis.setAutoTickUnitSelection(true);//setStandardTickUnits//(CategoryAxis.DEFAULT_CATEGORY_MARGIN);//createIntegerTickUnits());
 		rangeAxis.setTickLabelFont(new Font("Arial",Font.BOLD, 12));
@@ -307,7 +314,7 @@ extends MonitorTab {
 
 		CategoryAxis domainAxis = ((CategoryPlot) plot).getDomainAxis();
 
-		// 2015-10-18 set the label position to go sideway at 45 deg downward
+		// Set the label position to go sideway at 45 deg downward
 		domainAxis.setCategoryLabelPositions(CategoryLabelPositions.DOWN_45); // DOWN_90);
 		domainAxis.setTickLabelFont(new Font("Calibri", Font.BOLD, 12));
 		domainAxis.setMaximumCategoryLabelWidthRatio(1);
@@ -317,8 +324,7 @@ extends MonitorTab {
 	    domainAxis.setCategoryMargin(.5);
 	    //domainAxis.setItemMargin(0.2);
 
-
-		// 2015-10-18 Adds label on each bar
+		// Adds label on each bar
 		//renderer.setBaseItemLabelGenerator(new StandardCategoryItemLabelGenerator()); // only work for 2D bar chart
 		//renderer.setBaseItemLabelsVisible(true); // only work for 2D bar chart
 		CategoryItemLabelGenerator generator = new StandardCategoryItemLabelGenerator();
@@ -328,46 +334,42 @@ extends MonitorTab {
 				new ItemLabelPosition(ItemLabelAnchor.OUTSIDE12, TextAnchor.BASELINE_CENTER,
 						TextAnchor.BASELINE_CENTER, 0.0));
 		renderer.setItemLabelAnchorOffset(10);
-/*
-
-  		TODO: implement interval marker for the ave high and ave low
-		IntervalMarker target = new IntervalMarker(average_low,average_high);
-		target.setLabelFont(new Font("SansSerif", Font.ITALIC, 11));
-		target.setLabelAnchor(RectangleAnchor.LEFT);
-		target.setLabelTextAnchor(TextAnchor.CENTER_LEFT);
-		((CategoryPlot) plot).addRangeMarker(target, Layer.BACKGROUND);
-*/
 
 
-		// 2015-10-18 Adds tooltip generator
+//  	// TODO: implement interval marker for the ave high and ave low
+//		IntervalMarker target = new IntervalMarker(average_low,average_high);
+//		target.setLabelFont(new Font("SansSerif", Font.ITALIC, 11));
+//		target.setLabelAnchor(RectangleAnchor.LEFT);
+//		target.setLabelTextAnchor(TextAnchor.CENTER_LEFT);
+//		((CategoryPlot) plot).addRangeMarker(target, Layer.BACKGROUND);
+
+		// Adds tooltip generator
 		// this version only work for 2D bar chart, not 3D bar chart
-/*		renderer.setBaseToolTipGenerator(new CategoryToolTipGenerator() {
-		    public String generateToolTip(CategoryDataset dataset, int row, int column) {
-		        return "(1) Left click and drag a range to magnify (2) Rotate mouse wheel to zoom in/out (3) Right click to fully customize chart"
-		     // TODO: use tooltip to show the corresponding value of a category
-		    }
-		});
-*/
+//		renderer.setBaseToolTipGenerator(new CategoryToolTipGenerator() {
+//		    public String generateToolTip(CategoryDataset dataset, int row, int column) {
+//		        return "(1) Left click and drag a range to magnify (2) Rotate mouse wheel to zoom in/out (3) Right click to fully customize chart"
+//		     // TODO: use tooltip to show the corresponding value of a category
+//		    }
+//		});
+
 		renderer.setDefaultToolTipGenerator(new MyToolTipGenerator());
 
-/*
-		class CustomToolTipGenerator implements CategoryToolTipGenerator  {
-		    public String generateToolTip(CategoryDataset dataset, int row, int column)   {
-		           return row + ": " + column;
-		    }
-		}
-		renderer.setSeriesToolTipGenerator(0,new CustomToolTipGenerator());
-*/
+//		class CustomToolTipGenerator implements CategoryToolTipGenerator  {
+//		    public String generateToolTip(CategoryDataset dataset, int row, int column)   {
+//		           return row + ": " + column;
+//		    }
+//		}
+//		renderer.setSeriesToolTipGenerator(0,new CustomToolTipGenerator());
 
 		// Create a panel for chart
 		JComponent chartpanel = new ChartPanel(chart);
 		chart.setBackgroundPaint(getBackground());
 
-		// 2015-10-18 Adds zooming
+		// Adds zooming
 		((ChartPanel)chartpanel).setFillZoomRectangle(true);
 		((ChartPanel)chartpanel).setMouseWheelEnabled(true);
 
-		// 2015-10-18 Prevents label scaling
+		// Prevents label scaling
 		((ChartPanel)chartpanel).setMaximumDrawHeight(10000);
 		((ChartPanel)chartpanel).setMaximumDrawWidth(10000);
 		((ChartPanel)chartpanel).setMinimumDrawWidth(20);
@@ -378,16 +380,12 @@ extends MonitorTab {
 		// dependent upon the categories, it can not be smaller than the
 		// label width.
 		int columnWidth = barModel.getSeriesCount() * COLUMNWIDTH;
-		//System.out.println("columnWidth is " + columnWidth );
 
 		if (columnWidth < LABELWIDTH) {
 			columnWidth = LABELWIDTH;
 		}
-		//System.out.println("columnWidth is " + columnWidth );
-
 		// Check the width for possible scrolling
 		int chartwidth = columnWidth * barModel.getCategoryCount();
-		//System.out.println("chartwidth is " + chartwidth );
 
 		//JComponent scrollPane = null;
 
@@ -401,10 +399,7 @@ extends MonitorTab {
 					JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 		}
 
-
-
-/*
-	       // 2015-10-18 Added setting below to keep the aspect ratio
+	    // Added setting below to keep the aspect ratio
         // see http://www.jfree.org/forum/viewtopic.php?f=3&t=115763
         // Chart will always be drawn to an off-screen buffer that is the same size as the ChartPanel, so no scaling will happen when the offscreen image is copied to the panel.
         // chartpanel.setPreferredSize(new Dimension (700, 700));
@@ -413,27 +408,25 @@ extends MonitorTab {
         //chartpanel.setMinimumDrawHeight(0);
         //chartpanel.setMaximumDrawHeight(Integer.MAX_VALUE);
 
-		JPanel fixedSizePane = new JPanel(new FlowLayout());
-		fixedSizePane.add(chartpanel);
-		fixedSizePane.addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentResized(ComponentEvent e) {
-            	int w = fixedSizePane.getWidth();
-                int h = fixedSizePane.getHeight();
-                int size =  Math.min(w, h);
-                chartpanel.setPreferredSize(new Dimension(size, size));
-                fixedSizePane.revalidate();
-            }
-        });
-*/
+//		JPanel fixedSizePane = new JPanel(new FlowLayout());
+//		fixedSizePane.add(chartpanel);
+//		fixedSizePane.addComponentListener(new ComponentAdapter() {
+//            @Override
+//            public void componentResized(ComponentEvent e) {
+//            	int w = fixedSizePane.getWidth();
+//                int h = fixedSizePane.getHeight();
+//                int size =  Math.min(w, h);
+//                chartpanel.setPreferredSize(new Dimension(size, size));
+//                fixedSizePane.revalidate();
+//            }
+//        });
+
 		chartpanel.setPreferredSize(new Dimension(800, 0));
 		add(chartpanel, BorderLayout.CENTER);
-
-		//System.out.println("done with BarChartTab's constructor");
 	}
 
 
-    // 2015-10-18 adds custom tooltip generator
+    // Adds custom tooltip generator
     private class MyToolTipGenerator extends StandardCategoryToolTipGenerator {
         @Override
         public String generateToolTip(CategoryDataset dataset, int row, int column) {

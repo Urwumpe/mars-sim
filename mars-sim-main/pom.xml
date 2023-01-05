@@ -1,35 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" 
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">	
-	
+<project xmlns="https://maven.apache.org/POM/4.0.0" 
+	xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://maven.apache.org/POM/4.0.0 https://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<artifactId>mars-sim</artifactId>
-		<groupId>com.github</groupId>
-		<version>3.1.2</version>
+		<groupId>com.github.mars-sim</groupId>
+		<version>pre-3.5.0</version>
 	</parent>
-	<groupId>com.github.mars-sim</groupId>
 	<artifactId>mars-sim-main</artifactId>
 	<name>mars-sim-main</name>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<domainNameMainClass>org.mars_sim.main.MarsProjectStarter</domainNameMainClass>
+		<starterClass>org.mars_sim.main.MarsProjectStarter</starterClass>
+		<mainClass>org.mars_sim.main.MarsProject</mainClass>
 	</properties>
 	
 	<dependencies>
-		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<exclusions>
-				<exclusion>
-					<artifactId>hamcrest-core</artifactId>
-					<groupId>org.hamcrest</groupId>
-				</exclusion>
-			</exclusions>
-			<version>${junit.version}</version>
-			<scope>test</scope>
-		</dependency>
 		<dependency>
 			<groupId>com.github.mars-sim</groupId>
 			<artifactId>mars-sim-core</artifactId>
@@ -45,35 +32,86 @@
 			<artifactId>mars-sim-ui</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-		<!-- https://mvnrepository.com/artifact/org.apache.commons/commons-lang3
-			 See pom.xml at core submodule
-		<dependency>
-		    <groupId>org.apache.commons</groupId>
-		    <artifactId>commons-lang3</artifactId>
-		    <version>3.9</version>
-		</dependency> -->
-	
 	</dependencies>
-	
+
+<!-- https://medium.com/graalvm/gradle-and-maven-plugins-for-native-image-with-initial-junit-testing-support-dde00a8caf0b -->
+<!-- https://github.com/graalvm/native-build-tools -->
+<!-- https://graalvm.github.io/native-build-tools/latest/maven-plugin.html 
+	 https://docs.oracle.com/en/graalvm/enterprise/22/docs/reference-manual/native-image/guides/use-native-image-maven-plugin/
+-->
+  <profiles>
+    <profile>
+      <id>native</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <version>${native.maven.plugin.version}</version>
+            <extensions>true</extensions>
+            <executions>
+              <execution>
+                <id>build-native</id>
+                <goals>
+                  <goal>build</goal>
+                </goals>
+                <phase>package</phase>
+              </execution>
+              <execution>
+                <id>test-native</id>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <phase>test</phase>
+              </execution>
+            </executions>
+            <configuration>
+				<imageName>mars-sim-graal</imageName>
+				<mainClass>${mainClass}</mainClass>			  
+				<fallback>false</fallback>
+				<buildArgs>
+					<arg>-H:DashboardDump=fortune -H:+DashboardAll</arg>
+				</buildArgs>
+ 				<agent>
+ 					<enabled>true</enabled>
+ 					<options>
+ 					 	<option>experimental-class-loader-support</option>
+ 					</options>
+				</agent>			  
+				<verbose>true</verbose>    	            
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+  
 	<build>
-		<plugins>				
+		<defaultGoal>clean package install</defaultGoal>
+		<plugins>
+						
 			<!-- https://mvnrepository.com/artifact/org.codehaus.mojo/exec-maven-plugin -->
 			<!-- https://www.mojohaus.org/exec-maven-plugin/ -->
 			<!-- https://github.com/mojohaus/mojo-parent -->
 			<plugin>
 		        <groupId>org.codehaus.mojo</groupId>
 		        <artifactId>exec-maven-plugin</artifactId>
-		        <version>1.6.0</version>
+		        <!-- >version>1.6.0</version-->
+		        <version>3.1.0</version>
 		        <executions>
 		            <execution>
-		                <goals>
+			             <id>java-agent</id>
+			             <goals>
+			                 <goal>exec</goal>
+			             </goals>		            
+		                <!--goals>
 		                    <goal>java</goal>
-		                </goals>
+		                </goals-->
 		            </execution>
 		        </executions>
 		        <configuration>
 		            <executable>java</executable>
-		            <!--mainClass>org.mars_sim.headless.MarsProjectHeadless</mainClass-->
+		            <!--mainClass>org.mars_sim.main.MarsProject</mainClass-->
 		            <arguments>
                			<argument>-Djava.util.logging.config.file=logging.properties -cp .;*;jars\*</argument>
                			<argument>-classpath</argument>
@@ -87,29 +125,32 @@
 				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-jar-plugin  : 27 KB -->
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
-				<version>3.2.0</version>
+				<version>3.3.0</version>
 				<configuration>
 					<archive>
 						<manifest>
 							<addClasspath>true</addClasspath>
-							<mainClass>${domainNameMainClass}</mainClass>
+							<mainClass>${mainClass}</mainClass>
 						</manifest>
 					</archive>
 				</configuration>
 			</plugin>
 			<plugin>
 				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-assembly-plugin 
-					https://maven.apache.org/plugins/maven-assembly-plugin/ : 235 KB -->
+					 https://maven.apache.org/plugins/maven-assembly-plugin/ : 235 KB 
+					 For creating a self-contained Jar file containing the code from modules along with dependencies
+				-->
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-assembly-plugin</artifactId>
-				<version>3.2.0</version>
+				<version>3.4.2</version>
 				<configuration>
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
 					<archive>
 						<manifest>
-							<mainClass>${domainNameMainClass}</mainClass>
+							<addClasspath>true</addClasspath>						
+							<mainClass>${mainClass}</mainClass>
 						</manifest>
 						<manifestEntries>
 						    <Multi-Release>true</Multi-Release>
@@ -131,7 +172,7 @@
 				<!-- https://mvnrepository.com/artifact/org.vafer/jdeb : 1.8 MB -->
 				<groupId>org.vafer</groupId>
 				<artifactId>jdeb</artifactId>
-				<version>1.8</version>
+				<version>1.10</version>
 				<executions>
 					<execution>
 						<phase>package</phase>
@@ -204,11 +245,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
-	<repositories>
-		<repository>
-			<id>jcenter</id>
-			<url>https://jcenter.bintray.com/</url>
-		</repository>
-	</repositories>
 </project>

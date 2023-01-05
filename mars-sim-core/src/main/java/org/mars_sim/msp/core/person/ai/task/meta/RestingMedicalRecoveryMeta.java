@@ -1,43 +1,38 @@
-/**
+/*
  * Mars Simulation Project
  * RestingMedicalRecoveryMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
 import java.util.Iterator;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.task.RestingMedicalRecovery;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
 import org.mars_sim.msp.core.person.health.HealthProblem;
-import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.MedicalCare;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.SickBay;
+import org.mars_sim.msp.core.vehicle.VehicleType;
 
 /**
  * Meta task for the RestingMedicalRecoveryMeta task.
  */
-public class RestingMedicalRecoveryMeta implements MetaTask, Serializable {
-
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
+public class RestingMedicalRecoveryMeta extends FactoryMetaTask {
 
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.restingMedicalRecovery"); //$NON-NLS-1$
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
+    public RestingMedicalRecoveryMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.ANY_HOUR);
+	}
 
     @Override
     public Task constructInstance(Person person) {
@@ -48,7 +43,7 @@ public class RestingMedicalRecoveryMeta implements MetaTask, Serializable {
     public double getProbability(Person person) {
 
         double result = 0D;
-        
+
         if (person.isOutside())
         	return 0;
 
@@ -63,21 +58,21 @@ public class RestingMedicalRecoveryMeta implements MetaTask, Serializable {
         }
 
         if (bedRestNeeded) {
-            result = 200D;
+            result = 500D;
 
             int hunger = (int) person.getPhysicalCondition().getHunger();
-            result = result - (hunger - 333) / 3;
-            
+            result = result - (hunger - 333) / 3.0;
+
             // Determine if any available medical aids can be used for bed rest.
             if (hasUsefulMedicalAids(person)) {
                 result+= 100D;
             }
-            
+
 	        double pref = person.getPreference().getPreferenceScore(this);
-	        
+
 	        if (pref > 0)
 	        	result = result + pref * 10;
-	        
+
             if (result < 0) result = 0;
         }
 
@@ -144,7 +139,7 @@ public class RestingMedicalRecoveryMeta implements MetaTask, Serializable {
 
         boolean result = false;
 
-        if (person.getVehicle() instanceof Rover) {
+        if (VehicleType.isRover(person.getVehicle().getVehicleType())) {
             Rover rover = (Rover) person.getVehicle();
             if (rover.hasSickBay()) {
                 SickBay sickBay = rover.getSickBay();
@@ -158,16 +153,4 @@ public class RestingMedicalRecoveryMeta implements MetaTask, Serializable {
 
         return result;
     }
-
-	@Override
-	public Task constructInstance(Robot robot) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 }

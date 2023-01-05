@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MultisortTableHeaderCellRenderer.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -60,6 +60,8 @@ public class MultisortTableHeaderCellRenderer extends DefaultTableHeaderCellRend
             return new AlphaIcon(UIManager.getIcon("Table.ascendingSortIcon"), computedAlpha);
           case DESCENDING:
             return new AlphaIcon(UIManager.getIcon("Table.descendingSortIcon"), computedAlpha);
+		default:
+			break;
         }
       }
       computedAlpha *= alpha;

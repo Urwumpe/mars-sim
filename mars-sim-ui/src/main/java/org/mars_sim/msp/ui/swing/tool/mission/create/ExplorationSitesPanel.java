@@ -1,23 +1,51 @@
-/**
+/*
  * Mars Simulation Project
  * ExplorationSitesPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JTable;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.table.TableCellRenderer;
+
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Direction;
 import org.mars_sim.msp.core.IntPoint;
-import org.mars_sim.msp.core.person.ai.mission.CollectResourcesMission;
 import org.mars_sim.msp.core.person.ai.mission.Exploration;
+import org.mars_sim.msp.core.person.ai.mission.RoverMission;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.map.*;
+import org.mars_sim.msp.ui.swing.tool.map.CannedMarsMap;
+import org.mars_sim.msp.ui.swing.tool.map.EllipseLayer;
+import org.mars_sim.msp.ui.swing.tool.map.MapPanel;
+import org.mars_sim.msp.ui.swing.tool.map.MapUtils;
+import org.mars_sim.msp.ui.swing.tool.map.MineralMapLayer;
+import org.mars_sim.msp.ui.swing.tool.map.NavpointEditLayer;
+import org.mars_sim.msp.ui.swing.tool.map.SurfMarsMap;
+import org.mars_sim.msp.ui.swing.tool.map.UnitIconMapLayer;
+import org.mars_sim.msp.ui.swing.tool.map.UnitLabelMapLayer;
 
 import com.alee.laf.button.WebButton;
 import com.alee.laf.label.WebLabel;
@@ -25,21 +53,10 @@ import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
 import com.alee.laf.table.WebTable;
 
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-
-import javax.swing.JTable;
-import javax.swing.table.AbstractTableModel;
-import javax.swing.table.TableCellRenderer;
-
-import java.awt.*;
-import java.awt.event.*;
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * This is a wizard panel for selecting exploration sites for the mission.
  */
+@SuppressWarnings("serial")
 class ExplorationSitesPanel extends WizardPanel {
 
 	/** Wizard panel name. */
@@ -106,11 +123,13 @@ class ExplorationSitesPanel extends WizardPanel {
 		// Create the map panel.
 		mapPane = new MapPanel(desktop, 200L);
 		mineralLayer = new MineralMapLayer(mapPane);
+		
 		mapPane.addMapLayer(mineralLayer, 0);
 		mapPane.addMapLayer(new UnitIconMapLayer(mapPane), 1);
 		mapPane.addMapLayer(new UnitLabelMapLayer(), 2);
 		mapPane.addMapLayer(ellipseLayer = new EllipseLayer(Color.GREEN), 3);
 		mapPane.addMapLayer(navLayer = new NavpointEditLayer(mapPane, true), 4);
+		
 		mapPane.setBorder(new MarsPanelBorder());
 		mapPane.addMouseListener(new NavpointMouseListener());
 		mapPane.addMouseMotionListener(new NavpointMouseMotionListener());
@@ -297,7 +316,7 @@ class ExplorationSitesPanel extends WizardPanel {
 	 */
 	private double getRange() {
 		// Use range modifier.
-		double range = getWizard().getMissionData().getRover().getRange(Exploration.missionType) * RANGE_MODIFIER;
+		double range = getWizard().getMissionData().getRover().getRange(Exploration.MISSION_TYPE) * RANGE_MODIFIER;
 //		if (range > MAX_RANGE)
 //			range = MAX_RANGE;
 		return range;
@@ -312,7 +331,7 @@ class ExplorationSitesPanel extends WizardPanel {
 		Rover rover = getWizard().getMissionData().getRover();
 		int memberNum = getWizard().getMissionData().getMixedMembers().size();
 		try {
-			return CollectResourcesMission.getTotalTripTimeLimit(rover, memberNum, true);
+			return RoverMission.getTotalTripTimeLimit(rover, memberNum, true);
 		} catch (Exception e) {
 			return 0D;
 		}
@@ -652,10 +671,8 @@ class ExplorationSitesPanel extends WizardPanel {
 		 * @return true if within boundaries.
 		 */
 		private boolean withinBounds(IntPoint position, Coordinates location) {
-			boolean result = true;
-			if (!navLayer.withinDisplayEdges(position))
-				result = false;
-			if (getRemainingRange(false) < getDistanceDiff(location))
+			boolean result = navLayer.withinDisplayEdges(position);
+            if (getRemainingRange(false) < getDistanceDiff(location))
 				result = false;
 			return result;
 		}
@@ -757,7 +774,7 @@ class ExplorationSitesPanel extends WizardPanel {
 			if (row < getRowCount()) {
 				String mineralName = mineralNames.get(row);
 				if (column == 0) {
-					return Conversion.capitalize(mineralName);
+					return mineralName;
 				} else if (column == 1) {
 					return mineralColors.get(mineralName);
 				} else

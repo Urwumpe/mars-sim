@@ -1,14 +1,15 @@
 /**
  * Mars Simulation Project
  * VehicleDisplayInfoBean.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.unit_display_info;
 
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.mars.MarsSurface;
+import org.mars_sim.msp.core.environment.MarsSurface;
+import org.mars_sim.msp.core.vehicle.Drone;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
@@ -50,8 +51,8 @@ abstract class VehicleDisplayInfoBean implements UnitDisplayInfo {
         boolean result = true;
         
         Unit container = unit.getContainerUnit();
-		if (!(container instanceof MarsSurface))
-        	result = false;
+		if (container == null || container instanceof MarsSurface)
+        	result = true;
         
         Vehicle vehicle = (Vehicle) unit;
         if (vehicle.isSalvaged()) result = false;
@@ -152,11 +153,8 @@ abstract class VehicleDisplayInfoBean implements UnitDisplayInfo {
         
         // Show the vehicle only if it's on a mission outside
         int containerID = vehicle.getContainerID();
-		if (containerID == Unit.MARS_SURFACE_UNIT_ID
-				&& vehicle instanceof Rover)
-        	result = true;
-		else
-			result = false;
+        result = (containerID == Unit.MARS_SURFACE_UNIT_ID || containerID == Unit.UNKNOWN_UNIT_ID)
+                && (vehicle instanceof Rover || vehicle instanceof Drone);
 		
         if (vehicle.isSalvaged()) 
         	result = false;
@@ -190,6 +188,8 @@ abstract class VehicleDisplayInfoBean implements UnitDisplayInfo {
     
     /** 
      * Gets icon for unit button.
+     * To be overrided by sub-class
+     * 
      * @return icon
      */
     public Icon getButtonIcon() {

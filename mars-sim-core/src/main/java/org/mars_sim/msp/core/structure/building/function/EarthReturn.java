@@ -1,22 +1,22 @@
 /**
  * Mars Simulation Project
  * EarthReturn.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.structure.building.function;
 
-import java.io.Serializable;
 import java.util.Iterator;
 
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
 
 /**
  * A building function for launching an Earth return mission.
  */
-public class EarthReturn extends Function implements Serializable {
+public class EarthReturn extends Function {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -27,15 +27,15 @@ public class EarthReturn extends Function implements Serializable {
 
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param building the building this function is for.
 	 */
-	public EarthReturn(Building building) {
+	public EarthReturn(Building building, FunctionSpec spec) {
 		// Use Function constructor.
-		super(FunctionType.EARTH_RETURN, building);
+		super(FunctionType.EARTH_RETURN,spec, building);
 
 		// Populate data members.
-		crewCapacity = buildingConfig.getEarthReturnCrewCapacity(building.getBuildingType());
+		crewCapacity = spec.getCapacity();
 
 		// Initialize hasLaunched to false.
 		hasLaunched = false;
@@ -43,7 +43,7 @@ public class EarthReturn extends Function implements Serializable {
 
 	/**
 	 * Gets the value of the function for a named building.
-	 * 
+	 *
 	 * @param buildingName the building name.
 	 * @param newBuilding  true if adding a new building.
 	 * @param settlement   the settlement.
@@ -59,14 +59,14 @@ public class EarthReturn extends Function implements Serializable {
 		Iterator<Building> i = settlement.getBuildingManager().getBuildings(FunctionType.EARTH_RETURN).iterator();
 		while (i.hasNext()) {
 			Building earthReturnBuilding = i.next();
-			EarthReturn earthReturn = (EarthReturn) earthReturnBuilding.getFunction(FunctionType.EARTH_RETURN);
+			EarthReturn earthReturn = earthReturnBuilding.getEarthReturn();
 			double crewCapacity = earthReturn.getCrewCapacity();
 			double wearFactor = ((earthReturnBuilding.getMalfunctionManager().getWearCondition() / 100D) * .75D) + .25D;
 			supply += crewCapacity * wearFactor;
 		}
 
 		if (!newBuilding) {
-			supply -= buildingConfig.getEarthReturnCrewCapacity(buildingName);
+			supply -= buildingConfig.getFunctionSpec(buildingName, FunctionType.EARTH_RETURN).getCapacity();
 			if (supply < 0D)
 				supply = 0D;
 		}
@@ -76,7 +76,7 @@ public class EarthReturn extends Function implements Serializable {
 
 	/**
 	 * Get the crew capacity for an Earth return mission.
-	 * 
+	 *
 	 * @return crew capacity.
 	 */
 	public int getCrewCapacity() {
@@ -85,7 +85,7 @@ public class EarthReturn extends Function implements Serializable {
 
 	/**
 	 * Checks if the Earth return mission for this building has launched.
-	 * 
+	 *
 	 * @return true if mission has launched.
 	 */
 	public boolean hasLaunched() {

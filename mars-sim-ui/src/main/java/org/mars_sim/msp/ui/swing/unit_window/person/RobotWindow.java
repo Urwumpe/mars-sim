@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RobotWindow.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.unit_window.person;
@@ -13,7 +13,6 @@ import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.unit_window.InventoryTabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.LocationTabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.NotesTabPanel;
-import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.UnitWindow;
 
 /**
@@ -35,7 +34,7 @@ public class RobotWindow extends UnitWindow {
 	 */
 	public RobotWindow(MainDesktopPane desktop, Robot robot) {
 		// Use UnitWindow constructor
-		super(desktop, robot, false);
+		super(desktop, robot, robot.getAssociatedSettlement().getName() + " - " + robot.getNickName(), false);
 		this.robot = robot;
 
 		// Add tab panels
@@ -50,16 +49,16 @@ public class RobotWindow extends UnitWindow {
 			inoperableCache = false;
 
 		addTabPanel(new InventoryTabPanel(robot, desktop));
-		addTopPanel(new LocationTabPanel(robot, desktop));
+		addTabPanel(new LocationTabPanel(robot, desktop));
 		addTabPanel(new NotesTabPanel(robot, desktop));
 		addTabPanel(new TabPanelSchedule(robot, desktop));
 		addTabPanel(new TabPanelSkill(robot, desktop));
-		// addTabPanel(new TabPanelHealth(robot, desktop));
-		// addTabPanel(new TabPanelGeneral(robot, desktop));
-
+		
 		// Add tab sorting
 		sortTabPanels();
-
+		
+		// Add to tab panels. 
+		addTabIconPanels();
 	}
 
 	/**

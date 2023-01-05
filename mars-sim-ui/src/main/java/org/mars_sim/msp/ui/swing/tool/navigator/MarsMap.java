@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MarsMap.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.navigator;
@@ -26,25 +26,23 @@ import org.mars_sim.msp.ui.swing.ImageLoader;
  * The MarsMap class generates the surface, the topographical and 
  * the geological map for GlobeDisplay.
  */
-
 public class MarsMap {
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(MarsMap.class.getName());
+	private static final Logger logger = Logger.getLogger(MarsMap.class.getName());
 
 	// Constant data members
 	/** Height of map source image (pixels). */
-	// private final static int map_height = 150;
-	public final static int MAP_H = NavigatorWindow.HORIZONTAL_SURFACE_MAP; //HORIZONTAL_LEFT_HALF; //
+	public static final int MAP_H = NavigatorWindow.HORIZONTAL_SURFACE_MAP;
 	/** Width of map source image (pixels). */
-	public final static int MAP_W = MAP_H * 2;
+	public static final int MAP_W = MAP_H * 2;
+	private static final int HALF_MAP_HEIGHT = MAP_H / 2;
+	
+	private static final double PI_HALF = Math.PI / 2;
+	private static final double PI_DOUBLE = Math.PI * 2;
+	private static final double RHO = MAP_H / Math.PI;
+	private static final double COL_ARRAY_MODIFIER = 1 / PI_DOUBLE;
 
-	private final double PI_half = Math.PI / 2D;
-	private final double PI_double = Math.PI * 2D;
-
-	private double rho = MAP_H / Math.PI;
-	private double col_array_modifier = 1D / PI_double;
-	private int half_map_height = MAP_H / 2;
 
 	// Data members
 	/** Center position of globe. */
@@ -72,7 +70,7 @@ public class MarsMap {
 		// Initialize Variables
 		// this.globeType = globeType;
 		this.displayArea = displayArea;
-		centerCoords = new Coordinates(PI_half, PI_half);
+		centerCoords = new Coordinates(PI_HALF, PI_HALF);
 
 		// Load Surface Map Image, which is now part of the globe enum
 		String imageName = globeType.getPath();
@@ -84,6 +82,8 @@ public class MarsMap {
 			mtrack.waitForAll();
 		} catch (InterruptedException e) {
 			logger.log(Level.SEVERE, Msg.getString("MarsMap.log.mediaTrackerError", e.toString())); //$NON-NLS-1$
+			// Restore interrupted state
+		    Thread.currentThread().interrupt();
 		}
 
 		// Prepare Sphere
@@ -107,32 +107,30 @@ public class MarsMap {
 		// Initialize variables
 		imageDone = false;
 
-		centerCoords.setCoords(adjNewCenter);
+		centerCoords = adjNewCenter;
 
-		// double PI_half = Math.PI / 2D;
-		// double PI_double = Math.PI * 2D;
 		double phi = centerCoords.getPhi();
 		double theta = centerCoords.getTheta();
-		double end_row = phi - PI_half;
+		double end_row = phi - PI_HALF;
 		double start_row = end_row + Math.PI;
 		double row_iterate;
 		boolean north;
 
 		// Determine if sphere should be created from north-south, or from south-north
-		if (phi <= PI_half) {
+		if (phi <= PI_HALF) {
 			north = true;
-			end_row = phi - PI_half;
+			end_row = phi - PI_HALF;
 			start_row = end_row + Math.PI;
 			row_iterate = 0D - (Math.PI / (double) MAP_H);
 		} else {
 			north = false;
-			start_row = phi - PI_half;
+			start_row = phi - PI_HALF;
 			end_row = start_row + Math.PI;
 			row_iterate = (Math.PI / (double) MAP_H);
 		}
 
 		// More variable initializations
-		double col_correction = -PI_half - theta;
+		double col_correction = -PI_HALF - theta;
 		// double rho = map_height / Math.PI;
 		double sin_offset = MoreMath.sin(phi + Math.PI);
 		double cos_offset = MoreMath.cos(phi + Math.PI);
@@ -157,36 +155,36 @@ public class MarsMap {
 			int circum = sphereColor[array_y].size();
 			double row_cos =  MoreMath.cos(row);
 
-			// Determine visible boundry of row
+			// Determine visible boundary of row
 			double col_boundry = Math.PI;
-			if (phi <= PI_half) {
-				if ((row >= PI_half *  MoreMath.cos(phi)) && (row < PI_half)) {
-					col_boundry = PI_half * (1D + row_cos);
-				} else if (row >= PI_half) {
-					col_boundry = PI_half;
+			if (phi <= PI_HALF) {
+				if ((row >= PI_HALF *  MoreMath.cos(phi)) && (row < PI_HALF)) {
+					col_boundry = PI_HALF * (1D + row_cos);
+				} else if (row >= PI_HALF) {
+					col_boundry = PI_HALF;
 				}
 			} else {
-				if ((row <= PI_half *  MoreMath.cos(phi)) && (row > PI_half)) {
-					col_boundry = PI_half * (1D - row_cos);
-				} else if (row <= PI_half) {
-					col_boundry = PI_half;
+				if ((row <= PI_HALF *  MoreMath.cos(phi)) && (row > PI_HALF)) {
+					col_boundry = PI_HALF * (1D - row_cos);
+				} else if (row <= PI_HALF) {
+					col_boundry = PI_HALF;
 				}
 			}
-			if (phi == PI_half) {
-				col_boundry = PI_half;
+			if (phi == PI_HALF) {
+				col_boundry = PI_HALF;
 			}
 
 			double col_iterate = Math.PI / (double) circum;
 
 			// Error adjustment for theta center close to PI_half
-			double error_correction = phi - PI_half;
+			double error_correction = phi - PI_HALF;
 
 			if (error_correction > 0D) {
 				if (error_correction < row_iterate) {
-					col_boundry = PI_half;
+					col_boundry = PI_HALF;
 				}
 			} else if (error_correction > 0D - row_iterate) {
-				col_boundry = PI_half;
+				col_boundry = PI_HALF;
 			}
 
 			// Determine column starting and stopping points for row
@@ -195,11 +193,11 @@ public class MarsMap {
 			if (col_boundry == Math.PI)
 				end_col -= col_iterate;
 
-			double temp_buff_x = rho * MoreMath.sin(row);
+			double temp_buff_x = RHO * MoreMath.sin(row);
 			double temp_buff_y1 = temp_buff_x * cos_offset;
-			double temp_buff_y2 = rho * row_cos * sin_offset;
+			double temp_buff_y2 = RHO * row_cos * sin_offset;
 
-			double col_array_modifier2 = col_array_modifier * circum;
+			double col_array_modifier2 = COL_ARRAY_MODIFIER * circum;
 
 			// Go through each column in row
 			for (double col = start_col; col <= end_col; col += col_iterate) {
@@ -214,8 +212,8 @@ public class MarsMap {
 				double temp_col = col + col_correction;
 
 				// Determine x and y position of point on image
-				int buff_x = (int) Math.round(temp_buff_x *  MoreMath.cos(temp_col)) + half_map_height;
-				int buff_y = (int) Math.round((temp_buff_y1 * MoreMath.sin(temp_col)) + temp_buff_y2) + half_map_height;
+				int buff_x = (int) Math.round(temp_buff_x *  MoreMath.cos(temp_col)) + HALF_MAP_HEIGHT;
+				int buff_y = (int) Math.round((temp_buff_y1 * MoreMath.sin(temp_col)) + temp_buff_y2) + HALF_MAP_HEIGHT;
 
 				// Put point in buffer array
 				buffer_array[buff_x + (MAP_H * buff_y)] = (int) sphereColor[array_y].elementAt(array_x);
@@ -227,20 +225,20 @@ public class MarsMap {
 		// Create image out of buffer array
 		globeImage = displayArea
 				.createImage(new MemoryImageSource(MAP_H, MAP_H, buffer_array, 0, MAP_H));
-
+		
+		// NOTE: Replace MediaTracker with faster method
+		// Use BufferedImage image = ImageIO.read() ? 
 		MediaTracker mt = new MediaTracker(displayArea);
 		mt.addImage(globeImage, 0);
-		// System.out.println("mt.addImage(globeImage, 0)");
 		try {
 			mt.waitForID(0);
 			// Indicate that image is complete
 			imageDone = true;
-			// System.out.println("mt.waitForID(0)");
-
 		} catch (InterruptedException e) {
 			logger.log(Level.SEVERE, Msg.getString("MarsMap.log.mediaTrackerError", e.toString())); //$NON-NLS-1$
+			// Restore interrupted state
+		    Thread.currentThread().interrupt();
 		}
-
 	}
 
 	/**
@@ -266,12 +264,17 @@ public class MarsMap {
 		int[][] map_pixels = new int[MAP_W][MAP_H];
 
 		// Grab mars_surface image into pixels_color array using PixelGrabber
+		// NOTE: Replace PixelGrabber with faster method
 		PixelGrabber pg_color = new PixelGrabber(marsMap, 0, 0, MAP_W, MAP_H, pixels_color, 0, MAP_W);
+		
 		try {
 			pg_color.grabPixels();
 		} catch (InterruptedException e) {
 			logger.log(Level.SEVERE, Msg.getString("MarsMap.log.grabberError") + e); //$NON-NLS-1$
+			// Restore interrupted state
+		    Thread.currentThread().interrupt();
 		}
+		
 		if ((pg_color.status() & ImageObserver.ABORT) != 0)
 			logger.info(Msg.getString("MarsMap.log.grabberError")); //$NON-NLS-1$
 
@@ -287,7 +290,7 @@ public class MarsMap {
 		// Go through each row and create Sphere_Color vector with it
 		for (phi = offset; phi < Math.PI; phi += (Math.PI / ih_d)) {
 			row = MoreMath.floor((float) ((phi / Math.PI) * ih_d));//(int) Math.floor((phi / Math.PI) * ih_d);
-			circum = 2 * Math.PI * (rho * MoreMath.sin(phi));
+			circum = 2 * Math.PI * (RHO * MoreMath.sin(phi));
 			col_num = (int) Math.round(circum);
 			sphereColor[row] = new Vector<Integer>(col_num);
 
@@ -324,6 +327,4 @@ public class MarsMap {
 		displayArea = null;
 		imageDone = true;
 	}
-	
-
 }

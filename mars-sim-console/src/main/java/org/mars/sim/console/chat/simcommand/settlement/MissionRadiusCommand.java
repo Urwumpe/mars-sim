@@ -1,10 +1,16 @@
-package org.mars.sim.console.chat.simcommand.settlement;
+/**
+ * Mars Simulation Project
+ * MissionRadiusCommand.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
 
-import java.util.List;
+package org.mars.sim.console.chat.simcommand.settlement;
 
 import org.mars.sim.console.chat.ChatCommand;
 import org.mars.sim.console.chat.Conversation;
 import org.mars.sim.console.chat.simcommand.StructuredResponse;
+import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.structure.Settlement;
 
 /**
@@ -27,44 +33,33 @@ public class MissionRadiusCommand extends AbstractSettlementCommand {
 	 */
 	@Override
 	protected boolean execute(Conversation context, String input, Settlement settlement) {
-		List<String> missionNames = Settlement.getTravelMissionNames();
-
 		StructuredResponse status = new StructuredResponse();
 		
-		int i = 0;
 		status.appendTableHeading("Id", 4, "Type of Mission", 24, "Mission Radius");
-		for (String string : missionNames) {
-			status.appendTableRow("" + (i + 1), string, settlement.getMissionRadius(i++));
+		for (MissionType  type : MissionType.values()) {
+			status.appendTableRow("" + type.ordinal(), type.getName(), settlement.getMissionRadius(type));
 		}
 		context.println(status.getOutput());
-		
+		 
 		int selected = context.getIntInput("Which one would you like to change ?");
-		if ((selected < 1) || (selected > missionNames.size())) {
+		if ((selected < 0) || (selected >= MissionType.values().length)) {
 			context.println("Value not valid.");
 		}
 		else {
-			selected--; // Index is zero based
-			String rangeText = context.getInput("Enter the new mission radius (a number between 50.0 and 2200.0 [in km])");
-			double newRange = 0;
+			String rangeText = context.getInput("Enter the new mission radius in exact km");
 			try {
-				newRange = Double.parseDouble(rangeText);
-				newRange = Math.round(newRange*10.0)/10.0;
+				int newRange = Integer.parseInt(rangeText);
 		
-				double oldRange = Math.round(settlement.getMissionRadius(selected)*10.0)/10.0;
-		
-				if (newRange >= 50.0 && newRange <= 2200.0) {
-					settlement.setMissionRadius(selected, newRange);
-					//settlement.setMaxMssionRange(newRange);
-					
-					context.println("Old Mission Radius :  " + oldRange + " km");
-					context.println("New Mission Radius :  " + newRange + " km");
-				}
-				else {
-					context.println("Radius has to be between 50.0 & 2200.0");
-				}
+				MissionType choosen = MissionType.values()[selected];
+				int oldRange = settlement.getMissionRadius(choosen);
+				settlement.setMissionRadius(choosen, newRange);
+				
+				context.println("Mission choosen    : " +  choosen.getName());
+				context.println("Old Mission Radius : " + oldRange + " km");
+				context.println("New Mission Radius : " + newRange + " km");
 			}
 			catch (NumberFormatException e) {
-				context.println("The radies is not a valid number");
+				context.println("The radius is not a valid number");
 			}	
 		}
 		

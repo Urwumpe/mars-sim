@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * NavpointMapLayer.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-31
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.map;
@@ -15,7 +15,7 @@ import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.IntPoint;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.NavPoint;
-import org.mars_sim.msp.core.person.ai.mission.TravelMission;
+import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 
 /**
@@ -27,10 +27,11 @@ public class NavpointMapLayer implements MapLayer {
 	private static final String BLUE_ICON_NAME = "FlagBlue";
 	private static final String WHITE_ICON_NAME = "FlagWhite";
 	private static final String GREEN_ICON_NAME = "FlagGreen";
-
+	
 	// Domain members
-	private double angle;
-
+	private static final int MAP_X_OFFSET = 5;
+	private static final int MAP_Y_OFFSET = 5;
+	
 	private Component displayComponent;
 	
 	private Icon navpointIconColor;
@@ -49,8 +50,6 @@ public class NavpointMapLayer implements MapLayer {
 
 		// Initialize domain data.
 		this.displayComponent = displayComponent;
-
-		angle = CannedMarsMap.HALF_MAP_ANGLE;
 
 		navpointIconColor = ImageLoader.getIcon(BLUE_ICON_NAME);
 		navpointIconWhite = ImageLoader.getIcon(WHITE_ICON_NAME);
@@ -85,13 +84,12 @@ public class NavpointMapLayer implements MapLayer {
 	 */
 	public void displayLayer(Coordinates mapCenter, String mapType, Graphics g) {
 		if (singleMission != null) {
-			if (singleMission instanceof TravelMission)
-				displayMission((TravelMission) singleMission, mapCenter, mapType, g);
+			if (singleMission instanceof VehicleMission)
+				displayMission((VehicleMission) singleMission, mapCenter, mapType, g);
 		} else {
-			// MissionManager manager = Simulation.instance().getMissionManager();
 			for (Mission mission : missionManager.getMissions()) {
-				if (mission instanceof TravelMission)
-					displayMission((TravelMission) mission, mapCenter, mapType, g);
+				if (mission instanceof VehicleMission)
+					displayMission((VehicleMission) mission, mapCenter, mapType, g);
 			}
 		}
 
@@ -108,9 +106,8 @@ public class NavpointMapLayer implements MapLayer {
 	 * @param mapType   the type of map.
 	 * @param g         graphics context of the map display.
 	 */
-	private void displayMission(TravelMission mission, Coordinates mapCenter, String mapType, Graphics g) {
+	private void displayMission(VehicleMission mission, Coordinates mapCenter, String mapType, Graphics g) {
 		for (int x = 0; x < mission.getNumberOfNavpoints(); x++) {
-			// NavPoint navpoint = mission.getNavpoint(x);
 			displayNavpoint(mission.getNavpoint(x), mapCenter, mapType, g);
 		}
 	}
@@ -124,9 +121,8 @@ public class NavpointMapLayer implements MapLayer {
 	 * @param g         graphics context of the map display.
 	 */
 	private void displayNavpoint(NavPoint navpoint, Coordinates mapCenter, String mapType, Graphics g) {
-		// double angle = CannedMarsMap.HALF_MAP_ANGLE;
 
-		if (mapCenter != null && mapCenter.getAngle(navpoint.getLocation()) < angle) {
+		if (mapCenter != null && mapCenter.getAngle(navpoint.getLocation()) < Map.HALF_MAP_ANGLE) {
 
 			// Chose a navpoint icon based on the map type.
 			Icon navIcon = null;
@@ -139,9 +135,8 @@ public class NavpointMapLayer implements MapLayer {
 
 			// Determine the draw location for the icon.
 			IntPoint location = MapUtils.getRectPosition(navpoint.getLocation(), mapCenter, mapType);
-			IntPoint drawLocation = new IntPoint(location.getiX(), (location.getiY() - navIcon.getIconHeight()));
-//			IntPoint drawLocation = new IntPoint(location.getiX()+MAP_X_OFFSET, 
-//					(location.getiY() - navIcon.getIconHeight())+MAP_Y_OFFSET);
+			IntPoint drawLocation = new IntPoint(location.getiX()+MAP_X_OFFSET, 
+					(location.getiY()+MAP_Y_OFFSET - navIcon.getIconHeight()));
 
 			// Draw the navpoint icon.
 			navIcon.paintIcon(displayComponent, g, drawLocation.getiX(), drawLocation.getiY());

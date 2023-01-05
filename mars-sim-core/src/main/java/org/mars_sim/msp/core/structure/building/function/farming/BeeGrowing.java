@@ -1,25 +1,23 @@
 /**
  * Mars Simulation Project
  * BeeGrowing.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.core.structure.building.function.farming;
 
-import java.io.Serializable;
-
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
 import org.mars_sim.msp.core.structure.building.function.Function;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.time.ClockPulse;
 
-public class BeeGrowing extends Function
-implements Serializable {
+public class BeeGrowing extends Function {
 	
 	/** default serial id. */
     private static final long serialVersionUID = 1L;
     /** default logger. */
-	//private static Logger logger = Logger.getLogger(BeeGrowing.class.getName());
+	//private static final Logger logger = Logger.getLogger(BeeGrowing.class.getName());
 
     // The bigger the number, the more erratic (and the less frequent) the update
     private static final int TICKS_PER_UPDATE = 100; 
@@ -27,9 +25,9 @@ implements Serializable {
     private Farming farm;
     private BeeHive hive;
 
-    public BeeGrowing(Farming farm) {
+    public BeeGrowing(Farming farm, FunctionSpec spec) {
         // Use Function constructor.
-        super(FunctionType.FARMING, farm.getBuilding());
+        super(FunctionType.FARMING, spec, farm.getBuilding());
 		
         this.farm = farm;      
         		

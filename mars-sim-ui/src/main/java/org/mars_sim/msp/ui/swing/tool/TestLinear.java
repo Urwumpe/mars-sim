@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TestLinear.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -20,9 +20,10 @@ import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.ui.steelseries.gauges.DigitialRadial;
-import org.mars_sim.msp.ui.steelseries.tools.LedColor;
-import org.mars_sim.msp.ui.steelseries.tools.Orientation;
+
+import eu.hansolo.steelseries.gauges.DigitalRadial;
+import eu.hansolo.steelseries.tools.LedColor;
+import eu.hansolo.steelseries.tools.Orientation;
 
 
 public class TestLinear {
@@ -40,7 +41,7 @@ public class TestLinear {
         };
         
         //JPanel temperaturePanel = new JPanel(new FlowLayout());
-        DigitialRadial temperatureL = new DigitialRadial();
+        DigitalRadial temperatureL = new DigitalRadial();
 		temperatureL.setTitle("Air Temperature");
 		temperatureL.setUnitString(Msg.getString("temperature.sign.degreeCelsius"));
 		temperatureL.setValueAnimated(20);

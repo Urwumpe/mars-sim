@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MiningSitePanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis
  */
 
@@ -22,19 +22,20 @@ import java.util.List;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JLabel;
 import javax.swing.JTable;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.IntPoint;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.mars.ExploredLocation;
-import org.mars_sim.msp.core.person.ai.mission.Mining;
+import org.mars_sim.msp.core.environment.ExploredLocation;
+import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 import org.mars_sim.msp.ui.swing.tool.map.CannedMarsMap;
 import org.mars_sim.msp.ui.swing.tool.map.EllipseLayer;
@@ -55,6 +56,7 @@ import com.alee.laf.table.WebTable;
 /**
  * A wizard panel for the mining site.
  */
+@SuppressWarnings("serial")
 public class MiningSitePanel extends WizardPanel {
 
 	/** Wizard panel name. */
@@ -79,7 +81,6 @@ public class MiningSitePanel extends WizardPanel {
 	private WebLabel errorMessageLabel;
 	private ExploredLocation selectedSite;
 	private DefaultTableModel concentrationTableModel;
-
 
 	/**
 	 * Constructor
@@ -118,11 +119,13 @@ public class MiningSitePanel extends WizardPanel {
 		// Create the map panel.
 		mapPane = new MapPanel(wizard.getDesktop(), 200L);
 		mineralLayer = new MineralMapLayer(mapPane);
+		
 		mapPane.addMapLayer(mineralLayer, 0);
 		mapPane.addMapLayer(unitIconLayer = new UnitIconMapLayer(mapPane), 1);
 		mapPane.addMapLayer(unitLabelLayer = new UnitLabelMapLayer(), 2);
 		mapPane.addMapLayer(ellipseLayer = new EllipseLayer(Color.GREEN), 3);
 		mapPane.addMapLayer(exploredSiteLayer = new ExploredSiteMapLayer(mapPane), 4);
+		
 		exploredSiteLayer.setDisplayMined(false);
 		exploredSiteLayer.setDisplayReserved(false);
 		mapPane.addMouseListener(new MouseAdapter() {
@@ -187,6 +190,10 @@ public class MiningSitePanel extends WizardPanel {
 		mineralConcentrationTable.setBorder(new MarsPanelBorder());
 		mineralConcentrationTable.setRowSelectionAllowed(true);
 		mineralConcentrationTable.getColumnModel().getColumn(1).setCellRenderer(new NumberCellRenderer(2));
+		
+		DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+		centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+		mineralConcentrationTable.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
 		
 		TableStyle.setTableStyle(mineralConcentrationTable);
 		
@@ -339,10 +346,7 @@ public class MiningSitePanel extends WizardPanel {
 	 * @throws Exception if error getting mission rover.
 	 */
 	private double getRoverRange() {
-		// return (getWizard().getMissionData().getRover().getRange() * RANGE_MODIFIER)
-		// / 2D;
-
-		double range = getWizard().getMissionData().getRover().getRange(Mining.missionType) * RANGE_MODIFIER;
+		double range = getWizard().getMissionData().getRover().getRange(MissionType.MINING) * RANGE_MODIFIER;
 		if (range > MAX_RANGE)
 			range = MAX_RANGE;
 		return range / 2D;
@@ -414,7 +418,7 @@ public class MiningSitePanel extends WizardPanel {
 
 		private MineralTableModel() {
 			mineralColors = mineralLayer.getMineralColors();
-			mineralNames = new ArrayList<String>(mineralColors.keySet());
+			mineralNames = new ArrayList<>(mineralColors.keySet());
 		}
 
 		public int getRowCount() {
@@ -447,7 +451,7 @@ public class MiningSitePanel extends WizardPanel {
 			if (row < getRowCount()) {
 				String mineralName = mineralNames.get(row);
 				if (column == 0) {
-					return Conversion.capitalize(mineralName);
+					return mineralName;
 				} else if (column == 1) {
 					return mineralColors.get(mineralName);
 				} else

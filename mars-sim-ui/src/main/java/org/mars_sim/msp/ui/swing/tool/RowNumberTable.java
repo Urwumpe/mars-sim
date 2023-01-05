@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * RowNumberTable.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-24
  * @author Manny Kung
  */
 
@@ -59,7 +59,7 @@ public class RowNumberTable extends JTable
 		addColumn( column );
 		column.setCellRenderer((TableCellRenderer) new RowNumberRenderer());
 
-		getColumnModel().getColumn(0).setPreferredWidth(25);
+		getColumnModel().getColumn(0).setPreferredWidth(40);
 		setPreferredScrollableViewportSize(getPreferredSize());
 	}
 
@@ -173,6 +173,7 @@ public class RowNumberTable extends JTable
 	/*
 	 *  Attempt to mimic the table header renderer
 	 */
+	@SuppressWarnings("serial")
 	private static class RowNumberRenderer extends DefaultTableCellRenderer
 	{
 		public RowNumberRenderer()

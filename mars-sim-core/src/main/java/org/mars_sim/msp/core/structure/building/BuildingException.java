@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * BuildingException.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
  
@@ -12,7 +12,9 @@ package org.mars_sim.msp.core.structure.building;
  */
 public class BuildingException extends Exception {
    
-    /**
+	private static final long serialVersionUID = 1L;
+
+	/**
      * Default constructor
      *
      * @param message the exception message.

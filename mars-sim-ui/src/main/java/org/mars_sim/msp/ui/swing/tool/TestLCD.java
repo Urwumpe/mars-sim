@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TestLCD.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -17,11 +17,11 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
-import org.mars_sim.msp.ui.steelseries.gauges.DisplayMulti;
-import org.mars_sim.msp.ui.steelseries.gauges.DisplayRectangular;
-import org.mars_sim.msp.ui.steelseries.gauges.DisplaySingle;
-import org.mars_sim.msp.ui.steelseries.tools.BackgroundColor;
-import org.mars_sim.msp.ui.steelseries.tools.LcdColor;
+import eu.hansolo.steelseries.gauges.DisplayMulti;
+import eu.hansolo.steelseries.gauges.DisplayRectangular;
+import eu.hansolo.steelseries.gauges.DisplaySingle;
+import eu.hansolo.steelseries.tools.BackgroundColor;
+import eu.hansolo.steelseries.tools.LcdColor;
 
 
 public class TestLCD {

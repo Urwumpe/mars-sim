@@ -13,6 +13,7 @@ module mars-sim-ui {
     requires java.awt;
     requires javax.net.ssl;
     requires javax.swing;
+    requires javax.xml.XMLConstants;
     
     requires netscape.javascript.JSObject;
     
@@ -23,6 +24,7 @@ module mars-sim-ui {
     requires trident;  
     requires jorbis;
     requires nimrodlf;
+    requires eu.hansolo.steelseries;
     
     requires weblaf-core;
     requires weblaf-ui;

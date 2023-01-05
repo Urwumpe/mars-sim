@@ -1,0 +1,729 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE governance [
+	<!ELEMENT governance (agendas, authorities)>
+
+	<!ELEMENT agendas (agenda+)>
+	<!ELEMENT agenda (sub-agenda+)>
+	<!ATTLIST agenda name CDATA #REQUIRED>
+	<!ATTLIST agenda objective CDATA #REQUIRED>
+	<!ATTLIST agenda findings CDATA #REQUIRED>
+	<!ATTLIST agenda samples CDATA #REQUIRED>
+	<!ELEMENT sub-agenda (modifier*)>
+	<!ATTLIST sub-agenda description CDATA #REQUIRED>
+	<!ELEMENT modifier EMPTY>
+	<!ATTLIST modifier mission CDATA #IMPLIED>
+	<!ATTLIST modifier science CDATA #IMPLIED>
+	<!ATTLIST modifier value CDATA #REQUIRED>
+
+	<!ELEMENT authorities (authority+)>
+	<!ELEMENT authority (country+, settlement-name*, rover-name*)>
+	<!ATTLIST authority code CDATA #REQUIRED>
+	<!ATTLIST authority name CDATA #REQUIRED>
+	<!ATTLIST authority agenda CDATA #REQUIRED>
+	<!ATTLIST authority gender-ratio CDATA #REQUIRED>
+	<!ELEMENT country EMPTY>
+	<!ATTLIST country name CDATA #REQUIRED>
+	<!ELEMENT settlement-name EMPTY>
+	<!ATTLIST settlement-name name CDATA #REQUIRED>
+	<!ELEMENT rover-name EMPTY>
+	<!ATTLIST rover-name name CDATA #REQUIRED>
+]>
+
+<governance>
+	<!-- Mission agendas that can be used by authorities -->
+	<agendas>
+		<agenda name="Advanced Technology"
+				objective="Prototyping Advanced Technologies"
+				findings="Updating the report of how advanced technologies may be tested and successfully deployed here"
+				samples="Mapping the morphology of this local region as test bed for developing advanced technologies of interest">
+			<sub-agenda description="Improve rover and flyer range and performance">
+				<modifier mission="EMERGENCY_SUPPLY" value="6"/>
+				<modifier mission="EXPLORATION" value="2"/>
+				<modifier mission="RESCUE_SALVAGE_VEHICLE" value="6"/>
+				<modifier mission="TRADE" value="3"/>
+				<modifier mission="TRAVEL_TO_SETTLEMENT" value="3"/>
+				<modifier science="ENGINEERING" value="5"/>
+				<modifier science="PHYSICS" value="2"/>
+			</sub-agenda>
+			<sub-agenda description="Prototype new building material">
+				<modifier mission="COLLECT_REGOLITH" value="4"/>
+				<modifier mission="MINING" value="4"/>
+				<modifier mission="TRADE" value="2"/>
+				<modifier science="ENGINEERING" value="9"/>
+			</sub-agenda>
+			<sub-agenda description="Test out new propulsion systems">
+				<modifier mission="DELIVERY" value="1"/>
+				<modifier mission="TRADE" value="1"/>
+				<modifier mission="TRAVEL_TO_SETTLEMENT" value="1"/>
+				<modifier science="ENGINEERING" value="8"/>
+			</sub-agenda>
+		</agenda>
+		<agenda name="Building Colonies"
+				objective="Building Self-Sustaining Colonies"
+				findings="Updating the report of the best practices in resource utilization"
+				samples="Analyzing various geological and environment factors affecting how to build self-sustainable colonies">
+			<sub-agenda description="Study meteorological environmental factors">
+				<modifier mission="AREOLOGY" value="3"/>
+				<modifier mission="METEOROLOGY" value="9"/>
+				<modifier science="AREOLOGY" value="2"/>
+				<modifier science="METEOROLOGY" value="9"/>
+			</sub-agenda>
+			<sub-agenda description="Fortify building structural integrity">
+				<modifier mission="COLLECT_REGOLITH" value="3"/>
+				<modifier mission="MINING" value="3"/>
+				<modifier science="AREOLOGY" value="2"/>
+
+			</sub-agenda>
+			<sub-agenda description="Refine techniques for ISRU polymer synthesis">
+				<modifier mission="COLLECT_REGOLITH" value="9"/>
+				<modifier mission="MINING" value="3"/>
+				<modifier science="AREOLOGY" value="2"/>
+			</sub-agenda>
+		</agenda>
+		<agenda name="Finding Life"
+				objective="Finding Life Past and Present on Mars"
+				findings="Looking for signature of life in soil samples"
+				samples="Analyzing and Cataloging samples from various sites">
+			<sub-agenda description="Follow the water">
+				<modifier mission="BIOLOGY" value="3"/>
+				<modifier mission="COLLECT_ICE" value="8"/>
+				<modifier science="BIOLOGY" value="7"/>					
+			</sub-agenda>
+			<sub-agenda description="Search regions capable hosting/sustaining microbial life">
+				<modifier mission="BIOLOGY" value="9"/>
+			</sub-agenda>
+			<sub-agenda description="Core drill rock samples from selected locations">
+				<modifier mission="EXPLORATION" value="9"/>
+				<modifier mission="MINING" value="3"/>
+			</sub-agenda>
+		</agenda>
+		<agenda name="Health Hazards"
+				objective="Researching short and long term medical impact on human health"
+				findings="Reporting on the various health hazards for human beings living on Mars"
+				samples="Classifying environmental hazards for surface operation">
+			<sub-agenda description="Investigate biological hazards">
+				<modifier mission="BIOLOGY" value="6"/>
+				<modifier mission="COLLECT_ICE" value="2"/>
+				<modifier mission="METEOROLOGY" value="1"/>
+				<modifier science="BIOLOGY" value="7"/>
+				<modifier science="MEDICINE" value="6"/>				
+			</sub-agenda>
+			<sub-agenda description="Examining microbes in water ice">
+				<modifier mission="AREOLOGY" value="1"/>
+				<modifier mission="BIOLOGY" value="1"/>
+				<modifier mission="COLLECT_ICE" value="1"/>
+				<modifier mission="COLLECT_REGOLITH" value="1"/>
+				<modifier mission="EXPLORATION" value="9"/>
+				<modifier mission="MINING" value="1"/>
+			</sub-agenda>
+			<sub-agenda description="Observe radiation risks, limits and exposures">
+				<modifier mission="AREOLOGY" value="1"/>
+				<modifier mission="BIOLOGY" value="1"/>
+				<modifier mission="COLLECT_ICE" value="1"/>
+				<modifier mission="COLLECT_REGOLITH" value="1"/>
+				<modifier mission="TRADE" value="1"/>
+				<modifier mission="TRAVEL_TO_SETTLEMENT" value="1"/>
+				<modifier science="MEDICINE" value="9"/>
+			</sub-agenda>
+		</agenda>
+		<agenda name="Human Habitation"
+				objective="Determining Human Habitability"
+				findings="Identifying engineering challenge of improving human habitability on the surface of Mars"
+				samples="Analyzing atmospheric condition dataset and geographical factors of human habitability in a local region">
+			<sub-agenda description="Predict meteorological changes">
+				<modifier mission="AREOLOGY" value="3"/>
+				<modifier mission="METEOROLOGY" value="9"/>
+				<modifier science="METEOROLOGY" value="1"/>
+			</sub-agenda>
+			<sub-agenda description="Study underground water reserve">
+				<modifier mission="COLLECT_ICE" value="9"/>
+				<modifier mission="AREOLOGY" value="6"/>				
+			</sub-agenda>
+			<sub-agenda description="Characterize radiation countermeasures">
+				<modifier mission="BIOLOGY" value="8"/>
+				<modifier mission="METEOROLOGY" value="3"/>
+				<modifier science="MEDICINE" value="5"/>
+			</sub-agenda>
+		</agenda>
+		<agenda name="Planet Life"
+				objective="Making life multiplanetary"
+				findings="Updating the report of the best practices in resource utilization."
+				samples="Analyzing factors affecting the transformation of Mars into hospitable environment to support colonization of Mars">
+			<sub-agenda description="Conceptualize interplanetary transportation network">
+				<modifier mission="DELIVERY" value="9"/>
+				<modifier mission="EMERGENCY_SUPPLY" value="3"/>
+				<modifier mission="EXPLORATION" value="2"/>
+				<modifier mission="METEOROLOGY" value="1"/>
+				<modifier mission="RESCUE_SALVAGE_VEHICLE" value="4"/>
+				<modifier mission="TRAVEL_TO_SETTLEMENT" value="8"/>
+			</sub-agenda>
+			<sub-agenda description="Study terraforming Mars environment">
+				<modifier mission="AREOLOGY" value="3"/>
+				<modifier mission="BIOLOGY" value="3"/>
+				<modifier mission="EXPLORATION" value="3"/>
+				<modifier science="AREOLOGY" value="3"/>
+				<modifier science="AREOLOGY" value="7"/>				
+			</sub-agenda>
+			<sub-agenda description="Investigate environmentally sustainable energy solutions">
+				<modifier mission="AREOLOGY" value="2"/>
+				<modifier mission="DELIVERY" value="2"/>
+				<modifier mission="EXPLORATION" value="1"/>
+				<modifier mission="METEOROLOGY" value="1"/>
+				<modifier mission="TRADE" value="6"/>
+			</sub-agenda>
+		</agenda>
+		<agenda name="Prospect Minerals"
+				objective="Prospecting Precious Minerals on Mars"
+				findings="Updating the report of trace mineral content in the collected soil samples."
+				samples="Analyzing the wealth of mineral contents from the colleted soil samples.">
+			<sub-agenda description="Analyze various signatures of minerals">
+				<modifier mission="AREOLOGY" value="3"/>
+				<modifier mission="COLLECT_REGOLITH" value="3"/>
+				<modifier mission="EXPLORATION" value="3"/>
+				<modifier mission="METEOROLOGY" value="3"/>
+				<modifier mission="MINING" value="3"/>
+				<modifier science="CHEMISTRY" value="8"/>
+			</sub-agenda>
+			<sub-agenda description="Corroborate surface geological data with on-orbit scans">
+				<modifier mission="AREOLOGY" value="3"/>
+				<modifier mission="METEOROLOGY" value="3"/>
+				<modifier science="AREOLOGY" value="7"/>					
+			</sub-agenda>
+			<sub-agenda description="Core drill rock samples from selected locations">
+				<modifier mission="EXPLORATION" value="4"/>
+				<modifier mission="MINING" value="6"/>
+			</sub-agenda>
+		</agenda>
+		<agenda name="Leapfrogs Science and Technology"
+				objective="Advancing Scientific Knowledge"
+				findings="Updating the report of possible research opportunities in this region"
+				samples="Analyzing the variation of gravity and atmospheric conditions for deploying a laser communication array">
+			<sub-agenda description="Analyze meteorite fragments">
+				<modifier mission="EXPLORATION" value="4"/>			
+				<modifier mission="AREOLOGY" value="5"/>
+				<modifier mission="MINING" value="6"/>
+				<modifier mission="METEOROLOGY" value="3"/>
+			</sub-agenda>
+			<sub-agenda description="Research environmental suitability for scientific projects">
+				<modifier mission="AREOLOGY" value="5"/>
+				<modifier mission="EXPLORATION" value="3"/>
+			</sub-agenda>
+			<sub-agenda description="Analyze bio-signature in rocks and water ice">
+				<modifier mission="BIOLOGY" value="8"/>
+				<modifier mission="COLLECT_ICE" value="5"/>
+				<modifier mission="COLLECT_REGOLITH" value="5"/>
+				<modifier mission="MINING" value="2"/>
+			</sub-agenda>
+		</agenda>
+		<agenda name="Settling Mars"
+				objective="Settling on Mars"
+				findings="Updating the report of the local in-situ resources that one can collect and process for immediate uses."
+				samples="Analyzing structural integrity of geological features for building settlements in this region.">
+			<sub-agenda description="Engineer soil capable of hosting and sustaining organic microbial life">
+				<modifier mission="COLLECT_REGOLITH" value="3"/>
+				<modifier science="BIOLOGY" value="6"/>				
+			</sub-agenda>
+			<sub-agenda description="Improve building structural integrity">
+				<modifier mission="COLLECT_REGOLITH" value="1"/>
+				<modifier mission="TRADE" value="2"/>
+				<modifier science="ENGINEERING" value="8"/>
+				<modifier science="COMPUTING" value="6"/>										
+			</sub-agenda>
+			<sub-agenda description="Minimize physiological effects of long term exposure to martian environment">
+				<modifier mission="AREOLOGY" value="1"/>
+				<modifier mission="BIOLOGY" value="1"/>
+				<modifier mission="COLLECT_ICE" value="1"/>
+				<modifier mission="COLLECT_REGOLITH" value="1"/>
+				<modifier mission="EXPLORATION" value="1"/>
+				<modifier mission="METEOROLOGY" value="1"/>
+				<modifier mission="MINING" value="1"/>
+				<modifier mission="TRADE" value="1"/>
+				<modifier mission="TRAVEL_TO_SETTLEMENT" value="1"/>
+				<modifier science="PSYCHOLOGY" value="10"/>
+			</sub-agenda>
+		</agenda>
+		<agenda name="Space Applications"
+				objective="Developing Practical Space Applications"
+				findings="Updating the report of possible applied space research in this frontier."
+				samples="Analyzing how this local region may impact the scope of our research of interest.">
+			<sub-agenda description="Test space-ground links">
+				<modifier mission="AREOLOGY" value="3"/>
+				<modifier mission="EXPLORATION" value="3"/>
+				<modifier mission="METEOROLOGY" value="3"/>
+				<modifier mission="TRADE" value="1"/>
+				<modifier science="PHYSICS" value="8"/>	
+				<modifier science="COMPUTING" value="4"/>								
+			</sub-agenda>
+			<sub-agenda description="Test new flexible space suit micro fabric">
+				<modifier mission="BIOLOGY" value="3"/>
+				<modifier mission="METEOROLOGY" value="3"/>
+				<modifier mission="TRADE" value="1"/>
+				<modifier science="ENGINEERING" value="8"/>				
+			</sub-agenda>
+			<sub-agenda description="Improve closed-loop life support system">
+				<modifier mission="COLLECT_REGOLITH" value="9"/>
+				<modifier mission="METEOROLOGY" value="3"/>
+				<modifier mission="MINING" value="3"/>
+				<modifier science="COMPUTING" value="4"/>
+				<modifier science="MEDICINE" value="6"/>										
+			</sub-agenda>
+		</agenda>
+		<agenda name="Surface Operations"
+				objective="Pushing Boundaries of Surface Operations"
+				findings="Updating the report of the human factors in surface operations."
+				samples="Analyzing the soil's strength in this local region for the suitability of the spaceport construction.">
+			<sub-agenda description="Stress test on human endurance">
+				<modifier mission="EMERGENCY_SUPPLY" value="3"/>
+				<modifier mission="EXPLORATION" value="3"/>
+				<modifier mission="TRAVEL_TO_SETTLEMENT" value="2"/>
+				<modifier science="PSYCHOLOGY" value="2"/>
+			</sub-agenda>
+			<sub-agenda description="Test return vehicle capability">
+				<modifier mission="DELIVERY" value="3"/>
+				<modifier mission="EMERGENCY_SUPPLY" value="3"/>
+				<modifier mission="RESCUE_SALVAGE_VEHICLE" value="3"/>
+				<modifier mission="TRAVEL_TO_SETTLEMENT" value="2"/>
+				<modifier science="ENGINEERING" value="8"/>					
+			</sub-agenda>
+			<sub-agenda description="Characterize dynamics of human interactions">
+				<modifier mission="AREOLOGY" value="1"/>
+				<modifier mission="BIOLOGY" value="1"/>
+				<modifier mission="COLLECT_ICE" value="1"/>
+				<modifier mission="COLLECT_REGOLITH" value="1"/>
+				<modifier mission="EXPLORATION" value="1"/>
+				<modifier mission="METEOROLOGY" value="1"/>
+				<modifier mission="MINING" value="1"/>
+				<modifier mission="TRADE" value="1"/>
+				<modifier mission="TRAVEL_TO_SETTLEMENT" value="1"/>
+				<modifier science="PSYCHOLOGY" value="8"/>
+			</sub-agenda>
+			<sub-agenda description="Extend EVA operations to climbing caves">
+				<modifier mission="AREOLOGY" value="1"/>
+				<modifier mission="BIOLOGY" value="1"/>
+				<modifier mission="COLLECT_ICE" value="1"/>
+				<modifier mission="COLLECT_REGOLITH" value="1"/>
+				<modifier mission="EXPLORATION" value="1"/>
+				<modifier mission="METEOROLOGY" value="1"/>
+				<modifier mission="MINING" value="1"/>
+				<modifier mission="TRADE" value="1"/>
+				<modifier mission="TRAVEL_TO_SETTLEMENT" value="1"/>
+			</sub-agenda>
+		</agenda>
+
+	</agendas>
+
+	<!--  Reporting authorities. The code attribute must match
+		the ReportingAuthorityType enum -->
+	<authorities>
+		<authority code="CNSA" name="China National Space Administration"
+					agenda="Prospect Minerals" gender-ratio="0.75">
+			<country name="China"/>
+			<settlement-name name="Tian Cheng" />
+			<settlement-name name="Xin Cheng" />
+			<settlement-name name="Huoxing Cheng" />
+			<settlement-name name="Chang-e Cheng" />
+			<settlement-name name="Xin Shenzhen" />
+			<settlement-name name="Xin Tianjin" />
+			<settlement-name name="Xin Shanghai" />
+			<settlement-name name="Xin Beijing" />
+			<settlement-name name="New Macau" />
+			<settlement-name name="Xin Chongqing" />
+			<settlement-name name="New Manchuria" />
+			<settlement-name name="Xin Xianggang" />
+			<rover-name name="Shenzhou" />  <!-- Chinese for divine craft -->
+			<rover-name name="Huoxing" />  <!-- Chinese for "Mars" -->
+			<rover-name name="Zidan" />    <!-- Chinese for bullet -->
+			<rover-name name="Huojian" />  <!-- Chinese for rocket -->
+			<rover-name name="Bolang" />   <!-- Chinese for wave front -->
+			<rover-name name="Lingxian" /> <!-- Chinese for leading the way -->
+			<rover-name name="guoLu" />    <!-- Chinese for passing through -->
+			<rover-name name="Youli" />    <!-- Chinese for traveling -->
+			<rover-name name="Changtu" />   <!-- Chinese for long journey" -->
+			<rover-name name="Hangcheng" /> <!-- Chinese for voyage -->
+			<rover-name name="Youke" />     <!-- Chinese for traveler -->
+			<rover-name name="YouShan" />   <!-- Chinese for treking mountain -->
+			<rover-name name="Aoxiang" />   <!-- Chinese for soaring -->
+			<rover-name name="Piaofu" />    <!-- Chinese for hovering -->
+			<rover-name name="Gaofei" />    <!-- Chinese for flying up -->
+		</authority>
+		<authority code="CSA" name="Canadian Space Agency"
+					agenda="Leapfrogs Science and Technology"  gender-ratio="0.5">
+			<country name="Canada"/>
+			<settlement-name name="New Quebec" />
+			<settlement-name name="New Columbia" />
+			<settlement-name name="New Ontario" />
+			<settlement-name name="New Alberta" />
+			<settlement-name name="New Yukon" />
+			<settlement-name name="New Montreal" />
+			<settlement-name name="New Toronto" />
+			<settlement-name name="New Vancouver" />
+			<settlement-name name="New Calgary" />
+			<settlement-name name="Sherbrooke" />
+			<settlement-name name="Fredericton" />
+			<settlement-name name="New Waterloo" />
+			<rover-name name="Desert Pearl" />
+			<rover-name name="Desert Rose" />
+			<rover-name name="Deimos Tide" />
+			<rover-name name="Desert Star" />
+			<rover-name name="Drift Wood" />
+			<rover-name name="Desertfarer" />
+			<rover-name name="Dream Chaser" />
+			<rover-name name="Dune Drifter" />
+			<rover-name name="Dune Runner" />
+			<rover-name name="Niagara" />
+			<rover-name name="Ottawa" />
+			<rover-name name="Nova Scotia" />
+			<rover-name name="Notre Dame" />
+			<rover-name name="Buffalo Jump" />
+			<rover-name name="Banff" />
+			<rover-name name="St Lawrence" />
+		</authority>
+		<authority code="ESA" name="European Space Agency"
+					agenda="Surface Operations" gender-ratio="0.5">
+			<country name="Austria"/>
+			<country name="Belgium"/>
+			<country name="Czech Republic"/>
+			<country name="Denmark"/>
+			<country name="Estonia"/>
+			<country name="Finland"/>
+			<country name="France"/>
+			<country name="Germany"/>
+			<country name="Greece"/>
+			<country name="Hungary"/>
+			<country name="Ireland"/>
+			<country name="Italy"/>
+			<country name="Luxembourg"/>
+			<country name="The Netherlands"/>
+			<country name="Norway"/>
+			<country name="Poland"/>
+			<country name="Portugal"/>
+			<country name="Romania"/>
+			<country name="Spain"/>
+			<country name="Sweden"/>
+			<country name="Switzerland"/>
+			<country name="UK"/>
+			<settlement-name name="Base Visage" />
+			<settlement-name name="Base Gaia" />
+			<settlement-name name="Station Mere" />
+			<settlement-name name="Neu Braunfels" />
+			<settlement-name name="Nieuw Amsterdam" />
+			<settlement-name name="New Paris" />
+			<settlement-name name="New Berlin" />
+			<settlement-name name="New Athen" />
+			<settlement-name name="New Brussels" />
+			<settlement-name name="New Madrid" />
+			<settlement-name name="New Copenhagen" />
+			<settlement-name name="New Rome" />
+			<settlement-name name="Europa" />
+
+			<rover-name name="al-Mirrikh" /> <!-- Arabic/Persian for "Mars" -->
+			<rover-name name="Areos Aster" /> <!-- Greek for "star of Ares" -->
+			<rover-name name="Ariane" />
+			<rover-name name="Beagle IV" />
+			<rover-name name="Bedouin" />
+			<rover-name name="Blodstjarna" /> <!-- Viking for "Mars" (not certain) -->
+			<rover-name name="Bahram" /> <!-- Ancient Persian for "Mars" -->
+
+			<rover-name name="Autobahn" />	<!-- German for Motorway  -->
+			<rover-name name="Fahrzeug" />	<!-- German for vehicle -->
+	 		<rover-name name="Gaspedal" />	<!-- German for Accelerator  -->
+			<rover-name name="Gondel" />		<!-- German for gondola -->
+			<rover-name name="Kutsche" />	<!-- German for carriage -->
+	 		<rover-name name="Schlitten" />	<!-- German for carriage -->
+
+			<rover-name name="Nergal" />     <!-- Babylonian for "Mars" -->
+
+			<rover-name name="Merih" />      <!-- Turkish for "Mars" -->
+			<rover-name name="Sakit" />      <!-- Ancient Turkish for "Mars" -->
+
+			<rover-name name="Voiture" />	<!-- French for vehicle -->
+		</authority>
+
+		<authority code="ISRO" name="The Indian Space Research Organisation"
+					agenda="Advanced Technology" gender-ratio="0.9">
+			<country name="India"/>
+			<settlement-name name="New Bengal" />
+			<settlement-name name="New Chennai" />
+			<settlement-name name="New Punjab" />
+			<settlement-name name="Mahindra" />
+			<settlement-name name="New Mumbai" />
+			<settlement-name name="Chandrasekhar" />
+			<settlement-name name="Maangalan" />
+			<settlement-name name="BhomBhavan" />
+			<settlement-name name="Marshal" />
+			<settlement-name name="Base Sani" />
+			<settlement-name name="Basti" />
+			<rover-name name="Tata" /> <!-- Indian for "bye" or "out of station" -->
+			<rover-name name="Maruti" /> <!-- Indian for "one born from Marut (or air)" -->
+			<rover-name name="Ashok" /> <!-- Sanskrit origion, meaning "yes" or "like" -->
+			<rover-name name="Opel" /> <!-- Indian  for "jewel" -->						
+			<rover-name name="Agni" /> <!-- Hindi for "fire" -->
+			<rover-name name="Naag" /> <!-- Hindi for "snake" -->
+			<rover-name name="Angaraka" /> <!-- Mars in Jyotish astrology (alternate name) -->
+			<rover-name name="Mangala" /> <!--  Sanskrit for "Mars" in Jyotish astrology -->
+			<rover-name name="Rahu" /> <!-- Hindi for "Mars" (not certain) -->
+			<rover-name name="Vayu" /> <!-- Hindi for "wind" -->
+			<rover-name name="Prithvi" /> <!-- Hindi for "earth" -->
+			<rover-name name="Reth" /> <!-- Hindi for "sand" -->
+			<rover-name name="Vikram" /> <!-- a male Hindu/Sanskrit name for being valorous, wise, brave and strong as well as victorious-->
+		</authority>
+
+		<authority code="JAXA" name="Japan Aerospace Exploration Agency"
+					agenda="Human Habitation" gender-ratio="0.6">
+			<country name="Japan"/>
+			<settlement-name name="New Tokyo" />
+			<settlement-name name="New Seto" />
+			<settlement-name name="Ohsumi" />
+			<settlement-name name="Kawasaki Port" />
+			<settlement-name name="Obayashi Port" />
+			<settlement-name name="Osamu" />
+			<settlement-name name="New Osake" />
+			<settlement-name name="New Okinawa" />
+			<settlement-name name="New Kyoto" />
+			<settlement-name name="New Saga" />
+			<settlement-name name="New Sapporo" />
+			<settlement-name name="New Yokohama" />
+			<settlement-name name="Sony World" />
+			<settlement-name name="Kyocera" />
+			<rover-name name="Jyu-Sokosha" />
+			<rover-name name="Ha-Go" />
+			<rover-name name="Ke-To" />
+			<rover-name name="Ke-Nu" />
+			<rover-name name="Shinhoto" />
+			<rover-name name="Ro-Go" />
+			<rover-name name="So-Ki" />
+			<rover-name name="So-Da" />
+			<rover-name name="Ku-Se" />
+			<rover-name name="Ke-Ri" />
+			<rover-name name="Ho-To" />
+			<rover-name name="Ke-Ho" />
+			<rover-name name="Chi-Ha" />
+			<rover-name name="Chi-He" />
+			<rover-name name="Chi-To" />
+			<rover-name name="Chi-Ri" />
+			<rover-name name="Shi-Ki" />
+		</authority>
+
+		<authority code="KARI" name="Korea Aerospace Research Institute"
+					agenda="Space Applications" gender-ratio="0.4">
+			<country name="South Korea"/>
+			<settlement-name name="New Sacheon" />
+			<settlement-name name="New Gimhae" />
+			<settlement-name name="New Kunsan" />
+			<settlement-name name="New Incheon" />
+			<settlement-name name="New Daegu" />
+			<settlement-name name="New Busan" />
+			<settlement-name name="New Seoul" />
+			<settlement-name name="New Goyang" />
+			<settlement-name name="New Yongin" />
+			<settlement-name name="New Suwon" />
+			<settlement-name name="Samsung Town" />
+			<settlement-name name="New Ansan" />		
+			<rover-name name="Osan" />
+			<rover-name name="Nuri" />		
+			<rover-name name="Naro" />					
+			<rover-name name="Guri" />
+			<rover-name name="Naju" />
+			<rover-name name="Kia" />
+			<rover-name name="Proto" />
+			<rover-name name="Zyle" />
+			<rover-name name="Daewoo" />
+			<rover-name name="Hyundai" />
+			<rover-name name="Renault" />
+			<rover-name name="Zyle" />
+			<rover-name name="Sungri" />
+			<rover-name name="Chongjin" />
+			<rover-name name="Pyeonghwa" />
+			<rover-name name="Koryo" />
+			<rover-name name="Teeway" />
+			<rover-name name="Gimpo" />			
+			<rover-name name="Kai" />
+			<rover-name name="Surion" />
+			<rover-name name="Songgolmae" />
+		</authority>
+
+		<authority code="MS" name="Mars Society"
+					agenda="Settling Mars" gender-ratio="0.5">
+			<country name="Austria"/>
+			<country name="Belgium"/>
+			<country name="Canada"/>
+			<country name="China"/>
+			<country name="Czech Republic"/>
+			<country name="Denmark"/>
+			<country name="Estonia"/>
+			<country name="Finland"/>
+			<country name="France"/>
+			<country name="Germany"/>
+			<country name="Greece"/>
+			<country name="Hungary"/>
+			<country name="India"/>
+			<country name="Ireland"/>
+			<country name="Italy"/>
+			<country name="Japan"/>
+			<country name="Luxembourg"/>
+			<country name="The Netherlands"/>
+			<country name="Norway"/>
+			<country name="Poland"/>
+			<country name="Portugal"/>
+			<country name="Romania"/>
+			<country name="Russia"/>
+			<country name="Spain"/>
+			<country name="Sweden"/>
+			<country name="Switzerland"/>
+			<country name="UK"/>
+			<country name="USA"/>
+			<settlement-name name="New Cairo" />
+			<settlement-name name="New Boulder" />
+			<settlement-name name="Burroughsburg" />
+			<settlement-name name="Zubrin City" />
+			<settlement-name name="Clarketown" />
+			<settlement-name name="Sojourner Station" />
+			<settlement-name name="Viking Base" />
+			<settlement-name name="Camp Bradbury" />
+			<settlement-name name="Camp Wells" />
+			<settlement-name name="Heinlein" />
+			<settlement-name name="Port Kokh" />
+			<settlement-name name="Port Lowell" />			
+			<settlement-name name="Heinlein" />
+			<settlement-name name="Burroughs" />
+			<settlement-name name="Robinson" />
+			<settlement-name name="Hartmann Base" />
+			<settlement-name name="Shoemaker" />
+			<rover-name name="Dusty Star" />
+			<rover-name name="Dust Storm" />
+			<rover-name name="Dust Sprite" />
+			<rover-name name="Dust Bowl" />
+			<rover-name name="Martian Escape" />
+			<rover-name name="Martian Cloud" />
+			<rover-name name="Ma'adim" /> <!-- Hebrew for "Mars" -->
+			<rover-name name="Red Mariner" />
+			<rover-name name="Red Moon" />
+			<rover-name name="Ridge Runner" />
+			<rover-name name="Shooting Star" />
+			<rover-name name="Sand Dancer" />
+			<rover-name name="Spice Trader" />
+			<rover-name name="Solitude" />
+			<rover-name name="Sand Spirit" />
+			<rover-name name="Sand Crawler" />
+			<rover-name name="Sojourner II" />
+			<rover-name name="Spirit II" />
+			<rover-name name="Sun Dancer" />
+			<rover-name name="Wind Runner" />
+			<rover-name name="Windstorm" />
+			<rover-name name="Desert Fox" />
+		</authority>
+
+		<authority code="NASA" name="National Aeronautics and Space Administration"
+					agenda="Finding Life" gender-ratio="0.6">
+			<country name="USA"/>
+			<settlement-name name="Jamestown" />
+			<settlement-name name="Port Braun" />
+			<settlement-name name="Sagan Station" />
+			<settlement-name name="McKay Base" />
+			<!-- http://www.jpl.nasa.gov/media/mgs-sept05/meyer.html -->
+			<settlement-name name="Meyer Station" />
+			<!-- http://science.gsfc.nasa.gov/staff/garvin-10_2005.html -->
+			<settlement-name name="Garvin Station" />
+			<settlement-name name="Goddard Base" />
+			<settlement-name name="Ares One" />
+			<settlement-name name="Asimov Base" />
+			<settlement-name name="Ames Town" />
+			<settlement-name name="Orion City" />
+			<settlement-name name="New Boston" />
+			<settlement-name name="New Albany" />
+			<settlement-name name="JFK City" />
+			<settlement-name name="Camp Huygens" />				
+			<settlement-name name="Camp Kelper" />				
+			<settlement-name name="Tranquility" />
+																		
+			<rover-name name="Agartha" /> <!-- Agartha is a legendary city that is said to be located in the Earth's core -->
+			<rover-name name="Atlanta" /> <!-- The meaning of Atlanta is secure, immovable -->
+			<rover-name name="Crater Crab" />
+			<rover-name name="Desert Rat" />
+			<rover-name name="Firefly" />
+			<rover-name name="Fire Star" />
+			<rover-name name="Fremen Wanderer" />
+			<rover-name name="Liberty" />
+			<rover-name name="Loonie" />
+			<rover-name name="Jetson" />
+			<rover-name name="Marina" />
+			<rover-name name="Opportunity II" />
+			<rover-name name="Curosity II" />	
+			<rover-name name="Perseverance II" />
+			<rover-name name="Pathfinder II" />					
+			<rover-name name="Buggy" />
+			<rover-name name="Gemini" />
+			<rover-name name="Mercury" />
+			<rover-name name="Schrodinger" />
+			<rover-name name="Artemis" />
+		</authority>
+
+		<authority code="RKA" name="Roscosmos"
+					agenda="Health Hazards" gender-ratio="0.75">
+			<country name="Russia"/>
+			<settlement-name name="Mir Town" />
+			<settlement-name name="Kosmosdrome" />
+			<settlement-name name="Konstantin Point" />
+			<settlement-name name="Gorbachev" />
+			<settlement-name name="New Moscow" />
+			<settlement-name name="Chebyshev" />
+			<settlement-name name="Mendeleev" />
+			<settlement-name name="Kaspersky" />
+			<settlement-name name="Star City" />
+			<settlement-name name="Munku-Sardyk" /> <!-- which means "eternal bald peak" in Russian -->
+			<settlement-name name="Ropa" /> <!-- which means mountain in Russian -->	
+			<settlement-name name="Otechestvo" /> <!-- which means fatherland or in Russian -->
+			<settlement-name name="Rodina" /> <!-- which means homeland or motherland in Russian -->
+			<rover-name name="Kliper" /> <!-- which means clipper in Russian -->
+			<rover-name name="Ropa" /> <!-- which means mountain or in Russian -->
+			<rover-name name="Chizhevsky" />
+			<rover-name name="Lomonosov" />
+			<rover-name name="Lvov" />
+			<rover-name name="Obruchev" />
+			<rover-name name="Tatishchev" />
+			<rover-name name="Vernadsky" />
+			<rover-name name="Chikhachyov" />
+			<rover-name name="Dokuchaev" />
+			<rover-name name="Karpinsky" />
+			<rover-name name="Middendorf" />
+			<rover-name name="Shirshov" />
+			<rover-name name="Shokalsky" />
+			<rover-name name="Tikhonov" />
+			<rover-name name="Maleev" />
+		</authority>
+
+		<authority code="SPACEX" name="Space X"
+					agenda="Planet Life" gender-ratio="0.5">
+			<country name="USA"/>
+			<country name="Canada"/>
+			<settlement-name name="MuskVille" />
+			<settlement-name name="Falcon Station" />
+			<settlement-name name="Nicolas Town" />
+			<settlement-name name="AI City" />
+			<settlement-name name="Solar City" />
+			<settlement-name name="New Eden" />
+			<settlement-name name="Teslapolis " />		
+			<settlement-name name="IronVille" />
+			<settlement-name name="Boringburg" />
+			<settlement-name name="Hawthorne" />
+			<settlement-name name="XAE City" />
+			<settlement-name name="New Vegas" />
+			<settlement-name name="Brownsville" />			
+			<rover-name name="Genesis" />
+			<rover-name name="Vega" />
+			<rover-name name="Raptor" />
+			<rover-name name="Merlin" />
+			<rover-name name="Roadster" />
+			<rover-name name="Gypsea" />
+			<rover-name name="Nomad" />
+			<rover-name name="Oasis" />
+			<rover-name name="Odyssey" />
+			<rover-name name="Osprey" />
+			<rover-name name="Drifter" />
+			<rover-name name="Princess" />
+			<rover-name name="Serenity" />
+			<rover-name name="Ironman" />
+			<rover-name name="Mariner" />			
+		</authority>
+	</authorities>
+</governance>

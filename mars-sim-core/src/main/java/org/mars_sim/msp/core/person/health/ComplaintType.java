@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ComplaintType.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  *
  */
@@ -39,7 +39,7 @@ public enum ComplaintType {
 	MENINGITIS						(Msg.getString("ComplaintType.meningitis")), //$NON-NLS-1$
 	MINOR_BURNS						(Msg.getString("ComplaintType.minorBurns")), //$NON-NLS-1$
 	PANIC_ATTACK					(Msg.getString("ComplaintType.panicAttack")), //$NON-NLS-1$
-	PULL_MUSCLE_TENDON				(Msg.getString("ComplaintType.pulledMuscleTendon")), //$NON-NLS-1$
+	PULLED_MUSCLE_TENDON			(Msg.getString("ComplaintType.pulledMuscleTendon")), //$NON-NLS-1$
 	RADIATION_SICKNESS				(Msg.getString("ComplaintType.radiationSickness")), //$NON-NLS-1$
 	RUPTURED_APPENDIX				(Msg.getString("ComplaintType.rupturedAppendix")), //$NON-NLS-1$
 	SUICIDE							(Msg.getString("ComplaintType.suicide")) //$NON-NLS-1$
@@ -59,16 +59,5 @@ public enum ComplaintType {
 	@Override
 	public String toString() {
 		return this.name;
-	}
-
-	public static ComplaintType fromString(String name) {
-		if (name != null) {
-			for (ComplaintType b : ComplaintType.values()) {
-				if (name.equalsIgnoreCase(b.name)) {
-					return b;
-				}
-			}
-		}
-		return null;
 	}
 }

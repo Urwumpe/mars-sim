@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * TransportManager.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-25
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.interplanetary.transport;
@@ -11,15 +11,19 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.configuration.Scenario;
 import org.mars_sim.msp.core.events.HistoricalEvent;
 import org.mars_sim.msp.core.events.HistoricalEventManager;
 import org.mars_sim.msp.core.interplanetary.transport.resupply.ResupplyUtil;
-import org.mars_sim.msp.core.interplanetary.transport.settlement.ArrivingSettlementUtil;
+import org.mars_sim.msp.core.interplanetary.transport.settlement.ArrivingSettlement;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.EventType;
+import org.mars_sim.msp.core.reportingAuthority.ReportingAuthorityFactory;
+import org.mars_sim.msp.core.structure.SettlementConfig;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.Temporal;
@@ -31,31 +35,64 @@ public class TransportManager implements Serializable, Temporal {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
+	
+	/** Average transit time for arriving settlements from Earth to Mars (sols). */
+	private static int AVG_TRANSIT_TIME = 250;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(TransportManager.class.getName());
-
-	// Data members
-	// private volatile boolean isTransportingBuilding = false;
+	private static final SimLogger logger = SimLogger.getLogger(TransportManager.class.getName());
 
 	private Collection<Transportable> transportItems;
 
-	private static HistoricalEventManager eventManager = Simulation.instance().getEventManager();
+	private transient HistoricalEventManager eventManager;
+	private transient SimulationConfig simConfig;
+	private transient Simulation sim = Simulation.instance();
 
 	/**
 	 * Constructor.
+	 * 
+	 * @param scenario 
+	 * @param raFactory 
 	 */
-	public TransportManager() {
-		// initialize ResupplyUtil.
-		new ResupplyUtil();
+	public TransportManager(SimulationConfig simConfig, Simulation sim) {
+		this.eventManager = sim.getEventManager();
+		this.sim = sim;
+		this.simConfig = simConfig;
+
 		// Initialize data
-		transportItems = new ConcurrentLinkedQueue<Transportable>();
-		// Create initial arriving settlements.
-		transportItems.addAll(ArrivingSettlementUtil.createInitialArrivingSettlements());
-		// Create initial resupply missions.
+		transportItems = new ArrayList<>();
+	}
+	
+	public void init() {
 		transportItems.addAll(ResupplyUtil.loadInitialResupplyMissions());
 	}
-
+	
+	/**
+	 * Adds any arriving Settlements that are defined in a Scenario.
+	 * 
+	 * @param scenario
+	 * @param settlementConfig 
+	 * @param raFactory 
+	 */
+	public void loadArrivingSettments(Scenario scenario, SettlementConfig settlementConfig,
+									  ReportingAuthorityFactory raFactory) {
+		MarsClock now = Simulation.instance().getMasterClock().getMarsClock();
+		// Create initial arriving settlements.
+		for (ArrivingSettlement a : scenario.getArrivals()) {
+			// Check the defines values are correct; these throw exception
+			settlementConfig.getItem(a.getTemplate());
+			
+			if (raFactory.getItem(a.getSponsorCode()) == null) {
+				throw new IllegalArgumentException("Arriving settlement has a incorrect RAcode " + a.getSponsorCode());
+			}
+			
+			a.scheduleLaunch(now, AVG_TRANSIT_TIME);
+			logger.config("Scheduling a new settlement called '" + a.getName() + "' to arrive at Sol "
+						+ a.getArrivalDate().getTrucatedDateTimeStamp());
+			transportItems.add(a);
+		}
+	}
+	
 	/**
 	 * Adds a new transport item.
 	 * 
@@ -65,17 +102,12 @@ public class TransportManager implements Serializable, Temporal {
 		transportItems.add(transportItem);
 		HistoricalEvent newEvent = new TransportEvent(transportItem, EventType.TRANSPORT_ITEM_CREATED,
 				"Mission Control", transportItem.getSettlementName());
+		if (sim == null)
+			sim = Simulation.instance();
+		if (eventManager == null)
+			eventManager = sim.getEventManager();
 		eventManager.registerNewEvent(newEvent);
-		logger.info("A new transport item was created ");// + transportItem.toString());
-	}
-
-	/**
-	 * Gets all of the transport items.
-	 * 
-	 * @return list of all transport items.
-	 */
-	public List<Transportable> getAllTransportItems() {
-		return new ArrayList<Transportable>(transportItems);
+		logger.info("A transport item was added: " + transportItem.toString());
 	}
 
 	/**
@@ -84,7 +116,7 @@ public class TransportManager implements Serializable, Temporal {
 	 * @return transportables.
 	 */
 	public List<Transportable> getIncomingTransportItems() {
-		List<Transportable> incoming = new ArrayList<Transportable>(transportItems.size());
+		List<Transportable> incoming = new ArrayList<>();
 
 		Iterator<Transportable> i = transportItems.iterator();
 		while (i.hasNext()) {
@@ -104,7 +136,7 @@ public class TransportManager implements Serializable, Temporal {
 	 * @return transportables.
 	 */
 	public List<Transportable> getArrivedTransportItems() {
-		List<Transportable> arrived = new ArrayList<Transportable>(transportItems.size());
+		List<Transportable> arrived = new ArrayList<>();
 
 		Iterator<Transportable> i = transportItems.iterator();
 		while (i.hasNext()) {
@@ -127,8 +159,12 @@ public class TransportManager implements Serializable, Temporal {
 		transportItem.setTransitState(TransitState.CANCELED);
 		HistoricalEvent cancelEvent = new TransportEvent(transportItem, EventType.TRANSPORT_ITEM_CANCELLED, "Reserved",
 				transportItem.getSettlementName());
+		if (sim == null)
+			sim = Simulation.instance();
+		if (eventManager == null)
+			eventManager = sim.getEventManager();
 		eventManager.registerNewEvent(cancelEvent);
-		logger.info("A transport item was cancelled: ");// + transportItem.toString());
+		logger.info("A transport item was cancelled: ");
 	}
 
 	/**
@@ -139,29 +175,40 @@ public class TransportManager implements Serializable, Temporal {
 	 */
 	@Override
 	public boolean timePassing(ClockPulse pulse) {
-		Iterator<Transportable> i = transportItems.iterator();
-		while (i.hasNext()) {
-			Transportable transportItem = i.next();
-			if (TransitState.PLANNED == transportItem.getTransitState()) {
-				if (MarsClock.getTimeDiff(pulse.getMarsTime(), transportItem.getLaunchDate()) >= 0D) {
-					// Transport item is launched.
-					transportItem.setTransitState(TransitState.IN_TRANSIT);
-					HistoricalEvent deliverEvent = new TransportEvent(transportItem, EventType.TRANSPORT_ITEM_LAUNCHED,
-							"Transport item launched", transportItem.getSettlementName());
-					eventManager.registerNewEvent(deliverEvent);
-					logger.info("Transport item launched: " + transportItem.toString());
-					continue;
-				}
-			} else if (TransitState.IN_TRANSIT == transportItem.getTransitState()) {
-				if (MarsClock.getTimeDiff(pulse.getMarsTime(), transportItem.getArrivalDate()) >= 0D) {
-					// Transport item has arrived on Mars.
-					transportItem.setTransitState(TransitState.ARRIVED);
-					transportItem.performArrival();
-					HistoricalEvent arrivalEvent = new TransportEvent(transportItem, EventType.TRANSPORT_ITEM_ARRIVED,
-							transportItem.getSettlementName(), "Transport item arrived on Mars");
-					eventManager.registerNewEvent(arrivalEvent);
-					logger.info("Transport item arrived at " + transportItem.toString());
-				}
+		for(Transportable transportItem : transportItems) {
+			switch(transportItem.getTransitState()) {
+				case PLANNED:
+					if (MarsClock.getTimeDiff(pulse.getMarsTime(), transportItem.getLaunchDate()) >= 0D) {
+						// Transport item is launched.
+						transportItem.setTransitState(TransitState.IN_TRANSIT);
+						HistoricalEvent deliverEvent = new TransportEvent(transportItem, EventType.TRANSPORT_ITEM_LAUNCHED,
+								"A transport item launched", transportItem.getSettlementName());
+						if (sim == null)
+							sim = Simulation.instance();
+						if (eventManager == null)
+							eventManager = sim.getEventManager();
+						eventManager.registerNewEvent(deliverEvent);
+						logger.info("A transport item launched on " + transportItem.toString());
+					}
+					break;
+
+				case IN_TRANSIT:
+					if (MarsClock.getTimeDiff(pulse.getMarsTime(), transportItem.getArrivalDate()) >= 0D) {
+						// Transport item has arrived on Mars.
+						transportItem.setTransitState(TransitState.ARRIVED);
+						transportItem.performArrival(simConfig, sim);
+						HistoricalEvent arrivalEvent = new TransportEvent(transportItem, EventType.TRANSPORT_ITEM_ARRIVED,
+								transportItem.getSettlementName(), "A transport item arrived on Mars");
+						if (sim == null)
+							sim = Simulation.instance();
+						if (eventManager == null)
+							eventManager = sim.getEventManager();
+						eventManager.registerNewEvent(arrivalEvent);
+						logger.info("A transport item arrived at " + transportItem.toString());
+					}
+					break;
+
+				default:
 			}
 		}
 		
@@ -169,23 +216,15 @@ public class TransportManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * initializes instances after loading from a saved sim
-	 * 
-	 * @param {@link HistoricalEventManager}
+	 * Reset links to the managers classes after a reload. This also reinit's the TransportItems
 	 */
-	public static void initializeInstances(HistoricalEventManager h) {
-		eventManager = h;
-	}
+	public void initalizeInstances(SimulationConfig simConfig, Simulation sim) {
+		this.sim = sim;
+		this.simConfig = simConfig;
 
-	/**
-	 * Prepare object for garbage collection.
-	 */
-//	@Override
-	public void destroy() {
-		Iterator<Transportable> i = transportItems.iterator();
-		while (i.hasNext())
-			i.next().destroy();
-		transportItems.clear();
-		transportItems = null;
+		UnitManager um = sim.getUnitManager();
+		for(Transportable t : transportItems) {
+			t.reinit(um);
+		}
 	}
 }

@@ -1,6 +1,10 @@
-/**
- * @(#)AlphaImageIcon.java	1.0 08/16/10
+/*
+ * Mars Simulation Project
+ * AlphaImageIcon.java
+ * @date 2022-09-01
+ * @author Manny Kung
  */
+
 package org.mars_sim.msp.ui.swing.tool;
 
 import java.awt.AlphaComposite;
@@ -19,13 +23,14 @@ import javax.swing.ImageIcon;
  * that holds an animated image.  To show a non-animated Icon with transparency,
  * the companion class {@link AlphaIcon} is a lighter alternative.
  *
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Darryl
  */
+@SuppressWarnings("serial")
 public class AlphaImageIcon extends ImageIcon {
 
-  private Icon icon;
-  private Image image;
+  private transient Icon icon;
+  private transient Image imageObj;
   private float alpha;
 
   /**
@@ -49,7 +54,7 @@ public class AlphaImageIcon extends ImageIcon {
    */
   @Override
   public Image getImage() {
-    return image;
+    return imageObj;
   }
 
   /**
@@ -134,11 +139,11 @@ public class AlphaImageIcon extends ImageIcon {
    * @param y the Y coordinate of the icon's top-left corner
    */
   @Override
-  public void paintIcon(Component c, Graphics g, int x, int y) {
+  public synchronized void paintIcon(Component c, Graphics g, int x, int y) {
     if (icon instanceof ImageIcon) {
-      image = ((ImageIcon) icon).getImage();
+      imageObj = ((ImageIcon) icon).getImage();
     } else {
-      image = null;
+      imageObj = null;
     }
     Graphics2D g2 = (Graphics2D) g.create();
     g2.setComposite(AlphaComposite.SrcAtop.derive(alpha));

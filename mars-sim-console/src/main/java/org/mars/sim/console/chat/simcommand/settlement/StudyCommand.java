@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * StudyCommand.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand.settlement;
 
 import java.util.List;
@@ -19,7 +26,7 @@ public class StudyCommand extends AbstractSettlementCommand {
 	public static final ChatCommand STUDY = new StudyCommand();
 
 	private StudyCommand() {
-		super("st", "study", "Settlement Science studies");
+		super("ss", "study", "Settlement Scientific Studies");
 	}
 
 	/** 
@@ -36,7 +43,7 @@ public class StudyCommand extends AbstractSettlementCommand {
 		
 		for (ScientificStudy study : studies) {
 			CommandHelper.outputStudy(response, study);
-			response.append(System.lineSeparator());
+			response.appendBlankLine();
 		}
 		
 		context.println(response.getOutput());

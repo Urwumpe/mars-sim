@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * NavigatorWindow.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.navigator;
@@ -42,9 +42,10 @@ import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitManager;
-import org.mars_sim.msp.core.mars.Landmark;
-import org.mars_sim.msp.core.mars.Mars;
-import org.mars_sim.msp.core.mars.TerrainElevation;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.environment.Landmark;
+import org.mars_sim.msp.core.environment.TerrainElevation;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.JComboBoxMW;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.tool.JStatusBar;
@@ -63,7 +64,7 @@ import org.mars_sim.msp.ui.swing.tool.map.TopoMarsMap;
 import org.mars_sim.msp.ui.swing.tool.map.UnitIconMapLayer;
 import org.mars_sim.msp.ui.swing.tool.map.UnitLabelMapLayer;
 import org.mars_sim.msp.ui.swing.tool.map.VehicleTrailMapLayer;
-import org.mars_sim.msp.ui.swing.toolWindow.ToolWindow;
+import org.mars_sim.msp.ui.swing.toolwindow.ToolWindow;
 import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfo;
 import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfoFactory;
 
@@ -75,7 +76,6 @@ import com.alee.laf.label.WebLabel;
 import com.alee.laf.menu.WebCheckBoxMenuItem;
 import com.alee.laf.menu.WebPopupMenu;
 import com.alee.laf.panel.WebPanel;
-import com.alee.laf.text.WebTextField;
 import com.alee.managers.style.StyleId;
 
 /**
@@ -89,38 +89,30 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 	/** Tool name. */
 	public static final String NAME = Msg.getString("NavigatorWindow.title"); //$NON-NLS-1$
 
-//	public static final int HORIZONTAL = 435;//700;//635;
-//	public static final int VERTICAL = 435;
+	public static final int HORIZONTAL_SURFACE_MAP = MapDataUtil.GLOBE_BOX_HEIGHT; 
+	public static final int HORIZONTAL_FULL_WDITH = HORIZONTAL_SURFACE_MAP * 2;
+	public static final int GLOBAL_MAP_WIDTH = HORIZONTAL_SURFACE_MAP;
 
-	public static final int HORIZONTAL_SURFACE_MAP = MapDataUtil.IMAGE_WIDTH; 
-	public static final int HORIZONTAL_FULL = HORIZONTAL_SURFACE_MAP * 2;//800; //310; //300;// 274
-	public static final int HORIZONTAL_LEFT_HALF = HORIZONTAL_SURFACE_MAP; 
-//	public static final int VERTICAL_MINIMAP = 340; //660; //700;// 695;
-	public static final int HEIGHT_BUTTON_PANE = 26; //700;// 695;
-	public static final int HEIGHT = (int)(HORIZONTAL_SURFACE_MAP + 3.5 * HEIGHT_BUTTON_PANE);
-	
+	public static final int HEIGHT_BUTTON_PANE = 26;
+	public static final int HEIGHT_STATUS_BAR = 20;
+
 	public static final int CB_WIDTH = 120;
 
 	public static final double RAD_PER_DEGREE = Math.PI / 180D;
-	
+
+	public static final String WHITESPACE = " ";
 	public static final String COMMA = ", ";
-	public static final String THETA = "Theta: ";
-	public static final String PHI = "Phi: ";
+	public static final String THETA = "\u03B8: "; //"Theta: ";
+	public static final String PHI = "\u03C6: "; //"Phi: ";
 	public static final String CLOSE_P = ")";
 
-	
 	private static final String RGB = "RGB (";
 	private static final String HSB = "HSB (";
-	
-	private static final String ELEVATION = "Elev: ";
+
+	private static final String ELEVATION = " h: ";
 	private static final String KM = " km";
 	
-//	private static final String WHITESPACES_4 = "    ";
-//	private static final String WHITESPACES_3 = "   ";
-//	private static final String WHITESPACES_2 = "  ";
-	
-	// Data members
-	
+	// Data member
 	/** The status bar. */
 	private JStatusBar statusBar;
 	/** The latitude combox  */
@@ -135,12 +127,12 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 	private GlobeDisplay globeNav;
 	/** Compass navigation buttons. */
 	// private NavButtonDisplay navButtons;
-	/** Topographical and distance legend. */
-	private LegendDisplay ruler;
-	/** Latitude entry. */
-	private WebTextField latText;
-	/** Longitude entry. */
-	private WebTextField longText;
+//	/** Topographical and distance legend. */
+//	private LegendDisplay ruler;
+//	/** Latitude entry. */
+//	private WebTextField latText;
+//	/** Longitude entry. */
+//	private WebTextField longText;
 	/** Latitude direction choice. */
 	private JComboBoxMW<?> latDir;
 	/** Longitude direction choice. */
@@ -182,7 +174,6 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 	/** Show minerals menu item. */
 	private WebCheckBoxMenuItem mineralItem;
 
-
 	private MapLayer unitIconLayer;
 	private MapLayer unitLabelLayer;
 	private MapLayer shadingLayer;
@@ -192,13 +183,8 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 	private MapLayer landmarkLayer;
 	private MapLayer exploredSiteLayer;
 
-	private static List<Landmark> landmarks;
-	
-	private static Simulation sim = Simulation.instance();
-	private static TerrainElevation terrainElevation;
-	private static Mars mars;
-	
-	private static UnitManager unitManager = sim.getUnitManager();
+	private List<Landmark> landmarks;
+	private UnitManager unitManager;
 
 	/**
 	 * Constructor.
@@ -208,54 +194,34 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 	public NavigatorWindow(MainDesktopPane desktop) {
 		// use ToolWindow constructor
 		super(NAME, desktop);
-		this.desktop = desktop;
 
-		if (mars == null)
-			mars = sim.getMars();
-		if (terrainElevation == null)
-			terrainElevation =  mars.getSurfaceFeatures().getTerrainElevation();
-		
-		landmarks = mars.getSurfaceFeatures().getLandmarks();
-
-		// setTitleName(null);
-		// ...
-//			putClientProperty("JInternalFrame.isPalette", Boolean.TRUE);
-//			getRootPane().setWindowDecorationStyle(JRootPane.NONE);
-//			// Remove title bar
-//			BasicInternalFrameUI bi = (BasicInternalFrameUI) super.getUI();
-//			bi.setNorthPane(null);
-//			// Remove border (not working)
-//			setBorder(null);
-
-		setPreferredSize(new Dimension(HORIZONTAL_FULL + 10, HEIGHT));
-		setMaximumSize(getPreferredSize());
-		
+		Simulation sim = desktop.getSimulation();
+		this.landmarks = sim.getSurfaceFeatures().getLandmarks();
+		this.unitManager = sim.getUnitManager();
+	
 		// Prepare content pane		
 		JPanel contentPane = new JPanel(new BorderLayout(0, 0));
 		setContentPane(contentPane);
 		
 		// Prepare whole pane
 		JPanel wholePane = new JPanel(new GridLayout(1, 2));
-		wholePane.setPreferredSize(new Dimension(HORIZONTAL_FULL + 10, HEIGHT));
-//		wholePane.setLayout(new BoxLayout(wholePane, BoxLayout.Y_AXIS));
-		// mainPane.setBorder(new MarsPanelBorder());
 		contentPane.add(wholePane, BorderLayout.CENTER);
 
 		JPanel leftPane = new JPanel(new BorderLayout(0, 0));
-		leftPane.setPreferredSize(new Dimension(HORIZONTAL_LEFT_HALF + 5, HORIZONTAL_SURFACE_MAP + 5 + HEIGHT_BUTTON_PANE));
+		leftPane.setMaximumSize(new Dimension(GLOBAL_MAP_WIDTH, HORIZONTAL_SURFACE_MAP));
 		wholePane.add(leftPane);
 		
 		// Prepare globe display
 		globeNav = new GlobeDisplay(this);
 		WebPanel globePane = new WebPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-		globePane.setPreferredSize(new Dimension(HORIZONTAL_LEFT_HALF + 5, HORIZONTAL_SURFACE_MAP + 5 + HEIGHT_BUTTON_PANE));
+		globePane.setMaximumSize(new Dimension(GLOBAL_MAP_WIDTH, HORIZONTAL_SURFACE_MAP));
 		globePane.setBackground(Color.black);
 		globePane.setOpaque(true);
 		globePane.setBorder(new CompoundBorder(new BevelBorder(BevelBorder.LOWERED), new LineBorder(Color.gray)));
 		globePane.add(globeNav);
 
 		globePane.setAlignmentX(Component.CENTER_ALIGNMENT);
-		globePane.setAlignmentY(Component.CENTER_ALIGNMENT);
+		globePane.setAlignmentY(Component.TOP_ALIGNMENT);
 		leftPane.add(globePane, BorderLayout.CENTER);
 
 		
@@ -263,31 +229,22 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 
 		
 		JPanel rightPane = new JPanel(new BorderLayout(0, 0));
-		rightPane.setPreferredSize(new Dimension(HORIZONTAL_SURFACE_MAP  + 5, HORIZONTAL_SURFACE_MAP + 5 + HEIGHT_BUTTON_PANE));
 		wholePane.add(rightPane);
 	
 		WebPanel detailPane = new WebPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
 		rightPane.add(detailPane, BorderLayout.CENTER);
-		
-		detailPane.setPreferredSize(new Dimension(HORIZONTAL_SURFACE_MAP + 5, HORIZONTAL_SURFACE_MAP + 5 + HEIGHT_BUTTON_PANE));
-		// detailPane.setBorder( new CompoundBorder(new BevelBorder(BevelBorder.LOWERED), new LineBorder(Color.gray)));
-//		detailPane.setBackground(Color.black);
-//		detailPane.setOpaque(true);
-		
+	
 		mapPaneInner = new WebPanel(new BorderLayout(0, 0));
 		detailPane.add(mapPaneInner);
-		
-		mapPaneInner.setBorder(new CompoundBorder(new BevelBorder(BevelBorder.LOWERED), new LineBorder(Color.gray)));
+	
 		mapPaneInner.setBackground(Color.black);
-		mapPaneInner.setPreferredSize(new Dimension(HORIZONTAL_SURFACE_MAP + 5, HORIZONTAL_SURFACE_MAP + 5 + HEIGHT_BUTTON_PANE));
 		mapPaneInner.setOpaque(true);
 		mapPaneInner.setAlignmentX(CENTER_ALIGNMENT);
 		mapPaneInner.setAlignmentY(TOP_ALIGNMENT);
-		// mapPaneInner.setCursor(new Cursor(java.awt.Cursor.DEFAULT_CURSOR));
 
 		mapLayerPanel = new MapPanel(desktop, 500L);
-		mapLayerPanel.setPreferredSize(new Dimension(HORIZONTAL_SURFACE_MAP + 5, HORIZONTAL_SURFACE_MAP + 5 + HEIGHT_BUTTON_PANE));
 		mapLayerPanel.setNavWin(this);
+		
 		mapLayerPanel.addMouseListener(new MouseListener());
 		mapLayerPanel.addMouseMotionListener(new MouseMotionListener());
 		// map.setCursor(new Cursor(java.awt.Cursor.DEFAULT_CURSOR));
@@ -304,6 +261,7 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 
 		// Add default map layers.
 		mapLayerPanel.addMapLayer(shadingLayer, 0);
+		// Note: mineralLayer is 1; 
 		mapLayerPanel.addMapLayer(unitIconLayer, 2);
 		mapLayerPanel.addMapLayer(unitLabelLayer, 3);
 		mapLayerPanel.addMapLayer(navpointLayer, 4);
@@ -314,15 +272,14 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 		// mapPaneInner.setAlignmentX(Component.CENTER_ALIGNMENT);
 		mapPaneInner.add(mapLayerPanel, BorderLayout.CENTER);
 		
-		// turn off day night layer
+		// turn on day night layer
 		setMapLayer(false, 0, shadingLayer);
-		globeNav.setDayNightTracking(false);
-		
+//		globeNav.setDayNightTracking(false);
 		
 		///////////////////////////////////////////////////////////////////////////
 		
 
-		// Prepare position entry panel
+		// Prepare position coordination entry panel on the left pane
 		WebPanel coordPane = new WebPanel(new GridLayout(1, 6, 0, 0));
 		coordPane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		coordPane.setAlignmentY(Component.BOTTOM_ALIGNMENT);
@@ -330,7 +287,8 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 		leftPane.add(coordPane, BorderLayout.SOUTH);
 		
 		// coordPane.setBorder(new EmptyBorder(6, 6, 3, 3));
-		coordPane.setMaximumHeight(HEIGHT_BUTTON_PANE);
+//		coordPane.setMaximumHeight(HEIGHT_BUTTON_PANE);
+//		coordPane.setPreferredHeight(HEIGHT_BUTTON_PANE);
 //		coordPane.setMaximumSize(new Dimension(300, HEIGHT_BUTTON_PANE));
 		coordPane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		coordPane.setAlignmentY(Component.TOP_ALIGNMENT);
@@ -364,7 +322,7 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 		};
 		latDir = new JComboBoxMW<Object>(latStrings);
 		latDir.setEditable(false);
-		latDir.setPreferredSize(new Dimension(20, -1));
+		latDir.setSize(new Dimension(20, -1));
 		coordPane.add(latDir);
 
 		// Prepare longitude entry components
@@ -383,15 +341,17 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 		};
 		longDir = new JComboBoxMW<Object>(longStrings);
 		longDir.setEditable(false);
-		longDir.setPreferredSize(new Dimension(20, -1));
+		longDir.setSize(new Dimension(20, -1));
 		coordPane.add(longDir);
 
-		// Prepare options panel
+		///////////////////////////////////////////////////////////////////////////
+		
+		// Prepare options panel on the right pane
 		WebPanel optionsPane = new WebPanel(new GridLayout(1, 3));
 //		controlPane.add(optionsPane);
 		rightPane.add(optionsPane, BorderLayout.SOUTH);
 		
-		optionsPane.setPreferredHeight(HEIGHT_BUTTON_PANE);
+//		optionsPane.setPreferredHeight(HEIGHT_BUTTON_PANE);
 //		optionsPane.setMaximumSize(new Dimension(300, HEIGHT_BUTTON_PANE));
 		optionsPane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		optionsPane.setAlignmentY(Component.BOTTOM_ALIGNMENT);
@@ -444,7 +404,7 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 		
 		coordLabel = new WebStyledLabel(StyleId.styledlabelShadow);
 		coordLabel.setFont(font);
-		coordLabel.setForeground(Color.GREEN.darker());
+		coordLabel.setForeground(Color.GREEN.darker().darker());
 		phiLabel = new WebStyledLabel(StyleId.styledlabelShadow);
 		phiLabel.setFont(font);
 		phiLabel.setForeground(Color.BLUE.darker());
@@ -456,45 +416,47 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 		heightLabel.setForeground(Color.ORANGE.darker());
 		rgbLabel = new WebStyledLabel(StyleId.styledlabelShadow);
 		rgbLabel.setFont(font1);
-		rgbLabel.setForeground(Color.DARK_GRAY);
+		rgbLabel.setForeground(Color.red.darker().darker());
 		hsbLabel = new WebStyledLabel(StyleId.styledlabelShadow);
 		hsbLabel.setFont(font2);
-		hsbLabel.setForeground(Color.DARK_GRAY);
-        
-	    WebPanel w0 = new WebPanel();
-	    w0.setPreferredSize(new Dimension(91, 18));
-	    w0.add(heightLabel);
-	    
-	    WebPanel w1 = new WebPanel();
-	    w1.setPreferredSize(new Dimension(106, 18));
-	    w1.add(coordLabel);
-	    
-	    WebPanel w1a = new WebPanel();
-	    w1a.setPreferredSize(new Dimension(54, 18));
-	    w1a.add(phiLabel);
-	
-	    WebPanel w1b = new WebPanel();
-	    w1b.setPreferredSize(new Dimension(74, 18));
-	    w1b.add(thetaLabel);
-	    
-	    WebPanel w2 = new WebPanel();
-	    w2.setPreferredSize(new Dimension(114, 18));
-	    w2.add(rgbLabel);
-	    
-	    WebPanel w3 = new WebPanel();
-	    w3.setPreferredSize(new Dimension(135, 18));
-	    w3.add(hsbLabel);
-	    
-		statusBar.addLeftComponent(w0, false);
-		statusBar.addLeftComponent(w2, false);
-		
-		statusBar.addCenterComponent(w3, false);
+		hsbLabel.setForeground(Color.MAGENTA.darker());
 
-		statusBar.addRightComponent(w1, false);
-		statusBar.addRightComponent(w1a, false);
-		statusBar.addRightComponent(w1b, false);
+	    WebPanel p = new WebPanel();
+	    p.setPreferredSize(new Dimension(45, HEIGHT_STATUS_BAR));
+	    p.add(phiLabel);
+	
+	    WebPanel t = new WebPanel();
+	    t.setPreferredSize(new Dimension(45, HEIGHT_STATUS_BAR));
+	    t.add(thetaLabel);
+	     
+	    WebPanel c = new WebPanel();
+	    c.setPreferredSize(new Dimension(135, HEIGHT_STATUS_BAR));
+	    c.add(coordLabel);
+	    
+	    WebPanel e = new WebPanel();
+	    e.setPreferredSize(new Dimension(150, HEIGHT_STATUS_BAR));
+	    e.add(heightLabel);
+	    
+	    WebPanel r = new WebPanel();
+	    r.setPreferredSize(new Dimension(110, HEIGHT_STATUS_BAR));
+	    r.add(rgbLabel);
+	    
+	    WebPanel hs = new WebPanel();
+	    hs.setPreferredSize(new Dimension(130, HEIGHT_STATUS_BAR));
+	    hs.add(hsbLabel);
+	    
+		statusBar.addLeftComponent(c, false);
+		statusBar.addLeftComponent(p, false);
+		statusBar.addLeftComponent(t, false);
+		
+		statusBar.addCenterComponent(e, false);
+
+//		statusBar.addRightComponent(e, false);
+		statusBar.addRightComponent(r, false);
+		statusBar.addRightComponent(hs, false);
 		
 //		statusBar.addRightCorner();
+		
 		
 		// Create the option menu
 		if (optionsMenu == null)
@@ -509,15 +471,26 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 		pack();
 	}
 
-	public void createStatusBarLabels(String height, String coord, double phi, double theta, String rgb, String hsb) {
-		heightLabel.setText(height);
-		coordLabel.setText(coord);
+	/**
+	 * Updates the labels on the status bar.
+	 * 
+	 * @param height
+	 * @param coord
+	 * @param phi
+	 * @param theta
+	 * @param rgb
+	 * @param hsb
+	 */
+	public void updateStatusBarLabels(String height, String coord, double phi, double theta, String rgb, String hsb) {
+		heightLabel.setText(ELEVATION + height);
+		coordLabel.setText(WHITESPACE + coord);
 		phiLabel.setText(PHI + phi);
 		thetaLabel.setText(THETA + theta);
 		rgbLabel.setText(rgb);
 		hsbLabel.setText(hsb);
 	}
 	
+	@SuppressWarnings("unused")
 	private class TransparentPanel extends JPanel {
 	    {
 	        setOpaque(false);
@@ -627,7 +600,7 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 				globeNav.showTopo();
 				// turn off day night layer
 				setMapLayer(false, 0, shadingLayer);
-				globeNav.setDayNightTracking(false);
+//				globeNav.setDayNightTracking(false);
 				// turn off mineral layer
 				setMapLayer(false, 1, mineralLayer);
 				mineralItem.setSelected(false);
@@ -655,7 +628,7 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 			}
 		} else if (source == dayNightItem) {
 			setMapLayer(dayNightItem.isSelected(), 0, shadingLayer);
-			globeNav.setDayNightTracking(dayNightItem.isSelected());
+//			globeNav.setDayNightTracking(dayNightItem.isSelected());
 		} else if (source == unitLabelItem)
 			setMapLayer(unitLabelItem.isSelected(), 3, unitLabelLayer);
 		else if (source == trailItem)
@@ -839,7 +812,9 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 		}
 
 		public void mouseClicked(MouseEvent event) {
-			checkClick(event);
+			if (SwingUtilities.isRightMouseButton(event) && event.getClickCount() == 1) {
+				checkClick(event);
+            }
 		}
 	}
 
@@ -861,15 +836,20 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 
 			Coordinates clickedPosition = mapLayerPanel.getCenterLocation().convertRectToSpherical(x, y, rho);
 
-//			System.out.println(clickedPosition.getFormattedString() 
-//			+ " " + terrainElevation.getElevation(clickedPosition) + " km"
-//			);
-			
 			Iterator<Unit> i = unitManager.getDisplayUnits().iterator();
 
 			// Open window if unit is clicked on the map
 			while (i.hasNext()) {
 				Unit unit = i.next();
+				
+				if (unit.getUnitType() == UnitType.VEHICLE) {
+					if (((Vehicle)unit).isOutsideOnMarsMission()) {
+						// Proceed to below to set cursor;
+					}
+					else 
+						continue;
+				}
+				
 				UnitDisplayInfo displayInfo = UnitDisplayInfoFactory.getUnitDisplayInfo(unit);
 				if (displayInfo != null && displayInfo.isMapDisplayed(unit)) {
 					Coordinates unitCoords = unit.getCoordinates();
@@ -899,46 +879,43 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 			double x = (double) (event.getX() - (Map.DISPLAY_WIDTH / 2D) - 1);
 			double y = (double) (event.getY() - (Map.DISPLAY_HEIGHT / 2D) - 1);
 			
-			Coordinates clickedPosition = mapLayerPanel.getCenterLocation().convertRectToSpherical(x, y, rho);
+			Coordinates pos = mapLayerPanel.getCenterLocation().convertRectToSpherical(x, y, rho);
+			
+			StringBuilder coordSB = new StringBuilder();			
+			StringBuilder rgbSB = new StringBuilder();
+			StringBuilder hsbSB = new StringBuilder();
+			StringBuilder elevSB = new StringBuilder();
+			
+			double phi = pos.getPhi();
+			double theta = pos.getTheta();			
+			double h0 = TerrainElevation.getMOLAElevation(phi, theta);
+			double h1 = TerrainElevation.getPatchedElevation(pos);
+			
+			phi = Math.round(phi*1000.0)/1000.0;
+			theta = Math.round(theta*1000.0)/1000.0;
 
-			if (mars == null)
-				mars = sim.getMars();
-			if (terrainElevation == null)
-				terrainElevation =  mars.getSurfaceFeatures().getTerrainElevation();
-
-			double e = terrainElevation.getMOLAElevation(clickedPosition);
-					
-			StringBuilder s0 = new StringBuilder();
-			s0.append(ELEVATION).append(Math.round(e*1000.0)/1000.0).append(KM);
+			elevSB.append(ELEVATION)
+				.append(Math.round(h0*1000.0)/1000.0)
+				.append(" / " + Math.round(h1*1000.0)/1000.0)
+				.append(KM);
 			
-			StringBuilder s1 = new StringBuilder();
-			s1.append(clickedPosition.getFormattedString());
-			
-			StringBuilder s2 = new StringBuilder();
-			
-			StringBuilder s3 = new StringBuilder();
-			
-			double phi = Math.round(clickedPosition.getPhi()*100.0)/100.0;
-			double theta = Math.round(clickedPosition.getTheta()*100.0)/100.0;
-					
 			if (topoItem.isSelected()) {
-				int[] rgb = terrainElevation.getRGB(clickedPosition);
-				float[] hsb = terrainElevation.getHSB(rgb);
+				int[] rgb = TerrainElevation.getRGB(pos);
+				float[] hsb = TerrainElevation.getHSB(rgb);
 				
-				s2.append(RGB).append(rgb[0]).append(COMMA)
+				rgbSB.append(RGB).append(rgb[0]).append(COMMA)
 				.append(rgb[1]).append(COMMA)
 				.append(rgb[2]).append(CLOSE_P);
 				
-				s3.append(HSB).append(Math.round(hsb[0]*100.0)/100.0).append(COMMA)
+				hsbSB.append(HSB).append(Math.round(hsb[0]*100.0)/100.0).append(COMMA)
 					.append(Math.round(hsb[1]*100.0)/100.0).append(COMMA)
 					.append(Math.round(hsb[2]*100.0)/100.0).append(CLOSE_P);
 			}
 			
-			createStatusBarLabels(s0.toString(), s1.toString(), phi, theta , s2.toString(), s3.toString());
+			coordSB.append(pos.getCoordinateString());
 			
-			// System.out.println("x is " + x + " y is " + y);
-			
-			Coordinates mousePos = mapLayerPanel.getCenterLocation().convertRectToSpherical(x, y, rho);
+			updateStatusBarLabels(elevSB.toString(), coordSB.toString(), phi, theta, rgbSB.toString(), hsbSB.toString());
+
 			boolean onTarget = false;
 
 			Iterator<Unit> i = unitManager.getDisplayUnits().iterator();
@@ -946,10 +923,19 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 			// Change mouse cursor if hovering over an unit on the map
 			while (i.hasNext()) {
 				Unit unit = i.next();
+
+				if (unit.getUnitType() == UnitType.VEHICLE) {
+					if (((Vehicle)unit).isOutsideOnMarsMission()) {
+						// Proceed to below to set cursor;
+					}
+					else 
+						continue;
+				}
+				
 				UnitDisplayInfo displayInfo = UnitDisplayInfoFactory.getUnitDisplayInfo(unit);
 				if (displayInfo != null && displayInfo.isMapDisplayed(unit)) {
 					Coordinates unitCoords = unit.getCoordinates();
-					double clickRange = Coordinates.computeDistance(unitCoords, mousePos);
+					double clickRange = Coordinates.computeDistance(unitCoords, pos);
 					double unitClickRange = displayInfo.getMapClickRange();
 					if (clickRange < unitClickRange) {
 						// System.out.println("you're on a settlement or vehicle");
@@ -959,13 +945,15 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
 				}
 			}
 
+			// TODO: how to avoid overlapping labels ?
+			
 			// Change mouse cursor if hovering over a landmark on the map
 			Iterator<Landmark> j = landmarks.iterator();
 			while (j.hasNext()) {
 				Landmark landmark = (Landmark) j.next();
 
 				Coordinates unitCoords = landmark.getLandmarkCoord();
-				double clickRange = Coordinates.computeDistance(unitCoords, mousePos);
+				double clickRange = Coordinates.computeDistance(unitCoords, pos);
 				double unitClickRange = 40D;
 
 				if (clickRange < unitClickRange) {
@@ -1015,7 +1003,7 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
          popOver.setPadding(2);
          popOver.setTitle(landmark.getLandmarkName());
          
-         final WebPanel c = new WebPanel(StyleId.panelTransparent, new BorderLayout(5,5));
+         final WebPanel c = new WebPanel(StyleId.panelTransparent, new BorderLayout(5, 5));
 
          final WebLabel l = new WebLabel(landmark.getLandmarkLandingLocation(), WebLabel.CENTER);
          c.add(l, BorderLayout.NORTH);
@@ -1028,28 +1016,21 @@ public class NavigatorWindow extends ToolWindow implements ActionListener {
          popOver.add(c);
          popOver.show(event.getComponent(), x + 5, y + 5, PopOverDirection.down);
 	}
-	
-	public MainDesktopPane getDesktop() {
-		return desktop;
-	}
 
+	@Override
 	public void destroy() {
 		if (mapLayerPanel != null)
 			mapLayerPanel.destroy();
 		if (globeNav != null)
 			globeNav.destroy();
 
-		sim = null;
-		unitManager = null;
-		landmarks = null;
-
 		latCB = null;
 		longCB = null;
 		mapLayerPanel = null;
 		globeNav = null;
-		ruler = null;
-		latText = null;
-		longText = null;
+//		ruler = null;
+//		latText = null;
+//		longText = null;
 		latDir = null;
 		longDir = null;
 		goThere = null;

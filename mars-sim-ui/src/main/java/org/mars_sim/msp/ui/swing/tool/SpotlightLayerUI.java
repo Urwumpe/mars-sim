@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
- * SpotlightLayterUI.java
- * @version 3.1.2 2020-09-02
+ * SpotlightLayerUI.java
+ * @date 2021-09-20
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.tool;
@@ -25,6 +25,7 @@ import org.mars_sim.msp.ui.swing.tool.settlement.SettlementMapPanel;
 
 import com.alee.laf.panel.WebPanel;
 
+@SuppressWarnings("serial")
 public class SpotlightLayerUI extends LayerUI<WebPanel> {
 
 	//private static final long serialVersionUID = 1L;
@@ -95,12 +96,14 @@ public class SpotlightLayerUI extends LayerUI<WebPanel> {
 	    g2.dispose();
 	  }
 
+	  @SuppressWarnings("rawtypes")
 	  @Override
 	  protected void processMouseEvent(MouseEvent e, JLayer l) {
 	    if (e.getID() == MouseEvent.MOUSE_ENTERED) mActive = true;
 	    if (e.getID() == MouseEvent.MOUSE_EXITED) mActive = false;
 	  }
 
+	  @SuppressWarnings("rawtypes")
 	  @Override
 	  protected void processMouseMotionEvent(MouseEvent e, JLayer l) {
 	    Point p = SwingUtilities.convertPoint(e.getComponent(), e.getPoint(), l);

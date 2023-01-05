@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ConstructionStage.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-15
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.construction;
@@ -11,9 +11,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
-import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.tool.Conversion;
 
 /**
@@ -261,8 +259,8 @@ public class ConstructionStage implements Serializable {
      * @param parts map of parts and their numbers.
      * @return total mass.
      */
-    private double getConstructionMaterialMass(Map<Integer, Double> resources, Map<Integer, 
-            Integer> parts) {
+    private double getConstructionMaterialMass(Map<Integer, Double> resources, 
+    		Map<Integer, Integer> parts) {
 
         double result = 0D;
 

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * EquipmentWindow.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
@@ -30,7 +30,7 @@ public class EquipmentWindow extends UnitWindow {
 
 	// Data members
 	private boolean salvaged;
-	
+
 	private Equipment equipment;
     /**
      * Constructor
@@ -40,13 +40,13 @@ public class EquipmentWindow extends UnitWindow {
      */
     public EquipmentWindow(MainDesktopPane desktop, Equipment equipment) {
         // Use UnitWindow constructor
-        super(desktop, equipment, false);
+        super(desktop, equipment, equipment.getAssociatedSettlement().getName() + " - " + equipment.getName(), false);
         this.equipment = equipment;
 
         // Add tab panels
-        addTabPanel(new LocationTabPanel(equipment, desktop));
-
         addTabPanel(new InventoryTabPanel(equipment, desktop));
+
+        addTabPanel(new LocationTabPanel(equipment, desktop));
 
         if (equipment instanceof Malfunctionable)
         	addTabPanel(new MaintenanceTabPanel(equipment, desktop));
@@ -59,6 +59,8 @@ public class EquipmentWindow extends UnitWindow {
 
     	sortTabPanels();
 
+		// Add to tab panels. 
+		addTabIconPanels();
     }
 
     /**
@@ -80,7 +82,7 @@ public class EquipmentWindow extends UnitWindow {
 //
 //		if (oldTab == null || newTab != oldTab) {
 //			oldTab = newTab;
-//			
+//
 //			if (!newTab.isUIDone());
 //				newTab.initializeUI();
 //		}

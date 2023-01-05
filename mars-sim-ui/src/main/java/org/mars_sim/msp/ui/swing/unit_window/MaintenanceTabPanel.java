@@ -1,21 +1,18 @@
-/**
+/*
  * Mars Simulation Project
  * MaintenanceTabPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-10
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.ui.swing.unit_window;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.GridLayout;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.Map;
 
 import javax.swing.BoundedRangeModel;
 import javax.swing.BoxLayout;
@@ -29,21 +26,17 @@ import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.malfunction.Malfunction;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
-import org.mars_sim.msp.core.resource.ItemResourceUtil;
-import org.mars_sim.msp.core.resource.Part;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 
 /**
  * The MaintenanceTabPanel is a tab panel for unit maintenance information.
  */
 @SuppressWarnings("serial")
 public class MaintenanceTabPanel extends TabPanel {
-
-	/** Is UI constructed. */
-	private boolean uiDone = false;
 	
+	private static final String SPANNER_ICON = Msg.getString("icon.spanner"); //$NON-NLS-1$
+
     private int wearConditionCache; // The cached value for the wear condition.
     private int lastCompletedTime; // The time since last completed maintenance.
     
@@ -58,39 +51,34 @@ public class MaintenanceTabPanel extends TabPanel {
     private Collection<Malfunction> malfunctionCache; // List of malfunctions.
 
     /**
-     * Constructor
+     * Constructor.
      *
      * @param unit the unit to display.
      * @param desktop the main desktop.
      */
     public MaintenanceTabPanel(Unit unit, MainDesktopPane desktop) {
         // Use the TabPanel constructor
-        super("Maint", null, "Maintenance", unit, desktop);
-
-		this.unit = unit;
+        super(
+        	Msg.getString("MaintenanceTabPanel.title"),
+        	Msg.getString("MaintenanceTabPanel.title"), 
+        	ImageLoader.getNewIcon(SPANNER_ICON), 
+        	Msg.getString("MaintenanceTabPanel.title"),
+        	unit, desktop
+        );
 	}
 	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
-		
-        Malfunctionable malfunctionable = (Malfunctionable) unit;
+    @Override
+    protected void buildUI(JPanel content) {
+        Malfunctionable malfunctionable = (Malfunctionable) getUnit();
         MalfunctionManager manager = malfunctionable.getMalfunctionManager();
 
-        // Create maintenance label.
-  		JPanel mpanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        JLabel maintenanceLabel = new JLabel(Msg.getString("MaintenanceTabPanel.title", JLabel.CENTER));
-        maintenanceLabel.setFont(new Font("Serif", Font.BOLD, 16));
-  		mpanel.add(maintenanceLabel);
-        topContentPanel.add(mpanel);
+        JPanel northPanel = new JPanel();
+        northPanel.setLayout(new BoxLayout(northPanel, BoxLayout.Y_AXIS));
 
         // Create maintenance panel
         JPanel maintenancePanel = new JPanel(new GridLayout(6, 1, 0, 0));
-        maintenancePanel.setBorder(new MarsPanelBorder());
-        topContentPanel.add(maintenancePanel);
+        northPanel.add(maintenancePanel);
+        content.add(northPanel, BorderLayout.NORTH);
 
         // Create wear condition label.
         wearConditionCache = (int) Math.round(manager.getWearCondition());
@@ -128,8 +116,7 @@ public class MaintenanceTabPanel extends TabPanel {
 
         // Prepare malfunction panel
         JPanel malfunctionPanel = new JPanel(new BorderLayout(0, 0));
-//        malfunctionPanel.setBorder(new MarsPanelBorder());
-        centerContentPanel.add(malfunctionPanel, BorderLayout.CENTER);
+        content.add(malfunctionPanel, BorderLayout.CENTER);
 
         // Create malfunctions label
         JLabel malfunctionsLabel = new JLabel("Malfunctions", JLabel.CENTER);
@@ -137,7 +124,7 @@ public class MaintenanceTabPanel extends TabPanel {
 
         // Create scroll panel for malfunction list
         JScrollPane malfunctionScrollPanel = new JScrollPane();
-        malfunctionScrollPanel.setPreferredSize(new Dimension(170, 90));
+        malfunctionScrollPanel.setPreferredSize(new Dimension(170, 120));
         malfunctionPanel.add(malfunctionScrollPanel, BorderLayout.CENTER);
 
         // Create malfunction list main panel.
@@ -151,23 +138,21 @@ public class MaintenanceTabPanel extends TabPanel {
 
         // Create malfunction panels
         malfunctionCache = malfunctionable.getMalfunctionManager().getMalfunctions();
-        malfunctionPanels = new ArrayList<MalfunctionPanel>();
+        malfunctionPanels = new ArrayList<>();
         Iterator<Malfunction> i = malfunctionCache.iterator();
         while (i.hasNext()) {
-            MalfunctionPanel panel = new MalfunctionPanel(i.next());
+            MalfunctionPanel panel = new MalfunctionPanel(i.next(), null);
             malfunctionListPanel.add(panel);
             malfunctionPanels.add(panel);
         }
     }
 
     /**
-     * Update this panel
+     * Updates this panel.
      */
+    @Override
     public void update() {
-		if (!uiDone)
-			initializeUI();
-		
-        Malfunctionable malfunctionable = (Malfunctionable) unit;
+        Malfunctionable malfunctionable = (Malfunctionable) getUnit();
         MalfunctionManager manager = malfunctionable.getMalfunctionManager();
 
         // Update the wear condition label.
@@ -209,7 +194,7 @@ public class MaintenanceTabPanel extends TabPanel {
             while (iter1.hasNext()) {
                 Malfunction malfunction = iter1.next();
                 if (!malfunctionCache.contains(malfunction)) {
-                    MalfunctionPanel panel = new MalfunctionPanel(malfunction);
+                    MalfunctionPanel panel = new MalfunctionPanel(malfunction, null);
                     malfunctionPanels.add(panel);
                     malfunctionListPanel.add(panel);
                 }
@@ -234,37 +219,20 @@ public class MaintenanceTabPanel extends TabPanel {
 
         // Have each malfunction panel update.
         Iterator<MalfunctionPanel> i = malfunctionPanels.iterator();
-        while (i.hasNext()) i.next().update();
+        while (i.hasNext()) i.next().updateMalfunctionPanel();
     }
 
     /**
      * Gets the parts string.
+     * 
      * @return string.
      */
-	// 2015-03-06 Reformatted part list and capitalized part.getName()
     private String getPartsString(boolean useHtml) {
-    	Malfunctionable malfunctionable = (Malfunctionable) unit;
-        StringBuilder buf = new StringBuilder("Needed Parts: ");
+    	Malfunctionable malfunctionable = (Malfunctionable) getUnit();
 
-    	Map<Integer, Integer> parts = malfunctionable.getMalfunctionManager().getMaintenanceParts();
-    	if (parts.size() > 0) {
-    		Iterator<Integer> i = parts.keySet().iterator();
-    		while (i.hasNext()) {
-    			Integer id = i.next();
-    			int number = parts.get(id);
-    			Part p = ItemResourceUtil.findItemResource(id);
-				if (useHtml) buf.append("<br>");
-				buf.append(number).append(" ").append(Conversion.capitalize(p.getName()));
-				if (i.hasNext()) buf.append(", ");
-				else {
-					buf.append(".");
-					if (useHtml) buf.append("<br>");
-				}
-      		}
-    	}
-    	else buf.append("None.");
-
-    	return buf.toString();
+        return MalfunctionPanel.getPartsString("Needed Parts: ",
+                                        malfunctionable.getMalfunctionManager().getMaintenanceParts(),
+                                        useHtml).toString();
     }
 
 	/**
@@ -272,8 +240,10 @@ public class MaintenanceTabPanel extends TabPanel {
 	 */
 	private String getToolTipString() {
 		StringBuilder result = new StringBuilder("<html>");
-		result.append("The Last Complete Maintenance Was Done ").append(lastCompletedTime).append(" Sols Ago<br>");
-		result.append("</html>");
+		result.append("The Last Complete Maintenance Was Done ")
+			.append(lastCompletedTime)
+			.append(" Sols Ago<br>")
+			.append("</html>");
 		return result.toString();
 	}
 
@@ -289,7 +259,8 @@ public class MaintenanceTabPanel extends TabPanel {
         Iterator<MalfunctionPanel> i = malfunctionPanels.iterator();
         while (i.hasNext()) {
             MalfunctionPanel panel = i.next();
-            if (panel.getMalfunction() == malfunction) result = panel;
+            if (panel.getMalfunction() == malfunction) 
+            	result = panel;
         }
 
         return result;

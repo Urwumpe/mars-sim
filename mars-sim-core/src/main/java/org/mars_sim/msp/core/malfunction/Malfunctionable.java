@@ -1,29 +1,23 @@
-/**
+/*
  * Mars Simulation Project
  * Malfunctionable.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-20
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.core.malfunction;
 
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.person.Person;
-
+import java.io.Serializable;
 import java.util.Collection;
+
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.logging.Loggable;
+import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.structure.Settlement;
 
 /**
  * The Malfunctionable interface represents a Unit that can have malfunctions.
  */
-public interface Malfunctionable {
-
-	/**
-	 * Gets the entity's object.
-	 * 
-	 * @return object
-	 */
-	public Unit getUnit();
+public interface Malfunctionable extends Loggable, Serializable {
 
 	/**
 	 * Gets the entity's malfunction manager.
@@ -33,21 +27,6 @@ public interface Malfunctionable {
 	public MalfunctionManager getMalfunctionManager();
 
 	/**
-	 * Gets the name of the malfunctionable entity.
-	 * 
-	 * @return name the entity name
-	 * 
-	 *         public String getName();
-	 */
-
-	/**
-	 * Gets the unique/nickname of the malfunctionable entity if it's a building.
-	 * 
-	 * @return nickname
-	 */
-	public String getNickName();
-
-	/**
 	 * Gets a collection of people affected by this entity.
 	 * 
 	 * @return person collection
@@ -55,24 +34,17 @@ public interface Malfunctionable {
 	public Collection<Person> getAffectedPeople();
 
 	/**
-	 * Gets the inventory associated with this entity.
+	 * Gets the Settlement associated with the malfunctioning entity.
 	 * 
-	 * @return inventory
+	 * @return
 	 */
-	public Inventory getInventory();
-
+	public Settlement getAssociatedSettlement();
+	
+	
 	/**
-	 * Gets the short location name associated with this entity.
+	 * Gets the unit type
 	 * 
-	 * @return location
+	 * @return
 	 */
-	public String getImmediateLocation();
-
-	/**
-	 * Gets the long location name associated with this entity.
-	 * 
-	 * @return location
-	 */
-	public String getLocale();
-
+	public abstract UnitType getUnitType();
 }

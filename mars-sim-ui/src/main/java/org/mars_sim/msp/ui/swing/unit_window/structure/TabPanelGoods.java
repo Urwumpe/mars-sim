@@ -1,16 +1,15 @@
-/**
+/*
  * Mars Simulation Project
  * TabPanelGoods.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-09
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
 
 import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
 import java.util.List;
 
+import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
@@ -18,31 +17,25 @@ import javax.swing.table.DefaultTableCellRenderer;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.goods.Good;
+import org.mars_sim.msp.core.goods.GoodsManager;
+import org.mars_sim.msp.core.goods.GoodsUtil;
 import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.structure.goods.Good;
-import org.mars_sim.msp.core.structure.goods.GoodsManager;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
 
 @SuppressWarnings("serial")
 public class TabPanelGoods extends TabPanel {
 
+	private static final String CART_ICON = Msg.getString("icon.cart"); //$NON-NLS-1$
+	
 	// Data members
-	/** Is UI constructed. */
-	private boolean uiDone = false;
-	
-	/** The Settlement instance. */
-	private Settlement settlement;
-	
 	private JTable goodsTable;
 	private GoodsTableModel goodsTableModel;
 
@@ -54,42 +47,25 @@ public class TabPanelGoods extends TabPanel {
 	public TabPanelGoods(Unit unit, MainDesktopPane desktop) {
 		// Use TabPanel constructor.
 		super(
-			Msg.getString("TabPanelGoods.title"), //$NON-NLS-1$
 			null,
-			Msg.getString("TabPanelGoods.tooltip"), //$NON-NLS-1$
+			ImageLoader.getNewIcon(CART_ICON),
+			Msg.getString("TabPanelGoods.title"), //$NON-NLS-1$
 			unit, desktop
 		);
-
-		settlement = (Settlement) unit;
-
 	}
 	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
+	@Override
+	protected void buildUI(JPanel content) {
 		
-		// Prepare goods label panel.
-		WebPanel goodsLabelPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(goodsLabelPanel);
-
-		// Prepare goods label.
-		WebLabel titleLabel = new WebLabel(Msg.getString("TabPanelGoods.label"), WebLabel.CENTER); //$NON-NLS-1$
-		titleLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		//titleLabel.setForeground(new Color(102, 51, 0)); // dark brown
-		goodsLabelPanel.add(titleLabel);
-
-		// Create scroll panel for the outer table panel.
+ 		// Create scroll panel for the outer table panel.
 		WebScrollPane goodsScrollPane = new WebScrollPane();
 		goodsScrollPane.setPreferredSize(new Dimension(250, 300));
 		// increase vertical mousewheel scrolling speed for this one
 		goodsScrollPane.getVerticalScrollBar().setUnitIncrement(16);
-		centerContentPanel.add(goodsScrollPane);
+		content.add(goodsScrollPane);
 
 		// Prepare goods table model.
-		goodsTableModel = new GoodsTableModel(((Settlement) unit).getGoodsManager());
+		goodsTableModel = new GoodsTableModel(((Settlement) getUnit()).getGoodsManager());
 
 		// Prepare goods table.
 		goodsTable = new ZebraJTable(goodsTableModel);
@@ -131,9 +107,6 @@ public class TabPanelGoods extends TabPanel {
 	 */
 	@Override
 	public void update() {
-		if (!uiDone)
-			this.initializeUI();
-		
 		TableStyle.setTableStyle(goodsTable);
 		goodsTableModel.update();
 	}
@@ -187,21 +160,20 @@ public class TabPanelGoods extends TabPanel {
 			if (row < getRowCount()) {
 				Good good = (Good) goods.get(row);
 				// Capitalized good's names
-				if (column == 0) return Conversion.capitalize(good.getName()) + " ";
+				if (column == 0) return good.getName();
 				else if (column == 1) {
 					try {
 						// Note: twoDecimal format is in conflict with Table column number sorting
 						//return twoDecimal.format(manager.getGoodValuePerItem(good));
-						return manager.getGoodValuePerItem(good);
+						return manager.getGoodValuePoint(good.getID());
 					}
 					catch (Exception e) {
-						e.printStackTrace(System.err);
-						return null;
 					}
 				}
 				else return null;
 			}
-			else return null;
+			
+			return null;
 		}
 
 		public void update() {
@@ -212,7 +184,10 @@ public class TabPanelGoods extends TabPanel {
 	/**
 	 * Prepare object for garbage collection.
 	 */
+	@Override
 	public void destroy() {
+		super.destroy();
+		
 		goodsTable = null;
 		goodsTableModel = null;
 	}

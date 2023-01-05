@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * SalvageProjectPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis
  */
 
@@ -29,8 +29,7 @@ import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.mission.MissionMember;
-import org.mars_sim.msp.core.resource.Part;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -40,6 +39,7 @@ import org.mars_sim.msp.core.structure.construction.ConstructionUtil;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
+@SuppressWarnings("serial")
 public class SalvageProjectPanel
 extends WizardPanel {
 
@@ -299,11 +299,11 @@ extends WizardPanel {
                 	
                     int memberNum = getWizard().getMissionData().getMixedMembers().size();
                     // Add mission members.
-                    Iterator<MissionMember> i = getWizard().getMissionData().getMixedMembers().iterator();
+                    Iterator<Worker> i = getWizard().getMissionData().getMixedMembers().iterator();
                     while (i.hasNext()) {
                      	
                         // TODO Refactor
-                        MissionMember member = i.next();
+                        Worker member = i.next();
             	        if (member instanceof Person) {
             	        	person = (Person) member;
             	        	int constructionSkill = person.getSkillManager().getSkillLevel(SkillType.CONSTRUCTION);

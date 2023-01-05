@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * TopoMarsMap.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-02
  * @author Scott Davis
  * @author Greg Whelan
  */
@@ -16,6 +16,7 @@ import org.mars_sim.mapdata.MapDataUtil;
  * The TopoMarsMap class is a map of the topography of Mars that can be
  * generated for the MapDisplay.
  */
+@SuppressWarnings("serial")
 public class TopoMarsMap extends CannedMarsMap {
 
 	// The map type.

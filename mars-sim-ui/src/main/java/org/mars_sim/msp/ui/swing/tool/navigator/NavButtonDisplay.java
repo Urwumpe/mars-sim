@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * NavButtonDisplay.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.navigator;
@@ -17,27 +17,24 @@ import java.awt.event.MouseListener;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.swing.JComponent;
+
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.ui.swing.ImageLoader;
-
-import com.alee.extended.WebComponent;
-import com.alee.managers.style.StyleId;
 
 /** 
  * The NavButtonDisplay class is a component that displays and
  * implements the behavior of the navigation buttons which control
  * the globe and map.
  */
+@SuppressWarnings("serial")
 public class NavButtonDisplay
-extends WebComponent
+extends JComponent
 implements MouseListener {
 
-	/** default serial id. */
-	private static final long serialVersionUID = 1L;
-
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(NavButtonDisplay.class.getName());
+	private static final Logger logger = Logger.getLogger(NavButtonDisplay.class.getName());
 
 	// Constant data members
 	/** Circular degree unit. */
@@ -88,7 +85,9 @@ implements MouseListener {
 		lightUpButtons[6] = ImageLoader.getImage(Msg.getString("img.nav.plus.south")); //$NON-NLS-1$
 		lightUpButtons[7] = ImageLoader.getImage(Msg.getString("img.nav.plus.east")); //$NON-NLS-1$
 		lightUpButtons[8] = ImageLoader.getImage(Msg.getString("img.nav.plus.west")); //$NON-NLS-1$
-
+		
+		// NOTE: Replace MediaTracker with faster method
+		// Use BufferedImage image = ImageIO.read() ? 
 		MediaTracker mtrack = new MediaTracker(this);
 
 		mtrack.addImage(navMain, 0);
@@ -96,9 +95,14 @@ implements MouseListener {
 			mtrack.addImage(lightUpButtons[x], x + 1);
 		}
 
-		try { mtrack.waitForAll(); }
-		catch (InterruptedException e) {
-			logger.log(Level.SEVERE,Msg.getString("NavButtonDisplay.log.mediaTrackerError", e.toString())); //$NON-NLS-1$
+		try { 
+			mtrack.waitForAll(); 
+		} catch (InterruptedException e) {
+			logger.log(Level.SEVERE,
+					Msg.getString("NavButtonDisplay.log.mediaTrackerError", 
+					e.toString())); //$NON-NLS-1$
+			// Restore interrupted state
+		    Thread.currentThread().interrupt();
 		}
 
 		// Set hot spots for mouse clicks
@@ -114,13 +118,13 @@ implements MouseListener {
 		hotSpots[8] = new Rectangle(0, 61, 15, 28);
 	}
 
-	/**
-	 * Update coordinates
-	 * @param newCenter the new center position
-	 */
-	public void updateCoords(Coordinates newCenter) {
-		centerCoords.setCoords(newCenter);
-	}
+//	/**
+//	 * Update coordinates
+//	 * @param newCenter the new center position
+//	 */
+//	public void updateCoords(Coordinates newCenter) {
+//		centerCoords.setCoords(newCenter);
+//	}
 
 	/**
 	 * Override paintComponent method. Paints buttons and lit button
@@ -155,54 +159,58 @@ implements MouseListener {
 
 		// Use Image Map Technique to Determine Which Button was Selected
 		int spot = findHotSpot(event.getX(), event.getY());
-
+		boolean reCenter = true;
+		double newPhi = centerCoords.getPhi();
+		double newTheta = centerCoords.getTheta();
+		
 		// Results Based on Button Selected
 		switch (spot) {
 		case 0: // Zoom Button
 			parentNavigator.updateCoords(centerCoords);
+			reCenter = false;
 			break;
 		case 1: // Inner Top Arrow
-			centerCoords.setPhi(centerCoords.getPhi() - (5D * RAD_PER_DEGREE));
-			if (centerCoords.getPhi() < 0D)
-				centerCoords.setPhi(0D);
+			newPhi = newPhi - (5D * RAD_PER_DEGREE);
 			break;
 		case 2: // Inner Bottom Arrow
-			centerCoords.setPhi(centerCoords.getPhi() + (5D * RAD_PER_DEGREE));
-			if (centerCoords.getPhi() > Math.PI)
-				centerCoords.setPhi(Math.PI);
+			newPhi = newPhi + (5D * RAD_PER_DEGREE);
 			break;
 		case 3: // Inner Right Arrow
-			centerCoords.setTheta(centerCoords.getTheta() + (5D * RAD_PER_DEGREE));
-			if (centerCoords.getTheta() > (2D * Math.PI))
-				centerCoords.setTheta(centerCoords.getTheta() - (2D * Math.PI));
+			newTheta = newTheta  + (5D * RAD_PER_DEGREE);
 			break;
 		case 4: // Inner Left Arrow
-			centerCoords.setTheta(centerCoords.getTheta() - (5D * RAD_PER_DEGREE));
-			if (centerCoords.getTheta() < 0D)
-				centerCoords.setTheta(centerCoords.getTheta() + (2D * Math.PI));
+			newTheta = newTheta  - (5D * RAD_PER_DEGREE);
 			break;
 		case 5: // Outer Top Arrow
-			centerCoords.setPhi(centerCoords.getPhi() - (30D * RAD_PER_DEGREE));
-			if (centerCoords.getPhi() < 0D)
-				centerCoords.setPhi(0D);
+			newPhi = newPhi - (30D * RAD_PER_DEGREE);
 			break;
 		case 6: // Outer Bottom Arrow
-			centerCoords.setPhi(centerCoords.getPhi() + (30D * RAD_PER_DEGREE));
-			if (centerCoords.getPhi() > Math.PI)
-				centerCoords.setPhi(Math.PI);
+			newPhi = newPhi + (30D * RAD_PER_DEGREE);
 			break;
 		case 7: // Outer Right Arrow
-			centerCoords.setTheta(centerCoords.getTheta() + (30D * RAD_PER_DEGREE));
-			if (centerCoords.getTheta() >= (2D * Math.PI))
-				centerCoords.setTheta(centerCoords.getTheta() - (2D * Math.PI));
+			newTheta = newTheta  + (30D * RAD_PER_DEGREE);
 			break;
 		case 8: // Outer Left Arrow
-			centerCoords.setTheta(centerCoords.getTheta() - (30D * RAD_PER_DEGREE));
-			if (centerCoords.getTheta() < 0D)
-				centerCoords.setTheta(centerCoords.getTheta() + (2D * Math.PI));
+			newTheta = newTheta  - (30D * RAD_PER_DEGREE);
 			break;
 		}
 
+		// Recenter
+		if (reCenter) {
+			if (newPhi < 0D)
+				newPhi = 0D;
+			else if (newPhi > Math.PI)
+				newPhi = Math.PI;
+			
+			if (newTheta < 0D)
+				newTheta = newTheta + (2D * Math.PI);
+			else if (newTheta >= (2D * Math.PI))
+				newTheta = newTheta  - (2D * Math.PI);
+			
+			centerCoords = new Coordinates(newPhi, newTheta);
+			logger.info("Recnetered to " + centerCoords);
+		}
+		
 		// Reposition Globe If Non-Zoom Button is Selected
 		if (spot > 0)
 			parentNavigator.updateGlobeOnly(centerCoords);
@@ -246,23 +254,5 @@ implements MouseListener {
 			}
 		}
 		return -1;
-	}
-
-	@Override
-	public StyleId getDefaultStyleId() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public void updateUI() {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public String getUIClassID() {
-		// TODO Auto-generated method stub
-		return null;
 	}
 }

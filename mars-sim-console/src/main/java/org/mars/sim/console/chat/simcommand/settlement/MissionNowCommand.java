@@ -1,6 +1,14 @@
+/**
+ * Mars Simulation Project
+ * MissionNowCommand.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand.settlement;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.mars.sim.console.chat.ChatCommand;
 import org.mars.sim.console.chat.Conversation;
@@ -14,29 +22,44 @@ public class MissionNowCommand extends AbstractSettlementCommand {
 	
 
 	private MissionNowCommand() {
-		super("mn", "mission now", "Settlement Missions");		
+		super("mn", "mission", "Settlement Missions {active|all}");		
 	}
 	
 	@Override
 	protected boolean execute(Conversation context, String input, Settlement settlement) {
 		StructuredResponse response = new StructuredResponse();
 
-		List<Mission> missions = context.getSim().getMissionManager().getMissionsForSettlement(settlement);
+		boolean onlyActive = true;
+		if (input != null) {
+			onlyActive = "active".equalsIgnoreCase(input);
+		}
+		
+		List<Mission> missions;
+		if (onlyActive) {
+			// By default this only return uncompleted Missions
+			missions = context.getSim().getMissionManager().getMissionsForSettlement(settlement);
+		}
+		else {
+			// This is all missions
+			missions = context.getSim().getMissionManager().getMissions().stream()
+								.filter(m -> settlement.equals(m.getAssociatedSettlement()))
+								.collect(Collectors.toList());
+		}
+			
+		// Display what we have found	
 		if (missions.isEmpty()) {
 			response.append(settlement.getName() + " : ");
-			response.append("no on-going/pending missions right now.");
-			response.append(System.lineSeparator());
+			response.appendText("no on-going/pending missions right now.");
 		}
 		else {
 			response.append(settlement.getName() + " : ");
-			response.append("here's the mission roster.");
-			response.append(System.lineSeparator());
+			response.appendText("here's the mission roster.");
 			int i = 1;
 			for (Mission mission : missions) {
 				response.appendHeading(" (" + i++ + ") " + mission.getName());
 				
 				CommandHelper.outputMissionDetails(response, mission);
-				response.append(System.lineSeparator());
+				response.appendBlankLine();
 			}
 		}
 		context.println(response.getOutput());

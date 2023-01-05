@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * FoodProductionPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-11
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure.building.food;
@@ -19,18 +19,18 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 
-import org.mars_sim.msp.core.foodProduction.FoodProductionProcess;
-import org.mars_sim.msp.core.foodProduction.FoodProductionProcessInfo;
-import org.mars_sim.msp.core.foodProduction.FoodProductionProcessItem;
+import org.mars_sim.msp.core.food.FoodProductionProcess;
+import org.mars_sim.msp.core.food.FoodProductionProcessInfo;
+import org.mars_sim.msp.core.food.FoodProductionProcessItem;
 import org.mars_sim.msp.core.resource.ItemType;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 
 /**
  * A panel showing information about a foodProduction process.
  */
+@SuppressWarnings("serial")
 public class FoodProductionPanel extends JPanel {
 
 	// Data members
@@ -89,7 +89,7 @@ public class FoodProductionPanel extends JPanel {
 		if (name.length() > processStringWidth)
 			name = name.substring(0, processStringWidth) + "...";
 		// 2014-11-19 Capitalized process names
-		JLabel nameLabel = new JLabel(Conversion.capitalize(name), JLabel.CENTER);
+		JLabel nameLabel = new JLabel(name, JLabel.CENTER);
 		namePane.add(nameLabel);
 
 		if (showBuilding) {
@@ -175,7 +175,7 @@ public class FoodProductionPanel extends JPanel {
 	public static String getToolTipString(FoodProductionProcessInfo info, Building building) {
 		StringBuilder result = new StringBuilder("<html>");
 
-		result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;Process : ").append(Conversion.capitalize(info.getName()))
+		result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;Process : ").append(info.getName())
 				.append("<br>");
 		// 2014-11-19 Changed from getName() to getNickName()
 		// if (building != null) result.append("&emsp;&emsp;&emsp;&emsp;Building:
@@ -196,11 +196,11 @@ public class FoodProductionPanel extends JPanel {
 			FoodProductionProcessItem item = i.next();
 			// 2014-11-19 Capitalized process names
 			if (ii == 0)
-				result.append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName()))
+				result.append(getItemAmountString(item)).append(" ").append(item.getName())
 						.append("<br>");
 			else
 				result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;")
-						.append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName()))
+						.append(getItemAmountString(item)).append(" ").append(item.getName())
 						.append("<br>");
 			ii++;
 		}
@@ -213,11 +213,11 @@ public class FoodProductionPanel extends JPanel {
 			FoodProductionProcessItem item = j.next();
 			// 2014-11-19 Capitalized process names
 			if (jj == 0)
-				result.append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName()))
+				result.append(getItemAmountString(item)).append(" ").append(item.getName())
 						.append("<br>");
 			else
 				result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;")
-						.append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName()))
+						.append(getItemAmountString(item)).append(" ").append(item.getName())
 						.append("<br>");
 			jj++;
 		}

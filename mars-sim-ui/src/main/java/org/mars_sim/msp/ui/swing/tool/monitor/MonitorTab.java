@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MonitorTab.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-02
  * @author Barry Evans
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -30,31 +30,35 @@ public abstract class MonitorTab extends JPanel {
 	private MonitorModel model;
 	private Icon icon;
 	private boolean mandatory;
+	private boolean ownModel = true;
 
 	/**
 	 * Tee constructor that creates a view within a tab displaying the specified model.
-	 * 
+	 *
 	 * @param model     The model of entities to display.
 	 * @param mandatory This view is a mandatory view can can not be removed.
+	 * @param ownModel The model is owned by this tab and not shared
 	 * @param icon      Iconic representation.
 	 */
-	public MonitorTab(MonitorModel model, boolean mandatory, Icon icon) {
+	public MonitorTab(MonitorModel model, boolean mandatory, boolean ownModel, Icon icon) {
 		this.model = model;
 		this.icon = icon;
 		this.mandatory = mandatory;
-		
+		this.ownModel = ownModel;
+
 		this.setOpaque(false);
 
 		// Create a panel
 		setLayout(new BorderLayout());
-		// setBorder(MainDesktopPane.newEmptyBorder());
 	}
 
 	/**
 	 * Remove this view.
 	 */
 	public void removeTab() {
-		model.destroy();
+		if (ownModel) {
+			model.destroy();
+		}
 		model = null;
 	}
 
@@ -66,18 +70,18 @@ public abstract class MonitorTab extends JPanel {
 		Iterator<?> it = rows.iterator();
 		while (it.hasNext()) {
 			Object selected = it.next();
-			if (selected instanceof Unit)
+			if (selected instanceof Unit) {
 				desktop.openUnitWindow((Unit) selected, false);
+			}
 			else if (selected instanceof Mission) {
-				((MissionWindow) desktop.getToolWindow(MissionWindow.NAME)).selectMission((Mission) selected);
-				desktop.openToolWindow(MissionWindow.NAME);
+				desktop.openToolWindow(MissionWindow.NAME, (Mission) selected);
 			}
 		}
 	}
 
 	/**
 	 * Center the map on the first selected row.
-	 * 
+	 *
 	 * @param desktop Main window of application.
 	 */
 	public void centerMap(MainDesktopPane desktop) {
@@ -92,14 +96,14 @@ public abstract class MonitorTab extends JPanel {
 	/**
 	 * Display property window controlling this view.
 	 */
-	abstract public void displayProps(MainDesktopPane desktop);
+	public abstract void displayProps(MainDesktopPane desktop);
 
 	/**
 	 * This return the selected objects that are current selected in this tab.
 	 *
 	 * @return List of objects selected in this tab.
 	 */
-	abstract protected List<?> getSelection();
+	protected abstract List<?> getSelection();
 
 	/**
 	 * Gets the tab count string.
@@ -110,7 +114,7 @@ public abstract class MonitorTab extends JPanel {
 
 	/**
 	 * Get the icon associated with this view.
-	 * 
+	 *
 	 * @return Icon for this view
 	 */
 	public Icon getIcon() {
@@ -119,7 +123,7 @@ public abstract class MonitorTab extends JPanel {
 
 	/**
 	 * Get the associated model.
-	 * 
+	 *
 	 * @return Monitored model associated to the tab.
 	 */
 	public MonitorModel getModel() {
@@ -128,7 +132,7 @@ public abstract class MonitorTab extends JPanel {
 
 	/**
 	 * Get the mandatory state of this view
-	 * 
+	 *
 	 * @return Mandatory view.
 	 */
 	public boolean getMandatory() {

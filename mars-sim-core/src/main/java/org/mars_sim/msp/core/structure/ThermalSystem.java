@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ThermalSystem.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.structure;
@@ -33,7 +33,7 @@ implements Serializable, Temporal {
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(ThermalSystem.class.getName());
+	private static final Logger logger = Logger.getLogger(ThermalSystem.class.getName());
 
 //	private DecimalFormat fmt = new DecimalFormat("#.####");
 

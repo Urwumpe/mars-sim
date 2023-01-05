@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * UnitType.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author stpa
  */
 
@@ -9,12 +9,18 @@ package org.mars_sim.msp.core;
 
 public enum UnitType {
 
-	SETTLEMENT ("UnitType.settlement"),
-	PERSON ("UnitType.person"),
-	VEHICLE ("UnitType.vehicle"),
-	EQUIPMENT ("UnitType.equipment"),
-	ROBOT ("UnitType.robot"),
-	BUILDING ("UnitType.building");
+	// Use (Msg.getString("UnitType.planet")), //$NON-NLS-1$
+
+	PLANET			("UnitType.planet"),
+	SETTLEMENT 		("UnitType.settlement"),
+	PERSON 			("UnitType.person"),
+	VEHICLE 		("UnitType.vehicle"),
+//	EQUIPMENT 		("UnitType.equipment"),
+	CONTAINER		("UnitType.container"),
+	EVA_SUIT 		("UnitType.evasuit"),
+	ROBOT 			("UnitType.robot"),
+	BUILDING 		("UnitType.building"),
+	CONSTRUCTION 	("UnitType.construction");
 
 	private String msgKey;
 

@@ -1,16 +1,15 @@
-/**
+/*
  * Mars Simulation Project
  * TaskProbabilityUtil.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-06-11
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
 import java.util.Iterator;
 
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
+import org.mars_sim.msp.core.person.ai.social.RelationshipUtil;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
@@ -34,7 +33,7 @@ public class TaskProbabilityUtil {
      * @param newBuilding the building the person is to go to.
      * @return probability modifier
      */
-    protected static double getCrowdingProbabilityModifier(Person person, Building newBuilding) {
+    public static double getCrowdingProbabilityModifier(Person person, Building newBuilding) {
         double modifier = 1D;
 
         Building currentBuilding = BuildingManager.getBuilding(person);
@@ -88,16 +87,15 @@ public class TaskProbabilityUtil {
     /**
      * Gets the probability modifier for a person performing a task based on his/her
      * relationships with the people in the room the task is to be performed in.
+     * 
      * @param person the person to check for.
      * @param building the building the person will need to be in for the task.
      * @return probability modifier
      */
-    protected static double getRelationshipModifier(Person person, Building building) {
+    public static double getRelationshipModifier(Person person, Building building) {
         double result = 1D;
 
-        RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
-
-        if ((person == null) || (building == null)) {
+         if ((person == null) || (building == null)) {
             throw new IllegalArgumentException("Task.getRelationshipModifier(): null parameter.");
         }
         else {
@@ -108,7 +106,7 @@ public class TaskProbabilityUtil {
                 while (i.hasNext()) {
                     Person occupant = i.next();
                     if (person != occupant) {
-                        totalOpinion+= ((relationshipManager.getOpinionOfPerson(person, occupant) - 50D) / 50D);
+                        totalOpinion+= ((RelationshipUtil.getOpinionOfPerson(person, occupant) - 50D) / 50D);
                     }
                 }
 

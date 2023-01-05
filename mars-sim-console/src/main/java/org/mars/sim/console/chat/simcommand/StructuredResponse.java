@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * StructuredResponse.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand;
 
 import java.util.ArrayList;
@@ -14,10 +21,12 @@ public class StructuredResponse {
 
 	// Formats
 	private static final String HEADING_FORMAT = " %s%n";
-	private static final String ONE_COLUMN = "%27s : %s%n";
-	private static final String ONE_DIGITCOLUMN = "%27s : %d%n";
+	private static final String ONE_COLUMN = "%30s : %s%n";
+	private static final String ONE_DIGITCOLUMN = "%30s : %d%n";
 	
 	private static final String LIST = "  %2d - %s%n";
+	
+	private static final String LF = System.lineSeparator();
 	
 	private StringBuilder buffer = new StringBuilder();
 	private int[] columnsWidth;
@@ -30,6 +39,13 @@ public class StructuredResponse {
 		buffer.append(string);
 	}
 
+	/**
+	 * Add a blank line to the structured output.
+	 */
+	public void appendBlankLine() {
+		buffer.append(LF);
+	}
+	
 	/**
 	 * Add a subheading to the output. This will also add a seperator.
 	 * @param heading
@@ -58,13 +74,24 @@ public class StructuredResponse {
 	}
 	
 	/**
-	 * Output anumbers list of items
-	 * @param names
+	 * Output a numbered list of items
+	 * @param heading An optional heading
+	 * @param items
 	 */
-	public void appendNumberedList(List<String> names) {
-		int i = 1;
-		for (String string : names) {
-			buffer.append(String.format(LIST, i++, string));
+	public void appendNumberedList(String heading, List<String> items) {
+		if (heading != null) {
+			buffer.append(heading + ":" + LF);
+		}
+		
+		if (!items.isEmpty()) {
+			int i = 1;
+			for (String string : items) {
+				buffer.append(String.format(LIST, i++, string));
+			}
+		}
+		else {
+			buffer.append("None");
+			buffer.append(LF);
 		}
 	}
 
@@ -72,7 +99,8 @@ public class StructuredResponse {
 	 * Seperator
 	 */
 	public void appendSeperator() {
-		buffer.append(" --------------------------------------------\n");	
+		buffer.append(" --------------------------------------------");
+		buffer.append(LF);	
 	}
 
 	/**
@@ -103,7 +131,11 @@ public class StructuredResponse {
 			if (((i + 1) < headings.length) && (headings[i+1] instanceof Integer)) {
 				i++;
 				int hWidth = (int) headings[i];
-				w = Math.max(hWidth,  w);
+				
+				// hWidth could be negative if left aligned but need absolute width
+				if (w < Math.abs(hWidth)) {
+					w = hWidth;
+				}
 			}
 			
 			// Add column
@@ -160,28 +192,41 @@ public class StructuredResponse {
 				fmt.append(w);
 				fmt.append('d');			
 			}
+			else if (value instanceof Boolean) {
+				fmt.append(w);
+				fmt.append('s');			
+				value = ((Boolean)value).booleanValue() ? "Yes" : "No";
+			}
+			else if (value != null) {
+				fmt.append(w);
+				fmt.append('s');
+				value = value.toString();
+			}
 			else {
 				fmt.append(w);
 				fmt.append('s');
-				value = "??";
+				value = "";				
 			}
 			buffer.append(String.format(fmt.toString(), value));
 		}
-		buffer.append(System.lineSeparator());		
+		buffer.append(LF);		
 	}
 
+
+	/**
+	 * Write a line of text
+	 * @param string
+	 */
+	public void appendText(String string) {
+		buffer.append(string);
+		buffer.append(LF);		
+	}
+	
 	/**
 	 * Get the text output of this response
 	 * @return
 	 */
 	public String getOutput() {
 		return buffer.toString();
-	}
-
-	/**
-	 * Add a blank line to the structured output.
-	 */
-	public void blankLine() {
-		buffer.append(System.lineSeparator());
 	}
 }

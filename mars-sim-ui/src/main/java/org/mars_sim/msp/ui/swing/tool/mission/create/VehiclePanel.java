@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * VehiclePanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-10-21
  * @author Scott Davis
  */
 
@@ -25,7 +25,6 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.mars_sim.msp.core.CollectionUtils;
-import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -33,7 +32,6 @@ import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 
@@ -91,6 +89,7 @@ class VehiclePanel extends WizardPanel {
 
 		// Create the vehicle table.
 		vehicleTable = new ZebraJTable(vehicleTableModel);
+		
 		TableStyle.setTableStyle(vehicleTable);
 		// Added sorting
 		vehicleTable.setAutoCreateRowSorter(true);
@@ -205,13 +204,14 @@ class VehiclePanel extends WizardPanel {
 		private VehicleTableModel() {
 			// Use UnitTableModel constructor.
 			super();
-
+						
 			// Add columns.
 			columns.add("Name");
 			columns.add("Type");
 			columns.add("Crew Cap.");
 			columns.add("Range");
 			columns.add("Lab");
+			
 			columns.add("Sick Bay");
 			columns.add("Cargo Cap.");
 			columns.add("Current Cargo");
@@ -231,13 +231,12 @@ class VehiclePanel extends WizardPanel {
 
 			if (row < units.size()) {
 				Rover vehicle = (Rover) getUnit(row);
-				Inventory inv = vehicle.getInventory();
-
+				
 				try {
 					if (column == 0)
 						result = vehicle.getName();
 					else if (column == 1)
-						result = Conversion.capitalize(vehicle.getDescription());
+						result = vehicle.getDescription();
 					else if (column == 2)
 						result = vehicle.getCrewCapacity();
 					else if (column == 3)
@@ -247,15 +246,15 @@ class VehiclePanel extends WizardPanel {
 					else if (column == 5)
 						result = vehicle.hasSickBay();
 					else if (column == 6)
-						result = (int) inv.getGeneralCapacity();
+						result = (int) vehicle.getCargoCapacity();
 					else if (column == 7)
-						result = (int) inv.getTotalInventoryMass(true);
+						result = (int) vehicle.getStoredMass();
 					else if (column == 8)
 						result = vehicle.printStatusTypes();
 					else if (column == 9) {
 						Mission mission = missionManager.getMissionForVehicle(vehicle);
 						if (mission != null)
-							result = mission.getDescription();
+							result = mission.getName();
 						else
 							result = "None";
 					}
@@ -294,23 +293,15 @@ class VehiclePanel extends WizardPanel {
 			Rover vehicle = (Rover) getUnit(row);
 
 			if (column == 7) {
-//                try {
-				if (vehicle.getInventory().getTotalInventoryMass(true) > 0D)
+				if (vehicle.getStoredMass() > 0D)
 					result = true;
-//                }
-//                catch (InventoryException e) {
-//                    e.printStackTrace(System.err);
-//                }
 			} else if (column == 8) {
-				if (!vehicle.haveStatusType(StatusType.PARKED) && !vehicle.haveStatusType(StatusType.GARAGED))
+				if ((vehicle.getPrimaryStatus() != StatusType.PARKED) && (vehicle.getPrimaryStatus() != StatusType.GARAGED))
 					result = true;
 
 				// Allow rescue/salvage mission to use vehicle undergoing maintenance.
 				if (MissionType.RESCUE_SALVAGE_VEHICLE == getWizard().getMissionData().getMissionType()) {
-					if (vehicle.haveStatusType(StatusType.MAINTENANCE))
-						result = false;
-					else
-						result = true;
+                    result = !vehicle.haveStatusType(StatusType.MAINTENANCE);
 				}
 				
 			} else if (column == 9) {

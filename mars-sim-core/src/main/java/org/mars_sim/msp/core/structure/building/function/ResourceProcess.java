@@ -1,76 +1,79 @@
-/**
+/*
  * Mars Simulation Project
  * ResourceProcess.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-30
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.core.structure.building.function;
 
 import java.io.Serializable;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.goods.GoodsManager;
+import org.mars_sim.msp.core.logging.SimLogger;
+import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.building.ResourceProcessEngine;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * The ResourceProcess class represents a process of converting one set of
- * resources to another.
+ * resources to another. This represent the actual process instant attached to a Building.
  */
 public class ResourceProcess implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
-
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(ResourceProcess.class.getName());
+	private static SimLogger logger = SimLogger.getLogger(ResourceProcess.class.getName());
 
-	/** The work time required to toggle this process on or off. */
-	public static final double TOGGLE_RUNNING_WORK_TIME_REQUIRED = 20D;
+	private static final double SMALL_AMOUNT = 0.000001;
+	// How often should the process be checked? 
+	private static final double PROCESS_CHECK_FREQUENCY = 5D; // 200 times per sol
 	
-	private String name;
-	private Map<Integer, Double> maxInputResourceRates;
-	private Map<Integer, Double> maxAmbientInputResourceRates;
-	private Map<Integer, Double> maxOutputResourceRates;
-	private Map<Integer, Double> maxWasteOutputResourceRates;
-	
+	/** Flag for active change. */
+	private boolean flag = false;
+	/** is this process running ? */
 	private boolean runningProcess;
-	private int[] timeLimit = new int[] {1, 0};
 	
+	/** The level of effort for this resource process. */	
+	private int level = 2;
+	
+	/** The time accumulated [in millisols]. */
+	private double accumulatedTime;
+
 	private double currentProductionLevel;
+
 	private double toggleRunningWorkTime;
-	private double powerRequired;
+
+	private String name;
+
+	private int[] timeLimit = new int[] {1, 0};
+
+	private ResourceProcessEngine engine;
 
 	private static MarsClock marsClock;
 
 	/**
 	 * Constructor.
-	 * 
-	 * @param name          the name of the process.
-	 * @param powerRequired the amount of power required to run the process (kW).
-	 * @param defaultOn     true of process is on by default, false if off by
-	 *                      default.
+	 *
+	 * @param engine The processing engine that this Process manages
 	 */
-	public ResourceProcess(String name, double powerRequired, boolean defaultOn) {
-		this.name = name;
-		maxInputResourceRates = new HashMap<>();
-		maxAmbientInputResourceRates = new HashMap<>();
-		maxOutputResourceRates = new HashMap<>();
-		maxWasteOutputResourceRates = new HashMap<>();
-		runningProcess = defaultOn;
+	public ResourceProcess(ResourceProcessEngine engine) {
+		this.name = engine.getName();
+		runningProcess = engine.getDefaultOn();
 		currentProductionLevel = 1D;
-		this.powerRequired = powerRequired;
+		this.engine = engine;
+
+		// Add some randomness, today is sol 1
+		resetToggleTime(1, 100 + RandomUtil.getRandomInt(engine.getProcessTime()));
 	}
 
 	/**
 	 * Gets the process name.
-	 * 
+	 *
 	 * @return process name as string.
 	 */
 	public String getProcessName() {
@@ -78,42 +81,8 @@ public class ResourceProcess implements Serializable {
 	}
 
 	/**
-	 * Adds a maximum input resource rate if it doesn't already exist.
-	 * 
-	 * @param resource the amount resource.
-	 * @param rate     max input resource rate (kg/millisol)
-	 * @param ambient  is resource from available from surroundings? (air)
-	 */
-	public void addMaxInputResourceRate(Integer resource, double rate, boolean ambient) {
-		if (ambient) {
-			if (!maxAmbientInputResourceRates.containsKey(resource))
-				maxAmbientInputResourceRates.put(resource, rate);
-		} else {
-			if (!maxInputResourceRates.containsKey(resource))
-				maxInputResourceRates.put(resource, rate);
-		}
-	}
-
-	/**
-	 * Adds a maximum output resource rate if it doesn't already exist.
-	 * 
-	 * @param resource the amount resource.
-	 * @param rate     max output resource rate (kg/millisol)
-	 * @param waste    is resource waste material not to be stored?
-	 */
-	public void addMaxOutputResourceRate(Integer resource, double rate, boolean waste) {
-		if (waste) {
-			if (!maxWasteOutputResourceRates.containsKey(resource))
-				maxWasteOutputResourceRates.put(resource, rate);
-		} else {
-			if (!maxOutputResourceRates.containsKey(resource))
-				maxOutputResourceRates.put(resource, rate);
-		}
-	}
-
-	/**
 	 * Gets the current production level of the process.
-	 * 
+	 *
 	 * @return proportion of full production (0D - 1D)
 	 */
 	public double getCurrentProductionLevel() {
@@ -122,7 +91,7 @@ public class ResourceProcess implements Serializable {
 
 	/**
 	 * Checks if the process is running or not.
-	 * 
+	 *
 	 * @return true if process is running.
 	 */
 	public boolean isProcessRunning() {
@@ -131,7 +100,7 @@ public class ResourceProcess implements Serializable {
 
 	/**
 	 * Sets if the process is running or not.
-	 * 
+	 *
 	 * @param runningProcess true if process is running.
 	 */
 	public void setProcessRunning(boolean runningProcess) {
@@ -139,206 +108,235 @@ public class ResourceProcess implements Serializable {
 	}
 
 	/**
-	 * Adds work time to toggling the process on or off.
-	 * 
-	 * @param time the amount (millisols) of time to add.
+	 * Checks if the process has been flagged for change.
+	 *
+	 * @return true if the process has been flagged for change.
 	 */
-	public void addToggleWorkTime(double time) {
-		toggleRunningWorkTime += time;
-		if (toggleRunningWorkTime >= TOGGLE_RUNNING_WORK_TIME_REQUIRED) {
-			toggleRunningWorkTime = 0D;
-			runningProcess = !runningProcess;
-			if (runningProcess) {
-				logger.finest("Done turning on " + name);
-			} else {
-				logger.finest("Done turning off " + name);
-			}
-		}
+	public boolean isFlagged() {
+		return flag;
 	}
 
 	/**
+	 * Flags the process for change.
+	 *
+	 * @param value true if the flag is true.
+	 */
+	public void setFlag(boolean value) {
+		flag = value;
+	}
+	
+	/**
+	 * Adds work time to toggling the process on or off.
+	 *
+	 * @param time the amount (millisols) of time to add.
+	 * @return true if done
+	 */
+	public boolean addToggleWorkTime(double time) {
+		toggleRunningWorkTime += time;
+		if (toggleRunningWorkTime >= engine.getWorkTime()) {
+			toggleRunningWorkTime = 0D;
+			
+			runningProcess = !runningProcess;
+
+			// Reset for next toggle
+			resetToggleTime(marsClock.getMissionSol(), marsClock.getMillisolInt());
+			
+			return true;
+		}
+		
+		return false;
+	}
+
+	public double getRemainingToggleWorkTime() {
+		double time = engine.getWorkTime() - toggleRunningWorkTime;
+		if (time > 0)
+			return time;
+		else
+			return 0;
+	}
+			
+	/**
 	 * Gets the set of input resources.
-	 * 
+	 *
 	 * @return set of resources.
 	 */
 	public Set<Integer> getInputResources() {
-		Set<Integer> results = new HashSet<>();
-		results.addAll(maxInputResourceRates.keySet());
-		results.addAll(maxAmbientInputResourceRates.keySet());
-		return results;
+		return engine.getInputResources();
 	}
 
+	public int getNumModules() {
+		return engine.getModules();
+	}
+	
 	/**
 	 * Gets the max input resource rate for a given resource.
-	 * 
+	 *
 	 * @return rate in kg/millisol.
 	 */
-	public double getMaxInputResourceRate(Integer resource) {
-		double result = 0D;
-		if (maxInputResourceRates.containsKey(resource))
-			result = maxInputResourceRates.get(resource);
-		else if (maxAmbientInputResourceRates.containsKey(resource))
-			result = maxAmbientInputResourceRates.get(resource);
-		return result;
+	public double getMaxInputRate(Integer resource) {
+		return engine.getMaxInputRate(resource);
 	}
 
 	/**
 	 * Checks if resource is an ambient input.
-	 * 
+	 *
 	 * @param resource the resource to check.
 	 * @return true if ambient resource.
 	 */
 	public boolean isAmbientInputResource(Integer resource) {
-		return maxAmbientInputResourceRates.containsKey(resource);
+		return engine.isAmbientInputResource(resource);
 	}
 
+	public boolean isInSitu(int resource) {
+		return ResourceUtil.isInSitu(resource);
+	}
+	
 	/**
 	 * Gets the set of output resources.
-	 * 
+	 *
 	 * @return set of resources.
 	 */
 	public Set<Integer> getOutputResources() {
-		Set<Integer> results = new HashSet<>();
-		results.addAll(maxOutputResourceRates.keySet());
-		results.addAll(maxWasteOutputResourceRates.keySet());
-		return results;
+		return engine.getOutputResources();
 	}
 
 	/**
 	 * Gets the max output resource rate for a given resource.
-	 * 
+	 *
 	 * @return rate in kg/millisol.
 	 */
-	public double getMaxOutputResourceRate(Integer resource) {
-		double result = 0D;
-		if (maxOutputResourceRates.containsKey(resource))
-			result = maxOutputResourceRates.get(resource);
-		else if (maxWasteOutputResourceRates.containsKey(resource))
-			result = maxWasteOutputResourceRates.get(resource);
-		return result;
+	public double getMaxOutputRate(Integer resource) {
+		return engine.getMaxOutputRate(resource);
 	}
 
 	/**
 	 * Checks if resource is a waste output.
-	 * 
+	 *
 	 * @param resource the resource to check.
 	 * @return true if waste output.
 	 */
 	public boolean isWasteOutputResource(Integer resource) {
-		return maxWasteOutputResourceRates.containsKey(resource);
+		return engine.isWasteOutputResource(resource);
 	}
 
 	/**
 	 * Processes resources for a given amount of time.
-	 * 
-	 * @param time            (millisols)
+	 *
+	 * @param pulse
 	 * @param productionLevel proportion of max process rate (0.0D - 1.0D)
 	 * @param inventory       the inventory pool to use for processes.
 	 * @throws Exception if error processing resources.
 	 */
-	public void processResources(double time, double productionLevel, Inventory inventory) {
-
+	public void processResources(ClockPulse pulse, double productionLevel, Settlement settlement) {
+		double time = pulse.getElapsed();
 		double level = productionLevel;
-		
-		if ((level < 0D) || (level > 1D) || (time < 0D))
-			throw new IllegalArgumentException();
 
-		// logger.info(name + " process");
+		if ((level < 0D) || (level > 1D) || (time < SMALL_AMOUNT))
+			return;
 
 		if (runningProcess) {
-			// Convert time from millisols to seconds.
-			// double timeSec = MarsClock.convertMillisolsToSeconds(time);
 
-			// Get resource bottleneck
-			double bottleneck = getInputBottleneck(time, inventory);
-			if (level > bottleneck)
-				level = bottleneck;
+			accumulatedTime += time;
 
-			// logger.info(name + " production level: " + productionLevel);
+			double newCheckPeriod = PROCESS_CHECK_FREQUENCY * time;
+			
+			if (accumulatedTime >= newCheckPeriod) {
+				// Compute the remaining accumulatedTime
+				accumulatedTime -= newCheckPeriod;
+//				logger.info(settlement, 30_000, name + "  pulse width: " + Math.round(time * 10000.0)/10000.0 
+//						+ "  accumulatedTime: " + Math.round(accumulatedTime * 100.0)/100.0 
+//						+ "  processInterval: " + processInterval);
+	
+				double bottleneck = 1D;
 
-			// Input resources from inventory.
-			 Iterator<Integer> inputI = maxInputResourceRates.keySet().iterator();
-			 while (inputI.hasNext()) {
-				 Integer resource = inputI.next();
-				double maxRate = maxInputResourceRates.get(resource);
-				double resourceRate = maxRate * level;
-				double resourceAmount = resourceRate * time;
-				double remainingAmount = inventory.getAmountResourceStored(resource, false);
-
-				if (resourceAmount > remainingAmount)
-					resourceAmount = remainingAmount;
-
-				try {
-					inventory.retrieveAmountResource(resource, resourceAmount);
-
-				} catch (Exception e) {
+				// Input resources from inventory.
+				for(Integer resource : engine.getInputResources()) {
+					double maxRate = engine.getMaxInputRate(resource);
+					double resourceRate = maxRate * level;
+					double required = resourceRate * accumulatedTime;
+					double stored = settlement.getAmountResourceStored(resource);
+					
+					// Get resource bottleneck
+					double desiredResourceAmount = maxRate * time;
+					double proportionAvailable = 1D;
+					if (desiredResourceAmount > 0D)
+						proportionAvailable = stored / desiredResourceAmount;
+					if (bottleneck > proportionAvailable)
+						bottleneck = proportionAvailable;
+					
+					// Retrieve the right amount
+					if (stored > SMALL_AMOUNT) {
+						if (required > stored) {
+							logger.warning(settlement, 30_000, "Case A. Used up all '" + ResourceUtil.findAmountResourceName(resource)
+								+ "' input to start '" + name + "'. Required: " + Math.round(required * 1000.0)/1000.0 + " kg. Remaining: "
+								+ Math.round(stored * 1000.0)/1000.0 + " kg in storage.");
+							required = stored;
+							settlement.retrieveAmountResource(resource, required);
+							setProcessRunning(false);
+							break;
+							// Note: turn on a yellow flag and indicate which the input resource is missing
+						}
+						else
+							settlement.retrieveAmountResource(resource, required);
+						
+					}
+					else {
+						logger.warning(settlement, 30_000, "Case B. Not enough '" + ResourceUtil.findAmountResourceName(resource)
+							+ "' input to start '" + name + "'. Required: " + Math.round(required * 1000.0)/1000.0 + " kg. Remaining: "
+							+ Math.round(stored * 1000.0)/1000.0 + " kg in storage.");
+						setProcessRunning(false);
+						break;
+					}
 				}
-				// logger.info(resourceName + " input: " + resourceAmount + "kg.");
+
+				// Set level
+				if (level > bottleneck)
+					level = bottleneck;
+				
+				// Output resources to inventory.
+				for(Integer resource : engine.getOutputResources()) {
+					double maxRate = engine.getMaxOutputRate(resource);
+					double resourceRate = maxRate * level;
+					double required = resourceRate * accumulatedTime;
+					double remainingCap = settlement.getAmountResourceRemainingCapacity(resource);
+					
+					// Store the right amount
+					if (remainingCap > SMALL_AMOUNT) {
+						if (required > remainingCap) {
+							logger.warning(settlement, 30_000, "Case C. Used up all remaining space for storing '" 
+									+ ResourceUtil.findAmountResourceName(resource)
+									+ "' output in '" + name + "'. Required: " + Math.round((required - remainingCap) * 1000.0)/1000.0 
+									+ " kg of storage. Remaining cap: 0 kg.");
+							required = remainingCap;
+							settlement.storeAmountResource(resource, required);
+							setProcessRunning(false);						
+							break;
+							// Note: turn on a yellow flag and indicate which the output resource is missing
+						}
+						else
+							settlement.storeAmountResource(resource, required);
+						
+					}
+					else {
+						logger.warning(settlement, 30_000, "Case D. Not enough space for storing '" 
+								+ ResourceUtil.findAmountResourceName(resource)
+								+ "' output to continue '" + name + "'. Required: " + Math.round(required * 1000.0)/1000.0 
+								+ " kg of storage. Remaining cap: " + Math.round(remainingCap * 1000.0)/1000.0 + " kg.");
+						setProcessRunning(false);
+						break;
+					}
+				}
 			}
 
-			// Output resources to inventory.
-			 Iterator<Integer> outputI = maxOutputResourceRates.keySet().iterator();
-			 while (outputI.hasNext()) {
-				Integer resource = outputI.next();
-				double maxRate = maxOutputResourceRates.get(resource);
-				double resourceRate = maxRate * level;
-				double resourceAmount = resourceRate * time;
-				double remainingCapacity = inventory.getAmountResourceRemainingCapacity(resource, false, false);
-				if (resourceAmount > remainingCapacity)
-					resourceAmount = remainingCapacity;
-				try {
-					inventory.storeAmountResource(resource, resourceAmount, false);
-					inventory.addAmountSupply(resource, resourceAmount);
-				} catch (Exception e) {
-				}
-				// logger.info(resourceName + " output: " + resourceAmount + "kg.");
-			}
-		} else
-			level = 0D;
-
-		// Set the current production level.
-		currentProductionLevel = level;
-	}
-
-	/**
-	 * Finds the bottleneck of input resources from inventory pool.
-	 * 
-	 * @param time      (millisols)
-	 * @param inventory the inventory pool the process uses.
-	 * @return bottleneck (0.0D - 1.0D)
-	 * @throws Exception if error getting input bottleneck.
-	 */
-	private double getInputBottleneck(double time, Inventory inventory) {
-
-		// Check for illegal argument.
-		if (time < 0D)
-			throw new IllegalArgumentException("time must be > 0D");
-
-		double bottleneck = 1D;
-
-		// Convert time from millisols to seconds.
-		// double timeSec = MarsClock.convertMillisolsToSeconds(time);
-
-		Iterator<Integer> inputI = maxInputResourceRates.keySet().iterator();
-		while (inputI.hasNext()) {
-			Integer resource = inputI.next();
-//			logger.info(resource.getName());
-			double maxRate = maxInputResourceRates.get(resource);
-			double desiredResourceAmount = maxRate * time;
-			double inventoryResourceAmount = inventory.getAmountResourceStored(resource, false);
-			double proportionAvailable = 1D;
-			if (desiredResourceAmount > 0D)
-				proportionAvailable = inventoryResourceAmount / desiredResourceAmount;
-			if (bottleneck > proportionAvailable)
-				bottleneck = proportionAvailable;
+			// Set the current production level.
+			currentProductionLevel = level;
 		}
-
-		return bottleneck;
 	}
+
 
 	/**
 	 * Gets the string value for this object.
-	 * 
+	 *
 	 * @return string
 	 */
 	public String toString() {
@@ -347,71 +345,199 @@ public class ResourceProcess implements Serializable {
 
 	/**
 	 * Gets the amount of power required to run the process.
-	 * 
+	 *
 	 * @return power (kW).
 	 */
 	public double getPowerRequired() {
-		return powerRequired;
+		return engine.getPowerRequired();
 	}
-	
+
 	/**
-	 * Checks if it has exceeded the time limit
-	 * 
+	 * Checks if it has exceeded the time limit.
+	 *
 	 * @return
 	 */
-	public boolean hasPassedTimeLimit() {
+	public boolean isToggleAvailable() {
 		int sol = marsClock.getMissionSol();
 		int millisol = marsClock.getMillisolInt();
 		if (sol == timeLimit[0]) {
-			if (millisol > timeLimit[1]) {
-				return true;
-			}
-			else
-				return false;
+            return millisol > timeLimit[1];
 		}
 		else {
-			if (millisol > timeLimit[1] + 1000) {
-				return true;
-			}
-			else
-				return false;
+			// Toggleing has rolled over the day
+            return sol > timeLimit[0];
 		}
-		
 	}
 
+
 	/**
-	 * Sets the time permission for the next toggling
+	 * Gets the time permissions for the next toggle.
 	 * 
-	 * @param sol
-	 * @param millisols
+	 * @return
 	 */
-	public void setTimeLimit(int sol, int millisols) {
-		timeLimit[0] = sol;
-		timeLimit[1] = millisols;
+	public int[] getTimeLimit() {
+		return timeLimit;
 	}
-	
 
 	/**
-	 * Reloads instances after loading from a saved sim
-	 * 
+	 * Reloads instances after loading from a saved sim.
+	 *
 	 * @param clock
 	 */
 	public static void initializeInstances(MarsClock clock) {
 		marsClock = clock;
 	}
+
+	/**
+	 * Resets the toggle time from teh current baseline time.
+	 * 
+	 * @param sol Baseline mission sol
+	 * @param millisols
+	 */
+	private void resetToggleTime(int sol, int millisols) {
+		// Compute the time limit
+		millisols += engine.getProcessTime();
+		if (millisols >= 1000) {
+			millisols = millisols - 1000;
+			sol = sol + 1;
+		}
+
+		// Tag this particular process for toggling
+		timeLimit[0] = sol;
+		timeLimit[1] = millisols;
+	}
+
+	/**
+	 * Times of the toggle operation. First item is the toggle work executed, 2nd is the target.
+	 * 
+	 * @return
+	 */
+	public double[] getToggleSwitchDuration() {
+		return new double[] {toggleRunningWorkTime, engine.getWorkTime()};
+	}
+
+	public void setLevel(int level) {
+		this.level = level;
+	}
+
+	public int getLevel() {
+		return level;
+	}
+
+	/**
+	 * Checks if a resource process has all input resources.
+	 *
+	 * @param settlement the settlement the resource is at.
+	 * @return false if any input resources are empty.
+	 */
+	public boolean isInputsPresent(Settlement settlement) {
+
+		for(int resource: getInputResources()) {
+			if (!isAmbientInputResource(resource)) {
+				double stored = settlement.getAmountResourceStored(resource);
+				if (stored < SMALL_AMOUNT) {
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
+
+	/**
+	 * Checks if a resource process has no output resources.
+	 *
+	 * @param settlement the settlement the resource is at.
+	 * @return true if any output resources are empty.
+	 */
+	public boolean isEmptyOutputs(Settlement settlement) {
+
+		for(int resource : getOutputResources()) {
+			double stored = settlement.getAmountResourceStored(resource);
+			if (stored < SMALL_AMOUNT) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	
 	/**
-	 * Prepare object for garbage collection.
+	 * Gets the total value of a resource process's input or output.
+	 *
+	 * @param settlement the settlement for the resource process.
+	 * @param input      is the resource value for the input?
+	 * @return the total value for the input or output.
 	 */
-	public void destroy() {
-		name = null;
-		// maxInputResourceRates.clear();
-		maxInputResourceRates = null;
-		// maxAmbientInputResourceRates.clear();
-		maxAmbientInputResourceRates = null;
-		// maxOutputResourceRates.clear();
-		maxOutputResourceRates = null;
-		// maxWasteOutputResourceRates.clear();
-		maxWasteOutputResourceRates = null;
+	public double getResourcesValue(Settlement settlement, boolean input) {
+		double score = 0D;
+		double benchmarkValue = 0;
+
+		Set<Integer> set = null;
+		if (input)
+			set = getInputResources();
+		else
+			set = getOutputResources();
+
+		GoodsManager gm = settlement.getGoodsManager();
+		for (int resource : set) {
+			// Gets the vp for this resource
+			double vp = gm.getGoodValuePoint(resource);
+
+			// Gets the supply of this resource
+			// Note: use supply instead of stored amount.
+			// Stored amount is slower and more time consuming
+			double supply = gm.getSupplyValue(resource);
+
+			if (input) {
+
+				double rate = getMaxInputRate(resource) / getNumModules() * 1000;
+				// Limit the vp so as to favor the production of output resources
+				double modVp = Math.max(.01, Math.min(20, vp / 10));
+				// The original value without being affected by vp and supply
+				benchmarkValue += rate;
+
+				// if this resource is ambient
+				// that the settlement doesn't need to supply (e.g. carbon dioxide),
+				// then it won't need to check how much it has in stock
+				// and it will not be affected by its vp and supply
+				if (isAmbientInputResource(resource)) {
+					score += rate / Math.max(10, supply) / 10;
+				} else if (isInSitu(resource)) {
+					score += rate / supply / supply / 10;
+				} else
+					score += ((rate * modVp) / supply);
+			}
+
+			else {
+				// Gets the remaining amount of this resource
+				double remain = settlement.getAmountResourceRemainingCapacity(resource);
+
+				if (remain == 0.0)
+					return 0;
+
+				double rate = getMaxOutputRate(resource) / getNumModules() * 1000;
+
+				// For output value
+				if (rate > remain) {
+					rate = remain;
+				}
+
+				benchmarkValue += rate;
+
+				// if this resource is ambient or a waste product
+				// that the settlement won't keep (e.g. carbon dioxide),
+				// then it won't need to check how much it has in stock
+				// and it will not be affected by its vp and supply
+				if (isWasteOutputResource(resource)) {
+					score += rate * (1 + level) * 2;
+				} else
+					score += ((rate * vp) / supply) * (1 + level) * 2;
+			}
+		}
+
+		return (score - benchmarkValue);
 	}
 }

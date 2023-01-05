@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MembersPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-27
  * @author Scott Davis
  */
 
@@ -31,8 +31,8 @@ import javax.swing.event.ListSelectionListener;
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionMember;
 import org.mars_sim.msp.core.person.ai.mission.MissionType;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
@@ -44,14 +44,15 @@ import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
 
 /**
- * A wizard panel to select mission members.
+ * A wizard panel for selecting settlers.
  */
+@SuppressWarnings("serial")
 class MembersPanel
 extends WizardPanel
 implements ActionListener {
 
 	/** The wizard panel name. */
-	private final static String NAME = "Members";
+	private final static String NAME = "Settlers";
 
 	// Data members.
 	private PeopleTableModel peopleTableModel;
@@ -60,7 +61,7 @@ implements ActionListener {
 	private JTable peopleTable;
 	private JTable membersTable;
 	
-	private WebLabel roverCapacityLabel;
+	private WebLabel vehicleCapacityLabel;
 	private WebLabel errorMessageLabel;
 	
 	private WebButton addButton;
@@ -136,7 +137,7 @@ implements ActionListener {
 								}
 								else {
 									// Check if number of rows exceed rover remaining capacity.
-									if (selectedRows.length > getRemainingRoverCapacity()) {
+									if (selectedRows.length > getRemainingVehicleCapacity()) {
 										// Display over capacity message and disable add button.
 										errorMessageLabel.setText("Not enough rover capacity to hold selected people.");
 										addButton.setEnabled(false);
@@ -206,7 +207,7 @@ implements ActionListener {
 							people.add((Person) membersTableModel.getUnit(selectedRow));
 						peopleTableModel.addPeople(people);
 						membersTableModel.removePeople(people);
-						updateRoverCapacityLabel();
+						updateVehicleCapacityLabel();
 					}
 				});
 		buttonPane.add(removeButton);
@@ -215,9 +216,9 @@ implements ActionListener {
 		add(Box.createVerticalStrut(10));
 
 		// Create the rover capacity label.
-		roverCapacityLabel = new WebLabel("Remaining rover capacity: ");
-		roverCapacityLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-		add(roverCapacityLabel);
+		vehicleCapacityLabel = new WebLabel("Remaining rover capacity: ");
+		vehicleCapacityLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		add(vehicleCapacityLabel);
 
 		// Add a vertical strut to make UI space.
 		add(Box.createVerticalStrut(10));
@@ -276,17 +277,11 @@ implements ActionListener {
 	 * @retun true if changes can be committed.
 	 */
 	boolean commitChanges() {
-		//Collection<Person> people = new ConcurrentLinkedQueue<Person>();
-		//for (int x = 0; x < membersTableModel.getRowCount(); x++) 
-		//	people.add((Person) membersTableModel.getUnit(x));
-		//getWizard().getMissionData().setMembers(people);
-		
-		Collection<MissionMember> members = new ConcurrentLinkedQueue<MissionMember>();
+		Collection<Worker> members = new ConcurrentLinkedQueue<Worker>();
 		for (int x = 0; x < membersTableModel.getRowCount(); x++) {
-			members.add((MissionMember) membersTableModel.getUnit(x));
+			members.add((Worker) membersTableModel.getUnit(x));
 		}
-		getWizard().getMissionData().setMixedMembers(members);		
-		
+		getWizard().getMissionData().addMixedMembers(members);			
 		return true;
 	}
 
@@ -305,37 +300,48 @@ implements ActionListener {
 	void updatePanel() {
 		peopleTableModel.updateTable();
 		membersTableModel.updateTable();
-		updateRoverCapacityLabel();
+		updateVehicleCapacityLabel();
 	}
 
 	/**
-	 * Updates the rover capacity label.
+	 * Updates the vehicle capacity label.
 	 */
-	void updateRoverCapacityLabel() {
+	void updateVehicleCapacityLabel() {
 		MissionType type = getWizard().getMissionData().getMissionType();
 		if (MissionType.BUILDING_CONSTRUCTION == type) {
-			roverCapacityLabel.setText(" ");
+			vehicleCapacityLabel.setText(" ");
 		}
 		else if (MissionType.BUILDING_SALVAGE == type) { 
-			roverCapacityLabel.setText(" ");
+			vehicleCapacityLabel.setText(" ");
 		}
 		else {
-			roverCapacityLabel.setText("Remaining rover capacity: " + getRemainingRoverCapacity());
+			
+			if (MissionType.DELIVERY == type) {
+				vehicleCapacityLabel.setText("Remaining drone capacity: " + getRemainingVehicleCapacity());
+			}
+			else {
+				vehicleCapacityLabel.setText("Remaining rover capacity: " + getRemainingVehicleCapacity());
+			}
 		}
 	}
 
 	/**
-	 * Gets the remaining rover capacity.
-	 * @return rover capacity.
+	 * Gets the remaining vehicle capacity.
+	 * @return vehicle capacity.
 	 */
-	int getRemainingRoverCapacity() {
+	int getRemainingVehicleCapacity() {
 		MissionType type = getWizard().getMissionData().getMissionType();
 		if (MissionType.BUILDING_CONSTRUCTION == type) return Integer.MAX_VALUE;
 		else if (MissionType.BUILDING_SALVAGE == type) return Integer.MAX_VALUE;
 		else {
-			int roverCapacity = getWizard().getMissionData().getRover().getCrewCapacity();
-			int memberNum = membersTableModel.getRowCount();
-			return roverCapacity - memberNum;
+			if (MissionType.DELIVERY == type) {
+				return 1;
+			}
+			else {
+				int roverCapacity = getWizard().getMissionData().getRover().getCrewCapacity();
+				int memberNum = membersTableModel.getRowCount();
+				return roverCapacity - memberNum;
+			}
 		}
 	}
 
@@ -377,7 +383,7 @@ implements ActionListener {
 					if (column == 0) 
 						result = person.getName();
 					else if (column == 1) 
-						result = person.getMind().getJob().getName(person.getGender());
+						result = person.getMind().getJob().getName();
 					else if (column == 2) {
 						Mission mission = person.getMind().getMission();
 						if (mission != null) result = mission.getName();
@@ -497,7 +503,7 @@ implements ActionListener {
 					if (column == 0) 
 						result = person.getName();
 					else if (column == 1) 
-						result = person.getMind().getJob().getName(person.getGender());
+						result = person.getMind().getJob().getName();
 					else if (column == 2) {
 						Mission mission = person.getMind().getMission();
 						if (mission != null) result = mission.getName();
@@ -578,7 +584,7 @@ implements ActionListener {
 		for (int selectedRow : selectedRows) people.add((Person) peopleTableModel.getUnit(selectedRow));
 		peopleTableModel.removePeople(people);
 		membersTableModel.addPeople(people);
-		updateRoverCapacityLabel();
+		updateVehicleCapacityLabel();
 	}
 	
 }

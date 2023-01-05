@@ -1,33 +1,31 @@
-/**
+/*
  * Mars Simulation Project
  * PowerGeneration.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-06-24
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingException;
-import org.mars_sim.msp.core.structure.goods.Good;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
+import org.mars_sim.msp.core.structure.building.SourceSpec;
 import org.mars_sim.msp.core.time.ClockPulse;
 
 /**
  * The PowerGeneration class is a building function for generating power.
  */
-public class PowerGeneration extends Function implements Serializable {
+public class PowerGeneration extends Function {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(PowerGeneration.class.getName());
+//	private static final SimLogger logger = SimLogger.getLogger(PowerGeneration.class.getName());
 
 	private double powerGeneratedCache;
 
@@ -41,13 +39,51 @@ public class PowerGeneration extends Function implements Serializable {
 	 * @param building the building this function is for.
 	 * @throws BuildingException if error in constructing function.
 	 */
-	public PowerGeneration(Building building) {
+	public PowerGeneration(Building building, FunctionSpec spec) {
 		// Call Function constructor.
-		super(FunctionType.POWER_GENERATION, building);
+		super(FunctionType.POWER_GENERATION, spec, building);
 
 		// Determine power sources.
-		powerSources = buildingConfig.getPowerSources(building.getBuildingType());
-
+		powerSources = new ArrayList<>();
+		for (SourceSpec sourceSpec : buildingConfig.getPowerSources(building.getBuildingType())) {
+			String type = sourceSpec.getType();
+			double power = sourceSpec.getCapacity();
+		
+			PowerSource powerSource = null;
+			PowerSourceType powerType = PowerSourceType.getType(type);
+			switch (powerType) {
+			case STANDARD_POWER:
+				powerSource = new StandardPowerSource(power);				
+				break;
+				
+			case SOLAR_POWER:
+				powerSource = new SolarPowerSource(power);
+				break;
+				
+			case SOLAR_THERMAL:
+				powerSource = new SolarThermalPowerSource(power);
+				break;
+				
+			case FUEL_POWER:
+				boolean toggleStafe = Boolean.parseBoolean(sourceSpec.getAttribute(SourceSpec.TOGGLE));
+				String fuelType = sourceSpec.getAttribute(SourceSpec.FUEL_TYPE);
+				double consumptionSpeed = Double.parseDouble(sourceSpec.getAttribute(SourceSpec.CONSUMPTION_RATE));
+				powerSource = new FuelPowerSource(power, toggleStafe, fuelType, consumptionSpeed);
+				break;
+				
+			case WIND_POWER:
+				powerSource = new WindPowerSource(power);				
+				break;
+				
+			case AREOTHERMAL_POWER:
+				powerSource = new AreothermalPowerSource(power);
+				break;
+			
+			default:
+				throw new IllegalArgumentException("Don't know how to build PowerSource : " + type);
+			}
+			powerSources.add(powerSource);
+		}
 	}
 
 	/**
@@ -79,7 +115,9 @@ public class PowerGeneration extends Function implements Serializable {
 
 		double existingPowerValue = demand / (supply + 1D);
 
-		double powerSupply = getPowerSourceSupply(buildingConfig.getPowerSources(buildingName), settlement);
+
+		double powerSupply = buildingConfig.getHeatSources(buildingName).stream()
+								.mapToDouble(SourceSpec::getCapacity).sum();
 
 		return powerSupply * existingPowerValue;
 	}
@@ -106,8 +144,8 @@ public class PowerGeneration extends Function implements Serializable {
 				double fuelPower = source.getMaxPower();
 				// AmountResource fuelResource = fuelSource.getFuelResource();
 				int id = fuelSource.getFuelResourceID();
-				Good fuelGood = GoodsUtil.getResourceGood(id);
-				double fuelValue = settlement.getGoodsManager().getGoodValuePerItem(fuelGood);
+//				Good fuelGood = GoodsUtil.getResourceGood(id);
+				double fuelValue = settlement.getGoodsManager().getGoodValuePoint(id);
 				fuelValue *= fuelSource.getFuelConsumptionRate();
 				fuelPower -= fuelValue;
 				if (fuelPower < 0D)
@@ -143,8 +181,7 @@ public class PowerGeneration extends Function implements Serializable {
 		Iterator<PowerSource> i = powerSources.iterator();
 		while (i.hasNext()) {
 			PowerSource powerSource = i.next();
-			if (powerSource.getType().equals(PowerSourceType.FUEL_POWER)) {
-				// System.out.println(heatSource.toString() + " at building "+
+			if (powerSource.getType() == PowerSourceType.FUEL_POWER) {
 				// building.getNickName() + " is HEAT_OFF");
 				powerSource.setTime(time);
 			}
@@ -172,38 +209,6 @@ public class PowerGeneration extends Function implements Serializable {
 		return result;
 	}
 
-//	/**
-//	 * Gets the amount of electrical power generated.
-//	 * @return power generated in kW
-//	 
-//	public double getGeneratedPower() {
-//	double result = 0D;
-//		// Building should only produce power if it has no current malfunctions.
-//		if (!getBuilding().getMalfunctionManager().hasMalfunction()) {
-//			
-//			Iterator<PowerSource> i = powerSources.iterator();
-//			while (i.hasNext()) {
-//					PowerSource powerSource = i.next();
-//				    if (powerSource.getType().equals(PowerSourceType.FUEL_POWER)) {
-//				    	//System.out.println(heatSource.toString() + " at building "+ building.getNickName() + " is HEAT_OFF");
-//				    	powerSource.setTime(time);
-//				    	result += powerSource.getCurrentPower(getBuilding());
-//				    }
-//				    else
-//						result += powerSource.getCurrentPower(getBuilding());
-//			}			
-//			
-//			//Iterator<PowerSource> i = powerSources.iterator();
-//			//while (i.hasNext()) {
-//			//	result += i.next().getCurrentPower(getBuilding());
-//			//}
-//		}
-//
-//
-//		return powerGeneratedCache;
-//
-//	}
-
 	/**
 	 * Time passing for the building.
 	 * 
@@ -217,29 +222,8 @@ public class PowerGeneration extends Function implements Serializable {
 			powerGeneratedCache = calculateGeneratedPower(pulse.getElapsed());
 		}
 		return valid;
-//		for (PowerSource source : powerSources) {
-//			if (source instanceof SolarPowerSource) {
-//				SolarPowerSource solarPowerSource = (SolarPowerSource) source;
-//				//System.out.println("solarPowerSource.getMaxPower() is "+ solarPowerSource.getMaxPower());
-//				double factor = solarPowerSource.getCurrentPower(getBuilding()) / solarPowerSource.getMaxPower();
-//				// TODO : use PowerMode.FULL_POWER ?
-//				double d_factor = SolarPowerSource.DEGRADATION_RATE_PER_SOL * time/1000D;
-//				double eff = solarPowerSource.getEfficiency() ;
-//				double new_eff = eff - eff * d_factor * factor;
-//				solarPowerSource.setEfficiency(new_eff);
-//				//System.out.println("new_eff is " + new_eff);
-//			}
-//			
-//			else if (source instanceof FuelPowerSource) {
-//				FuelPowerSource fuelSource = (FuelPowerSource) source;
-//				if (fuelSource.isToggleON()) {
-//					//fuelSource.consumeFuel(time, getBuilding().getSettlementInventory());
-//				}
-//			}
-//
-//		}
 	}
-
+	
 	@Override
 	public String[] getMalfunctionScopeStrings() {
 		String[] result = new String[powerSources.size() + 1];
@@ -276,7 +260,7 @@ public class PowerGeneration extends Function implements Serializable {
 	}
 	
 	/**
-	 * Return the fuel cell stacks to the inventory
+	 * Returns the power source to the inventory.
 	 */
 	public void removeFromSettlement() {
 		Iterator<PowerSource> i = powerSources.iterator();
@@ -293,15 +277,15 @@ public class PowerGeneration extends Function implements Serializable {
 	public void destroy() {
 		super.destroy();
 
-		powerSources = null;
 		thermalGeneration = null;
 
-//		Iterator<PowerSource> i = powerSources.iterator();
-//		while (i.hasNext()) {
-//			i.next().destroy();
-//		}
-//		powerSources.clear();
+		Iterator<PowerSource> i = powerSources.iterator();
+		while (i.hasNext()) {
+			i.next().destroy();
+		}
+		powerSources.clear();
 
+		powerSources = null;
 	}
 
 }

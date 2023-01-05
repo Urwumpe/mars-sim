@@ -1,3 +1,10 @@
+/*
+ * Mars Simulation Project
+ * RepeatCommand.java
+ * @date 2022-07-17
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.command;
 
 import java.util.ArrayList;
@@ -10,18 +17,20 @@ import org.mars.sim.console.chat.Conversation;
 import org.mars.sim.console.chat.command.InteractiveChatCommand.ParseResult;
 
 /**
- * A command to repeate other commands periodically. 
+ * A command to repeat other commands periodically. 
  * This command is NOT stateless.
  */
 public class RepeatCommand extends ChatCommand implements CancellableCommand {
 
 	private static final int MIN_DELAY = 1;
 	private static final int MAX_DELAY = 60;
-
+	
+	private static final String DES = "repeat [delay seconds] [counts] {command}";
+	
 	private boolean stopRun;
 
 	public RepeatCommand() {
-		super(COMMAND_GROUP, "rp", "repeat", "Repeatedly call a command; > repeat [delay sec] [repeat] {command}");
+		super(COMMAND_GROUP, "rt", "repeat", "Repeatedly call a command; > " + DES);
 		setInteractive(true);
 	}
 
@@ -29,18 +38,33 @@ public class RepeatCommand extends ChatCommand implements CancellableCommand {
 	public boolean execute(Conversation context, String input) {
 		InteractiveChatCommand parent = context.getCurrentCommand();
 		
-		// Extract seconds delay
-		String[] parts = input.split(" ", 3);
-		int delaySec = Integer.parseInt(parts[0]);
-		if ((delaySec < MIN_DELAY) || (delaySec > MAX_DELAY)) {
-			context.println("Delay must be between " + MIN_DELAY + " and " + MAX_DELAY + " secs");
+		// Extract repate parameters
+		String[] parts = ((input != null) ? input : "").split(" ", 3);
+		boolean badFormat = (parts.length != 3);
+		int delaySec = 0;
+		int repeatCount = 0;
+		if (!badFormat) {
+			try {
+				delaySec = Integer.parseInt(parts[0]);
+				if ((delaySec < MIN_DELAY) || (delaySec > MAX_DELAY)) {
+					context.println("Delay must be between " + MIN_DELAY + " and " + MAX_DELAY + " secs");
+					return false;
+				}
+				repeatCount = Integer.parseInt(parts[1]);
+			}
+			catch(NumberFormatException nfe) {
+				badFormat = true;
+			}
+		}
+		if (badFormat) {
+			context.println("Command must be '" + DES + "'");
+			context.println("e.g. > /rt 20 10 /d");
 			return false;
 		}
-		int repeatCount = Integer.parseInt(parts[1]);
-		
+
 		// Check the command is not interactive
 		String commandStr = parts[2].trim();
-		ParseResult parsedCommand = parent.parseInput(commandStr);
+		ParseResult parsedCommand = parent.parseInput(context, commandStr);
 		if (parsedCommand.command == null) {
 			context.println("Can not understand " + commandStr);
 			return false;
@@ -51,9 +75,8 @@ public class RepeatCommand extends ChatCommand implements CancellableCommand {
 		}
 		
 		// Execute the requested command first time including the description
-		context.println("Going to execute '" + commandStr + "' every " + delaySec + " secs");
-		context.println("To stop press " + Conversation.CANCEL_KEY);
-		
+		context.println("Going to execute '" + commandStr + "' every " + delaySec + " secs for " + repeatCount + " times");
+		context.println("To stop, press '" + Conversation.CANCEL_KEY + "'");
 		
 		boolean result = parsedCommand.command.execute(context, parsedCommand.parameter);
 		int count = 1;
@@ -62,12 +85,7 @@ public class RepeatCommand extends ChatCommand implements CancellableCommand {
 		
 		while (result && !stopRun && (count != repeatCount)) {
 			context.println("Waiting..........");
-			try {
-				Thread.sleep(delaySec * 1000L);
-			} catch (InterruptedException e) {
-				context.println("Abort repeat");
-				Thread.currentThread().interrupt();
-			}
+			sleep(context, delaySec);
 			
 			if (!stopRun) {
 				result = parsedCommand.command.execute(context, parsedCommand.parameter);
@@ -79,6 +97,15 @@ public class RepeatCommand extends ChatCommand implements CancellableCommand {
 		return result;
 	}
 
+	public void sleep(Conversation context, int delaySec) {
+		try {
+			Thread.sleep(delaySec * 1000L);
+		} catch (InterruptedException e) {
+			context.println("Abort repeat");
+			Thread.currentThread().interrupt();
+		}
+	}
+	
 	/**
 	 * This delegates to the parent Interactive Command
 	 */

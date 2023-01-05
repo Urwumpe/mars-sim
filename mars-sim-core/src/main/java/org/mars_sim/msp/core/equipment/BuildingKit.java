@@ -1,27 +1,26 @@
-/**
+/*
  * Mars Simulation Project
  * BuildingKit.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-11-14
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.core.equipment;
 
-import java.io.Serializable;
 import java.util.Collection;
 
-import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
-import org.mars_sim.msp.core.manufacture.Salvagable;
 import org.mars_sim.msp.core.manufacture.SalvageInfo;
 import org.mars_sim.msp.core.manufacture.SalvageProcessInfo;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.time.ClockPulse;
+import org.mars_sim.msp.core.time.Temporal;
 
-public class BuildingKit extends Equipment implements Serializable, Malfunctionable, Salvagable {
+public class BuildingKit extends Equipment
+	implements Malfunctionable, Temporal {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -30,6 +29,8 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 	public static final String TYPE = "Building Kit";
 	/** Unloaded mass of EVA suit (kg.). */
 	public static final double EMPTY_MASS = 30D;
+	/** capacity (kg). */
+	public static final double CAPACITY = 0;
 
 	/** 334 Sols (1/2 orbit). */
 	private static final double WEAR_LIFETIME = 334_000;
@@ -46,8 +47,8 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 	/**
 	 * The BuildingKit class represents a building kit in a building.
 	 */
-	public BuildingKit(Coordinates location) {
-		super(TYPE, TYPE, location);
+	public BuildingKit(Settlement base) {
+		super(TYPE, TYPE, base);
 
 		// Initialize data members.
 		isSalvaged = false;
@@ -55,13 +56,19 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 
 		// Add scope to malfunction manager.
 		malfunctionManager = new MalfunctionManager(this, WEAR_LIFETIME, MAINTENANCE_TIME);
-//		malfunctionManager.addScopeString(TYPE);
-//		malfunctionManager.addScopeString("Life Support");
 	}
 
 	/**
+     * Gets the total capacity of resource that this container can hold.
+     * @return total capacity (kg).
+     */
+    public double getCargoCapacity() {
+        return CAPACITY;
+    }
+
+	/**
 	 * Checks if the item is salvaged.
-	 * 
+	 *
 	 * @return true if salvaged.
 	 */
 	public boolean isSalvaged() {
@@ -74,7 +81,7 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 
 	/**
 	 * Indicate the start of a salvage process on the item.
-	 * 
+	 *
 	 * @param info       the salvage process info.
 	 * @param settlement the settlement where the salvage is taking place.
 	 */
@@ -85,7 +92,7 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 
 	/**
 	 * Gets the salvage info.
-	 * 
+	 *
 	 * @return salvage info or null if item not salvaged.
 	 */
 	public SalvageInfo getSalvageInfo() {
@@ -94,7 +101,7 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 
 	/**
 	 * Gets the unit's malfunction manager.
-	 * 
+	 *
 	 * @return malfunction manager
 	 */
 	public MalfunctionManager getMalfunctionManager() {
@@ -103,38 +110,15 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 
 	/**
 	 * Time passing for the Building Kit.
-	 * 
+	 *
 	 * @param time the amount of time passing (millisols)
 	 * @throws Exception if error during time.
 	 */
 	@Override
 	public boolean timePassing(ClockPulse pulse) {
 
-//		Unit container = getContainerUnit();
-//		if (container instanceof Building) {
-//			Building building = (Building) container;
-//			 if (!person.getPhysicalCondition().isDead()) {
-//			 malfunctionManager.activeTimePassing(time);
-//			 }
-//		}
 		return malfunctionManager.timePassing(pulse);
 	}
-
-//	/**
-//	 * Obtains the immediate location (either building, vehicle, a settlement's vicinity or outside on Mars)
-//	 * @return the name string of the location the unit is at
-//	 */
-//	public String getImmediateLocation() {
-//			if (getContainerUnit() != null)
-//				return getContainerUnit().getName();
-////			else if (e.getTopContainerUnit() != null)
-////				return e.getTopContainerUnit().getName();
-//			else if (isRightOutsideSettlement())
-//				return findSettlementVicinity().getName() + VICINITY;  
-//			else
-//				return OUTSIDE_ON_MARS;
-//
-//	}
 
 	public Settlement findSettlementVicinity() {
 
@@ -153,16 +137,6 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 	}
 
 	@Override
-	public String getImmediateLocation() {
-		return getLocationTag().getImmediateLocation();
-	}
-
-	@Override
-	public String getLocale() {
-		return getLocationTag().getLocale();
-	}
-
-	@Override
 	public void destroy() {
 		super.destroy();
 		if (salvageInfo != null)
@@ -172,7 +146,6 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 
 	@Override
 	public Building getBuildingLocation() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
@@ -182,7 +155,37 @@ public class BuildingKit extends Equipment implements Serializable, Malfunctiona
 	}
 
 	@Override
-	public Unit getUnit() {
-		return this;
+	public double storeAmountResource(int resource, double quantity) {
+		return 0;
+	}
+
+	@Override
+	public double retrieveAmountResource(int resource, double quantity) {
+		return 0;
+	}
+
+	@Override
+	public double getAmountResourceCapacity(int resource) {
+		return 0;
+	}
+
+	@Override
+	public double getAmountResourceStored(int resource) {
+		return 0;
+	}
+
+	@Override
+	public boolean isEmpty(boolean brandNew) {
+		return false;
+	}
+
+	@Override
+	public double getStoredMass() {
+		return 0;
+	}
+
+	@Override
+	public UnitType getUnitType() {
+		return UnitType.CONTAINER;
 	}
 }

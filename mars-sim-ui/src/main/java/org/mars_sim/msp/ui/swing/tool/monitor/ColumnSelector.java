@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ColumnSelector.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Barry Evans
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -32,7 +32,7 @@ import org.mars_sim.msp.ui.swing.ModalInternalFrame;
  * This window displays a list of columns from the specified model.
  * The columns displayed depends upon the final chart being rendered.
  */
-//2015-10-18 Switched from extending JDialog to JinternalFrame
+@SuppressWarnings("serial")
 public class ColumnSelector
 extends ModalInternalFrame {
 
@@ -44,18 +44,15 @@ extends ModalInternalFrame {
 	private JList<?> columnList = null;
 	private int columnMappings[] = null;
 	private boolean okPressed = false;
-	//private Frame owner;
-
 
 	/**
 	 * Constructs the dialog with a title and columns extracted from the
 	 * specified model.
-	 * @param desktop MainDesktopPane // owner the owner of the dialog.
+	 * @param desktop MainDesktopPane the owner of the dialog.
 	 * @param model Model driving the columns.
 	 * @param bar Display selection for a Bar chart.
 	 */
 	public ColumnSelector(MainDesktopPane desktop, MonitorModel model, boolean bar) {
-		//super(owner, model.getName(), true);
 		// Use ModalInternalFrame constructor
         super(model.getName());
 
@@ -75,7 +72,7 @@ extends ModalInternalFrame {
 
 			// If a bar, look for Number classes
 			if (bar) {
-				if (Number.class.isAssignableFrom(columnType)) {
+				if (isNumber(columnType)) {
 					columnMappings[items.size()] = i;
 					items.add(model.getColumnName(i));
 				}
@@ -137,7 +134,7 @@ extends ModalInternalFrame {
 //		    setLocation(width, height);
 //		}
 
-        // 2016-10-22 Add to its own tab pane
+        // Add to its own tab pane
         //if (desktop.getMainScene() != null)
         //	desktop.add(this);
         	//desktop.getMainScene().getDesktops().get(0).add(this);
@@ -145,11 +142,10 @@ extends ModalInternalFrame {
         	desktop.add(this);
 
         setModal(true);
-
+        moveToFront();
 	    //setVisible(true);
 		//pack();
 
-		//System.out.println("done ColumnSelector's constructor");
 	}
 
 	/**
@@ -160,18 +156,15 @@ extends ModalInternalFrame {
 	 */
 	public static int[] createBarSelector(MainDesktopPane desktop,
 			MonitorModel model) {
-        //System.out.println("ColumnSelector.java : start calling createBarSelector ");
 		ColumnSelector select = new ColumnSelector(desktop, model, true);
 		select.setVisible(true);
 		//select.setModal(true);
 		//return select.getSelectedColumns();
 		int columns[] = select.getSelectedColumns();
 		//if (columns.length > 0) {
-			//System.out.println("createBarSelector() : columns is not null");
 			return columns;
 		//}
 		//else {
-			//System.out.println("createBarSelector() : columns is " + columns);
 		//	return columns;
 		//}
 	}
@@ -244,12 +237,18 @@ extends ModalInternalFrame {
 
 	/**
 	 * Is the class specified suitable to be displayed as a category dataset.
-	 * This is basically any class that is an Class and not a numerical
+	 * This is basically any non-numerical class
 	 * @param columnClass The Class of the data in the column.
 	 * @return Is the class a category
 	 */
 	private boolean isCategory(Class<?> columnClass) {
-		return (!Number.class.isAssignableFrom(columnClass) &&
-				!Coordinates.class.equals(columnClass));
+		return (String.class.equals(columnClass)
+				&& !Number.class.isAssignableFrom(columnClass)
+				&& !Coordinates.class.equals(columnClass));
+	}
+
+	private boolean isNumber(Class<?> columnClass) {
+		return (Number.class.isAssignableFrom(columnClass)
+				&& !String.class.equals(columnClass));
 	}
 }

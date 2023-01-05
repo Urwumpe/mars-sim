@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * FieldSitePanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission.create;
@@ -20,6 +20,7 @@ import java.awt.event.MouseMotionAdapter;
 /**
  * A wizard panel for determining a field site to research for the mission.
  */
+@SuppressWarnings("serial")
 public class FieldSitePanel extends WizardPanel {
 
  
@@ -60,10 +61,12 @@ public class FieldSitePanel extends WizardPanel {
         
         // Create the map panel.
         mapPane = new MapPanel(wizard.getDesktop(), 200L);
+        
         mapPane.addMapLayer(new UnitIconMapLayer(mapPane), 0);
         mapPane.addMapLayer(new UnitLabelMapLayer(), 1);
         mapPane.addMapLayer(ellipseLayer = new EllipseLayer(Color.GREEN), 2);
         mapPane.addMapLayer(navLayer = new NavpointEditLayer(mapPane, false), 3);
+        
         mapPane.addMouseListener(new NavpointMouseListener());
         mapPane.addMouseMotionListener(new NavpointMouseMotionListener());
         mapPane.setMaximumSize(mapPane.getPreferredSize());
@@ -221,11 +224,9 @@ public class FieldSitePanel extends WizardPanel {
          * @return true if within boundaries.
          */
         private boolean withinBounds(IntPoint position) {
-            boolean result = true;
-            
-            if (!navLayer.withinDisplayEdges(position)) result = false;
-            
-            int radius = (int) Math.round(Math.sqrt(Math.pow(150D - position.getX(), 2D) + 
+            boolean result = navLayer.withinDisplayEdges(position);
+
+            int radius = (int) Math.round(Math.sqrt(Math.pow(150D - position.getX(), 2D) +
                     Math.pow(150D - position.getY(), 2D)));
             if (radius > pixelRange) result = false;
             

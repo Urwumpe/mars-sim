@@ -1,15 +1,15 @@
-/**
+/*
  * Mars Simulation Project
  * ConstructionManager.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-15
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.construction;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.person.Person;
@@ -45,10 +45,10 @@ implements Serializable {
 	 */
 	public ConstructionManager(Settlement settlement) {
 		this.settlement = settlement;
-		sites = new CopyOnWriteArrayList<ConstructionSite>();
+		sites = new ArrayList<>();
 		values = new ConstructionValues(settlement);
 		salvageValues = new SalvageValues(settlement);
-		constructedBuildingLog = new CopyOnWriteArrayList<ConstructedBuildingLogEntry>();
+		constructedBuildingLog = new ArrayList<>();
 	}
 
 	/**
@@ -56,7 +56,7 @@ implements Serializable {
 	 * @return list of construction sites.
 	 */
 	public List<ConstructionSite> getConstructionSites() {
-		return new CopyOnWriteArrayList<ConstructionSite>(sites);
+		return new ArrayList<ConstructionSite>(sites);
 	}
 
 	/**
@@ -73,7 +73,7 @@ implements Serializable {
 	 * @return list of construction sites.
 	 */
 	public List<ConstructionSite> getConstructionSitesNeedingConstructionMission() {
-		List<ConstructionSite> result = new CopyOnWriteArrayList<ConstructionSite>();
+		List<ConstructionSite> result = new ArrayList<>();
 		Iterator<ConstructionSite> i = sites.iterator();
 		while (i.hasNext()) {
 			ConstructionSite site = i.next();
@@ -115,7 +115,7 @@ implements Serializable {
 	    	Integer resource = i.next();
 	        double amountRequired = stage.getRemainingResources().get(resource);
 	        if (amountRequired > 0D) {
-	            double amountStored = settlement.getInventory().getAmountResourceStored(resource, false);
+	            double amountStored = settlement.getAmountResourceStored(resource);
 	            if (amountStored > 0D) {
 	                result = true;
 	            }
@@ -127,7 +127,7 @@ implements Serializable {
 	    	Integer part = j.next();
 	        int numRequired = stage.getRemainingParts().get(part);
 	        if (numRequired > 0) {
-	            int numStored = settlement.getInventory().getItemResourceNum(part);
+	            int numStored = settlement.getItemResourceStored(part);
 	            if (numStored > 0) {
 	                result = true;
 	            }
@@ -142,7 +142,7 @@ implements Serializable {
 	 * @return list of construction sites.
 	 */
 	public List<ConstructionSite> getConstructionSitesNeedingSalvageMission() {
-		List<ConstructionSite> result = new CopyOnWriteArrayList<ConstructionSite>();
+		List<ConstructionSite> result = new ArrayList<>();
 		Iterator<ConstructionSite> i = sites.iterator();
 		while (i.hasNext()) {
 			ConstructionSite site = i.next();
@@ -163,7 +163,7 @@ implements Serializable {
 	 * @return newly created construction site.
 	 */
 	public ConstructionSite createNewConstructionSite() {
-		ConstructionSite result = new ConstructionSite(settlement);//, this);
+		ConstructionSite result = new ConstructionSite(settlement);
 		sites.add(result);
 		settlement.fireUnitUpdate(UnitEventType.START_CONSTRUCTION_SITE_EVENT, result);
 		return result;
@@ -221,7 +221,7 @@ implements Serializable {
 	 * @return list of ConstructedBuildingLogEntry
 	 */
 	public List<ConstructedBuildingLogEntry> getConstructedBuildingLog() {
-		return new CopyOnWriteArrayList<ConstructedBuildingLogEntry>(constructedBuildingLog);
+		return new ArrayList<>(constructedBuildingLog);
 	}
 
 	/**
@@ -260,8 +260,7 @@ implements Serializable {
 
 		// Add construction site.
 		ConstructionSite site = createNewConstructionSite();
-		site.setXLocation(salvagedBuilding.getXLocation());
-		site.setYLocation(salvagedBuilding.getYLocation());
+		site.setPosition(salvagedBuilding.getPosition());
 		site.setFacing(salvagedBuilding.getFacing());
 		ConstructionStageInfo buildingStageInfo = ConstructionUtil.getConstructionStageInfo(salvagedBuilding.getBuildingType());
 		if (buildingStageInfo != null) {

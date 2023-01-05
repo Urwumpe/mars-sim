@@ -1,35 +1,30 @@
-/**
+/*
  * Mars Simulation Project
  * SolarThermalPowerSource.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-06-24
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import java.io.Serializable;
 
-import org.mars_sim.msp.core.Coordinates;
+import org.mars_sim.msp.core.environment.SurfaceFeatures;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 
 /**
  * A solar thermal power source.
  */
-public class SolarThermalPowerSource
-extends PowerSource
-implements Serializable {
+public class SolarThermalPowerSource extends PowerSource {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	private static final double MAINTENANCE_FACTOR = 2.5D;
 	
-	private static double efficiency_solar_thermal = .70;
+	private static double efficiencySolarThermal = .70;
 	
-	public static double ARRAY_AREA = 100D;		// in square feet
-	
-	private Coordinates location;
-	
+//	public static double ARRAY_AREA = 100D;		// in square feet
+		
 	/**
 	 * Constructor.
 	 * @param maxPower the maximum generated power.
@@ -40,22 +35,18 @@ implements Serializable {
 	}
 
 	public static double getEfficiency() {
-		return efficiency_solar_thermal;
+		return efficiencySolarThermal;
 	}
 
 	@Override
 	public double getCurrentPower(Building building) {
-//		BuildingManager manager = building.getBuildingManager();
-		if (location == null)
-			location = building.getBuildingManager().getSettlement().getCoordinates();
 
-		double sunlight = surface.getSolarIrradiance(location) * efficiency_solar_thermal / 1000D * ARRAY_AREA;
-		double max = getMaxPower(); 
-		if (sunlight <= max)
-			return sunlight;
-		else
-			return max;
+		double I = surface.getSolarIrradiance(building.getCoordinates());
+
+		if (I <= 0)
+			return 0;
 		
+		return I / SurfaceFeatures.MEAN_SOLAR_IRRADIANCE * getMaxPower();		
 	}
 
 	@Override
@@ -70,20 +61,16 @@ implements Serializable {
 
 	@Override
 	public void removeFromSettlement() {
-		// TODO Auto-generated method stub
-
+		// May model how to salvage the parts from this power source
 	}
 
 	@Override
 	public void setTime(double time) {
-		// TODO Auto-generated method stub
-		
+		// May use this method to control turning on and off this power source
 	}
 	
 	@Override
 	public void destroy() {
 		super.destroy();
-		location = null;
-
 	}
 }

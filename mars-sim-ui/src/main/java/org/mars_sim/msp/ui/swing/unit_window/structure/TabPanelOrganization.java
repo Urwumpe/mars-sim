@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * TabPanelOrganization.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-27
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -23,9 +23,7 @@ import java.util.Map;
 import javax.swing.Icon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.JTree;
-import javax.swing.ScrollPaneConstants;
 import javax.swing.UIManager;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -35,7 +33,6 @@ import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitEvent;
 import org.mars_sim.msp.core.UnitEventType;
@@ -44,11 +41,14 @@ import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.UnitManagerEvent;
 import org.mars_sim.msp.core.UnitManagerEventType;
 import org.mars_sim.msp.core.UnitManagerListener;
+import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.role.RoleType;
 import org.mars_sim.msp.core.structure.ChainOfCommand;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
 /**
@@ -58,20 +58,19 @@ import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 @SuppressWarnings("serial")
 public class TabPanelOrganization extends TabPanel {
 
-	/** Is UI constructed. */
-	private boolean uiDone = false;
+	private static final String CHART_ICON = Msg.getString("icon.chart"); //$NON-NLS-1$
 	
 	/** The Settlement instance. */
 	private Settlement settlement;
-	
+
 	private JPanel infoPanel;
 
 	private JTree tree;
 
 	private DefaultMutableTreeNode root;
-	
+
 	private DefaultTreeModel defaultTreeModel;
-	
+
 	private DefaultMutableTreeNode commanderStaffNode;
 	private DefaultMutableTreeNode commanderNode;
 	private DefaultMutableTreeNode subCommanderNode;
@@ -82,6 +81,10 @@ public class TabPanelOrganization extends TabPanel {
 	private DefaultMutableTreeNode agricultureNode;
 	private DefaultMutableTreeNode agricultureSpecialistNode;
 	private DefaultMutableTreeNode agricultureChiefNode;
+
+	private DefaultMutableTreeNode computingNode;
+	private DefaultMutableTreeNode computingSpecialistNode;
+	private DefaultMutableTreeNode computingChiefNode;
 
 	private DefaultMutableTreeNode engineeringNode;
 	private DefaultMutableTreeNode engineeringSpecialistNode;
@@ -105,53 +108,41 @@ public class TabPanelOrganization extends TabPanel {
 	private DefaultMutableTreeNode supplyNode;
 	private DefaultMutableTreeNode supplySpecialistNode;
 	private DefaultMutableTreeNode supplyChiefNode;
-	
+
 	private Map<Person, RoleType> roles = new HashMap<>();
-	
+
 	private List<DefaultMutableTreeNode> nodes = new ArrayList<>();
-	
+
 	private Map<Person, PersonListener> listeners  = new HashMap<>();
-	
+
+	private LocalUnitManagerListener unitManagerListener;
+
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param unit    the unit to display.
 	 * @param desktop the main desktop.
 	 */
 	public TabPanelOrganization(Unit unit, MainDesktopPane desktop) {
 		// Use the TabPanel constructor
-		super("Org", //$NON-NLS-1$
-				null, Msg.getString("TabPanelStructure.tooltip"), //$NON-NLS-1$
-				unit, desktop);
+		super(
+			null, 
+			ImageLoader.getNewIcon(CHART_ICON),
+			Msg.getString("TabPanelStructure.title"), //$NON-NLS-1$
+			unit, desktop);
 
 		settlement = (Settlement) unit;
 	}
-	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;		
 
-		UnitManager unitManager = Simulation.instance().getUnitManager();
-		LocalUnitManagerListener unitManagerListener = new LocalUnitManagerListener();
-		unitManager.addUnitManagerListener(unitManagerListener);
-
-		// Create label panel.
-		JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(titlePanel);
-
-		// Prepare label
-		JLabel tlabel = new JLabel(Msg.getString("TabPanelStructure.title"), JLabel.CENTER); //$NON-NLS-1$
-		tlabel.setFont(new Font("Serif", Font.BOLD, 16));
-		// tlabel.setForeground(new Color(102, 51, 0)); // dark brown
-		titlePanel.add(tlabel);
+	@Override
+	protected void buildUI(JPanel content) {
+		UnitManager unitManager = getSimulation().getUnitManager();
+		unitManagerListener = new LocalUnitManagerListener();
+		unitManager.addUnitManagerListener(UnitType.PERSON, unitManagerListener);
 
 		// Prepare info panel.
 		infoPanel = new JPanel(new GridLayout(1, 2, 0, 0));
-//		infoPanel.setBorder(new MarsPanelBorder());
-		centerContentPanel.add(infoPanel, BorderLayout.NORTH);
+		content.add(infoPanel, BorderLayout.NORTH);
 
 		// Create label panel.
 		JPanel labelPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
@@ -159,6 +150,7 @@ public class TabPanelOrganization extends TabPanel {
 
 		// Prepare label
 		JLabel label = new JLabel(Msg.getString("TabPanelStructure.label"), JLabel.CENTER); //$NON-NLS-1$
+		label.setFont(new Font(Font.DIALOG, Font.ITALIC, 13));
 		labelPanel.add(label);
 
 		root = new DefaultMutableTreeNode(settlement.getName());
@@ -166,64 +158,50 @@ public class TabPanelOrganization extends TabPanel {
 		tree = new JTree(root);
 		tree.setVisibleRowCount(8);
 		tree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
-		//Listen for when the selection changes.
-//	    tree.addTreeSelectionListener(new MyTreeModelListener());
-	    
-		// Use treeSearchable
-//		TreeSearchable searchable = SearchableUtils.installSearchable(tree);
-//		searchable.setPopupTimeout(5000);
-//		searchable.setCaseSensitive(false);
-		
+
 		defaultTreeModel = new DefaultTreeModel(root);
 		tree.setModel(defaultTreeModel);
 
-		centerContentPanel.add(new JScrollPane(tree, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
-				ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER), BorderLayout.CENTER);
-	
+		content.setBorder(new MarsPanelBorder());
+		content.add(tree);
+
 		buildTreeNodes();
-		
+
 		initNodes();
 	}
-	
-//	ImageIcon leafIcon = createImageIcon("images/middle.gif");
-//	if (leafIcon != null) {
-//	    DefaultTreeCellRenderer renderer = 
-//	        new DefaultTreeCellRenderer();
-//	    renderer.setLeafIcon(leafIcon);
-//	    tree.setCellRenderer(renderer);
-//	}
-	
+
 	/**
 	 * Track tree changes
-	 * 
+	 *
 	 * @param e TreeSelectionEvent
 	 */
 	public void valueChanged(TreeSelectionEvent e) {
 		//Returns the last path element of the selection.
 		// This method is useful only when the selection model allows a single selection.
-		DefaultMutableTreeNode node = (DefaultMutableTreeNode)
-		                       tree.getLastSelectedPathComponent();
+//		DefaultMutableTreeNode node = (DefaultMutableTreeNode)
+//		                       tree.getLastSelectedPathComponent();
 
-	    if (node == null)
-	    //Nothing is selected.     
-	    return;
+//	    if (node == null)
+	    //Nothing is selected.
+//	    return;
 
-	    Object nodeInfo = node.getUserObject();
-	    if (node.isLeaf()) {
-	        ;
-	    } else {
-	       ; 
-	    }
+	    // Update nodes 
+//	    Object nodeInfo = node.getUserObject();
+//	    if (node.isLeaf()) {
+//	        ;
+//	    } else {
+//	       ;
+//	    }
 	}
-	
-	public void initNodes() {
-		
+
+	protected void initNodes() {
+
 		constructNodes();
-		
+
 		considerRoles();
-		
+
 		setupMouseOnNodes();
-		
+
 		for (int i = 0; i < tree.getRowCount(); i++)
 			tree.expandRow(i);
 	}
@@ -237,13 +215,13 @@ public class TabPanelOrganization extends TabPanel {
 		nodes.add(commanderStaffNode);
 		nodes.add(commanderNode);
 		nodes.add(subCommanderNode);
-		
+
 		divisionNode = new DefaultMutableTreeNode("Division");
 		mayorNode = new DefaultMutableTreeNode(RoleType.MAYOR.toString());
 
 		nodes.add(divisionNode);
 		nodes.add(mayorNode);
-		
+
 		agricultureNode = new DefaultMutableTreeNode("Agriculture");
 		agricultureSpecialistNode = new DefaultMutableTreeNode(
 				RoleType.AGRICULTURE_SPECIALIST.toString());
@@ -253,7 +231,17 @@ public class TabPanelOrganization extends TabPanel {
 		nodes.add(agricultureNode);
 		nodes.add(agricultureSpecialistNode);
 		nodes.add(agricultureChiefNode);
-		
+
+		computingNode = new DefaultMutableTreeNode("Computing");
+		computingSpecialistNode = new DefaultMutableTreeNode(
+				RoleType.COMPUTING_SPECIALIST.toString());
+		computingChiefNode = new DefaultMutableTreeNode(
+				RoleType.CHIEF_OF_COMPUTING.toString());
+
+		nodes.add(computingNode);
+		nodes.add(computingSpecialistNode);
+		nodes.add(computingChiefNode);
+
 		engineeringNode = new DefaultMutableTreeNode("Engineering");
 		engineeringSpecialistNode = new DefaultMutableTreeNode(
 				RoleType.ENGINEERING_SPECIALIST.toString());
@@ -263,7 +251,7 @@ public class TabPanelOrganization extends TabPanel {
 		nodes.add(engineeringNode);
 		nodes.add(engineeringSpecialistNode);
 		nodes.add(engineeringChiefNode);
-		
+
 		logisticNode = new DefaultMutableTreeNode("Logistic");
 		logisticSpecialistNode = new DefaultMutableTreeNode(
 				RoleType.LOGISTIC_SPECIALIST.toString());
@@ -273,7 +261,7 @@ public class TabPanelOrganization extends TabPanel {
 		nodes.add(logisticNode);
 		nodes.add(logisticSpecialistNode);
 		nodes.add(logisticChiefNode);
-		
+
 		missionNode = new DefaultMutableTreeNode("Mission");
 		missionSpecialistNode = new DefaultMutableTreeNode(
 				RoleType.MISSION_SPECIALIST.toString());
@@ -283,7 +271,7 @@ public class TabPanelOrganization extends TabPanel {
 		nodes.add(missionNode);
 		nodes.add(missionSpecialistNode);
 		nodes.add(missionChiefNode);
-		
+
 		safetyNode = new DefaultMutableTreeNode("Safety");
 		safetySpecialistNode = new DefaultMutableTreeNode(RoleType.SAFETY_SPECIALIST.toString());
 		safetyChiefNode = new DefaultMutableTreeNode(
@@ -292,7 +280,7 @@ public class TabPanelOrganization extends TabPanel {
 		nodes.add(safetyNode);
 		nodes.add(safetySpecialistNode);
 		nodes.add(safetyChiefNode);
-		
+
 		scienceNode = new DefaultMutableTreeNode("Science");
 		scienceSpecialistNode = new DefaultMutableTreeNode(
 				RoleType.SCIENCE_SPECIALIST.toString());
@@ -301,7 +289,7 @@ public class TabPanelOrganization extends TabPanel {
 		nodes.add(scienceNode);
 		nodes.add(scienceSpecialistNode);
 		nodes.add(scienceChiefNode);
-		
+
 		supplyNode = new DefaultMutableTreeNode("Supply");
 		supplySpecialistNode = new DefaultMutableTreeNode(
 				RoleType.RESOURCE_SPECIALIST.toString());
@@ -311,20 +299,24 @@ public class TabPanelOrganization extends TabPanel {
 		nodes.add(supplySpecialistNode);
 		nodes.add(supplyChiefNode);
 	}
-	
+
 	public void deleteAllNodes() {
 		nodes.clear();
 		root.removeAllChildren();
 	}
-	
+
 	public void constructNodes() {
 		int population = settlement.getNumCitizens();
 
 		if (population >= ChainOfCommand.POPULATION_WITH_CHIEFS) {
-			
+
 			divisionNode.add(agricultureNode);
 			agricultureNode.add(agricultureChiefNode);
 			agricultureNode.add(agricultureSpecialistNode);
+
+			divisionNode.add(computingNode);
+			computingNode.add(computingChiefNode);
+			computingNode.add(computingSpecialistNode);
 
 			divisionNode.add(engineeringNode);
 			engineeringNode.add(engineeringChiefNode);
@@ -351,11 +343,14 @@ public class TabPanelOrganization extends TabPanel {
 			supplyNode.add(supplySpecialistNode);
 
 		}
-		
+
 		else {
-			
+
 			divisionNode.add(agricultureNode);
 			agricultureNode.add(agricultureSpecialistNode);
+
+			divisionNode.add(computingNode);
+			computingNode.add(computingSpecialistNode);
 
 			divisionNode.add(engineeringNode);
 			engineeringNode.add(engineeringSpecialistNode);
@@ -376,20 +371,20 @@ public class TabPanelOrganization extends TabPanel {
 			supplyNode.add(supplySpecialistNode);
 		}
 
-		
+
 		if (population >= ChainOfCommand.POPULATION_WITH_MAYOR) {
 			root.add(commanderStaffNode);
 			commanderStaffNode.add(mayorNode);
 			commanderStaffNode.add(commanderNode);
 			commanderStaffNode.add(subCommanderNode);
 		}
-		
+
 		else if (population >= ChainOfCommand.POPULATION_WITH_SUB_COMMANDER) {
 			root.add(commanderStaffNode);
 			commanderStaffNode.add(commanderNode);
 			commanderStaffNode.add(subCommanderNode);
 		}
-		
+
 		else if (population >= ChainOfCommand.POPULATION_WITH_COMMANDER) {
 			root.add(commanderStaffNode);
 			commanderStaffNode.add(commanderNode);
@@ -397,67 +392,72 @@ public class TabPanelOrganization extends TabPanel {
 
 		root.add(divisionNode);
 	}
-	
-	
+
+
 	public void considerRoles() {
-		
+
 		Collection<Person> people = settlement.getAllAssociatedPeople(); // .getInhabitants();
 
 		for (Person p : people) {
 //			PersonListener personListener = new PersonListener();
 //			p.addUnitListener(personListener);
 //			listeners.put(p, personListener);
-			
+
 			addListener(p);
-			
+
 			roles.clear();
-			
+
 			RoleType rt = p.getRole().getType();
-			
+
 			roles.put(p, rt);
-			
+
 			if (rt == RoleType.COMMANDER) {
 				commanderNode.add(new DefaultMutableTreeNode(p));
 			} else if (rt == RoleType.SUB_COMMANDER) {
 				subCommanderNode.add(new DefaultMutableTreeNode(p));
 			} else if (rt == RoleType.MAYOR) {
 				mayorNode.add(new DefaultMutableTreeNode(p));
-				
+
 			} else if (rt == RoleType.CHIEF_OF_AGRICULTURE) {
 				agricultureChiefNode.add(new DefaultMutableTreeNode(p));
 			} else if (rt == RoleType.AGRICULTURE_SPECIALIST) {
 				agricultureSpecialistNode.add(new DefaultMutableTreeNode(p));
-				
+
+			} else if (rt == RoleType.CHIEF_OF_COMPUTING) {
+				computingChiefNode.add(new DefaultMutableTreeNode(p));
+			} else if (rt == RoleType.COMPUTING_SPECIALIST) {
+				computingSpecialistNode.add(new DefaultMutableTreeNode(p));
+
 			} else if (rt == RoleType.CHIEF_OF_ENGINEERING) {
 				engineeringChiefNode.add(new DefaultMutableTreeNode(p));
 			} else if (rt == RoleType.ENGINEERING_SPECIALIST) {
 				engineeringSpecialistNode.add(new DefaultMutableTreeNode(p));
-				
+
 			} else if (rt == RoleType.CHIEF_OF_LOGISTICS_N_OPERATIONS) {
 				logisticChiefNode.add(new DefaultMutableTreeNode(p));
 			} else if (rt == RoleType.LOGISTIC_SPECIALIST) {
 				logisticSpecialistNode.add(new DefaultMutableTreeNode(p));
-				
+
 			} else if (rt == RoleType.CHIEF_OF_MISSION_PLANNING) {
 				missionChiefNode.add(new DefaultMutableTreeNode(p));
 			} else if (rt == RoleType.MISSION_SPECIALIST) {
 				missionSpecialistNode.add(new DefaultMutableTreeNode(p));
-				
+
 			} else if (rt == RoleType.CHIEF_OF_SAFETY_N_HEALTH) {
 				safetyChiefNode.add(new DefaultMutableTreeNode(p));
 			} else if (rt == RoleType.SAFETY_SPECIALIST) {
 				safetySpecialistNode.add(new DefaultMutableTreeNode(p));
-				
+
 			} else if (rt == RoleType.CHIEF_OF_SCIENCE) {
 				scienceChiefNode.add(new DefaultMutableTreeNode(p));
 			} else if (rt == RoleType.SCIENCE_SPECIALIST) {
 				scienceSpecialistNode.add(new DefaultMutableTreeNode(p));
-				
+
 			} else if (rt == RoleType.CHIEF_OF_SUPPLY_N_RESOURCES) {
 				supplyChiefNode.add(new DefaultMutableTreeNode(p));
 			} else if (rt == RoleType.RESOURCE_SPECIALIST) {
 				supplySpecialistNode.add(new DefaultMutableTreeNode(p));
-				
+
 			} else {
 				// anyone who does not belong will be placed in the root node
 				DefaultMutableTreeNode node = new DefaultMutableTreeNode(p);
@@ -465,7 +465,7 @@ public class TabPanelOrganization extends TabPanel {
 			}
 		}
 	}
-	
+
 	public void setupMouseOnNodes() {
 		MouseListener ml = new MouseAdapter() {
 			public void mousePressed(MouseEvent e) {
@@ -480,13 +480,13 @@ public class TabPanelOrganization extends TabPanel {
 						if (node.getUserObject() instanceof Person) {
 							Person person = (Person) node.getUserObject();
 							if (person != null) {
-								desktop.openUnitWindow(person, false);
-							} 
+								getDesktop().openUnitWindow(person, false);
+							}
 
 //							update();
 //							tree.revalidate();
 //							tree.repaint();
-						} 
+						}
 //						else {
 //							update();
 //							tree.revalidate();
@@ -528,32 +528,12 @@ public class TabPanelOrganization extends TabPanel {
 		});
 	}
 
-//	public Person findPerson(String name) {
-//		// Person person = null;
-//		Collection<Person> people = settlement.getIndoorPeople();
-//		// List<Person> peopleList = new ArrayList<Person>(people);
-//		Person person = (Person) people.stream().filter(p -> p.getName() == name);
-//
-//		return person;
-//	}
 
-	/**
-	 * Updates the info on this panel.
-	 */
-	@Override
-	public void update() {
-		if (!uiDone)
-			initializeUI();
-		
-		// Check if anyone has a role change.
-	}
-	
-	
 	/**
 	 * Reload the root
 	 */
 	public void reloadTree() {
-		defaultTreeModel.reload(root); // notify changes to model 
+		defaultTreeModel.reload(root); // notify changes to model
 		tree.expandPath(tree.getSelectionPath());
 		for (int i = 0; i < tree.getRowCount(); i++)
 			tree.expandRow(i);
@@ -566,29 +546,29 @@ public class TabPanelOrganization extends TabPanel {
 
 		for (int i = 0; i < tree.getRowCount(); i++)
 			tree.collapseRow(i);
-	
+
 		deleteAllNodes();
 	}
-	
+
 	/**
 	 * Removes the listener for a person
 	 */
 	public void removeListener(Person p) {
 //		for (Person p : listeners.keySet()) {
-			p.removeUnitListener(listeners.get(p));		
+			p.removeUnitListener(listeners.get(p));
 //		}
-		listeners.remove(p);	
+		listeners.remove(p);
 	}
-	
+
 	/**
 	 * Removes the listener for a person
 	 */
 	public void addListener(Person p) {
 		PersonListener pl = new PersonListener();
 //		for (Person p : listeners.keySet()) {
-			p.addUnitListener(pl);		
+			p.addUnitListener(pl);
 //		}
-		listeners.put(p, pl);	
+		listeners.put(p, pl);
 	}
 	/**
 	 * PersonListener class listens to the change of each settler in a settlement.
@@ -597,15 +577,15 @@ public class TabPanelOrganization extends TabPanel {
 
 		/**
 		 * Catch unit update event.
-		 * 
+		 *
 		 * @param event the unit event.
 		 */
 		public void unitUpdate(UnitEvent event) {
 			if (event.getType() == UnitEventType.ROLE_EVENT) {
-				Object o = event.getSource();
+				Unit unit = (Unit)event.getSource();
 //				System.out.println(eventType);
-				if (o instanceof Person) {
-					Person p = (Person) o;
+				if (unit.getUnitType() == UnitType.PERSON) {
+					Person p = (Person) unit;
 					if (p.getAssociatedSettlement() == settlement) {
 //						String personName = p.getName();
 						RoleType rt = p.getRole().getType();
@@ -630,13 +610,13 @@ public class TabPanelOrganization extends TabPanel {
 
 		/**
 		 * Catch unit manager update event.
-		 * 
+		 *
 		 * @param event the unit event.
 		 */
 		public void unitManagerUpdate(UnitManagerEvent event) {
 			Unit unit = event.getUnit();
 			UnitManagerEventType eventType = event.getEventType();
-			if (unit instanceof Person) {
+			if (unit.getUnitType() == UnitType.PERSON) {
 				if (eventType == UnitManagerEventType.ADD_UNIT) {
 					// TODO: should only add/remove the affected person's listener and node
 					addListener((Person) unit);
@@ -645,7 +625,7 @@ public class TabPanelOrganization extends TabPanel {
 					initNodes();
 					reloadTree();
 				}
-				
+
 				else if (eventType == UnitManagerEventType.REMOVE_UNIT) {
 					// TODO: should only add/remove the affected person's listener and node
 					removeListener((Person) unit);
@@ -661,7 +641,13 @@ public class TabPanelOrganization extends TabPanel {
 	/**
 	 * Prepare object for garbage collection.
 	 */
+	@Override
 	public void destroy() {
+		super.destroy();
+		
+		UnitManager unitManager = getSimulation().getUnitManager();
+		unitManager.removeUnitManagerListener(UnitType.PERSON, unitManagerListener);
+		
 		// take care to avoid null exceptions
 		settlement = null;
 		infoPanel = null;

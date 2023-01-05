@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * SurfMarsMap.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-02
  * @author Scott Davis
  * @author Greg Whelan
  */
@@ -17,6 +17,7 @@ import org.mars_sim.mapdata.MapDataUtil;
  * for the map display. Map data is retrieved from a data file and stored in
  * memory.
  */
+@SuppressWarnings("serial")
 public class SurfMarsMap extends CannedMarsMap {
 
 	// The map type.

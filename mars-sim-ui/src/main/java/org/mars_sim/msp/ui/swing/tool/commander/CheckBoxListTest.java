@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * CheckBoxListTest.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Manny Kung
  */
 
@@ -28,12 +28,12 @@ public class CheckBoxListTest
             @Override
             public void run ()
             {
-                final CheckBoxListModel model = new CheckBoxListModel ();
-                model.add ( new CheckBoxCellData ( "Sample 1" ) );
-                model.add ( new CheckBoxCellData ( "Sample 2" ) );
-                model.add ( new CheckBoxCellData ( "Sample 3" ) );
+                final CheckBoxListModel<String> model = new CheckBoxListModel<String> ();
+                model.add ( new CheckBoxCellData<String> ( "Sample 1" ) );
+                model.add ( new CheckBoxCellData<String> ( "Sample 2" ) );
+                model.add ( new CheckBoxCellData<String> ( "Sample 3" ) );
 
-                final WebCheckBoxList list = new WebCheckBoxList ( StyleId.checkboxlist, model );
+                final WebCheckBoxList<String> list = new WebCheckBoxList<String> ( StyleId.checkboxlist, model );
 
                 list.setCheckBoxSelected ( 0, true );
                 list.setCheckBoxSelected ( 1, false );

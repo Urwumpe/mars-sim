@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * Conversation.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat;
 
 import java.io.PrintWriter;
@@ -5,6 +12,7 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -13,7 +21,7 @@ import org.mars.sim.console.chat.command.InteractiveChatCommand;
 import org.mars_sim.msp.core.Simulation;
 
 /**
- * Establishes a Converation with a user.
+ * Establishes a Conversation with a user.
  */
 public class Conversation implements UserOutbound {
 	
@@ -21,7 +29,6 @@ public class Conversation implements UserOutbound {
 	public static final String HISTORY_BACK_KEY = "up";
 	public static final String HISTORY_FORWARD_KEY = "down";
 	public static final String CANCEL_KEY = "escape";
-	private static final String PRESSED_PREFIX = "pressed ";
 	
     private static final Logger LOGGER = Logger.getLogger(Conversation.class.getName());
 	
@@ -39,26 +46,38 @@ public class Conversation implements UserOutbound {
 	private Object optionsPartial;
 
 	private Simulation sim;
+	private Set<ConversationRole> roles = null;
 	
 	/**
 	 * Start a conversation with the user using a Comms Channel starting with a certain command.
-	 * @param in
-	 * @param out
-	 * @param initial
+	 * @param comms an instance of UserChannel
+	 * @param initial an instance of InteractiveChatCommand
+	 * @param roles a set of ConversationRole
+	 * @param sim an instance of Simulation
 	 */
-	public Conversation(UserChannel comms, InteractiveChatCommand initial, Simulation sim) {
+	public Conversation(UserChannel comms, InteractiveChatCommand initial, Set<ConversationRole> roles,
+						Simulation sim) {
 		this.current = initial;
         this.active = true;
         this.comms = comms;
+        this.roles = roles;
         this.previous = new Stack<>();
         this.inputHistory = new ArrayList<>();
         
         this.sim = sim;
 
-        comms.registerHandler(PRESSED_PREFIX + AUTO_COMPLETE_KEY.toUpperCase(), this, false);
-        comms.registerHandler(PRESSED_PREFIX + HISTORY_BACK_KEY.toUpperCase(), this, false);
-        comms.registerHandler(PRESSED_PREFIX + HISTORY_FORWARD_KEY.toUpperCase(), this, false);
-        comms.registerHandler(PRESSED_PREFIX + CANCEL_KEY.toUpperCase(), this, true);
+        comms.registerHandler(AUTO_COMPLETE_KEY, this, false);
+        comms.registerHandler(HISTORY_BACK_KEY, this, false);
+        comms.registerHandler(HISTORY_FORWARD_KEY, this, false);
+        comms.registerHandler(CANCEL_KEY, this, true);
+	}
+	
+	/**
+	 * The list of stacked commands in the current conversation. It does not include
+	 * the current command; only those stacked.
+	 */
+	public List<InteractiveChatCommand> getCommandStack() {
+		return previous;
 	}
 	
 	public InteractiveChatCommand getCurrentCommand() {
@@ -101,22 +120,33 @@ public class Conversation implements UserOutbound {
 	        	lastCurrent = current;
 			}
 			
-        	// Get input
-			String prompt = current.getPrompt() + " > ";
-        	String input = getInput(prompt);
-        	options = null; // Remove any auto complete options once user executes
-        	
-        	// Update history
-        	inputHistory.add(input);
-        	historyIdx = inputHistory.size();
+	      	try {
+	        	// Get input
+				String prompt = current.getPrompt(this) + " > ";
+	        	String input = getInput(prompt);
+	        	options = null; // Remove any auto complete options once user executes
+	        	
+	        	// Update history
+	        	boolean addToHistory = true; 
+	        	if (!inputHistory.isEmpty()) {
+	        		// Do not accept repeated commands
+	        		String lastCommand = inputHistory.get(inputHistory.size() - 1);
+	        		addToHistory = !input.equals(lastCommand);
+	        	}
+	        	if (addToHistory) {
+	        		inputHistory.add(input);
+	        	}
+	        	
+	        	// Always set the history pointer to the most recent command
+        		historyIdx = inputHistory.size();
 
-        	// Execute and trap exceptino to not break conversation
-        	LOGGER.fine("Entered " + input);
-        	try {
+	        	// Execute and trap exception to not break conversation
+	        	LOGGER.fine("Entered " + input);
+  
         		current.execute(this, input);
         	}
         	catch (RuntimeException rte) {
-        		LOGGER.log(Level.SEVERE, "Problem executing command " + input, rte);
+        		LOGGER.log(Level.SEVERE, "Problem executing command ", rte);
         		
         		StringWriter writer = new StringWriter();
         		PrintWriter out = new PrintWriter(writer);
@@ -164,10 +194,7 @@ public class Conversation implements UserOutbound {
 	 * User has pressed a special key that is listened for.
 	 * @param keyStroke Key pressed
 	 */
-	public void keyStrokeApplied(String keyStroke) {
-		// String out actual key
-		String key = keyStroke.substring(PRESSED_PREFIX.length()).toLowerCase();
-		
+	public void keyStrokeApplied(String key) { 		
 		switch(key) {
 		case AUTO_COMPLETE_KEY:
 			autoComplete();
@@ -242,6 +269,21 @@ public class Conversation implements UserOutbound {
 		}
 	}
 
+	public Set<ConversationRole> getRoles() {
+		return roles;
+	}
+	
+	public void setRoles(Set<ConversationRole> newRoles) {
+		this.roles = newRoles;
+		
+		// Clear the stacked interact commands
+		current.resetCache(this);
+		
+		for (InteractiveChatCommand i : previous) {
+			i.resetCache(this);
+		}
+	}
+	
 	public Simulation getSim() {
 		return sim;
 	}
@@ -260,7 +302,7 @@ public class Conversation implements UserOutbound {
 				newLevel = Integer.parseInt(response);
 			}
 			catch (NumberFormatException e) {
-				println("Sorry must neter a valid input");
+				println("Sorry, not a valid entry.");
 			}
 		}
 		return newLevel;

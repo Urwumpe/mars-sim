@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * EmergencySupplyMissionCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -17,10 +17,10 @@ import java.util.Map;
 import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.goods.Good;
 import org.mars_sim.msp.core.person.ai.mission.EmergencySupply;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
-import org.mars_sim.msp.core.structure.goods.Good;
 
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.scroll.WebScrollPane;
@@ -29,6 +29,7 @@ import com.alee.laf.table.WebTable;
 /**
  * A panel for displaying emergency supply mission information.
  */
+@SuppressWarnings("serial")
 public class EmergencySupplyMissionCustomInfoPanel
 extends MissionCustomInfoPanel {
 

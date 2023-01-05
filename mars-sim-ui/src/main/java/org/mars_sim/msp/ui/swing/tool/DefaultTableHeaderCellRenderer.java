@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * DefaultTableHeaderCellRenderer.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Manny Kung
  */
 
@@ -33,6 +33,7 @@ import javax.swing.table.JTableHeader;
  *
  * @author Darryl
  */
+@SuppressWarnings("serial")
 public class DefaultTableHeaderCellRenderer extends DefaultTableCellRenderer {
 
   /**
@@ -100,6 +101,8 @@ public class DefaultTableHeaderCellRenderer extends DefaultTableCellRenderer {
           return UIManager.getIcon("Table.ascendingSortIcon");
         case DESCENDING:
           return UIManager.getIcon("Table.descendingSortIcon");
+	default:
+		break;
       }
     }
     return null;

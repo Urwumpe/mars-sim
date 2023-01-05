@@ -1,36 +1,31 @@
-/**
+/*
  * Mars Simulation Project
  * StudyFieldSamples.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-17
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.malfunction.MalfunctionManager;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.environment.ExploredLocation;
+import org.mars_sim.msp.core.equipment.ResourceHolder;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
-import org.mars_sim.msp.core.mars.ExploredLocation;
-import org.mars_sim.msp.core.mars.MarsSurface;
-import org.mars_sim.msp.core.mars.MineralMap;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
-import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.mission.Exploration;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
@@ -47,16 +42,13 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
 /**
  * A task for studying collected field samples (rocks, etc).
  */
-public class StudyFieldSamples extends Task implements ResearchScientificStudy, Serializable {
+public class StudyFieldSamples extends Task implements ResearchScientificStudy {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(StudyFieldSamples.class.getName());
-
-	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-			logger.getName().length());
+	private static SimLogger logger = SimLogger.getLogger(StudyFieldSamples.class.getName());
 
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.studyFieldSamples"); //$NON-NLS-1$
@@ -68,7 +60,7 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 	private static final TaskPhase STUDYING_SAMPLES = new TaskPhase(Msg.getString("Task.phase.studyingSamples")); //$NON-NLS-1$
 
 	/** Mass (kg) of field sample to study. */
-	public static final double SAMPLE_MASS = 1D;
+	public static final double SAMPLE_MASS = .5;
 
 	private static final double ESTIMATE_IMPROVEMENT_FACTOR = 5D;
 
@@ -80,7 +72,7 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 	/** The science that is being researched. */
 	private ScienceType science;
 	/** The lab's associated malfunction manager. */
-	private MalfunctionManager malfunctions;
+	private Malfunctionable malfunctions;
 	/** The research assistant. */
 	private Person researchAssistant;
 
@@ -90,27 +82,31 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 	 * @param person {@link Person} the person performing the task.
 	 */
 	public StudyFieldSamples(Person person) {
-		// Use Task constructor.
-		super(NAME, person, true, false, STRESS_MODIFIER, true, 10D + RandomUtil.getRandomDouble(40D));
-
+		// Use Task constructor. Skill determined on the science
+		super(NAME, person, true, false, STRESS_MODIFIER, null, 10D, 20D + RandomUtil.getRandomDouble(20D));
+		
+		setExperienceAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
+		
 		// Determine study.
 		study = determineStudy();
 		if (study != null) {
 			science = study.getContribution(person);
 			if (science != null) {
+				addAdditionSkill(science.getSkill());
+				
 				lab = getLocalLab(person, science);
 				if (lab != null) {
 					addPersonToLab();
 				} else {
-					logger.info("lab could not be determined.");
+					logger.log(person, Level.WARNING, 0, "lab could not be determined.");
 					endTask();
 				}
 			} else {
-				logger.info("science could not be determined");
+				logger.log(person, Level.WARNING, 0, "science could not be determined");
 				endTask();
 			}
 		} else {
-			logger.info("study could not be determined");
+			logger.log(person, Level.WARNING, 0, "study could not be determined");
 			endTask();
 		}
 
@@ -119,30 +115,9 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 			endTask();
 		}
 
-		// Take field samples from inventory.
-		if (!isDone()) {
-			Unit container = person.getContainerUnit();
-			if (!(container instanceof MarsSurface)) {
-				Inventory inv = container.getInventory();
-				double totalRockSampleMass = inv.getAmountResourceStored(ResourceUtil.rockSamplesID, false);
-				if (totalRockSampleMass >= SAMPLE_MASS) {
-					double fieldSampleMass = RandomUtil.getRandomDouble(SAMPLE_MASS * 2D);
-					if (fieldSampleMass > totalRockSampleMass) {
-						fieldSampleMass = totalRockSampleMass;
-					}
-					inv.retrieveAmountResource(ResourceUtil.rockSamplesID, fieldSampleMass);
-				}
-			}
-		}
-
 		// Initialize phase
 		addPhase(STUDYING_SAMPLES);
 		setPhase(STUDYING_SAMPLES);
-	}
-
-	@Override
-	public FunctionType getLivingFunction() {
-		return FunctionType.RESEARCH;
 	}
 
 	/**
@@ -153,7 +128,7 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 	public static List<ScienceType> getFieldSciences() {
 
 		// Create list of possible sciences for studying field samples.
-		List<ScienceType> fieldSciences = new ArrayList<ScienceType>(3);
+		List<ScienceType> fieldSciences = new ArrayList<>();
 		fieldSciences.add(ScienceType.AREOLOGY);
 		fieldSciences.add(ScienceType.ASTRONOMY);
 		fieldSciences.add(ScienceType.BIOLOGY);
@@ -213,7 +188,7 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 
 		// Add all collaborative studies with appropriate sciences and in research
 		// phase.
-		Iterator<ScientificStudy> i = scientificStudyManager.getOngoingCollaborativeStudies(person).iterator();
+		Iterator<ScientificStudy> i = person.getCollabStudies().iterator();
 		while (i.hasNext()) {
 			ScientificStudy collabStudy = i.next();
 			if (ScientificStudy.RESEARCH_PHASE.equals(collabStudy.getPhase())
@@ -272,8 +247,7 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 
 		if (labBuildings.size() > 0) {
 			Map<Building, Double> labBuildingProbs = BuildingManager.getBestRelationshipBuildings(person, labBuildings);
-			Building building = RandomUtil.getWeightedRandomObject(labBuildingProbs);
-			result = (Research) building.getFunction(FunctionType.RESEARCH);
+			result = RandomUtil.getWeightedRandomObject(labBuildingProbs).getResearch();
 		}
 
 		return result;
@@ -359,34 +333,22 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 		try {
 			if (person.isInSettlement()) {
 				Building labBuilding = ((Research) lab).getBuilding();
-
 				// Walk to lab building.
-				walkToTaskSpecificActivitySpotInBuilding(labBuilding, false);
+				walkToResearchSpotInBuilding(labBuilding, false);
 				lab.addResearcher();
-				malfunctions = labBuilding.getMalfunctionManager();
-			} else if (person.isInVehicle()) {
-
+				malfunctions = labBuilding;
+			} 
+			else if (person.isInVehicle()) {
 				// Walk to lab internal location in rover.
 				walkToLabActivitySpotInRover((Rover) person.getVehicle(), false);
 				lab.addResearcher();
-				malfunctions = person.getVehicle().getMalfunctionManager();
+				malfunctions = person.getVehicle();
 			}
 		} catch (Exception e) {
 			logger.log(Level.SEVERE, "addPersonToLab(): " + e.getMessage());
 		}
 	}
 
-	@Override
-	protected void addExperience(double time) {
-		// Add experience to relevant science skill
-		// (1 base experience point per 10 millisols of research time)
-		// Experience points adjusted by person's "Academic Aptitude" attribute.
-		double newPoints = time / 10D;
-		int academicAptitude = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
-		newPoints += newPoints * ((double) academicAptitude - 50D) / 100D;
-		newPoints *= getTeachingExperienceModifier();
-		person.getSkillManager().addExperience(science.getSkill(), newPoints, time);
-	}
 
 	/**
 	 * Gets the effective research time based on the person's science skill.
@@ -422,18 +384,6 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 		return researchTime;
 	}
 
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(1);
-		results.add(science.getSkill());
-		return results;
-	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		SkillManager manager = person.getSkillManager();
-		return manager.getEffectiveSkillLevel(science.getSkill());
-	}
 
 	@Override
 	protected double performMappedPhase(double time) {
@@ -454,30 +404,68 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 	 */
 	private double studyingSamplesPhase(double time) {
 		// If person is incapacitated, end task.
-		if (person.getPerformanceRating() == 0D) {
+		if (person.getPerformanceRating() <= .1) {
 			endTask();
+			return time;
 		}
 
+		if (!person.isBarelyFit()) {
+        	endTask();
+	      	return time;
+		}
+		
 		// Check for laboratory malfunction.
-		if (malfunctions.hasMalfunction()) {
+		if (malfunctions.getMalfunctionManager().hasMalfunction()) {
 			endTask();
+			return time;
 		}
 
 		// Check if research in study is completed.
-		boolean isPrimary = study.getPrimaryResearcher().equals(person);
-
+		if (isDone()) {
+			endTask();
+			return time;
+		}
 
 		// Check if person is in a moving rover.
 		if (Vehicle.inMovingRover(person)) {
 			endTask();
-		}
-
-		if (isDone()) {
 			return time;
 		}
 
+		// Take field samples from inventory.
+		if (!isDone()) {
+			Unit container = person.getContainerUnit();
+			if (container.getUnitType() != UnitType.PLANET) {
+				double mostStored = 0D;
+	            int bestID = 0;
+	            if (container instanceof ResourceHolder) {
+	            	for (int i: ResourceUtil.rockIDs) {
+		            	double stored = ((ResourceHolder)container).getAmountResourceStored(i);
+		            	if (mostStored < stored) {
+		            		mostStored = stored;
+		            		bestID = i;
+		            	}
+		            }
+		            if (mostStored < SAMPLE_MASS) {
+		            	endTask();
+	                }
+	            }
+				
+				double fieldSampleMass = RandomUtil.getRandomDouble(SAMPLE_MASS/20.0, SAMPLE_MASS/10.0);
+				if (mostStored >= fieldSampleMass) {
+					if (fieldSampleMass > mostStored) {
+						fieldSampleMass = mostStored;
+					}
+					((ResourceHolder)container).retrieveAmountResource(bestID, fieldSampleMass);
+					// Record the amount of rock samples being studied
+					person.getAssociatedSettlement().addResourceCollected(bestID, fieldSampleMass);
+				}
+			}
+		}
+		
 		// Add research work time to study.
 		double researchTime = getEffectiveResearchTime(time);
+		boolean isPrimary = study.getPrimaryResearcher().equals(person);
 		if (isPrimary) {
 			study.addPrimaryResearchWorkTime(researchTime);
 		} else {
@@ -486,22 +474,20 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 
 		if (isPrimary) {
 			if (study.isPrimaryResearchCompleted()) {
-				LogConsolidated.flog(Level.INFO, 0, sourceName,
-						"[" + person.getLocationTag().getLocale() + "] " + person.getName() + " just spent "
-								+ Math.round(study.getPrimaryResearchWorkTimeCompleted() * 10.0) / 10.0
-								+ " millisols in studying the field samples for a primary research study in "
-								+ study.getScience().getName() + " in "
-								+ person.getLocationTag().getImmediateLocation());
+				logger.log(worker, Level.INFO, 0, "Completed studying field samples for "
+						+ "a primary research study on " 
+						+ study.getName() +	" in "
+						+ Math.round(study.getPrimaryResearchWorkTimeCompleted() * 10.0) / 10.0
+						+ " millisols.");
 				endTask();
 			}
 		} else {
 			if (study.isCollaborativeResearchCompleted(person)) {
-				LogConsolidated.flog(Level.INFO, 0, sourceName,
-						"[" + person.getLocationTag().getLocale() + "] " + person.getName() + " just spent "
-								+ Math.round(study.getCollaborativeResearchWorkTimeCompleted(person) * 10.0) / 10.0
-								+ " millisols in studying the field samples for a collaborative research study in " 
-								+ study.getScience().getName() + " in "
-								+ person.getLocationTag().getImmediateLocation());
+				logger.log(worker, Level.INFO, 0,"Completed studying field samples for "
+						+ "a collaborative research study on " 
+						+ study.getName() +	" in "
+						+ Math.round(study.getCollaborativeResearchWorkTimeCompleted(person) * 10.0) / 10.0
+						+ " millisols.");
 				endTask();
 			}
 		}
@@ -514,45 +500,9 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 		addExperience(researchTime);
 
 		// Check for lab accident.
-		checkForAccident(time);
+		checkForAccident(malfunctions, 0.005D, time);
 
 		return 0D;
-	}
-
-	/**
-	 * Check for accident in laboratory.
-	 * 
-	 * @param time the amount of time researching (in millisols)
-	 */
-	private void checkForAccident(double time) {
-
-		double chance = .005D;
-
-		// Science skill modification.
-		int skill = person.getSkillManager().getEffectiveSkillLevel(science.getSkill());
-		if (skill <= 3) {
-			chance *= (4 - skill);
-		} else {
-			chance /= (skill - 2);
-		}
-
-		Malfunctionable entity = null;
-		if (lab instanceof Research) {
-			entity = ((Research) lab).getBuilding();
-		} else {
-			entity = person.getVehicle();
-		}
-
-		if (entity != null) {
-
-			// Modify based on the entity's wear condition.
-			chance *= entity.getMalfunctionManager().getWearConditionAccidentModifier();
-
-			if (RandomUtil.lessThanRandPercent(chance * time)) {
-//                logger.info("[" + person.getLocationTag().getShortLocationName() +  "] " + person.getName() + " has a lab accident while studying field samples.");
-				entity.getMalfunctionManager().createASeriesOfMalfunctions(person);
-			}
-		}
 	}
 
 	/**
@@ -561,40 +511,16 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 	 * @param time the amount of time available (millisols).
 	 */
 	private void improveMineralConcentrationEstimates(double time) {
-		double probability = (time / 1000D) * getEffectiveSkillLevel() * ESTIMATE_IMPROVEMENT_FACTOR;
-		if (RandomUtil.getRandomDouble(1.0D) <= probability) {
+		ExploredLocation site = determineExplorationSite();
+		if (site != null) {
+			double probability = (time / 1000D) * getEffectiveSkillLevel() * ESTIMATE_IMPROVEMENT_FACTOR;
+			if ((site.getNumEstimationImprovement() == 0) || (RandomUtil.getRandomDouble(1.0D) <= probability)) {
+				ExploreSite.improveSiteEstimates(site, getEffectiveSkillLevel());
 
-			// Determine explored site to improve estimations.
-			ExploredLocation site = determineExplorationSite();
-			if (site != null) {
-				MineralMap mineralMap = surfaceFeatures.getMineralMap();
-				Map<String, Double> estimatedMineralConcentrations = site.getEstimatedMineralConcentrations();
-				Iterator<String> i = estimatedMineralConcentrations.keySet().iterator();
-				while (i.hasNext()) {
-					String mineralType = i.next();
-					double actualConcentration = mineralMap.getMineralConcentration(mineralType, site.getLocation());
-					double estimatedConcentration = estimatedMineralConcentrations.get(mineralType);
-					double estimationDiff = Math.abs(actualConcentration - estimatedConcentration);
-					double estimationImprovement = RandomUtil.getRandomDouble(1D * getEffectiveSkillLevel());
-					if (estimationImprovement > estimationDiff) {
-						estimationImprovement = estimationDiff;
-					}
-					if (estimatedConcentration < actualConcentration) {
-						estimatedConcentration += estimationImprovement;
-					} else {
-						estimatedConcentration -= estimationImprovement;
-					}
-					estimatedMineralConcentrations.put(mineralType, estimatedConcentration);
-				}
-
-				// Add to site mineral concentration estimation improvement number.
-				site.addEstimationImprovement();
-				LogConsolidated.flog(Level.FINE, 5000, sourceName, "[" + person.getLocationTag().getLocale() + "] "
-						+ person.getName() + " was studying field samples at " + site.getLocation().getFormattedString() 
+				logger.log(worker, Level.INFO, 5_000, "Studying field samples at " 
+						+ site.getLocation().getFormattedString() 
 						+ ". Estimation Improvement: "
-						+ site.getNumEstimationImprovement() + ".");
-//				logger.fine("Explored site " + site.getLocation().getFormattedString() + " estimation improvement: "
-//						+ site.getNumEstimationImprovement() + " from studying field samples");
+						+ site.getNumEstimationImprovement());
 			}
 		}
 	}
@@ -673,13 +599,12 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 	}
 
 	@Override
-	public void endTask() {
-		super.endTask();
-
+	protected void clearDown() {
 		// Remove person from lab so others can use it.
 		try {
 			if (lab != null) {
 				lab.removeResearcher();
+				lab = null;
 			}
 		} catch (Exception e) {
 		}
@@ -710,14 +635,4 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy, 
 		this.researchAssistant = researchAssistant;
 	}
 
-	@Override
-	public void destroy() {
-		super.destroy();
-
-		study = null;
-		lab = null;
-		science = null;
-		malfunctions = null;
-		researchAssistant = null;
-	}
 }

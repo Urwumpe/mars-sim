@@ -1,13 +1,10 @@
-/**
+/*
  * Mars Simulation Project
  * ConstructionVehicleType.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-15
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.core.structure.construction;
-
-import org.mars_sim.msp.core.resource.Part;
 
 import java.io.Serializable;
 import java.util.List;

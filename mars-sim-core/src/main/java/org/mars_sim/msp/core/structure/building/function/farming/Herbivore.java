@@ -1,10 +1,16 @@
+/**
+ * Mars Simulation Project
+ * Herbivore.java
+ * @version 3.2.0 2021-06-20
+ * @author Manny Kung
+ */
+
 // File: Herbivore.java from the package edu.colorado.simulations
 // Complete documentation is available from the Herbivore link in
-//   http://www.cs.colorado.edu/~main/docs /
+// http://www.cs.colorado.edu/~main/docs /
 
 package org.mars_sim.msp.core.structure.building.function.farming;
 
-import java.io.Serializable;
 
 /******************************************************************************
 * A <CODE>Herbivore</CODE> is an <CODE>Animal</CODE> with extra methods that
@@ -18,13 +24,13 @@ import java.io.Serializable;
 * @author Michael Main 
 *   <A HREF="mailto:main@colorado.edu"> (main@colorado.edu) </A>
 *
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
 *
 * @see Animal
 * @see Plant
 ******************************************************************************/
 
-public class Herbivore extends Animal implements Serializable {
+public class Herbivore extends Animal {
 	
 	/** default serial id. */
     private static final long serialVersionUID = 1L;

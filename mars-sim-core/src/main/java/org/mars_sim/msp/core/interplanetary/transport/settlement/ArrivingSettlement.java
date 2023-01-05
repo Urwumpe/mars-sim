@@ -1,49 +1,24 @@
-/**
+/*
  * Mars Simulation Project
  * ArrivingSettlement.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-10-11
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.interplanetary.transport.settlement;
 
 import java.io.Serializable;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.UnitManager;
-import org.mars_sim.msp.core.UnitType;
-import org.mars_sim.msp.core.equipment.Equipment;
-import org.mars_sim.msp.core.equipment.EquipmentFactory;
-import org.mars_sim.msp.core.events.HistoricalEvent;
 import org.mars_sim.msp.core.interplanetary.transport.TransitState;
-import org.mars_sim.msp.core.interplanetary.transport.TransportEvent;
 import org.mars_sim.msp.core.interplanetary.transport.Transportable;
-import org.mars_sim.msp.core.person.EventType;
-import org.mars_sim.msp.core.person.Favorite;
-import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PersonConfig;
-import org.mars_sim.msp.core.person.GenderType;
-import org.mars_sim.msp.core.person.ai.job.JobUtil;
-import org.mars_sim.msp.core.person.ai.social.RelationshipManager;
-import org.mars_sim.msp.core.resource.AmountResource;
-import org.mars_sim.msp.core.resource.Part;
-import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.RobotType;
-import org.mars_sim.msp.core.robot.ai.job.RobotJob;
+import org.mars_sim.msp.core.structure.InitialSettlement;
 import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.structure.SettlementConfig;
-import org.mars_sim.msp.core.structure.SettlementTemplate;
+import org.mars_sim.msp.core.structure.SettlementBuilder;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
-import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
-import org.mars_sim.msp.core.vehicle.Rover;
-import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * A new arriving settlement from Earth.
@@ -53,63 +28,69 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	/** default logger. */
-	private static Logger logger = Logger.getLogger(ArrivingSettlement.class.getName());
-
 	// Data members.
 	private int populationNum;
 	private int numOfRobots;
-	private int scenarioID;
+	private int templateID;
 	
 	private String name;
 	private String template;
 	
-	private TransitState transitState;
+	private TransitState transitState = TransitState.PLANNED;
 	private MarsClock launchDate;
 	private MarsClock arrivalDate;
 	private Coordinates landingLocation;
-	
-	private static UnitManager unitManager = Simulation.instance().getUnitManager();
-	private static RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
-	private static SettlementConfig settlementConfig = SimulationConfig.instance().getSettlementConfiguration();
+
+	private String sponsorCode;
+
+	private int arrivalSols;
 	
 	/**
 	 * Constructor.
 	 * 
 	 * @param name            the name of the arriving settlement.
 	 * @param template        the design template for the settlement.
-	 * @param arrivalDate     the arrival date.
+	 * @param sponsor 
+	 * @param arrivalSols     the arrival in terms of Sols in the future.
 	 * @param landingLocation the landing location.
 	 * @param populationNum   the population of new immigrants arriving with the
 	 *                        settlement.
 	 * @param numOfRobots     the number of new robots.
 	 */
-	public ArrivingSettlement(String name, String template, MarsClock arrivalDate, Coordinates landingLocation,
+	public ArrivingSettlement(String name, String template, String sponsorCode,
+			int arrivalSols, Coordinates landingLocation,
 			int populationNum, int numOfRobots) {
 		this.name = name;
 		this.template = template;
-		this.arrivalDate = arrivalDate;
+		this.sponsorCode = sponsorCode;
+		this.arrivalSols = arrivalSols;
 		this.landingLocation = landingLocation;
 		this.populationNum = populationNum;
 		this.numOfRobots = numOfRobots;
+		
+//		arrivalDate = new MarsClock(Simulation.instance().getMasterClock().getMarsClock());
+//		arrivalDate.addTime(
+//			(arrivalSols - 1) * 1000D
+//			+ 100 
+//			+ RandomUtil.getRandomDouble(890));
 	}
 
 	/**
-	 * Gets the scenarioID of the arriving settlement.
+	 * Gets the templateID of the arriving settlement.
 	 * 
-	 * @return settlement scenarioID
+	 * @return settlement templateID
 	 */
-	public int getScenarioID() {
-		return scenarioID;
+	public int getTemplateID() {
+		return templateID;
 	}
 
 	/**
-	 * Sets the scenarioID of the arriving settlement.
+	 * Sets the templateID of the arriving settlement.
 	 * 
 	 * @param settlement id
 	 */
-	public void setScenarioID(int id) {
-		scenarioID = id;
+	public void setTemplateID(int id) {
+		templateID = id;
 	}
 
 	/**
@@ -149,6 +130,23 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	}
 
 	/**
+	 * Gets the Sponsor of the settlement.
+	 * 
+	 * @return sponsor
+	 */
+	public String getSponsorCode() {
+		return sponsorCode;
+	}
+	
+	/**
+	 * Sets the sponsor of the Arriving Settlement
+	 * @param sponsor
+	 */
+	public void setSponsorCode(String sponsor) {
+		this.sponsorCode = sponsor;
+	}
+	
+	/**
 	 * Gets the transit state of the settlement.
 	 * 
 	 * @return transit state string.
@@ -185,6 +183,14 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	}
 
 	/**
+	 * The original arrival delay
+	 * @return
+	 */
+	public int getArrivalSols() {
+		return arrivalSols;
+	}
+	
+	/**
 	 * Gets the arrival date of the settlement.
 	 * 
 	 * @return the arrival date.
@@ -207,6 +213,7 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	 * 
 	 * @return landing location coordinates.
 	 */
+	@Override
 	public Coordinates getLandingLocation() {
 		return landingLocation;
 	}
@@ -256,230 +263,6 @@ public class ArrivingSettlement implements Transportable, Serializable {
 		this.numOfRobots = numOfRobots;
 	}
 
-	/**
-	 * Commits a set of modifications for the arriving settlement.
-	 */
-	public void commitModification() {
-		HistoricalEvent newEvent = new TransportEvent(this, EventType.TRANSPORT_ITEM_MODIFIED,
-				"Arriving settlement mission modded", landingLocation.toString());
-		Simulation.instance().getEventManager().registerNewEvent(newEvent);
-	}
-
-	/**
-	 * Create the new arriving settlement.
-	 */
-	private Settlement createNewSettlement() {
-		// Create new settlement with unit manager.
-//		UnitManager unitManager = Simulation.instance().getUnitManager();
-		// Compute sid
-		scenarioID = 9; // NOTE: scenarioID will be updated later and NOT important here
-		// TODO: add the option of choosing sponsor
-		String sponsor = Msg.getString("ReportingAuthorityType.MarsSociety"); //$NON-NLS-1$ //"Mars Society (MS)";
-
-		Settlement newSettlement = Settlement.createNewSettlement(name, scenarioID, template, sponsor, landingLocation,
-				populationNum, numOfRobots);
-		newSettlement.initialize();
-		unitManager.addUnit(newSettlement);
-	
-		// Add new settlement to credit manager.
-		Simulation.instance().getCreditManager().addSettlement(newSettlement);
-
-		return newSettlement;
-	}
-
-	/**
-	 * Create the new immigrants arriving with the settlement.
-	 * 
-	 * @param newSettlement the new settlement.
-	 */
-	private void createNewImmigrants(Settlement newSettlement) {
-
-		Collection<Person> immigrants = new ConcurrentLinkedQueue<Person>();
-//		UnitManager unitManager = Simulation.instance().getUnitManager();
-//		RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
-		for (int x = 0; x < populationNum; x++) {
-			PersonConfig personConfig = SimulationConfig.instance().getPersonConfig();
-			GenderType gender = GenderType.FEMALE;
-			if (RandomUtil.getRandomDouble(1.0D) <= personConfig.getGenderRatio())
-				gender = GenderType.MALE;
-//			String birthplace = "Earth"; // TODO: randomize from list of countries/federations
-			String immigrantName = unitManager.getNewName(UnitType.PERSON, null, gender, null);
-			String sponsor = newSettlement.getSponsor();
-			String country = UnitManager.getCountry(sponsor);
-			// Person immigrant = new Person(immigrantName, gender, country, newSettlement,
-			// sponsor);
-			// Use Builder Pattern for creating an instance of Person
-			Person immigrant = Person.create(immigrantName, newSettlement)
-					.setGender(gender)
-					.setCountry(country)
-					.setSponsor(sponsor)
-					.setSkill(null)
-					.setPersonality(null, null)
-					.setAttribute(null)
-					.build();
-			immigrant.initialize();
-
-			// Initialize favorites and preferences.
-			Favorite favorites = immigrant.getFavorite();
-			favorites.setFavoriteMainDish(favorites.getRandomMainDish());
-			favorites.setFavoriteSideDish(favorites.getRandomSideDish());
-			favorites.setFavoriteDessert(favorites.getRandomDessert());
-			favorites.setFavoriteActivity(favorites.getARandomFavoriteType());
-			immigrant.getPreference().initializePreference();
-
-			// Assign a job by calling getInitialJob
-			immigrant.getMind().getInitialJob(JobUtil.MISSION_CONTROL);
-
-			unitManager.addUnit(immigrant);
-			relationshipManager.addNewImmigrant(immigrant, immigrants);
-			immigrants.add(immigrant);
-			logger.info(immigrantName + " arrives on Mars at " + newSettlement.getName());
-		}
-
-		// Update command/governance and work shift schedules at settlement with new
-		// immigrants.
-		if (immigrants.size() > 0) {
-
-			int popSize = newSettlement.getNumCitizens();
-
-			// Reset work shift schedules at settlement.
-			unitManager.setupShift(newSettlement, popSize);
-		
-			// Reset command/government system at settlement.
-			newSettlement.getChainOfCommand().establishSettlementGovernance(newSettlement);
-
-//			// Assign a role to each person
-//			unitManager.assignRoles(newSettlement);
-		}
-	}
-
-	/**
-	 * Create the new settlement's robots.
-	 * 
-	 * @param newSettlement the new settlement.
-	 */
-	private void createNewRobots(Settlement newSettlement) {
-
-//		UnitManager unitManager = Simulation.instance().getUnitManager();
-		for (int x = 0; x < numOfRobots; x++) {
-
-			// Get a robotType randomly
-			RobotType robotType = unitManager.getABot(newSettlement, numOfRobots);
-
-			// Create arriving robot.
-			// Adopt Static Factory Method and Factory Builder Pattern
-			Robot robot = Robot
-					.create(unitManager.getNewName(UnitType.ROBOT, null, null, robotType), newSettlement, robotType)
-					.setCountry("Earth")
-					.setSkill(null, robotType)
-					.setAttribute(null)
-					.build();
-			robot.initialize();
-
-			unitManager.addUnit(robot);
-
-			// Initialize robot job.
-			String jobName = RobotJob.getName(robotType);
-			if (jobName != null) {
-				RobotJob robotJob = JobUtil.getRobotJob(robotType.getName());
-				if (robotJob != null) {
-					robot.getBotMind().setRobotJob(robotJob, true);
-				}
-			}
-		}
-	}
-
-	/**
-	 * Create the new settlement's equipment.
-	 * 
-	 * @param newSettlement the new settlement.
-	 */
-	private void createNewEquipment(Settlement newSettlement) {
-
-		SettlementTemplate template = settlementConfig
-				.getSettlementTemplate(getTemplate());
-		Iterator<String> equipmentI = template.getEquipment().keySet().iterator();
-		while (equipmentI.hasNext()) {
-			String equipmentType = equipmentI.next();
-			int number = template.getEquipment().get(equipmentType);
-			for (int x = 0; x < number; x++) {
-				Equipment equipment = EquipmentFactory.createEquipment(equipmentType, newSettlement.getCoordinates(),
-						false);
-				equipment.setName(unitManager.getNewName(UnitType.EQUIPMENT, equipmentType, null, null));
-				// Place this equipment within a settlement
-				newSettlement.getInventory().storeUnit(equipment);
-				unitManager.addUnit(equipment);
-			}
-		}
-	}
-
-	/**
-	 * Create the new settlement's parts.
-	 * 
-	 * @param newSettlement the new settlement.
-	 */
-	private void createNewParts(Settlement newSettlement) {
-
-		SettlementTemplate template = settlementConfig
-				.getSettlementTemplate(getTemplate());
-		Iterator<Part> partsI = template.getParts().keySet().iterator();
-		while (partsI.hasNext()) {
-			Part part = partsI.next();
-			int number = template.getParts().get(part);
-			newSettlement.getInventory().storeItemResources(part.getID(), number);
-		}
-	}
-
-	/**
-	 * Create the new settlement's resources.
-	 * 
-	 * @param newSettlement the new settlement.
-	 */
-	private void createNewResources(Settlement newSettlement) {
-
-		SettlementTemplate template = settlementConfig
-				.getSettlementTemplate(getTemplate());
-		Iterator<AmountResource> resourcesI = template.getResources().keySet().iterator();
-		while (resourcesI.hasNext()) {
-			AmountResource resource = resourcesI.next();
-			double amount = template.getResources().get(resource);
-			double capacity = newSettlement.getInventory().getAmountResourceRemainingCapacity(resource, true, false);
-			if (amount > capacity)
-				amount = capacity;
-			newSettlement.getInventory().storeAmountResource(resource, amount, true);
-			// newSettlement.getInventory().addAmountSupplyAmount(resource, amount);
-		}
-	}
-
-	/**
-	 * Create the new settlement's vehicles.
-	 * 
-	 * @param newSettlement the new settlement.
-	 */
-	private void createNewVehicles(Settlement newSettlement) {
-
-		String sponsor = newSettlement.getSponsor();
-		SettlementTemplate template = settlementConfig
-				.getSettlementTemplate(getTemplate());
-//		UnitManager unitManager = Simulation.instance().getUnitManager();
-		Iterator<String> vehicleI = template.getVehicles().keySet().iterator();
-		while (vehicleI.hasNext()) {
-			String vehicleType = vehicleI.next();
-			int number = template.getVehicles().get(vehicleType);
-			for (int x = 0; x < number; x++) {
-				Vehicle vehicle = null;
-				if (LightUtilityVehicle.NAME.equalsIgnoreCase(vehicleType)) {
-					String name = unitManager.getNewVehicleName(LightUtilityVehicle.NAME, sponsor);
-					vehicle = new LightUtilityVehicle(name, vehicleType.toLowerCase(), newSettlement);
-				} else {
-					String name = unitManager.getNewVehicleName(vehicleType, sponsor);
-					vehicle = new Rover(name, vehicleType.toLowerCase(), newSettlement);
-				}
-				unitManager.addUnit(vehicle);
-			}
-		}
-	}
-
 	@Override
 	public String getSettlementName() {
 		return name;
@@ -512,23 +295,46 @@ public class ArrivingSettlement implements Transportable, Serializable {
 	}
 
 	@Override
-	public synchronized void performArrival() {
-		// Create new settlement.
-		Settlement newSettlement = createNewSettlement();
-		// Create new immigrants with arriving settlement.
-		createNewImmigrants(newSettlement);
-		// Create new robots.
-		createNewRobots(newSettlement);
-		// Create new equipment.
-		createNewEquipment(newSettlement);
-		// Create new parts.
-		createNewParts(newSettlement);
-		// Create new resources.
-		createNewResources(newSettlement);
-		// Create new vehicles.
-		createNewVehicles(newSettlement);
+	public synchronized void performArrival(SimulationConfig sc, Simulation sim) {
+		SettlementBuilder build = new SettlementBuilder(sim, sc);
+		InitialSettlement spec = new InitialSettlement(name, sponsorCode,
+													   template, populationNum, numOfRobots,
+													   landingLocation, null);
+		Settlement newSettlement = build.createFullSettlement(spec);
+		
+		// Sim is already running so add to the active queue
+//		sim.getUnitManager().addUnit(newSettlement);
+		sim.getUnitManager().activateSettlement(newSettlement);
 	}
 
+	/**
+	 * Schedule the launch for a future date.
+	 */
+	public void scheduleLaunch(MarsClock currentTime, int transitSols) {
+		// Determine the arrival date
+		if (arrivalDate ==  null) {
+			arrivalDate = new MarsClock(currentTime);
+			arrivalDate.addTime(
+					(arrivalSols - 1) * 1000D
+					+ 100 
+					+ RandomUtil.getRandomDouble(890));
+		}
+		
+		// Determine launch date.
+		launchDate = new MarsClock(arrivalDate);
+		launchDate.addTime(-1D * transitSols * 1000D);
+		
+		if (landingLocation == null) {
+			// Create a new random location
+			double lat = Coordinates.getRandomLatitude();
+			double lon = Coordinates.getRandomLongitude();
+			landingLocation = new Coordinates(lat, lon);
+		}
+		if (arrivalSols < transitSols) {
+			transitState = TransitState.IN_TRANSIT;
+		}
+	}
+	
 	@Override
 	public void destroy() {
 		name = null;
@@ -539,4 +345,32 @@ public class ArrivingSettlement implements Transportable, Serializable {
 		landingLocation = null;
 	}
 
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ArrivingSettlement other = (ArrivingSettlement) obj;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		return true;
+	}
+
+	@Override
+	public void reinit(UnitManager um) {
+	}
 }

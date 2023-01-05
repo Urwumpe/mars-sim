@@ -1,26 +1,25 @@
 /**
  * Mars Simulation Project
  * TreatMedicalPatientMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
 import java.util.Iterator;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.location.LocationStateType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.task.TreatMedicalPatient;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.person.health.Treatment;
-import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
@@ -28,25 +27,26 @@ import org.mars_sim.msp.core.structure.building.function.MedicalCare;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.SickBay;
 import org.mars_sim.msp.core.vehicle.Vehicle;
+import org.mars_sim.msp.core.vehicle.VehicleType;
 
 /**
  * Meta task for the TreatMedicalPatient task.
  */
-public class TreatMedicalPatientMeta implements MetaTask, Serializable {
-
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
+public class TreatMedicalPatientMeta extends FactoryMetaTask {
     
-	private static final int VALUE = 1000;
+	private static final int VALUE = 500;
 	
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.treatMedicalPatient"); //$NON-NLS-1$
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
+    public TreatMedicalPatientMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.ANY_HOUR);
+		
+		setTrait(TaskTrait.MEDICAL);
+		setPreferredJob(JobType.MEDICS);
+	}
+   
 
     @Override
     public Task constructInstance(Person person) {
@@ -57,48 +57,20 @@ public class TreatMedicalPatientMeta implements MetaTask, Serializable {
     public double getProbability(Person person) {
 
         double result = 0D;
-      
-        // Probability affected by the person's stress and fatigue.
-//        PhysicalCondition condition = person.getPhysicalCondition();
-//        double fatigue = condition.getFatigue();
-//        double stress = condition.getStress();
-//        double hunger = condition.getHunger();
-//        
-//        if (fatigue > 1000 || stress > 50 || hunger > 500)
-//        	return 0;
-          
+         
         if (person.isInside()) {
 	        // Get the local medical aids to use.
 	        if (hasNeedyMedicalAids(person)) {
-	            result = VALUE;	
+	            result += VALUE;	
 	            
-	            if (person.isInVehicle()) {	
+	            if (person.isInVehicle()	
 	    	        // Check if person is in a moving rover.
-	    	        if (Vehicle.inMovingRover(person)) {
-	    	        	result += -50;
-	    	        } 	       
-	    	        else
-	    	        	result += 50;
+	    	        && Vehicle.inMovingRover(person)) {
+	    	        	result -= 100;
 	            }
-	            
 	        }
 	
-	        // Effort-driven task modifier.
-	        result *= person.getPerformanceRating();
-	
-	        // Job modifier.
-	        Job job = person.getMind().getJob();
-	        if (job != null) {
-	            result *= job.getStartTaskProbabilityModifier(TreatMedicalPatient.class);
-	        }
-	
-	        double pref = person.getPreference().getPreferenceScore(this);
-	        
-	        if (pref > 0)
-	        	result = result * 3D;
-
-	        if (result < 0) result = 0;
-	        
+	        result *= getPersonModifier(person);
         }
         
         return result;
@@ -134,7 +106,7 @@ public class TreatMedicalPatientMeta implements MetaTask, Serializable {
         boolean result = false;
 
         // Check all medical care buildings.
-        Iterator<Building> i = person.getSettlement().getBuildingManager().getBuildings(
+        Iterator<Building> i = settlement.getBuildingManager().getBuildings(
                 FunctionType.MEDICAL_CARE).iterator();
         while (i.hasNext() && !result) {
             Building building = i.next();
@@ -165,7 +137,7 @@ public class TreatMedicalPatientMeta implements MetaTask, Serializable {
 
         boolean result = false;
 
-        if (person.getVehicle() instanceof Rover) {
+        if (VehicleType.isRover(person.getVehicle().getVehicleType())) {
             Rover rover = (Rover) person.getVehicle();
             if (rover.hasSickBay()) {
                 SickBay sickBay = rover.getSickBay();
@@ -206,16 +178,4 @@ public class TreatMedicalPatientMeta implements MetaTask, Serializable {
 
         return result;
     }
-
-	@Override
-	public Task constructInstance(Robot robot) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 }

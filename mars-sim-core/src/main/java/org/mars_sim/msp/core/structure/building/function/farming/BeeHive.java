@@ -1,27 +1,23 @@
-/**
+/*
  * Mars Simulation Project
  * BeeHive.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.core.structure.building.function.farming;
 
-import java.io.Serializable;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.structure.building.function.Function;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.time.ClockPulse;
 
-public class BeeHive
-extends Function
-implements Serializable {
+public class BeeHive extends Function {
 	
 	/** default serial id. */
     private static final long serialVersionUID = 1L;
     /** default logger. */
-	private static Logger logger = Logger.getLogger(BeeHive.class.getName());
+//	private static final Logger logger = Logger.getLogger(BeeHive.class.getName());
 
     public static final int QUEEN = 0;
     public static final int WORKER = 1;
@@ -42,14 +38,13 @@ implements Serializable {
     private Bee queenBee;
     private Bee workerBee;
     private Bee maleBee;       
-    private Bee beeEgg; 
     private Bee beeLarvae;
     private Bee beePupa;
     
 
     public BeeHive(BeeGrowing beeGrowing, String beeSpecies) {
         // Use Function constructor.
-        super(FunctionType.FARMING, beeGrowing.getFarming().getBuilding());
+        super(FunctionType.FARMING, null, beeGrowing.getFarming().getBuilding());
 		
     	this.beeGrowing = beeGrowing;
     	this.beeSpecies = beeSpecies; 	

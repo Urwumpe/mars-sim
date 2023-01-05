@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * WeatherCommand.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand.settlement;
 
 import java.text.DecimalFormat;
@@ -8,9 +15,9 @@ import org.mars.sim.console.chat.simcommand.StructuredResponse;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.OrbitInfo;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
-import org.mars_sim.msp.core.mars.Weather;
+import org.mars_sim.msp.core.environment.OrbitInfo;
+import org.mars_sim.msp.core.environment.SurfaceFeatures;
+import org.mars_sim.msp.core.environment.Weather;
 import org.mars_sim.msp.core.structure.Settlement;
 
 public class WeatherCommand extends AbstractSettlementCommand {
@@ -26,9 +33,9 @@ public class WeatherCommand extends AbstractSettlementCommand {
 	protected boolean execute(Conversation context, String input, Settlement settlement) {
 		StructuredResponse response = new StructuredResponse();
 		Simulation sim = context.getSim();
-		SurfaceFeatures surfaceFeatures = sim.getMars().getSurfaceFeatures();
-		Weather weather = sim.getMars().getWeather();
-		OrbitInfo orbitInfo = sim.getMars().getOrbitInfo();
+		SurfaceFeatures surfaceFeatures = sim.getSurfaceFeatures();
+		Weather weather = sim.getWeather();
+		OrbitInfo orbitInfo = sim.getOrbitInfo();
 
 		Coordinates location = settlement.getCoordinates();
 		response.appendLabeledString("Location", location.toString());

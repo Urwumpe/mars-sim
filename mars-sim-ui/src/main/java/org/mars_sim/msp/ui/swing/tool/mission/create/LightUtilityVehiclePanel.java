@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * LightUtilityVehiclePanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
@@ -198,7 +198,7 @@ extends WizardPanel {
 						result = vehicle.printStatusTypes();
 					else if (column == 2) {
 						Mission mission = missionManager.getMissionForVehicle(vehicle);
-						if (mission != null) result = mission.getDescription();
+						if (mission != null) result = mission.getName();
 						else result = "None";
 					}
 				}
@@ -235,7 +235,7 @@ extends WizardPanel {
 			LightUtilityVehicle vehicle = (LightUtilityVehicle) getUnit(row);
 
 			if (column == 1) {
-				if (!vehicle.haveStatusType(StatusType.PARKED) && !vehicle.haveStatusType(StatusType.GARAGED))
+				if ((vehicle.getPrimaryStatus() != StatusType.PARKED) && (vehicle.getPrimaryStatus() != StatusType.GARAGED))
 					result = true;
 			}
 			else if (column == 2) {

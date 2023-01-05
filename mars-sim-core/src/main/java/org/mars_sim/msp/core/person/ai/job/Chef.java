@@ -1,12 +1,11 @@
-/**
+/*
  * Mars Simulation Project
  * Chef.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-27
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.job;
 
-import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 
@@ -14,12 +13,8 @@ import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
-import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
-import org.mars_sim.msp.core.person.ai.task.ConsolidateContainers;
-import org.mars_sim.msp.core.person.ai.task.CookMeal;
-import org.mars_sim.msp.core.person.ai.task.PrepareDessert;
-import org.mars_sim.msp.core.person.ai.task.ProduceFood;
+import org.mars_sim.msp.core.person.ai.job.util.Job;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
@@ -28,35 +23,12 @@ import org.mars_sim.msp.core.structure.building.function.cooking.Cooking;
 /**
  * The Chef class represents a job for a chef.
  */
-public class Chef extends Job implements Serializable {
-
-	/** default serial id. */
-	private static final long serialVersionUID = 1L;
-
-	// private static Logger logger = Logger.getLogger(Chef.class.getName());
-
-	private final int JOB_ID = 5;
-	
-	private double[] roleProspects = new double[] {35.0, 5.0, 5.0, 5.0, 20.0, 15.0, 15.0};
-	
+public class Chef extends Job {
+		
 	/** constructor. */
 	public Chef() {
 		// Use Job constructor
-		super(Chef.class);
-
-		// Add chef-related tasks.
-		jobTasks.add(CookMeal.class);
-		jobTasks.add(PrepareDessert.class);
-		jobTasks.add(ProduceFood.class);
-
-		// Add side tasks
-		jobTasks.add(ConsolidateContainers.class);
-
-		// Add chef-related missions.
-		jobMissionJoins.add(BuildingConstructionMission.class);
-		
-		jobMissionJoins.add(BuildingSalvageMission.class);
-
+		super(JobType.CHEF, Job.buildRoleMap(35.0, 5.0, 5.0, 5.0, 5.0, 20.0, 15.0, 15.0));
 	}
 
 	/**
@@ -67,14 +39,7 @@ public class Chef extends Job implements Serializable {
 	 */
 	public double getCapability(Person person) {
 
-		double result = 0D;
-
-		int cookingSkill = person.getSkillManager().getSkillLevel(SkillType.COOKING);
-		result = cookingSkill;
-
-		// int foodProcessingSkill =
-		// person.getMind().getSkillManager().getSkillLevel(SkillType.FOODPROCESSING);
-		// result = foodProcessingSkill;
+		double result =  person.getSkillManager().getSkillLevel(SkillType.COOKING);
 
 		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
 		int experienceAptitude = attributes.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
@@ -82,8 +47,6 @@ public class Chef extends Job implements Serializable {
 
 		if (person.getPhysicalCondition().hasSeriousMedicalProblems())
 			result = 0D;
-
-//		System.out.println(person + " chef : " + Math.round(result*100.0)/100.0);
 		
 		return result;
 	}
@@ -111,20 +74,6 @@ public class Chef extends Job implements Serializable {
 
 		result = (result + population / 12D) / 2.0;
 		
-//		System.out.println(settlement + " Chef Need: " + result);
-
 		return result;
-	}
-
-	public double[] getRoleProspects() {
-		return roleProspects;
-	}
-	
-	public void setRoleProspects(int index, int weight) {
-		roleProspects[index] = weight;
-	}
-	
-	public int getJobID() {
-		return JOB_ID;
 	}
 }

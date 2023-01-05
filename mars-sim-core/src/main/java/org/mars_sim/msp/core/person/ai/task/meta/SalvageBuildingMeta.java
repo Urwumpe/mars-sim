@@ -1,48 +1,46 @@
 /**
  * Mars Simulation Project
  * SalvageBuildingMeta.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.fav.FavoriteType;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
 import org.mars_sim.msp.core.person.ai.task.EVAOperation;
 import org.mars_sim.msp.core.person.ai.task.SalvageBuilding;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 
 /**
  * Meta task for the SalvageBuilding task.
  */
-public class SalvageBuildingMeta implements MetaTask, Serializable {
-
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
+public class SalvageBuildingMeta extends FactoryMetaTask {
 
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.salvageBuilding"); //$NON-NLS-1$
 
     /** default logger. */
-    private static Logger logger = Logger.getLogger(SalvageBuildingMeta.class.getName());
+    private static final Logger logger = Logger.getLogger(SalvageBuildingMeta.class.getName());
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
+    public SalvageBuildingMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.WORK_HOUR);
+		setFavorite(FavoriteType.OPERATION, FavoriteType.TINKERING);
+		setTrait(TaskTrait.STRENGTH);
+		setPreferredJob(JobType.ARCHITECT);
+	}
 
     @Override
     public Task constructInstance(Person person) {
@@ -55,16 +53,11 @@ public class SalvageBuildingMeta implements MetaTask, Serializable {
         double result = 0D;
 
         // Probability affected by the person's stress and fatigue.
-        PhysicalCondition condition = person.getPhysicalCondition();
-        double fatigue = condition.getFatigue();
-        double stress = condition.getStress();
-        double hunger = condition.getHunger();
-        
-        if (fatigue > 1000 || stress > 50 || hunger > 500)
+        if (!person.getPhysicalCondition().isFitByLevel(1000, 70, 1000))
         	return 0;
         
         // Check if an airlock is available
-        if (EVAOperation.getWalkableAvailableAirlock(person) == null) {
+        if (EVAOperation.getWalkableAvailableAirlock(person, false) == null) {
             return 0;
         }
 
@@ -91,37 +84,11 @@ public class SalvageBuildingMeta implements MetaTask, Serializable {
                 result *= 2D;
             }
 
-            // Effort-driven task modifier.
-            result *= person.getPerformanceRating();
-
-            // Job modifier.
-            Job job = person.getMind().getJob();
-            if (job != null) {
-                result *= job.getStartTaskProbabilityModifier(SalvageBuilding.class);
-            }
-
-            // Modify if construction is the person's favorite activity.
-            if (person.getFavorite().getFavoriteActivity() == FavoriteType.TINKERING) {
-                result *= 2D;
-            }
-
-            // 2015-06-07 Added Preference modifier
-            if (result > 0D) {
-            	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
-            }
-
-            if (result < 0D) {
-                return 0;
-            }
+            result *= getPersonModifier(person);
         }
 
         return result;
     }
-
-	@Override
-	public Task constructInstance(Robot robot) {
-        return null;//new SalvageBuilding(robot);
-	}
 
 	@Override
 	public double getProbability(Robot robot) {

@@ -1,47 +1,38 @@
-/**
+/*
  * Mars Simulation Project
  * ProposeScientificStudy.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-18
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
-import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.job.Job;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
-import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
 
 /**
  * A task for proposing a new scientific study.
  */
-public class ProposeScientificStudy extends Task implements Serializable {
+public class ProposeScientificStudy extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(ProposeScientificStudy.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	private static SimLogger logger = SimLogger.getLogger(ProposeScientificStudy.class.getName());
 
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.proposeScientificStudy"); //$NON-NLS-1$
@@ -61,35 +52,40 @@ public class ProposeScientificStudy extends Task implements Serializable {
 	 * @param person the person performing the task.
 	 */
 	public ProposeScientificStudy(Person person) {
-		super(NAME, person, false, true, STRESS_MODIFIER, true, 10D + RandomUtil.getRandomDouble(50D));
-
+		// Skill set set later on based on Study
+		super(NAME, person, false, true, STRESS_MODIFIER, null, 25D, 10D + RandomUtil.getRandomDouble(50D));
+		setExperienceAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
+		
 		study = person.getStudy();
-		if (study == null) {
+		if (study == null) {		
 			// Create new scientific study.
-			Job job = person.getMind().getJob();
+			JobType job = person.getMind().getJob();
 			ScienceType science = ScienceType.getJobScience(job);
 			if (science != null) {
 				SkillType skill = science.getSkill();
 				int level = person.getSkillManager().getSkillLevel(skill);
 				study = scientificStudyManager.createScientificStudy(person, science, level);
+
+				
 			} else {
-				logger.severe(person.getName() + " is a " 
-					+ job.getName(person.getGender()).toLowerCase() + "-- not a scientist");
+				logger.severe(person, "Not a scientist.");
 				endTask();
 			}
 		}
 
 		if (study != null) {
+			
+			addAdditionSkill(study.getScience().getSkill());
 			setDescription(
 					Msg.getString("Task.description.proposeScientificStudy.detail", study.getScience().getName())); // $NON-NLS-1$
 
 			// If person is in a settlement, try to find a building.
 			boolean walk = false;
 			if (person.isInSettlement()) {
-				Building b = getAvailableBuilding(study, person);
+				Building b = BuildingManager.getAvailableBuilding(study, person);
 				if (b != null) {
 					// Walk to this specific building.
-					walkToTaskSpecificActivitySpotInBuilding(b, false);
+					walkToResearchSpotInBuilding(b, false);
 					walk = true;
 				}
 			}
@@ -115,143 +111,6 @@ public class ProposeScientificStudy extends Task implements Serializable {
 		setPhase(PROPOSAL_PHASE);
 	}
 
-	/**
-	 * Gets an available building that the person can use.
-	 * 
-	 * @param person the person
-	 * @return available building or null if none.
-	 */
-	public static Building getAvailableBuilding(ScientificStudy study, Person person) {
-
-		Building result = null;
-
-		if (person.isInSettlement()) {
-			List<Building> buildings = null;
-
-			if (study != null) {
-				ScienceType science = study.getScience();
-				
-				buildings = person.getSettlement().getBuildingManager().getBuildingsWithScienceType(science);
-				
-//				if (science != null && science == ScienceType.ASTRONOMY)
-//					buildings = getBuildings(person, FunctionType.ASTRONOMICAL_OBSERVATIONS);
-//				else if (science == ScienceType.BOTANY)
-//					buildings = getBuildings(person, FunctionType.FARMING);
-//				else if (science == ScienceType.AREOLOGY)
-//					buildings = getBuildings(person, FunctionType.RESOURCE_PROCESSING);						
-			}
-			
-			if (buildings == null || buildings.size() == 0) {
-				buildings = getBuildings(person, FunctionType.RESEARCH);
-			}
-			if (buildings == null || buildings.size() == 0) {
-				buildings = getBuildings(person, FunctionType.ADMINISTRATION);
-			}
-			if (buildings == null || buildings.size() == 0) {
-				buildings = getBuildings(person, FunctionType.DINING);
-			}
-			if (buildings == null || buildings.size() == 0) {
-				buildings = getBuildings(person, FunctionType.LIVING_ACCOMMODATIONS);
-			}
-			
-			if (buildings != null && buildings.size() > 0) {
-				Map<Building, Double> possibleBuildings = BuildingManager.getBestRelationshipBuildings(person,
-						buildings);
-				result = RandomUtil.getWeightedRandomObject(possibleBuildings);
-			}
-		}
-
-		return result;
-	}
-
-	public static List<Building> getBuildings(Person person, FunctionType functionType) {
-		List<Building> buildings = person.getSettlement().getBuildingManager().getBuildings(functionType);
-		buildings = BuildingManager.getNonMalfunctioningBuildings(buildings);
-		return BuildingManager.getLeastCrowdedBuildings(buildings);
-	}
-
-	@Override
-	public FunctionType getLivingFunction() {
-		return FunctionType.RESEARCH;
-	}
-
-	/**
-	 * Performs the writing study proposal phase.
-	 * 
-	 * @param time the amount of time (millisols) to perform the phase.
-	 * @return the amount of time (millisols) left over after performing the phase.
-	 */
-	private double proposingPhase(double time) {
-
-		if (!study.getPhase().equals(ScientificStudy.PROPOSAL_PHASE)) {
-			endTask();
-		}
-
-		if (isDone()) {
-			return time;
-		}
-
-		// Determine amount of effective work time based on science skill.
-		double workTime = time;
-		int scienceSkill = getEffectiveSkillLevel();
-		if (scienceSkill == 0) {
-			workTime /= 2;
-		} else {
-			workTime += workTime * (.2D * (double) scienceSkill);
-		}
-
-		study.addProposalWorkTime(workTime);
-
-		checkDone();
-
-		// Add experience
-		addExperience(time);
-
-		return 0D;
-	}
-
-	private void checkDone() {
-		if (study.isProposalCompleted()) {
-			LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-					"[" + person.getLocationTag().getLocale() + "] " + person.getName()
-					+ " just finished writing a study proposal in " 
-					+ study.getScience().getName() + " in "
-					+ person.getLocationTag().getImmediateLocation() + ".");
-
-			// Update the person's preference
-//   			person.updateBuildingPreference(getBuildingFunction());
-			endTask();
-		}
-	}
-
-	@Override
-	protected void addExperience(double time) {
-		// Add experience to relevant science skill
-		// 1 base experience point per 25 millisols of proposal writing time.
-		double newPoints = time / 25D;
-
-		// Experience points adjusted by person's "Academic Aptitude" attribute.
-		int academicAptitude = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
-		newPoints += newPoints * ((double) academicAptitude - 50D) / 100D;
-		newPoints *= getTeachingExperienceModifier();
-
-		person.getSkillManager().addExperience(study.getScience().getSkill(), newPoints, time);
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> skills = new ArrayList<SkillType>(1);
-		if (study != null && study.getScience() != null)
-			skills.add(study.getScience().getSkill());
-		return skills;
-	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		SkillManager manager = person.getSkillManager();
-		return manager.getEffectiveSkillLevel(study.getScience().getSkill());
-	}
-
 	@Override
 	protected double performMappedPhase(double time) {
 		if (getPhase() == null) {
@@ -263,19 +122,54 @@ public class ProposeScientificStudy extends Task implements Serializable {
 		}
 	}
 
-//	/**
-//	 * Reloads instances after loading from a saved sim
-//	 * 
-//	 * @param {{@link ScientificStudyManager}
-//	 */
-//	public static void initializeInstances(ScientificStudyManager s) {
-//		scientificStudyManager = s;
-//	}
+	/**
+	 * Performs the writing study proposal phase.
+	 * 
+	 * @param time the amount of time (millisols) to perform the phase.
+	 * @return the amount of time (millisols) left over after performing the phase.
+	 */
+	private double proposingPhase(double time) {
+		double remainingTime = 0;
+		
+		if (!study.getPhase().equals(ScientificStudy.PROPOSAL_PHASE)) {
+			endTask();
+			return time;
+		}
 
-	@Override
-	public void destroy() {
-		super.destroy();
+		if (isDone()) {
+			logger.log(person, Level.INFO, 10_000, "Proposed " + study + ".");
+			endTask();
+			return time;
+		}
 
-		study = null;
+		if (person.getPhysicalCondition().computeFitnessLevel() < 2) {
+			logger.log(person, Level.FINE, 10_000, "Ended proposing scientific study. Not feeling well.");
+			endTask();
+			return time;
+		}
+		
+		// Determine amount of effective work time based on science skill.
+		double workTime = time;
+		int scienceSkill = getEffectiveSkillLevel();
+		if (scienceSkill == 0) {
+			workTime /= 2;
+		} else {
+			workTime += workTime * (.2D * (double) scienceSkill);
+		}
+
+		study.addProposalWorkTime(workTime);
+
+		// Add experience
+		addExperience(time);
+		
+		if (study.isProposalCompleted()) {
+			logger.log(worker, Level.INFO, 0, "Finished writing a study proposal for " 
+					+ study.getName() + "."); 
+
+			endTask();
+			return remainingTime;
+		}
+
+		return remainingTime;
 	}
 }

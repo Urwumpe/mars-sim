@@ -1,39 +1,38 @@
 /**
  * Mars Simulation Project
  * ConsolidateContainersMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
-
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
+import org.mars_sim.msp.core.person.ai.fav.FavoriteType;
 import org.mars_sim.msp.core.person.ai.task.ConsolidateContainers;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.ai.job.Deliverybot;
+import org.mars_sim.msp.core.robot.RobotType;
 
 /**
  * Meta task for the ConsolidateContainers task.
  */
-public class ConsolidateContainersMeta implements MetaTask, Serializable {
-
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
+public class ConsolidateContainersMeta extends FactoryMetaTask {
     
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.consolidateContainers"); //$NON-NLS-1$
+    
+    public ConsolidateContainersMeta() {
+		super(NAME, WorkerType.BOTH, TaskScope.WORK_HOUR);
+		
+		setFavorite(FavoriteType.OPERATION, FavoriteType.TINKERING);
+		setTrait(TaskTrait.STRENGTH);
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
+        addPreferredRobot(RobotType.DELIVERYBOT);
+	}
 
     @Override
     public Task constructInstance(Person person) {
@@ -49,33 +48,16 @@ public class ConsolidateContainersMeta implements MetaTask, Serializable {
         if (person.isInside()) {
         	
             // Probability affected by the person's stress and fatigue.
-            PhysicalCondition condition = person.getPhysicalCondition();
-            double fatigue = condition.getFatigue();
-            double stress = condition.getStress();
-            double hunger = condition.getHunger();
-            
-            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            if (!person.getPhysicalCondition().isFitByLevel(1000, 70, 1000)) {
             	return 0;
+            }
             
             // Check if there are local containers that need resource consolidation.
             if (ConsolidateContainers.needResourceConsolidation(person)) {
                 result = 10D;
             }
 
-            // Effort-driven task modifier.
-            result *= person.getPerformanceRating();
-
-            // Modify if operations is the person's favorite activity.
-            if (person.getFavorite().getFavoriteActivity() == FavoriteType.OPERATION) 
-                result *= 1.5D;
-
-            // 2015-06-07 Added Preference modifier
-            if (result > 0D) {
-                result = result + result * person.getPreference().getPreferenceScore(this)/5D;
-            }
-         
-            if (result < 0) result = 0;
-
+            result *= getPersonModifier(person);
         }
 
         return result;
@@ -91,7 +73,7 @@ public class ConsolidateContainersMeta implements MetaTask, Serializable {
 
         double result = 0D;
 
-        if (robot.getBotMind().getRobotJob() instanceof Deliverybot && robot.isInside()) {
+        if (robot.isInside()) {
 
             // Check if there are local containers that need resource consolidation.
             if (ConsolidateContainers.needResourceConsolidation(robot)) {

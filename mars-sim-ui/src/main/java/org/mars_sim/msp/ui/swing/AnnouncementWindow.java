@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * AnnouncementWindow.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing;
@@ -20,11 +20,12 @@ import javax.swing.JPanel;
  * The AnnouncementWindow class is an internal frame for displaying popup
  * announcements in the main desktop pane.
  */
+@SuppressWarnings("serial")
 public class AnnouncementWindow extends JInternalFrame {
 
 	private JLabel announcementLabel;
 
-	private MainDesktopPane desktop;
+//	private MainDesktopPane desktop;
 
 	/**
 	 * Constructor .
@@ -37,7 +38,7 @@ public class AnnouncementWindow extends JInternalFrame {
 		// Use JDialog constructor
 		super("", false, false, false, false); //$NON-NLS-1$
 
-		this.desktop = desktop;
+//		this.desktop = desktop;
 		// Create the main panel
 		JPanel mainPane = new JPanel();
 		mainPane.setLayout(new BorderLayout());

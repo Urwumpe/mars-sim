@@ -1,53 +1,66 @@
-/**
+/*
  * Mars Simulation Project
  * BuildingFunctionPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-10
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
-import javax.swing.JPanel;
-import javax.swing.border.Border;
-import javax.swing.border.CompoundBorder;
-import javax.swing.border.EmptyBorder;
+import javax.swing.Icon;
 
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
+import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
 /**
  * The BuildingFunctionPanel class is a panel representing a function for a
  * settlement building.
  */
 @SuppressWarnings("serial")
-public abstract class BuildingFunctionPanel extends JPanel {
+public abstract class BuildingFunctionPanel extends TabPanel {
 
 	/** The building this panel is for. */
 	protected Building building;
-	/** The main desktop. */
-	protected MainDesktopPane desktop;
-
+	
 	/**
-	 * Constructor.
+	 * Constructor 1.
 	 * 
+	 * @param title Shown as the tab title
+	 * @param description Shown as the long title/description at the top of the displayed panel
 	 * @param building The building this panel is for.
 	 * @param desktop  The main desktop.
 	 */
-	public BuildingFunctionPanel(Building building, MainDesktopPane desktop) {
-		// User JPanel constructor
-		super();
-
-		// Initialize data members
-		this.building = building;
-		this.desktop = desktop;
-
-		Border border = new MarsPanelBorder();
-		Border margin = new EmptyBorder(10,10,10,10);
-		setBorder(new CompoundBorder(border, margin));
+	protected BuildingFunctionPanel(String title, Building building, MainDesktopPane desktop) {
+		this(title, title, building, desktop);
 	}
-
+	
 	/**
-	 * Update this panel.
+	 * Constructor 2.
+	 * 
+	 * @param title
+	 * @param tabIcon
+	 * @param building
+	 * @param desktop
 	 */
-	public abstract void update();
+	protected BuildingFunctionPanel(String title, Icon tabIcon, Building building, MainDesktopPane desktop) {
+		// User TabPanel constructor
+		super (title, title, tabIcon, title, building, desktop);
+
+		this.building = building;
+	}
+	
+	/**
+	 * Constructor 3.
+	 * 
+	 * @param title Shown as the tab title
+	 * @param description Shown as the long title/description at the top of the displayed panel
+	 * @param building The building this panel is for.
+	 * @param desktop  The main desktop.
+	 */
+	protected BuildingFunctionPanel(String title, String description, Building building, MainDesktopPane desktop) {
+		// User TabPanel constructor
+		super(title, description, null, description, building, desktop);
+
+		this.building = building;
+	}
 }

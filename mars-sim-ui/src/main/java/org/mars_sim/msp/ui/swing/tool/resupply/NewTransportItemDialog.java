@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * NewTransportItemDialog.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-19
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.resupply;
@@ -26,10 +26,12 @@ import com.alee.laf.panel.WebPanel;
 
 /**
  * A dialog for creating a new transport item.
- * TODO externalize strings
  */
 @SuppressWarnings("serial")
 public class NewTransportItemDialog extends ModalInternalFrame {
+
+	/** default logger. */
+//	private static SimLogger logger = SimLogger.getLogger(NewTransportItemDialog.class.getName());
 
 	// Transport item types.
 	private static final String DEFAULT_MESSAGE = "Select Transport Item Type";
@@ -132,11 +134,7 @@ public class NewTransportItemDialog extends ModalInternalFrame {
 		buttonPane.add(cancelButton);
 
         // Add to its own tab pane
-//        if (desktop.getMainScene() != null)
-//        	desktop.add(this);
-//        	//desktop.getMainScene().getDesktops().get(2).add(this);
-//        else
-        	desktop.add(this);
+       	desktop.add(this);
 
 		Dimension desktopSize = desktop.getParent().getSize();
 	    Dimension jInternalFrameSize = this.getSize();
@@ -149,7 +147,7 @@ public class NewTransportItemDialog extends ModalInternalFrame {
 	}
 
 	/**
-	 * Set the editing panel.
+	 * Sets the editing panel.
 	 * 
 	 * @param panelKey the panel key string.
 	 */
@@ -178,7 +176,7 @@ public class NewTransportItemDialog extends ModalInternalFrame {
 	}
 
 	/**
-	 * Create the new transport item and close the dialog.
+	 * Creates the new transport item and close the dialog.
 	 */
 	private void createTransportItem() {
 		if ((editingPanel != null) && editingPanel.createTransportItem()) {
@@ -187,7 +185,7 @@ public class NewTransportItemDialog extends ModalInternalFrame {
 	}
 
 	/**
-	 * Prepare this window for deletion.
+	 * Prepares this window for deletion.
 	 */
 	public void destroy() {
 

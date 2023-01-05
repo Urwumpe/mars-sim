@@ -1,12 +1,11 @@
-/**
+/*
  * Mars Simulation Project
  * Manufacture.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-26
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import java.io.Serializable;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -14,14 +13,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.equipment.Equipment;
 import org.mars_sim.msp.core.equipment.EquipmentFactory;
+import org.mars_sim.msp.core.goods.Good;
+import org.mars_sim.msp.core.goods.GoodsUtil;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
 import org.mars_sim.msp.core.manufacture.ManufactureProcess;
 import org.mars_sim.msp.core.manufacture.ManufactureProcessInfo;
@@ -32,19 +31,21 @@ import org.mars_sim.msp.core.manufacture.Salvagable;
 import org.mars_sim.msp.core.manufacture.SalvageProcess;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.reportingAuthority.ReportingAuthority;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.ItemType;
 import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingException;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
-import org.mars_sim.msp.core.structure.goods.Good;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.tool.RandomUtil;
+import org.mars_sim.msp.core.vehicle.Drone;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.Vehicle;
@@ -53,21 +54,21 @@ import org.mars_sim.msp.core.vehicle.VehicleType;
 /**
  * A building function for manufacturing.
  */
-public class Manufacture extends Function implements Serializable {
+public class Manufacture extends Function {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(Manufacture.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	private static final SimLogger logger = SimLogger.getLogger(Manufacture.class.getName());
+	
+	private static final int SKILL_GAP = 1;
+
+	private static final int printerID = ItemResourceUtil.printerID;
 
 	private static final double PROCESS_MAX_VALUE = 100D;
 
-	public static final String LASER_SINTERING_3D_PRINTER = ItemResourceUtil.LASER_SINTERING_3D_PRINTER;
-
-	private static int printerID = ItemResourceUtil.printerID;
+	private static final String CONCURRENT_PROCESSES = "concurrent-processes";
 
 	// Data members.
 	private int techLevel;
@@ -77,42 +78,42 @@ public class Manufacture extends Function implements Serializable {
 	private List<ManufactureProcess> processes;
 	private List<SalvageProcess> salvages;
 
-	
+	// NOTE: create a map to show which process has a 3D printer in use and which doesn't
+
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param building the building the function is for.
+	 * @param spec Details of teh Funciton at hand
 	 * @throws BuildingException if error constructing function.
 	 */
-	public Manufacture(Building building) {
+	public Manufacture(Building building, FunctionSpec spec) {
 		// Use Function constructor.
-		super(FunctionType.MANUFACTURE, building);
+		super(FunctionType.MANUFACTURE, spec, building);
 
-		techLevel = buildingConfig.getManufactureTechLevel(building.getBuildingType());
-		numMaxConcurrentProcesses = buildingConfig.getManufactureConcurrentProcesses(building.getBuildingType());
+		techLevel = spec.getTechLevel();
+		numMaxConcurrentProcesses = spec.getIntegerProperty(CONCURRENT_PROCESSES);
 		numPrintersInUse = numMaxConcurrentProcesses;
-		
-		// Load activity spots
-		loadActivitySpots(buildingConfig.getManufactureActivitySpots(building.getBuildingType()));
 
-		processes = new CopyOnWriteArrayList<ManufactureProcess>();
-		salvages = new CopyOnWriteArrayList<SalvageProcess>();
+		processes = new CopyOnWriteArrayList<>();
+		salvages = new CopyOnWriteArrayList<>();
 	}
 
 	/**
-	 * Gets the value of the function for a named building.
-	 * 
-	 * @param buildingName the building name.
+	 * Gets the value of the function for a named building type.
+	 *
+	 * @param type the building type.
 	 * @param newBuilding  true if adding a new building.
 	 * @param settlement   the settlement.
 	 * @return value (VP) of building function.
 	 * @throws Exception if error getting function value.
 	 */
-	public static double getFunctionValue(String buildingName, boolean newBuilding, Settlement settlement) {
+	public static double getFunctionValue(String type, boolean newBuilding, Settlement settlement) {
 
 		double result = 0D;
 
-		int buildingTech = buildingConfig.getManufactureTechLevel(buildingName);
+		FunctionSpec spec = buildingConfig.getFunctionSpec(type, FunctionType.MANUFACTURE);
+		int buildingTech = spec.getTechLevel();
 
 		double demand = 0D;
 		Iterator<Person> i = settlement.getAllAssociatedPeople().iterator();
@@ -127,7 +128,7 @@ public class Manufacture extends Function implements Serializable {
 		Iterator<Building> j = buildingManager.getBuildings(FunctionType.MANUFACTURE).iterator();
 		while (j.hasNext()) {
 			Building building = j.next();
-			if (!newBuilding && building.getBuildingType().equalsIgnoreCase(buildingName) && !removedBuilding) {
+			if (!newBuilding && building.getBuildingType().equalsIgnoreCase(type) && !removedBuilding) {
 				removedBuilding = true;
 			} else {
 				Manufacture manFunction = building.getManufacture();
@@ -144,7 +145,7 @@ public class Manufacture extends Function implements Serializable {
 
 		double baseManufactureValue = demand / (supply + 1D);
 
-		double processes = buildingConfig.getManufactureConcurrentProcesses(buildingName);
+		double processes = spec.getIntegerProperty(CONCURRENT_PROCESSES);
 		double manufactureValue = (buildingTech * buildingTech) * processes;
 
 		result = manufactureValue * baseManufactureValue;
@@ -176,7 +177,7 @@ public class Manufacture extends Function implements Serializable {
 	/**
 	 * Gets the best manufacturing process value for a given manufacturing tech
 	 * level at a settlement.
-	 * 
+	 *
 	 * @param techLevel  the manufacturing tech level.
 	 * @param settlement the settlement
 	 * @return best manufacturing process value.
@@ -201,7 +202,7 @@ public class Manufacture extends Function implements Serializable {
 
 	/**
 	 * Gets the manufacturing tech level of the building.
-	 * 
+	 *
 	 * @return tech level.
 	 */
 	public int getTechLevel() {
@@ -211,7 +212,7 @@ public class Manufacture extends Function implements Serializable {
 	/**
 	 * Gets the maximum concurrent manufacturing processes supported by the
 	 * building.
-	 * 
+	 *
 	 * @return maximum concurrent processes.
 	 */
 	public int getMaxProcesses() {
@@ -221,16 +222,16 @@ public class Manufacture extends Function implements Serializable {
 	/**
 	 * Gets the current total number of manufacturing and salvage processes happening in this
 	 * building.
-	 * 
+	 *
 	 * @return current total.
 	 */
-	public int getCurrentProcesses() {
+	public int getCurrentTotalProcesses() {
 		return processes.size() + salvages.size();
 	}
 
 	/**
 	 * Gets a list of the current manufacturing processes.
-	 * 
+	 *
 	 * @return unmodifiable list of processes.
 	 */
 	public List<ManufactureProcess> getProcesses() {
@@ -239,7 +240,7 @@ public class Manufacture extends Function implements Serializable {
 
 	/**
 	 * Adds a new manufacturing process to the building.
-	 * 
+	 *
 	 * @param process the new manufacturing process.
 	 * @throws BuildingException if error adding process.
 	 */
@@ -247,66 +248,55 @@ public class Manufacture extends Function implements Serializable {
 		if (process == null) {
 			throw new IllegalArgumentException("process is null");
 		}
-		
-		if (getCurrentProcesses() >= numPrintersInUse) {
-			LogConsolidated.log(logger, Level.INFO, 20_000, sourceName,
-					"[" + getBuilding().getSettlement() + "] " 
-					+ getBuilding()
-					+ ": " + getCurrentProcesses() + " concurrent processes."
-					+ "");
-			LogConsolidated.log(logger, Level.INFO, 20_000, sourceName,
-					"[" + getBuilding().getSettlement() + "] " 
-					+ getBuilding()
+
+		if (getCurrentTotalProcesses() >= numPrintersInUse) {
+			logger.info(getBuilding().getSettlement(), 20_000,
+					getBuilding()
+					+ ": " + getCurrentTotalProcesses() + " concurrent processes.");
+			logger.info(getBuilding().getSettlement(), 20_000,
+					getBuilding()
 					+ ": " + numPrintersInUse + " 3D-printer(s) installed for use."
 					+ "");
-			LogConsolidated.log(logger, Level.INFO, 20_000, sourceName,
-					"[" + getBuilding().getSettlement() + "] " 
-					+ getBuilding()
-					+ ": " + (numMaxConcurrentProcesses-numPrintersInUse) 
+			logger.info(getBuilding().getSettlement(), 20_000,
+					getBuilding()
+					+ ": " + (numMaxConcurrentProcesses-numPrintersInUse)
 					+ " 3D-printer slot(s) available."
 					+ "");
-//			throw new IllegalStateException("No space to add new manufacturing process.");
 			return;
 		}
-		
+
 		processes.add(process);
 
-		Inventory inv = building.getInventory();
-		
 		// Consume inputs.
 		for (ManufactureProcessItem item : process.getInfo().getInputList()) {
 			if (ItemType.AMOUNT_RESOURCE.equals(item.getType())) {
-//				AmountResource resource = ResourceUtil.findAmountResource(item.getName());
 				int id = ResourceUtil.findIDbyAmountResourceName(item.getName());
-				inv.retrieveAmountResource(id, item.getAmount());
+				building.getSettlement().retrieveAmountResource(id, item.getAmount());
 				// Add tracking demand
-				inv.addAmountDemand(id, item.getAmount());
 			} else if (ItemType.PART.equals(item.getType())) {
-//				Part part = (Part) ItemResourceUtil.findItemResource(item.getName());
 				int id = ItemResourceUtil.findIDbyItemResourceName(item.getName());
-				inv.retrieveItemResources(id, (int) item.getAmount());
+				building.getSettlement().retrieveItemResource(id, (int) item.getAmount());
 				// Add tracking demand
-				inv.addItemDemand(id, (int) item.getAmount());
-			} else
-				// TODO: in future, add equipment here as the requirement for this process
-				throw new IllegalStateException("Manufacture process input: " + item.getType() + " not a valid type.");
-
-			// Recalculate settlement good value for input item.
-			building.getSettlement().getGoodsManager().updateGoodValue(ManufactureUtil.getGood(item), false);
+//			} else if (ItemType.EQUIPMENT.equals(item.getType())) {
+//				String equipmentType = item.getName();
+//				int number = (int) item.getAmount();
+//				building.getSettlement().getEquipmentInventory().removeEquipment(equipmentType);
+			} else 
+				// Future: add equipment here as the requirement for this process
+				logger.log(getBuilding().getSettlement(), Level.SEVERE, 20_000,
+						getBuilding()
+						+ " Manufacture process input: " + item.getType() + " not a valid type.");
 		}
 
 		// Log manufacturing process starting.
-		if (logger.isLoggable(Level.FINEST)) {
-			// Settlement settlement = getBuilding().getBuildingManager().getSettlement();
-			logger.finest(
-					building + " at " + building.getSettlement() 
-					+ " starting manufacturing process: " + process.getInfo().getName());
-		}
+		logger.log(getBuilding().getSettlement(), Level.FINEST, 20_000,
+				getBuilding()
+				+ " starting manufacturing process: " + process.getInfo().getName());
 	}
 
 	/**
 	 * Gets a list of the current salvage processes.
-	 * 
+	 *
 	 * @return unmodifiable list of salvage processes.
 	 */
 	public List<SalvageProcess> getSalvageProcesses() {
@@ -315,7 +305,7 @@ public class Manufacture extends Function implements Serializable {
 
 	/**
 	 * Adds a new salvage process to the building.
-	 * 
+	 *
 	 * @param process the new salvage process.
 	 * @throws BuildingException if error adding process.
 	 */
@@ -323,22 +313,28 @@ public class Manufacture extends Function implements Serializable {
 		if (process == null)
 			throw new IllegalArgumentException("process is null");
 
-		if (getCurrentProcesses() >= numPrintersInUse)
+		if (getCurrentTotalProcesses() >= numPrintersInUse)
 			throw new IllegalStateException("No more space left to add new salvage process.");
 
 		salvages.add(process);
 
-		// Retrieve salvaged unit from inventory and remove from unit manager.
-		// Inventory inv = getBuilding().getSettlementInventory();
+		// Retrieve salvaged unit and remove from unit manager.
 		Unit salvagedUnit = process.getSalvagedUnit();
 		if (salvagedUnit != null) {
-			// s_inv
-			building.getInventory().retrieveUnit(salvagedUnit);
+			if (salvagedUnit.getUnitType() == UnitType.CONTAINER
+					|| salvagedUnit.getUnitType() == UnitType.EVA_SUIT) {
+				building.getSettlement().removeEquipment((Equipment)salvagedUnit);
+			} else if (salvagedUnit.getUnitType() == UnitType.VEHICLE) {
+				building.getSettlement().removeOwnedVehicle((Vehicle)salvagedUnit);
+				building.getSettlement().removeParkedVehicle((Vehicle)salvagedUnit);
+			} else if (salvagedUnit.getUnitType() == UnitType.ROBOT) {
+				building.getSettlement().removeOwnedRobot((Robot)salvagedUnit);
+			}
 		} else
 			throw new IllegalStateException("Salvaged unit is null");
 
 		Settlement settlement = building.getSettlement();
-		
+
 		// Set the salvage process info for the salvaged unit.
 		// Settlement settlement = getBuilding().getBuildingManager().getSettlement();
 		((Salvagable) salvagedUnit).startSalvage(process.getInfo(), settlement.getIdentifier());
@@ -347,21 +343,19 @@ public class Manufacture extends Function implements Serializable {
 		// GoodsManager goodsManager = settlement.getGoodsManager();
 		Good salvagedGood = null;
 		if (salvagedUnit instanceof Equipment) {
-			salvagedGood = GoodsUtil.getEquipmentGood(salvagedUnit.getClass());
+			salvagedGood = GoodsUtil.getEquipmentGood(((Equipment) salvagedUnit).getEquipmentType());
 		} else if (salvagedUnit instanceof Vehicle) {
 			salvagedGood = GoodsUtil.getVehicleGood(salvagedUnit.getDescription());
 		}
 
 		if (salvagedGood != null) {
-			settlement.getGoodsManager().updateGoodValue(salvagedGood, false);
+//			settlement.getGoodsManager().updateGoodValue(salvagedGood, false);
 		} else
 			throw new IllegalStateException("Salvaged good is null");
 
 		// Log salvage process starting.
-		if (logger.isLoggable(Level.FINEST)) {
-			// Settlement stl = getBuilding().getBuildingManager().getSettlement();
-			logger.finest(getBuilding() + " at " + building.getSettlement() + " starting salvage process: " + process.toString());
-		}
+		logger.log(getBuilding().getSettlement(), Level.FINEST, 20_000,
+				getBuilding() + " starting salvage process: " + process.toString());
 	}
 
 	@Override
@@ -394,19 +388,19 @@ public class Manufacture extends Function implements Serializable {
 		if (valid) {
 			// Check once a sol only
 			checkPrinters(pulse);
-	
-			List<ManufactureProcess> finishedProcesses = new CopyOnWriteArrayList<ManufactureProcess>();
-	
+
+			List<ManufactureProcess> finishedProcesses = new CopyOnWriteArrayList<>();
+
 			Iterator<ManufactureProcess> i = processes.iterator();
 			while (i.hasNext()) {
 				ManufactureProcess process = i.next();
 				process.addProcessTime(pulse.getElapsed());
-	
+
 				if ((process.getProcessTimeRemaining() == 0D) && (process.getWorkTimeRemaining() == 0D)) {
 					finishedProcesses.add(process);
 				}
 			}
-	
+
 			// End all processes that are done.
 			Iterator<ManufactureProcess> j = finishedProcesses.iterator();
 			while (j.hasNext()) {
@@ -418,21 +412,22 @@ public class Manufacture extends Function implements Serializable {
 
 	/**
 	 * Checks if manufacturing function currently requires manufacturing work.
-	 * 
+	 *
 	 * @param skill the person's materials science skill level.
 	 * @return true if manufacturing work.
 	 */
-	public boolean requiresManufacturingWork(int skill) {
+	public boolean requiresWork(int skill) {
 		boolean result = false;
 
-		if (numPrintersInUse > getCurrentProcesses())
+		if (numPrintersInUse > getCurrentTotalProcesses())
 			result = true;
 		else {
 			Iterator<ManufactureProcess> i = processes.iterator();
 			while (i.hasNext()) {
 				ManufactureProcess process = i.next();
 				boolean workRequired = (process.getWorkTimeRemaining() > 0D);
-				boolean skillRequired = (process.getInfo().getSkillLevelRequired() <= skill);
+				// Allow a low material science skill person to have access to do the next level skill process
+				boolean skillRequired = (process.getInfo().getSkillLevelRequired() <= skill + SKILL_GAP);
 				if (workRequired && skillRequired)
 					result = true;
 			}
@@ -443,21 +438,22 @@ public class Manufacture extends Function implements Serializable {
 
 	/**
 	 * Checks if manufacturing function currently requires salvaging work.
-	 * 
+	 *
 	 * @param skill the person's materials science skill level.
 	 * @return true if manufacturing work.
 	 */
 	public boolean requiresSalvagingWork(int skill) {
 		boolean result = false;
 
-		if (numPrintersInUse > getCurrentProcesses())
+		if (numPrintersInUse > getCurrentTotalProcesses())
 			result = true;
 		else {
 			Iterator<SalvageProcess> i = salvages.iterator();
 			while (i.hasNext()) {
 				SalvageProcess process = i.next();
 				boolean workRequired = (process.getWorkTimeRemaining() > 0D);
-				boolean skillRequired = (process.getInfo().getSkillLevelRequired() <= skill);
+				// Allow a low material science skill person to have access to do the next level skill process
+				boolean skillRequired = (process.getInfo().getSkillLevelRequired() <= skill + 1);
 				if (workRequired && skillRequired)
 					result = true;
 			}
@@ -468,118 +464,109 @@ public class Manufacture extends Function implements Serializable {
 
 	/**
 	 * Ends a manufacturing process.
-	 * 
+	 *
 	 * @param process   the process to end.
 	 * @param premature true if the process has ended prematurely.
 	 * @throws BuildingException if error ending process.
 	 */
 	public void endManufacturingProcess(ManufactureProcess process, boolean premature) {
 		Settlement settlement = building.getSettlement();
-		Inventory inv = building.getInventory();
-		
+
 		if (!premature) {
 			// Produce outputs.
-			// WARNING : The UnitManager instance will be stale after loading from a saved
-			// sim
-			// It will fail to run methods in Settlement and without any warning as to why
-			// that it fails.
-
 			Iterator<ManufactureProcessItem> j = process.getInfo().getOutputList().iterator();
 			while (j.hasNext()) {
 				ManufactureProcessItem item = j.next();
 				if (ManufactureUtil.getManufactureProcessItemValue(item, settlement, true) > 0D) {
 					if (ItemType.AMOUNT_RESOURCE.equals(item.getType())) {
 						// Produce amount resources.
-//						AmountResource resource = ResourceUtil.findAmountResource(item.getName());
-						int id = ResourceUtil.findIDbyAmountResourceName(item.getName());						
+						int id = ResourceUtil.findIDbyAmountResourceName(item.getName());
 						double amount = item.getAmount();
-						double capacity = inv.getAmountResourceRemainingCapacity(id, true, false);
+						double capacity = settlement.getAmountResourceRemainingCapacity(id);
 						if (item.getAmount() > capacity) {
 							double overAmount = item.getAmount() - capacity;
-							logger.fine("Not enough storage capacity to store " + overAmount + " of " + item.getName()
+							logger.severe("Not enough storage capacity to store " + overAmount + " of " + item.getName()
 									+ " from " + process.getInfo().getName() + " at " + settlement.getName());
 							amount = capacity;
 						}
-						inv.storeAmountResource(id, amount, true);
-						// Add tracking supply
-						inv.addAmountSupply(id, amount);
+						settlement.storeAmountResource(id, amount);
 						// Add to the daily output
 						settlement.addOutput(id, amount, process.getTotalWorkTime());
-					} 
-					
+					}
+
 					else if (ItemType.PART.equals(item.getType())) {
 						// Produce parts.
 						Part part = (Part) ItemResourceUtil.findItemResource(item.getName());
-						int id = part.getID();//ItemResourceUtil.findIDbyItemResourceName(item.getName());
+						int id = part.getID();
 						int num = (int) item.getAmount();
 						double mass = num * part.getMassPerItem();
-						double capacity = inv.getGeneralCapacity();
+						double capacity = settlement.getCargoCapacity();
 						if (mass <= capacity) {
-							inv.storeItemResources(id, num);
-							// Add tracking supply
-							inv.addItemSupply(id, num);
+							settlement.storeItemResource(id, num);
 							// Add to the daily output
 							settlement.addOutput(id, num, process.getTotalWorkTime());
 						}
-					} 
-					
+					}
+
 					else if (ItemType.EQUIPMENT.equals(item.getType())) {
 						// Produce equipment.
 						String equipmentType = item.getName();
 						int number = (int) item.getAmount();
 						for (int x = 0; x < number; x++) {
 							Equipment equipment = EquipmentFactory.createEquipment(equipmentType,
-									settlement.getCoordinates(), false);
-							equipment.setName(unitManager.getNewName(UnitType.EQUIPMENT, equipmentType, null, null));
+									settlement);
+
 							// Place this equipment within a settlement
-//							inv.storeUnit(equipment);
-//							unitManager.addUnit(equipment);
-							unitManager.addEquipmentID(equipment);
-							// TODO: how to add tracking supply for equipment
+							unitManager.addUnit(equipment);
+							// Add this equipment as being owned by this settlement
+							settlement.addEquipment(equipment);
+							// Set the container unit
+							equipment.setContainerUnit(settlement);
 							// Add to the daily output
 							settlement.addOutput(equipment.getIdentifier(), number, process.getTotalWorkTime());
 						}
-					} 
-					
+					}
+
 					else if (ItemType.VEHICLE.equals(item.getType())) {
 						// Produce vehicles.
 						String vehicleType = item.getName();
-						String sponsor = settlement.getSponsor();
+						ReportingAuthority sponsor = settlement.getSponsor();
 						int number = (int) item.getAmount();
 						for (int x = 0; x < number; x++) {
+							String name = Vehicle.generateName(vehicleType, sponsor);
 							if (LightUtilityVehicle.NAME.equalsIgnoreCase(vehicleType)) {
-								String name = unitManager.getNewVehicleName(LightUtilityVehicle.NAME, sponsor);
 								unitManager.addUnit(new LightUtilityVehicle(name, vehicleType, settlement));
-							} else {
-								String name = unitManager.getNewVehicleName(vehicleType, sponsor);
+							}
+							else if (VehicleType.DELIVERY_DRONE.getName().equalsIgnoreCase(vehicleType)) {
+								unitManager.addUnit(new Drone(name, vehicleType, settlement));
+							}
+							else {
 								unitManager.addUnit(new Rover(name, vehicleType, settlement));
 							}
 							// Add to the daily output
 							settlement.addOutput(VehicleType.convertName2ID(vehicleType), number, process.getTotalWorkTime());
 						}
-					} 
-					
+					}
+
 					else
 						throw new IllegalStateException(
 								"Manufacture.addProcess(): output: " + item.getType() + " not a valid type.");
 
-					// Recalculate settlement good value for output item.
-					settlement.getGoodsManager().updateGoodValue(ManufactureUtil.getGood(item), false);
+					Good good = GoodsUtil.getGood(item.getName());
+					if (good == null) {
+						logger.severe(item.getName() + " is not a good.");
+					}
+					else
+						// Recalculate settlement good value for the output item.
+						settlement.getGoodsManager().determineGoodValue(good);
 				}
 			}
-		} 
-		
+		}
+
 		else {
 
 			// Premature end of process. Return all input materials.
-			// TODO: should some resources be consumed and irreversible ? 
-			
-			// WARNING : The UnitManager instance will be stale after loading from a saved
-			// sim
-			// It will fail to run methods in Settlement and without any warning as to why
-			// that it fails.
-//			UnitManager unitManager = Simulation.instance().getUnitManager();
-
+			// Note: should some resources be consumed and irreversible ?
 			Iterator<ManufactureProcessItem> j = process.getInfo().getInputList().iterator();
 			while (j.hasNext()) {
 				ManufactureProcessItem item = j.next();
@@ -588,61 +575,58 @@ public class Manufacture extends Function implements Serializable {
 						// Produce amount resources.
 						AmountResource resource = ResourceUtil.findAmountResource(item.getName());
 						double amount = item.getAmount();
-						double capacity = inv.getAmountResourceRemainingCapacity(resource, true, false);
+						double capacity = settlement.getAmountResourceRemainingCapacity(resource.getID());
 						if (item.getAmount() > capacity) {
 							double overAmount = item.getAmount() - capacity;
-							logger.severe("Not enough storage capacity to store " + overAmount + " of " + item.getName()
-									+ " from " + process.getInfo().getName() + " at " + settlement.getName());
+							logger.severe("Premature ending '" +  process.getInfo().getName() + "'. "
+									+ "Not enough storage capacity to store " + overAmount + " of " + item.getName()
+									+ " at " + settlement.getName());
 							amount = capacity;
 						}
-						inv.storeAmountResource(resource, amount, true);
-					} 
-					
+						settlement.storeAmountResource(resource.getID(), amount);
+					}
+
 					else if (ItemType.PART.equals(item.getType())) {
 						// Produce parts.
 						Part part = (Part) ItemResourceUtil.findItemResource(item.getName());
 						int num = (int) item.getAmount();
-						int id = part.getID();//ItemResourceUtil.findIDbyItemResourceName(item.getName());
+						int id = part.getID();
 						double mass = num * part.getMassPerItem();
-						double capacity = inv.getGeneralCapacity();
+						double capacity = settlement.getCargoCapacity();
 						if (mass <= capacity) {
-							inv.storeItemResources(id, num);
+							settlement.storeItemResource(id, num);
 						}
-					} 
-					
+					}
+
 					else if (ItemType.EQUIPMENT.equals(item.getType())) {
 						// Produce equipment.
 						String equipmentType = item.getName();
 						int number = (int) item.getAmount();
 						for (int x = 0; x < number; x++) {
 							Equipment equipment = EquipmentFactory.createEquipment(equipmentType,
-									settlement.getCoordinates(), false);
-							equipment.setName(unitManager.getNewName(UnitType.EQUIPMENT, equipmentType, null, null));
-//							inv.storeUnit(equipment);
+									settlement);
+							unitManager.addUnit(equipment);
 						}
-					} 
-					
+					}
+
 					else if (ItemType.VEHICLE.equals(item.getType())) {
 						// Produce vehicles.
 						String vehicleType = item.getName();
 						int number = (int) item.getAmount();
+						 ReportingAuthority sponsor = settlement.getSponsor();
 						for (int x = 0; x < number; x++) {
+							String name = Vehicle.generateName(vehicleType, sponsor);
 							if (LightUtilityVehicle.NAME.equalsIgnoreCase(vehicleType)) {
-								String name = unitManager.getNewName(UnitType.VEHICLE, LightUtilityVehicle.NAME, null, null);
 								unitManager.addUnit(new LightUtilityVehicle(name, vehicleType, settlement));
 							} else {
-								String name = unitManager.getNewName(UnitType.VEHICLE, null, null, null);
 								unitManager.addUnit(new Rover(name, vehicleType, settlement));
 							}
 						}
-					} 
-					
+					}
+
 					else
 						throw new IllegalStateException(
 								"Manufacture.addProcess(): output: " + item.getType() + " not a valid type.");
-
-					// Recalculate settlement good value for output item.
-					settlement.getGoodsManager().updateGoodValue(ManufactureUtil.getGood(item), false);
 				}
 			}
 		}
@@ -654,23 +638,21 @@ public class Manufacture extends Function implements Serializable {
 		// numPrinterInUse--;
 
 		// Log process ending.
-		if (logger.isLoggable(Level.FINEST)) {
-			// Settlement settlement = getBuilding().getBuildingManager().getSettlement();
-			logger.finest(getBuilding() + " at " + settlement + " ending manufacturing process: "
-					+ process.getInfo().getName());
-		}
+		logger.log(getBuilding().getSettlement(), Level.FINEST, 20_000,
+				getBuilding() + " ending manufacturing process: "
+				+ process.getInfo().getName());
 	}
 
 	/**
 	 * Ends a salvage process.
-	 * 
+	 *
 	 * @param process   the process to end.
 	 * @param premature true if process is ended prematurely.
 	 * @throws BuildingException if error ending process.
 	 */
 	public void endSalvageProcess(SalvageProcess process, boolean premature) {
 		Settlement settlement = building.getSettlement();
-	
+
 		Map<Integer, Integer> partsSalvaged = new ConcurrentHashMap<>(0);
 
 		if (!premature) {
@@ -704,15 +686,19 @@ public class Manufacture extends Function implements Serializable {
 
 				if (totalNumber > 0) {
 					partsSalvaged.put(id, totalNumber);
-					Inventory inv = building.getInventory();
-					
-					double mass = totalNumber * part.getMassPerItem();
-					double capacity = inv.getGeneralCapacity();
-					if (mass <= capacity)
-						inv.storeItemResources(id, totalNumber);
 
-					// Recalculate settlement good value for salvaged part.
-					settlement.getGoodsManager().updateGoodValue(GoodsUtil.getResourceGood(part), false);
+					double mass = totalNumber * part.getMassPerItem();
+					double capacity = settlement.getCargoCapacity();
+					if (mass <= capacity)
+						settlement.storeItemResource(id, totalNumber);
+
+					Good good = GoodsUtil.getGood(part.getName());
+					if (good == null) {
+						logger.severe(part.getName() + " is not a good.");
+					}
+					else
+						// Recalculate settlement good value for salvaged part.
+						settlement.getGoodsManager().determineGoodValue(good);
 				}
 			}
 		}
@@ -723,20 +709,17 @@ public class Manufacture extends Function implements Serializable {
 		salvages.remove(process);
 
 		// Log salvage process ending.
-		if (logger.isLoggable(Level.FINEST)) {
-			// Settlement settlement = getBuilding().getBuildingManager().getSettlement();
-			logger.finest(getBuilding() + " at " + settlement + " ending salvage process: " + process.toString());
-		}
+		logger.log(getBuilding().getSettlement(), Level.FINEST, 20_000,
+				getBuilding() + " ending salvage process: " + process.toString());
+
 	}
 
 	@Override
 	public double getMaintenanceTime() {
 		double result = 0D;
-
 		// Add maintenance for tech level.
 		result += techLevel * 10D;
-
-		// Add maintenance for concurrent process capacity.
+		// Add maintenance for num of printers in use.
 		result += numPrintersInUse * 10D;
 
 		return result;
@@ -745,53 +728,47 @@ public class Manufacture extends Function implements Serializable {
 	/**
 	 * Check if enough 3D printer(s) are supporting the manufacturing
 	 * processes
-	 * @param pulse 
+	 * @param pulse
 	 */
 	public void checkPrinters(ClockPulse pulse) {
 		// Check only once a day for # of processes that are needed.
 		if (pulse.isNewSol()) {
 			// Gets the available number of printers in storage
-			int numAvailable = building.getInventory().getItemResourceNum(printerID); // b_inv
-			
-//			System.out.println(building.getSettlement() 
-//					+ "'s supportingProcesses: " + supportingProcesses
-//					+ "   maxProcesses: " + maxProcesses);
+			int numAvailable = building.getSettlement().getItemResourceStored(printerID);
 
-			// TODO: create a settler's task to replace printer manually
-			
+			// NOTE: it's reasonable to create a settler's task to install a 3-D printer manually over a period of time
 			if (numPrintersInUse < numMaxConcurrentProcesses) {
 				int deficit = numMaxConcurrentProcesses - numPrintersInUse;
-				LogConsolidated.log(logger, Level.INFO, 1_000, sourceName,
-						"[" + getBuilding().getSettlement() + "] " 
-						+ getBuilding() + " - "
-						+ numAvailable 
-						+ " 3D-printer(s) in stock.");
-				LogConsolidated.log(logger, Level.INFO, 1_000, sourceName,
-						"[" + getBuilding().getSettlement() + "] " 
-						+ getBuilding() + " - "
-						+ numPrintersInUse 
+				logger.info(getBuilding().getSettlement(), 20_000,
+						getBuilding() + " - "
+						+ numAvailable
+						+ " 3D-printer(s) in storage.");
+				logger.info(getBuilding().getSettlement(), 20_000,
+						getBuilding() + " - "
+						+ numPrintersInUse
 						+ " 3D-printer(s) in use.");
 
 				if (deficit > 0 && numAvailable > 0) {
-					int size = deficit;
-					if (numAvailable < deficit) {
-						size = numAvailable;
-					}
+					int size = Math.min(numAvailable, deficit);
 					for (int i=0; i<size; i++) {
 						numPrintersInUse++;
 						numAvailable--;
-						building.getInventory().retrieveItemResources(printerID, 1);
+						int lacking = building.getSettlement().retrieveItemResource(printerID, 1);
+						if (lacking > 0) {
+							logger.info(getBuilding().getSettlement(), 20_000,
+									"No 3D-printer available for " + getBuilding() + ".");
+						}
 					}
-					
-					LogConsolidated.log(logger, Level.INFO, 1_000, sourceName,
-							"[" + getBuilding().getSettlement() + "] " 
-							+ getBuilding() + " - "
-							+ size 
+
+					logger.info(getBuilding().getSettlement(), 20_000,
+							getBuilding() + " - "
+							+ size
 							+ " 3D-printer(s) just installed.");
-					
-				}			
+				}
 			}
-            //TODO: determine when to push for building new 3D printers
+
+            // NOTE: if not having enough printers,
+			// determine how to use GoodsManager to push for making new 3D printers
 		}
 	}
 
@@ -801,7 +778,7 @@ public class Manufacture extends Function implements Serializable {
 //	public void distributePrinters() {
 //		Settlement settlement = building.getSettlement();
 //		Inventory inv = building.getInventory();
-//		
+//
 //		int s_available = inv.getItemResourceNum(printerID);
 //		int s_needed = settlement.getSumOfManuProcesses();
 //		int surplus = s_available - s_needed;

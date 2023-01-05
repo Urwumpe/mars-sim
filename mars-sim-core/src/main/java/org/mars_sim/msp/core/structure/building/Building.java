@@ -1,37 +1,48 @@
-/**
+/*
  * Mars Simulation Project
  * Building.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-28
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.core.structure.building;
 
-import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Set;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
+import org.mars_sim.msp.core.BoundedObject;
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.LocalBoundedObject;
-import org.mars_sim.msp.core.LogConsolidated;
+import org.mars_sim.msp.core.LocalPosition;
+import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.UnitEventType;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.equipment.ItemHolder;
+import org.mars_sim.msp.core.equipment.ResourceHolder;
+import org.mars_sim.msp.core.events.HistoricalEvent;
+import org.mars_sim.msp.core.events.HistoricalEventManager;
+import org.mars_sim.msp.core.hazard.HazardEvent;
+import org.mars_sim.msp.core.location.LocationStateType;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.malfunction.Malfunction;
 import org.mars_sim.msp.core.malfunction.MalfunctionFactory;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
+import org.mars_sim.msp.core.person.EventType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
-import org.mars_sim.msp.core.person.ai.task.Maintenance;
+import org.mars_sim.msp.core.person.ai.task.MaintainBuilding;
 import org.mars_sim.msp.core.person.ai.task.Repair;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.structure.BuildingTemplate;
@@ -40,16 +51,16 @@ import org.mars_sim.msp.core.structure.Structure;
 import org.mars_sim.msp.core.structure.building.connection.InsidePathLocation;
 import org.mars_sim.msp.core.structure.building.function.Administration;
 import org.mars_sim.msp.core.structure.building.function.AstronomicalObservation;
-import org.mars_sim.msp.core.structure.building.function.BuildingAirlock;
 import org.mars_sim.msp.core.structure.building.function.BuildingConnection;
 import org.mars_sim.msp.core.structure.building.function.Communication;
+import org.mars_sim.msp.core.structure.building.function.Computation;
 import org.mars_sim.msp.core.structure.building.function.EVA;
 import org.mars_sim.msp.core.structure.building.function.EarthReturn;
 import org.mars_sim.msp.core.structure.building.function.Exercise;
 import org.mars_sim.msp.core.structure.building.function.FoodProduction;
 import org.mars_sim.msp.core.structure.building.function.Function;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
-import org.mars_sim.msp.core.structure.building.function.GroundVehicleMaintenance;
+import org.mars_sim.msp.core.structure.building.function.VehicleGarage;
 import org.mars_sim.msp.core.structure.building.function.HeatMode;
 import org.mars_sim.msp.core.structure.building.function.Heating;
 import org.mars_sim.msp.core.structure.building.function.LifeSupport;
@@ -68,11 +79,12 @@ import org.mars_sim.msp.core.structure.building.function.Storage;
 import org.mars_sim.msp.core.structure.building.function.SystemType;
 import org.mars_sim.msp.core.structure.building.function.ThermalGeneration;
 import org.mars_sim.msp.core.structure.building.function.VehicleMaintenance;
-import org.mars_sim.msp.core.structure.building.function.WasteDisposal;
+import org.mars_sim.msp.core.structure.building.function.WasteProcessing;
 import org.mars_sim.msp.core.structure.building.function.cooking.Cooking;
 import org.mars_sim.msp.core.structure.building.function.cooking.Dining;
 import org.mars_sim.msp.core.structure.building.function.cooking.PreparingDessert;
 import org.mars_sim.msp.core.structure.building.function.farming.Farming;
+import org.mars_sim.msp.core.structure.building.function.farming.Fishery;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
@@ -80,463 +92,281 @@ import org.mars_sim.msp.core.tool.RandomUtil;
 /**
  * The Building class is a settlement's building.
  */
-public class Building extends Structure implements Malfunctionable, Indoor, // Comparable<Building>,
-		LocalBoundedObject, InsidePathLocation, Temporal, Serializable {
+public class Building extends Structure implements Malfunctionable, Indoor, 
+		LocalBoundedObject, InsidePathLocation, Temporal, ResourceHolder, ItemHolder {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 	// default logger.
-	private static final Logger logger = Logger.getLogger(Building.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	private static final SimLogger logger = SimLogger.getLogger(Building.class.getName());
 
-	public static final String TYPE = SystemType.BUILDING.getName();
-	
-	public static final String GREENHOUSE = "greenhouse";
-
-	public static final String INFLATABLE_GREENHOUSE = "inflatable greenhouse";
-	
-	public static final String INGROUND_GREENHOUSE = "inground greenhouse";
-	
-	public static final String LARGE_GREENHOUSE = "large greenhouse";
-		
-	public static final String HALLWAY = "hallway";
-	
-	public static final String TUNNEL = "tunnel";
-			
-	public static final String ASTRONOMY_OBSERVATORY = "Astronomy Observatory";
-	
-	public static final String EVA_AIRLOCK = "EVA Airlock";
-	
 	public static final int TISSUE_CAPACITY = 20;
-	
-	/** The unit count for this robot. */
-	private static int uniqueCount = Unit.FIRST_BUILDING_UNIT_ID;
-	
+
 	/** The height of an airlock in meters */
 	// Assume an uniform height of 2.5 meters in all buildings
-	public static final double HEIGHT = 2.5; 
-	/** The volume of an airlock in cubic meters */
-	public static final double AIRLOCK_VOLUME_IN_CM = BuildingAirlock.AIRLOCK_VOLUME_IN_CM; // 3 * 2 * 2; //in m^3
+	public static final double HEIGHT = 2.5;
 	/** 500 W heater for use during EVA ingress */
-	public static final double kW_EVA_HEATER = .5D; //
+	public static final double kWEvaHeater = .5D;
 	// Assuming 20% chance for each person to witness or be conscious of the
 	// meteorite impact in an affected building
 	public static final double METEORITE_IMPACT_PROBABILITY_AFFECTED = 20;
 
-	// The influx of meteorites entering Mars atmosphere can be estimated as
-	// log N = -0.689* log(m) + 4.17
-	// N is the number of meteorites per year having masses greater than m grams
-	// incident
-	// on an area of 10^6 km2 (Bland and Smith, 2000).
-	// see initial implementation in MeteoriteImpactImpl class
-
-	/**
-	 * The thickness of the Aluminum wall of a building in meter. Typically between
-	 * 10^-5 (.00001) and 10^-2 (.01) [in m]
-	 */
-	public static final double WALL_THICKNESS_ALUMINUM = 0.0000254;
-
-	// inflatable greenhouse : 4.815E-4 or 0.0004815
-	// large greenhouse : 9.63E-4 or 0.000963
-
-	/** The thickness of the wall of a greenhouse building in meter */
-	public static double wall_thickness_inflatable;// = 0.0000211;
-	/**
-	 * The safety factor when determining the wall/canopy thickness for an
-	 * inflatable greenhouse.
-	 */
-	private static final double safety_factor = 1.5D;
-	/**
-	 * The design pressure when determining the wall/canopy thickness for an
-	 * inflatable greenhouse.
-	 */
-	private static final double design_pressure = 14.7 - 4; // [in psi]
-	/** The diameter of the canopy thickness for an inflatable greenhouse. */
-	private static double diameter;
-	/**
-	 * The tensile strength of the composite material when determining the
-	 * wall/canopy thickness for an inflatable greenhouse.
-	 */
-	private static final double kevlar_tensile_strength = 100000; // [in psi] assume kevlar 49/epoxy
-
-	// Note : the typical values of penetrationThicknessOnAL for a 1 g/cm^3, 1 km/s
-	// meteorite can be .0010 to 0.0022 meter
-	// Loaded wearLifeTime, maintenanceTime, roomTemperature from buildings.xml
-	
 	/** A list of functions of this building. */
-	protected transient List<Function> functions;
-//	private static List<FunctionType> functionTypes = buildingConfig.getBuildingFunctions();
-	
-	/** Default : 3340 Sols (5 orbits). Will be overridden by the value from buildings.xml for each building type. */
-	private int wearLifeTime = 3_340_000;
-	/** Default : 50 millisols maintenance time. */
-	private int maintenanceTime = 50;
-	/** Default : 22.5 deg celsius. */
-	private double initialTemperature = 22.5D;
-	// public double GREENHOUSE_TEMPERATURE = 24D;
+	protected List<Function> functions;
 
 	// Data members
-	/** Unique identifier for this building. */
-	private int identifier;
+	boolean isImpactImminent = false;
+	/** Checked by getAllImmovableBoundedObjectsAtLocation() in LocalAreaUtil */
+	boolean inTransportMode = true;
+	
+	/** The designated zone where this building is located at. */
+	protected int zone;
 	/** Unique template id assigned for the settlement template of this building belong. */
 	protected int templateID;
-	/** The inhabitable ID for this building. */
-	protected int inhabitableID = -1;
 	/** The base level for this building. -1 for in-ground, 0 for above-ground. */
 	protected int baseLevel;
-	
-	/** Unique identifier for the settlement of this building. */
-	protected Integer settlementID;
 
+	/** Default : 22.5 deg celsius. */
+	private double initialTemperature = 22.5D;
 	protected double width;
 	protected double length;
 	protected double floorArea;
-	protected double xLoc;
-	protected double yLoc;
+	private ConstructionType construction;
+	protected LocalPosition loc;
 	protected double zLoc;
 	protected double facing;
 	protected double basePowerRequirement;
 	protected double basePowerDownPowerRequirement;
-	protected double powerNeededForEVAheater;
+	protected double powerNeededForEVAHeater;
 
-	boolean isImpactImminent = false;
-	/** Checked by getAllImmovableBoundedObjectsAtLocation() in LocalAreaUtil */
-	boolean inTransportMode = true;
-	/** building id on the building template. */
-	private int bid;
+
 	/** Type of building. */
 	protected String buildingType;
-	/** Nick name for this building. */
-	private String nickName;
 	/** Description for this building. */
 	private String description;
-	
-	/** The BuildingManager instance. */
-//	protected BuildingManager manager;
+
+	/** Unique identifier for the settlement of this building. */
+	private Integer settlementID;
+	/** The settlement of this building. */
+	private transient Settlement settlement;
+
 	/** The MalfunctionManager instance. */
 	protected MalfunctionManager malfunctionManager;
-	
-	private transient Communication comm;
-	private transient ThermalGeneration furnace;
-	private transient PowerGeneration powerGen;
-	private transient PowerStorage powerStorage;
-	private transient LifeSupport lifeSupport;
-	private transient RoboticStation roboticStation;
-	private transient Heating heating;
-	private transient EVA eva;
-	private transient Farming farm;
-	private transient LivingAccommodations livingAccommodations;
-	private transient PreparingDessert preparingDessert;
-	private transient Cooking cooking;
-	private transient Management management;
-	private transient MedicalCare medical;
-	private transient WasteDisposal waste;
-	private transient VehicleMaintenance garage;
-	private transient FoodProduction foodFactory;
-	private transient ResourceProcessing processing;
-	private transient Research lab;
-	private transient Manufacture workshop;
-	private transient Administration admin;
-	private transient Recreation rec;
-	private transient Dining dine;
-	private transient GroundVehicleMaintenance maint;
-	private transient AstronomicalObservation astro;
-	private transient Exercise gym;
-	private transient Storage storage;
-	
-	private static BuildingConfig buildingConfig;
-	private static Malfunction malfunctionMeteoriteImpact;
 
+	private Administration admin;
+	private AstronomicalObservation astro;
+	private Communication comm;
+	private Computation computation;
+	private Cooking cooking;
+	private Dining dine;
+	private EarthReturn earthReturn;
+	private EVA eva;
+	private Exercise gym;
+	private Farming farm;
+	private Fishery fish;
+	private FoodProduction foodFactory;
+	private VehicleGarage maint;
+	private Heating heating;
+	private LivingAccommodations livingAccommodations;
+	private LifeSupport lifeSupport;
+	private Management management;
+	private Manufacture manufacture;
+	private MedicalCare medicalCare;
+	private ThermalGeneration furnace;
+	private PowerGeneration powerGen;
+	private PowerStorage powerStorage;
+	private PreparingDessert preparingDessert;
+	private Recreation rec;
+	private Research lab;
+	private ResourceProcessing resourceProcessing;
+	private RoboticStation roboticStation;
+	private Storage storage;
+	private VehicleMaintenance vehicleMaintenance;
+	private WasteProcessing wasteProcessing;
+	
 	protected PowerMode powerModeCache;
 	protected HeatMode heatModeCache;
+	private BuildingCategory category;
 	
-	/**
-	 * Must be synchronised to prevent duplicate ids being assigned via different
-	 * threads.
-	 * 
-	 * @return
-	 */
-	private static synchronized int getNextIdentifier() {
-		return uniqueCount++;
-	}
-	
-	
-	/**
-	 * Get the unique identifier for this settlement
-	 * 
-	 * @return Identifier
-	 */
-	public int getIdentifier() {
-		return identifier;
-	}
-	
-	public void incrementID() {
-		// Gets the identifier
-		this.identifier = getNextIdentifier();
-	}
-	
+	private static HistoricalEventManager eventManager;
+
 	/**
 	 * Constructor 1. Constructs a Building object.
-	 * 
+	 *
 	 * @param template the building template.
 	 * @param manager  the building's building manager.
 	 * @throws BuildingException if building can not be created.
 	 */
 	public Building(BuildingTemplate template, BuildingManager manager) {
-		this(template.getID(), template.getBuildingType(), template.getNickName(), template.getWidth(),
-				template.getLength(), template.getXLoc(), template.getYLoc(), template.getFacing(), manager);
-		
-		this.bid = template.getID();
-//		this.manager = manager;
+		this(template.getID(), template.getZone(), template.getBuildingType(), template.getBuildingName(), template.getBounds(), manager);
+
 		buildingType = template.getBuildingType();
-		
-		settlementID = (Integer) manager.getSettlement().getIdentifier();
+		settlement = manager.getSettlement();
+		settlementID = settlement.getIdentifier();
 
-		// Set the instance of life support
 		// NOTE: needed for setting inhabitable id
-		if (hasFunction(FunctionType.LIFE_SUPPORT)) {
-			if (lifeSupport == null) {
-				lifeSupport = (LifeSupport) getFunction(FunctionType.LIFE_SUPPORT);
-				// Set up an inhabitable_building id for tracking composition of air
-				int id = manager.obtainNextInhabitableID();
-				setInhabitableID(id);
-			}
+		if (hasFunction(FunctionType.LIFE_SUPPORT)
+			&& lifeSupport == null) {
+			// Set the instance of life support
+			lifeSupport = (LifeSupport) getFunction(FunctionType.LIFE_SUPPORT);
 		}
-
-//		System.out.println(manager.getSettlement().getName() + "'s " + nickName + " (" + inhabitableID + ") is initialized.");
 	}
 
 	/**
 	 * Constructor 2 Constructs a Building object.
-	 * 
+	 *
 	 * @param id           the building's unique ID number.
 	 * @param buildingType the building Type.
-	 * @param nickName     the building's nick name.
-	 * @param w            the width (meters) of the building or -1 if not set.
-	 * @param l            the length (meters) of the building or -1 if not set.
-	 * @param xLoc         the x location of the building in the settlement.
-	 * @param yLoc         the y location of the building in the settlement.
-	 * @param facing       the facing of the building (degrees clockwise from
-	 *                     North).
+	 * @param name         the building's name.
+	 * @param bounds       the physical position of this Building
 	 * @param manager      the building's building manager.
 	 * @throws BuildingException if building can not be created.
 	 */
-	public Building(int id, String buildingType, String nickName, double w, double l, double xLoc, double yLoc,
-			double facing, BuildingManager manager) {
-		super(nickName, manager.getSettlement().getCoordinates());
-		
-		unitManager.addBuildingID(this);
+	public Building(int id, int zone, String buildingType, String name, BoundedObject bounds, BuildingManager manager) {
+		super(name, manager.getSettlement().getCoordinates());
 
 		this.templateID = id;
+		this.zone = zone;
 		this.buildingType = buildingType;
-		this.nickName = nickName;
-//		this.manager = manager;
 
-		settlementID = (Integer) manager.getSettlement().getIdentifier();
-		
-		this.xLoc = xLoc;
-		this.yLoc = yLoc;
-		this.facing = facing;
+		this.settlement = manager.getSettlement();
+		this.settlementID = settlement.getIdentifier();
+		setContainerID(settlementID);
 
-		buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
-		
-		malfunctionMeteoriteImpact = MalfunctionFactory
-				.getMeteoriteImpactMalfunction(MalfunctionFactory.METEORITE_IMPACT_DAMAGE);
+		this.loc = bounds.getPosition();
+		this.facing = bounds.getFacing();
 
-//		if (buildingType.equalsIgnoreCase("hallway") || buildingType.equalsIgnoreCase("tunnel")) {
-//			//b_inv = new Inventory(this);
-//			b_inv.addGeneralCapacity(100);
-//		} 
-//		else if (this.getBuildingType().toLowerCase().contains("greenhouse"))
-//			b_inv.addGeneralCapacity(1_000_000);
-//		else
-//			b_inv.addGeneralCapacity(100_000);
-//		}
+		BuildingSpec spec = SimulationConfig.instance().getBuildingConfiguration().getBuildingSpec(buildingType);
 
-		if (buildingType.toLowerCase().contains(GREENHOUSE)) {
-
-			if (buildingType.equalsIgnoreCase(INFLATABLE_GREENHOUSE))
-				diameter = 6;
-			else if (buildingType.equalsIgnoreCase(INGROUND_GREENHOUSE))
-				diameter = 5;
-			else if (buildingType.equalsIgnoreCase(LARGE_GREENHOUSE))
-				diameter = 12;
-
-			wall_thickness_inflatable = diameter * safety_factor * design_pressure / (2 * kevlar_tensile_strength);
-			// inflatable greenhouse : 4.815E-4 or 0.0004815
-			// large greenhouse : 9.63E-4 or 0.000963
-		}
-
+		construction = spec.getConstruction();
 		powerModeCache = PowerMode.FULL_POWER;
 		heatModeCache = HeatMode.HALF_HEAT;
-
-		if (buildingType.toLowerCase().contains(HALLWAY) || buildingType.toLowerCase().contains(TUNNEL)) {
-			length = l;
-			width = buildingConfig.getWidth(buildingType);
-		} 
-		
-		else {
-			width = buildingConfig.getWidth(buildingType);
-			length = buildingConfig.getLength(buildingType);
+		width = spec.getWidth();
+		if (width < 0) {
+			width = bounds.getWidth();
+		}
+		length = spec.getLength();
+		if (length < 0) {
+			length = bounds.getLength();
 		}
 
 		floorArea = length * width;
+		if (floorArea < 0) {
+			throw new IllegalArgumentException("Floor area cannot be -ve w=" + width + ", l=" + length);
+		}
 
-		baseLevel = buildingConfig.getBaseLevel(buildingType);
-		description = buildingConfig.getDescription(buildingType);
+		// Sets the base mass
+		setBaseMass(spec.getBaseMass());
+
+		baseLevel = spec.getBaseLevel();
+		description = spec.getDescription();
+		this.category = spec.getCategory();
 
 		// Get the building's functions
-		functions = determineFunctions();
+		functions = buildFunctions(spec);
 
 		// Get base power requirements.
-		basePowerRequirement = buildingConfig.getBasePowerRequirement(buildingType);
-		basePowerDownPowerRequirement = buildingConfig.getBasePowerDownPowerRequirement(buildingType);
-		wearLifeTime = buildingConfig.getWearLifeTime(buildingType);
-		maintenanceTime = buildingConfig.getMaintenanceTime(buildingType);
+		basePowerRequirement = spec.getBasePowerRequirement();
+		basePowerDownPowerRequirement = spec.getBasePowerDownPowerRequirement();
 
 		// Set room temperature
-		initialTemperature = buildingConfig.getRoomTemperature(buildingType);
+		initialTemperature = spec.getRoomTemperature();
 
 		// Determine total maintenance time.
-		double totalMaintenanceTime = maintenanceTime;
-		Iterator<Function> j = functions.iterator();
-		while (j.hasNext()) {
-			Function function = j.next();
-			totalMaintenanceTime += function.getMaintenanceTime();
+		double totalMaintenanceTime = spec.getMaintenanceTime();
+		for (Function mfunction : functions) {
+			totalMaintenanceTime += mfunction.getMaintenanceTime();
 		}
 
 		// Set up malfunction manager.
-		malfunctionManager = new MalfunctionManager(this, wearLifeTime, totalMaintenanceTime);
-		// Add scope to malfunction manager.
-		malfunctionManager.addScopeString(TYPE);
-
+		malfunctionManager = new MalfunctionManager(this, spec.getWearLifeTime(), totalMaintenanceTime);
+		// Add 'Building' to malfunction manager.
+		malfunctionManager.addScopeString(SystemType.BUILDING.getName());
+		// Add building's type to malfunction manager.
+		malfunctionManager.addScopeString(spec.getBuildingType());
+		
 		// Add each function to the malfunction scope.
-		// e.g. malfunctionManager.addScopeString(FunctionType.LIFE_SUPPORT.getName());
-		Iterator<Function> i = functions.iterator();
-		while (i.hasNext()) {
-			Function function = i.next();
-			int size = function.getMalfunctionScopeStrings().length;
-			for (int x = 0; x < size; x++) {
-				malfunctionManager.addScopeString(function.getMalfunctionScopeStrings()[x]);
+		for (Function sfunction : functions) {
+			String[] scopes = sfunction.getMalfunctionScopeStrings();
+			for (String scope : scopes) {
+				malfunctionManager.addScopeString(scope);
 			}
-			// malfunctionManager.addScopeString(function.getFunctionType().getName());
 		}
-		
-		
-//		for (Function f : functions)
-//			for (String s : f.getMalfunctionScopeStrings())
-//				malfunctionManager.addScopeString(f.getMalfunctionScopeStrings()[s]);
-		
 
-		// Initialize lab space for storing crop tissue cultures
-//		if (hasFunction(FunctionType.RESEARCH) && getResearch().hasSpecialty(ScienceType.BOTANY)) {
-//			lab = getResearch();
-//			// Add .1 kg of tissues for each food crop
-//			for (Integer ar : tissues) {
-////				System.out.println("ar : " + ar);
-//				// Warning : cannot add capacity this way because a new tissue instance will be created
-////				getInventory().addAmountResourceTypeCapacity(ar, TISSUE_CAPACITY); 
-//				getInventory().storeAmountResource(ar, .1, false);
-//				getInventory().addAmountDemand(ar, .1);
-//			}
-//		}
+		// If no life support then no internal repairs
+		malfunctionManager.setSupportsInside(hasFunction(FunctionType.LIFE_SUPPORT));
 	}
+
 
 	/**
 	 * Constructor 3 (for use by Mock Building in Unit testing)
-	 * 
+	 *
 	 * @return manager
 	 */
 	protected Building(BuildingManager manager, String name) {
 //		super("Mock Building", new Coordinates(0D, 0D));
 		super(name, new Coordinates(0D, 0D));
-		
-		unitManager.addBuildingID(this);
-//		unitManager.addUnit(this);
-		logger.info(name + "'s ID is " + getIdentifier());
-				
+
 		if (manager != null) {
-//			this.manager = manager;
-			// settlementID needs to be ready before calling this
-			settlementID = (Integer) manager.getSettlement().getIdentifier();
+			this.settlement = manager.getSettlement();
+			this.settlementID = settlement.getIdentifier();
 		}
 	}
 
 	/**
 	 * Constructor 4 (for use by Unit testing)
-	 * 
+	 *
 	 * @return manager
 	 */
 	protected Building() {
 		super("Mock Building", new Coordinates(0D, 0D));
 	}
-	
-	/**
-	 * Gets the settlement inventory of this building.
-	 * 
-	 * @return inventory
-	 */
-	public Inventory getSettlementInventory() {
-		return getSettlement().getInventory();
-	}
-
-	/**
-	 * Gets the settlement inventory of this building.
-	 * 
-	 * @return inventory
-	 */
-	public Inventory getInventory() {
-		return getSettlement().getInventory();
-	}
 
 	/**
 	 * Gets the description of a building.
-	 * 
+	 *
 	 * @return String description
 	 */
+	@Override
 	public String getDescription() {
 		return description;
 	}
 
 	/**
-	 * Sets building nickname
-	 * 
-	 * @param nick name
+	 * Get the category of this building
 	 */
-	public void setBuildingNickName(String name) {
-		this.nickName = name;
+	public BuildingCategory getCategory() {
+		return category;
 	}
 
 	/**
 	 * Gets the initial temperature of a building.
-	 * 
+	 *
 	 * @return temperature (deg C)
 	 */
 	public double getInitialTemperature() {
 		return initialTemperature;
 	}
 
-	
+
 	public Administration getAdministration() {
 		if (admin == null)
 			admin = (Administration) getFunction(FunctionType.ADMINISTRATION);
 		return admin;
 	}
 
-
 	public AstronomicalObservation getAstronomicalObservation() {
 		if (astro == null)
-			astro = (AstronomicalObservation) getFunction(FunctionType.ASTRONOMICAL_OBSERVATIONS);
+			astro = (AstronomicalObservation) getFunction(FunctionType.ASTRONOMICAL_OBSERVATION);
 		return astro;
 	}
-	
+
 	public Dining getDining() {
 		if (dine == null)
 			dine = (Dining) getFunction(FunctionType.DINING);
 		return dine;
 	}
-	
+
 	public LifeSupport getLifeSupport() {
 		if (lifeSupport == null)
 			lifeSupport = (LifeSupport) getFunction(FunctionType.LIFE_SUPPORT);
@@ -547,6 +377,12 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		if (farm == null)
 			farm = (Farming) getFunction(FunctionType.FARMING);
 		return farm;
+	}
+
+	public Fishery getFishery() {
+		if (fish == null)
+			fish = (Fishery) getFunction(FunctionType.FISHERY);
+		return fish;
 	}
 
 	public Communication getComm() {
@@ -567,31 +403,33 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		if (gym == null)
 			gym = (Exercise) getFunction(FunctionType.EXERCISE);
 		return gym;
-
 	}
 
 	public EVA getEVA() {
-		// if (hasFunction(BuildingFunction.EVA))
-		// eva = (EVA) getFunction(BuildingFunction.EVA);
-		// else
-		// return null;
 		if (eva == null)
 			eva = (EVA) getFunction(FunctionType.EVA);
 		return eva;
 	}
-	
+
+	public EarthReturn getEarthReturn() {
+		if (earthReturn == null)
+			earthReturn = (EarthReturn) getFunction(FunctionType.EARTH_RETURN);
+		return earthReturn;
+	}
+
+
 	public FoodProduction getFoodProduction() {
 		if (foodFactory == null)
 			foodFactory = (FoodProduction) getFunction(FunctionType.FOOD_PRODUCTION);
 		return foodFactory;
 	}
-	
-	public GroundVehicleMaintenance getGroundVehicleMaintenance() {
+
+	public VehicleGarage getVehicleParking() {
 		if (maint == null)
-			maint = (GroundVehicleMaintenance) getFunction(FunctionType.GROUND_VEHICLE_MAINTENANCE);
+			maint = (VehicleGarage) getFunction(FunctionType.VEHICLE_MAINTENANCE);
 		return maint;
 	}
-	
+
 	public LivingAccommodations getLivingAccommodations() {
 		if (livingAccommodations == null)
 			livingAccommodations = (LivingAccommodations) getFunction(FunctionType.LIVING_ACCOMMODATIONS);
@@ -603,23 +441,29 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 			management = (Management) getFunction(FunctionType.MANAGEMENT);
 		return management;
 	}
-	
+
 	public Manufacture getManufacture() {
-		if (workshop == null)
-			workshop = (Manufacture) getFunction(FunctionType.MANUFACTURE);
-		return workshop;
+		if (manufacture == null)
+			manufacture = (Manufacture) getFunction(FunctionType.MANUFACTURE);
+		return manufacture;
 	}
-	
+
 	public MedicalCare getMedical() {
-		if (medical == null)
-			medical = (MedicalCare) getFunction(FunctionType.MEDICAL_CARE);
-		return medical;
+		if (medicalCare == null)
+			medicalCare = (MedicalCare) getFunction(FunctionType.MEDICAL_CARE);
+		return medicalCare;
 	}
 
 	public PowerGeneration getPowerGeneration() {
 		if (powerGen == null)
 			powerGen = (PowerGeneration) getFunction(FunctionType.POWER_GENERATION);
 		return powerGen;
+	}
+
+	public Computation getComputation() {
+		if (computation == null)
+			computation = (Computation) getFunction(FunctionType.COMPUTATION);
+		return computation;
 	}
 
 	public PowerStorage getPowerStorage() {
@@ -639,7 +483,7 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 			rec = (Recreation) getFunction(FunctionType.RECREATION);
 		return rec;
 	}
-	
+
 	public Research getResearch() {
 		if (lab == null)
 			lab = (Research) getFunction(FunctionType.RESEARCH);
@@ -647,11 +491,11 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	}
 
 	public ResourceProcessing getResourceProcessing() {
-		if (processing == null)
-			processing = (ResourceProcessing) getFunction(FunctionType.RESOURCE_PROCESSING);
-		return processing;
+		if (resourceProcessing == null)
+			resourceProcessing = (ResourceProcessing) getFunction(FunctionType.RESOURCE_PROCESSING);
+		return resourceProcessing;
 	}
-
+	
 	public RoboticStation getRoboticStation() {
 		if (roboticStation == null)
 			roboticStation = (RoboticStation) getFunction(FunctionType.ROBOTIC_STATION);
@@ -670,22 +514,22 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 			storage = (Storage) getFunction(FunctionType.STORAGE);
 		return storage;
 	}
-	
-	public WasteDisposal getWaste() {
-		if (waste == null)
-			waste = (WasteDisposal) getFunction(FunctionType.WASTE_DISPOSAL);
-		return waste;
-	}
 
 	public VehicleMaintenance getVehicleMaintenance() {
-		if (garage == null)
-			garage = (VehicleMaintenance) getFunction(FunctionType.GROUND_VEHICLE_MAINTENANCE);
-		return garage;
+		if (vehicleMaintenance == null)
+			vehicleMaintenance = (VehicleMaintenance) getFunction(FunctionType.VEHICLE_MAINTENANCE);
+		return vehicleMaintenance;
 	}
 
+	public WasteProcessing getWasteProcessing() {
+		if (wasteProcessing == null)
+			wasteProcessing = (WasteProcessing) getFunction(FunctionType.WASTE_PROCESSING);
+		return wasteProcessing;
+	}
+	
 	/**
 	 * Gets the temperature of a building.
-	 * 
+	 *
 	 * @return temperature (deg C)
 	 */
 	public double getCurrentTemperature() {
@@ -697,7 +541,7 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 
 	/**
 	 * Gets a function type that has with openly available (empty) activity spot
-	 * 
+	 *
 	 * @return FunctionType
 	 */
 	public FunctionType getEmptyActivitySpotFunctionType() {
@@ -707,241 +551,193 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		else
 			return null;
 	}
-	
+
 	/**
 	 * Gets a function that has with openly available (empty) activity spot
-	 * 
+	 *
 	 * @return FunctionType
 	 */
 	public Function getEmptyActivitySpotFunction() {
-		List<Function> goodFunctions = new CopyOnWriteArrayList<Function>();
-		// Get the building's functions
-		if (functions == null)
-			functions = determineFunctions();
+		List<Function> goodFunctions = new ArrayList<>();
+
 		for (Function f : functions) {
 			if (f.hasEmptyActivitySpot())
 				goodFunctions.add(f);
 		}
-		
+
 		if (goodFunctions.isEmpty())
 			return null;
-		
+
 		// Choose a random function
 		int index = RandomUtil.getRandomInt(goodFunctions.size() - 1);
 
 		return goodFunctions.get(index);
 	}
-	
+
 	/**
 	 * Determines the building functions.
-	 * 
+	 *
 	 * @return list of building .
 	 * @throws Exception if error in functions.
 	 */
-	private List<Function> determineFunctions() {
-		List<Function> buildingFunctions = new CopyOnWriteArrayList<Function>();
-		// Set<Function> buildingFunctions = new HashSet<Function>();
-		if (buildingType == null) {
-			logger.info("Building : " + this);
-//			logger.info("Type : " + buildingType);
+	private List<Function> buildFunctions(BuildingSpec spec) {
+		List<Function> buildingFunctions = new ArrayList<>();
+
+		for(FunctionType supported : spec.getFunctionSupported()) {
+			FunctionSpec fSpec = spec.getFunctionSpec(supported);
+			switch (supported) {
+
+			case ADMINISTRATION:
+				buildingFunctions.add(new Administration(this, fSpec));
+				break;
+
+			case ASTRONOMICAL_OBSERVATION:
+				buildingFunctions.add(new AstronomicalObservation(this, fSpec));
+				break;
+
+			case BUILDING_CONNECTION:
+				buildingFunctions.add(new BuildingConnection(this, fSpec));
+				break;
+
+			case COMMUNICATION:
+				buildingFunctions.add(new Communication(this, fSpec));
+				break;
+
+			case COMPUTATION:
+				buildingFunctions.add(new Computation(this, fSpec));
+				break;
+
+			case COOKING:
+				buildingFunctions.add(new Cooking(this, fSpec));
+				break;
+
+			case DINING:
+				buildingFunctions.add(new Dining(this, fSpec));
+				break;
+
+			case EARTH_RETURN:
+				buildingFunctions.add(new EarthReturn(this, fSpec));
+				break;
+
+			case EVA:
+				buildingFunctions.add(new EVA(this, fSpec));
+				break;
+
+			case EXERCISE:
+				buildingFunctions.add(new Exercise(this, fSpec));
+				break;
+
+			case FARMING:
+				buildingFunctions.add(new Farming(this, fSpec));
+				break;
+
+			case FISHERY:
+				buildingFunctions.add(new Fishery(this, fSpec));
+				break;
+
+			case FOOD_PRODUCTION:
+				buildingFunctions.add(new FoodProduction(this, fSpec));
+				break;
+
+			case VEHICLE_MAINTENANCE:
+				buildingFunctions.add(new VehicleGarage(this, fSpec));
+				break;
+
+			case LIFE_SUPPORT:
+				buildingFunctions.add(new LifeSupport(this, fSpec));
+				break;
+
+			case LIVING_ACCOMMODATIONS:
+				buildingFunctions.add(new LivingAccommodations(this, fSpec));
+				break;
+
+			case MANAGEMENT:
+				buildingFunctions.add(new Management(this, fSpec));
+				break;
+
+			case MANUFACTURE:
+				buildingFunctions.add(new Manufacture(this, fSpec));
+				break;
+
+			case MEDICAL_CARE:
+				buildingFunctions.add(new MedicalCare(this, fSpec));
+				break;
+
+			case POWER_GENERATION:
+				buildingFunctions.add(new PowerGeneration(this, fSpec));
+				break;
+
+			case POWER_STORAGE:
+				buildingFunctions.add(new PowerStorage(this, fSpec));
+				break;
+
+			case PREPARING_DESSERT:
+				buildingFunctions.add(new PreparingDessert(this, fSpec));
+				break;
+				
+			case RECREATION:
+				buildingFunctions.add(new Recreation(this, fSpec));
+				break;
+
+			case RESEARCH:
+				buildingFunctions.add(new Research(this, fSpec));
+				break;
+
+			case RESOURCE_PROCESSING:
+				buildingFunctions.add(new ResourceProcessing(this, fSpec));
+				break;
+
+			case ROBOTIC_STATION:
+				buildingFunctions.add(new RoboticStation(this, fSpec));
+				break;
+
+			case STORAGE:
+				buildingFunctions.add(new Storage(this, fSpec));
+				break;
+
+			case THERMAL_GENERATION:
+				buildingFunctions.add(new ThermalGeneration(this, fSpec));
+				break;
+
+			case WASTE_PROCESSING:
+				buildingFunctions.add(new WasteProcessing(this, fSpec));
+				break;
+
+			default:
+				throw new IllegalArgumentException("Do not know how to build Function " + supported);
+			}
 		}
-		if (buildingConfig == null)
-			buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
-		// Set administration function.
-		if (buildingConfig.hasAdministration(buildingType))
-			buildingFunctions.add(new Administration(this));
-
-		// Set astronomical observation function
-		if (buildingConfig.hasAstronomicalObservation(buildingType))
-			buildingFunctions.add(new AstronomicalObservation(this));
-
-		// Set building connection function.
-		if (buildingConfig.hasBuildingConnection(buildingType))
-			buildingFunctions.add(new BuildingConnection(this));
-
-		// Set communication function.
-		if (buildingConfig.hasCommunication(buildingType))
-			buildingFunctions.add(new Communication(this));
-
-		if (buildingConfig.hasCooking(buildingType)) {
-			// Set cooking function.
-			buildingFunctions.add(new Cooking(this));
-			// Set preparing dessert function.
-			buildingFunctions.add(new PreparingDessert(this));
-		}
-
-		// Set dining function.
-		if (buildingConfig.hasDining(buildingType))
-			buildingFunctions.add(new Dining(this));
-
-		// Set Earth return function.
-		if (buildingConfig.hasEarthReturn(buildingType))
-			buildingFunctions.add(new EarthReturn(this));
-		// Set EVA function.
-		// eva = new EVA(this); if (config.hasEVA(buildingType))
-		// buildingFunctions.add(eva);
-		if (buildingConfig.hasEVA(buildingType))
-			buildingFunctions.add(new EVA(this));
-
-		// Set exercise function.
-		if (buildingConfig.hasExercise(buildingType))
-			buildingFunctions.add(new Exercise(this));
-
-		// Set farming function.
-		if (buildingConfig.hasFarming(buildingType))
-			buildingFunctions.add(new Farming(this));
-
-		// Added food production
-		if (buildingConfig.hasFoodProduction(buildingType))
-			buildingFunctions.add(new FoodProduction(this));
-
-		// Set ground vehicle maintenance function.
-		if (buildingConfig.hasGroundVehicleMaintenance(buildingType))
-			buildingFunctions.add(new GroundVehicleMaintenance(this));
-
-		// Set life support function.
-		if (buildingConfig.hasLifeSupport(buildingType))
-			buildingFunctions.add(new LifeSupport(this));
-
-		// Set living accommodations function.
-		if (buildingConfig.hasLivingAccommodations(buildingType))
-			buildingFunctions.add(new LivingAccommodations(this));
-
-		// Set management function.
-		if (buildingConfig.hasManagement(buildingType))
-			buildingFunctions.add(new Management(this));
-
-		// Set manufacture function.
-		if (buildingConfig.hasManufacture(buildingType))
-			buildingFunctions.add(new Manufacture(this));
-
-		// Set medical care function.
-		if (buildingConfig.hasMedicalCare(buildingType))
-			buildingFunctions.add(new MedicalCare(this));
-
-		// Set power generation function.
-		if (buildingConfig.hasPowerGeneration(buildingType))
-			buildingFunctions.add(new PowerGeneration(this));
-
-		// Set power storage function.
-		if (buildingConfig.hasPowerStorage(buildingType))
-			buildingFunctions.add(new PowerStorage(this));
-
-		// Set recreation function.
-		if (buildingConfig.hasRecreation(buildingType))
-			buildingFunctions.add(new Recreation(this));
-
-		// Set research function.
-		if (buildingConfig.hasResearchLab(buildingType))
-			buildingFunctions.add(new Research(this));
-
-		// Set resource processing function.
-		if (buildingConfig.hasResourceProcessing(buildingType))
-			buildingFunctions.add(new ResourceProcessing(this));
-
-		// Set robotic function.
-		if (buildingConfig.hasRoboticStation(buildingType))
-			buildingFunctions.add(new RoboticStation(this));
-
-		// Set storage function.
-		if (buildingConfig.hasStorage(buildingType))
-			buildingFunctions.add(new Storage(this));
-
-		// Set thermal generation function.
-		if (buildingConfig.hasThermalGeneration(buildingType))
-			buildingFunctions.add(new ThermalGeneration(this));
-
-		// Set thermal storage function.
-		// if (config.hasThermalStorage(buildingType)) buildingFunctions.add(new
-		// ThermalStorage(this));
-
 		return buildingFunctions;
 	}
 
 	/**
-	 * Checks if this building has the given functions (more than one).
-	 * 
-	 * @param function the name of the function.
-	 * @return true if it does.
-	 */
-	public boolean hasFunction(FunctionType[] fts) {
-		boolean result = false;
-		for (Function f : functions) {
-			for (FunctionType ft : fts) {
-				if (f.getFunctionType() == ft) {
-					result = result && true;
-				}
-			}
-		}
-		return result;
-	}
-
-	/**
-	 * Checks if this building has the given functions (more than one).
-	 * 
-	 * @param function the enum name of the functions.
-	 * @return true if it it does.
-	 */
-	public boolean hasFunction(FunctionType bf1, FunctionType bf2) {
-		return hasFunction(new FunctionType[] { bf1, bf2 });
-	}
-
-	/**
 	 * Checks if this building has a particular function.
-	 * 
+	 *
 	 * @param function the enum name of the function.
 	 * @return true if it does.
 	 */
-	public boolean hasFunction(FunctionType functionType) {		
-		if (functions == null)
-			functions = determineFunctions();
-		
+	public boolean hasFunction(FunctionType functionType) {
 		for (Function f : functions) {
 			if (f.getFunctionType() == functionType) {
 				return true;
 			}
 		}
-//		functions.stream()
-//		.filter((f) -> f.getFunction() == functionType)
-//		.forEach((f) -> {
-//        		return true;
-//		});
-//
-//
-//		Iterator<Function> i = functions.iterator();
-//		while (i.hasNext()) {
-//			if (i.next().getFunction() == function)
-//				return true;
-//		}
 		return false;
 	}
 
 	/**
 	 * Gets a function if the building has it.
-	 * 
+	 *
 	 * @param functionType {@link FunctionType} the function of the building.
 	 * @return function.
 	 * @throws BuildingException if building doesn't have the function.
 	 */
 	public Function getFunction(FunctionType functionType) {
-
-		if (functions == null)
-			functions = determineFunctions();
-		
 		for (Function f : functions) {
 			if (f.getFunctionType() == functionType) {
 				return f;
 			}
 		}
-//		
-//		 functions.forEach(f -> { if (f.getFunction() == functionType) return f; });
-//		 Iterator<Function> i = functions.iterator(); while (i.hasNext()) { Function
-//		 function = i.next(); if (function.getFunction() == functionType) result =
-//		 function; }	 
-		
-		// if (result != null) return result;
-		// else throw new IllegalStateException(buildingType + " does not have " +
-		// functionType);
 		return null;
 	}
 
@@ -958,78 +754,35 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 
 	/**
 	 * Remove a building function
-	 * 
+	 *
 	 * @param function
 	 */
 	public void removeFunction(Function function) {
 		if (functions.contains(function)) {
 			functions.remove(function);
-			// Need to remove the function from the building function map 
+			// Need to remove the function from the building function map
 			getBuildingManager().removeOneFunctionfromBFMap(this, function);
 		}
 	}
-	
+
 	/**
 	 * Gets the building's building manager.
-	 * 
+	 *
 	 * @return building manager
 	 */
 	public BuildingManager getBuildingManager() {
-		return unitManager.getSettlementByID(settlementID).getBuildingManager();
-	}
-
-	/**
-	 * Sets the building's nickName
-	 * 
-	 * @return none
-	 */
-	// Called by TabPanelBuilding.java for building nickname change
-	public void setNickName(String nickName) {
-		this.nickName = nickName;
-		changeName(nickName);
-	}
-
-	/**
-	 * Gets the building's nickName
-	 * 
-	 * @return building's nickName as a String
-	 */
-	// Called by TabPanelBuilding.java for building nickname change
-	public String getNickName() {
-		if (nickName == null || nickName.equalsIgnoreCase(""))
-			nickName = getName();			
-		return nickName;
-	}
-
-	/**
-	 * Gets the building type, not building's nickname
-	 * 
-	 * @return building type as a String.
-	 */
-	public String getName() {
-		return buildingType;
+		return settlement.getBuildingManager();
 	}
 
 	/**
 	 * Gets the building type.
-	 * 
+	 *
 	 * @return building type as a String. TODO internationalize building names for
 	 *         display in user interface.
 	 */
 	public String getBuildingType() {
 		return buildingType;
 	}
-
-//	/**
-//	 * Sets the building's type (formerly name)
-//	 * 
-//	 * @return none "buildingType" was formerly "name"
-//	 */
-//	public void setBuildingType(String type) {
-//		// System.out.println("input nickName is " + nickName);
-//		this.buildingType = type;
-//		// System.out.println("new buildingType is " + this.buildingType);
-//	}
 
 	public double getWidth() {
 		return width;
@@ -1045,7 +798,7 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 
 	/**
 	 * Returns the volume of the building in liter
-	 * 
+	 *
 	 * @return volume in liter
 	 */
 	public double getVolumeInLiter() {
@@ -1053,30 +806,13 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	}
 
 	@Override
-	public double getXLocation() {
-		return xLoc;
-	}
-
-	public void setXLocation(double x) {
-		this.xLoc = x;
-	}
-
-	@Override
-	public double getYLocation() {
-		return yLoc;
-	}
-
-	public void setYLocation(double y) {
-		this.yLoc = y;
+	public LocalPosition getPosition() {
+		return loc;
 	}
 
 	@Override
 	public double getFacing() {
 		return facing;
-	}
-
-	public void setFacing(double facing) {
-		this.facing = facing;
 	}
 
 	public boolean getInTransport() {
@@ -1089,7 +825,7 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 
 	/**
 	 * Gets the base level of the building.
-	 * 
+	 *
 	 * @return -1 for in-ground, 0 for above-ground.
 	 */
 	public int getBaseLevel() {
@@ -1098,37 +834,37 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 
 	/**
 	 * Gets the power this building currently requires for full-power mode.
-	 * 
+	 *
 	 * @return power in kW.
 	 */
 	public double getFullPowerRequired() {
 		double result = basePowerRequirement;
 
-		if (functions == null)
-			functions = determineFunctions();
-
 		// Determine power required for each function.
 		for (Function function : functions) {
 			double power = function.getFullPowerRequired();
-			result += power; 
+			if (power > 0) {
+//				System.out.println(nickName + " : "
+//					+ function.getFunctionType().toString() + " : "
+//					+ Math.round(power * 10.0)/10.0 + " kW");
+				result += power;
+			}
 		}
-		result += powerNeededForEVAheater;
-		return result;
+
+		return result + powerNeededForEVAHeater;
 	}
 
 	/**
 	 * Gets the power the building requires for power-down mode.
-	 * 
+	 *
 	 * @return power in kW.
 	 */
 	public double getPoweredDownPowerRequired() {
 		double result = basePowerDownPowerRequirement;
 
-		if (functions == null)
-			functions = determineFunctions();
 		// Determine power required for each function.
 		for (Function function : functions) {
-			result += function.getPoweredDownPowerRequired();	
+			result += function.getPoweredDownPowerRequired();
 		}
 
 		return result;
@@ -1150,7 +886,7 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 
 	/**
 	 * Gets the heat this building currently requires for full-power mode.
-	 * 
+	 *
 	 * @return heat in kW.
 	 */
 	public double getFullHeatRequired() {
@@ -1160,14 +896,12 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		if (furnace != null && heating != null)
 			result = furnace.getHeating().getFullHeatRequired();
 
-		// result += powerNeededForEVAheater;
-
 		return result;
 	}
 
 	/**
-	 * Sets the value of the heat generated 
-	 * 
+	 * Sets the value of the heat generated
+	 *
 	 * @param heatGenerated
 	 */
 	public void setHeatGenerated(double heatGenerated) {
@@ -1178,7 +912,7 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 
 	/**
 	 * Sets the required power for heating
-	 * 
+	 *
 	 * @param powerReq
 	 */
 	public void setPowerRequiredForHeating(double powerReq) {
@@ -1187,13 +921,9 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		heating.setPowerRequired(powerReq);
 	}
 
-//	 public void setPowerGenerated(double powerGenerated) {
-//		 powerGen.setPowerGenerated(powerGenerated);
-//	 }
-
 	/**
 	 * Gets the heat the building requires for power-down mode.
-	 * 
+	 *
 	 * @return heat in kJ/s.
 	 */
 	public double getPoweredDownHeatRequired() {
@@ -1219,7 +949,7 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 
 	/**
 	 * Gets the entity's malfunction manager.
-	 * 
+	 *
 	 * @return malfunction manager
 	 */
 	public MalfunctionManager getMalfunctionManager() {
@@ -1228,16 +958,16 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 
 	/**
 	 * Gets the total amount of lighting power in this greenhouse.
-	 * 
+	 *
 	 * @return power (kW)
 	 */
 	public double getTotalPowerForEVA() {
-		return powerNeededForEVAheater;
+		return powerNeededForEVAHeater;
 	}
 
 	/**
 	 * Calculates the number of people in the airlock
-	 * 
+	 *
 	 * @return number of people
 	 */
 	public int numOfPeopleInAirLock() {
@@ -1246,84 +976,79 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 			eva = (EVA) getFunction(FunctionType.EVA);
 		if (eva != null) {
 			num = eva.getAirlock().getOccupants().size();
-			powerNeededForEVAheater = num * kW_EVA_HEATER * .5D; // assume half of people are doing EVA ingress
-																	// statistically
+			// Note: Assuming (.5) half of people are doing EVA ingress statistically
+			powerNeededForEVAHeater = num * kWEvaHeater * .5D; 
 		}
 		return num;
 	}
 
-	
+
 	/**
 	 * Gets the number of people
-	 * 
+	 *
 	 * @return
 	 */
 	public int getNumPeople() {
 
 		int people = 0;
-		
+
 		if (lifeSupport != null) {
-			people = lifeSupport.getOccupants().size();
+			people = lifeSupport.getOccupantNumber();
 		}
 
 		return people;
 	}
-	
-	
+
+
 	/**
 	 * Gets a collection of inhabitants
-	 * 
+	 *
 	 * @return
 	 */
 	public Collection<Person> getInhabitants() {
-		Collection<Person> people = new ConcurrentLinkedQueue<Person>();
-
 		if (lifeSupport != null) {
-			for (Person occupant : lifeSupport.getOccupants()) {
-				if (!people.contains(occupant))
-					people.add(occupant);
-			}
+			return lifeSupport.getOccupants();
 		}
-
-		return people;
+		
+		return Collections.emptySet();
 	}
 
 	/**
 	 * Gets a collection of robots
-	 * 
+	 *
 	 * @return
 	 */
 	public Collection<Robot> getRobots() {
-		Collection<Robot> robots = new ConcurrentLinkedQueue<Robot>();
-
 		if (roboticStation != null) {
-			for (Robot occupant : roboticStation.getRobotOccupants()) {
-				if (!robots.contains(occupant))
-					robots.add(occupant);
-			}
+			return roboticStation.getRobotOccupants();
 		}
 		
-		return robots;
+		return Collections.emptySet();
 	}
-	
+
 	/**
 	 * Gets a collection of people affected by this entity. Children buildings
 	 * should add additional people as necessary.
-	 * 
+	 *
 	 * @return person collection
 	 */
 	public Collection<Person> getAffectedPeople() {
-		
-		Collection<Person> people = getInhabitants();
+
+		Collection<Person> people = new HashSet<>();
 		// Check all people in settlement.
-		Iterator<Person> i = unitManager.getSettlementByID(settlementID).getIndoorPeople().iterator();
+		Iterator<Person> i = settlement.getIndoorPeople().iterator();
 		while (i.hasNext()) {
 			Person person = i.next();
+
+			if (person.getBuildingLocation() == this) {
+				people.add(person);
+			}
+
 			Task task = person.getMind().getTaskManager().getTask();
 
 			// Add all people maintaining this building.
-			if (task instanceof Maintenance) {
-				if (((Maintenance) task).getEntity() == this) {
+			if (task instanceof MaintainBuilding) {
+				if (((MaintainBuilding) task).getEntity() == this) {
 					if (!people.contains(person))
 						people.add(person);
 				}
@@ -1342,82 +1067,8 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	}
 
 	/**
-	 * Gets a collection of affected robots
-	 * 
-	 * @return
-	 */
-	public Collection<Robot> getAffectedRobots() {
-		Collection<Robot> robots = new ConcurrentLinkedQueue<Robot>();
-
-		if (roboticStation != null) {
-			for (Robot occupant : roboticStation.getRobotOccupants()) {
-				if (!robots.contains(occupant))
-					robots.add(occupant);
-			}
-		}
-		
-		// Check all robots in settlement.
-		Iterator<Robot> i = unitManager.getSettlementByID(settlementID).getRobots().iterator();
-		while (i.hasNext()) {
-			Robot robot = i.next();
-			Task task = robot.getBotMind().getBotTaskManager().getTask();
-
-			// Add all robots maintaining this building.
-			if (task instanceof Maintenance) {
-				if (((Maintenance) task).getEntity() == this) {
-					if (!robots.contains(robot))
-						robots.add(robot);
-				}
-			}
-
-			// Add all robots repairing this facility.
-			if (task instanceof Repair) {
-				if (((Repair) task).getEntity() == this) {
-					if (!robots.contains(robot))
-						robots.add(robot);
-				}
-			}
-		}
-
-		return robots;
-	}
-
-	/**
-	 * String representation of this building.
-	 * 
-	 * @return building's nickName.
-	 */
-	public String toString() {
-		return nickName;
-	}
-
-	/**
-	 * Compares this object with the specified object for order.
-	 * 
-	 * @param o the Object to be compared.
-	 * @return a negative integer, zero, or a positive integer as this object is
-	 *         less than, equal to, or greater than the specified object.
-	 */
-	public int compareTo(Building o) {
-		return buildingType.compareToIgnoreCase(o.buildingType);
-	}
-
-	/**
-	 * Reloads instances after loading from a saved sim
-	 * 
-	 * @param {@link BuildingConfig}
-	 * @param {{@link UnitManager}
-	 */
-	public static void initializeInstances(BuildingConfig bc) {
-		buildingConfig = bc;
-
-		malfunctionMeteoriteImpact = MalfunctionFactory
-				.getMeteoriteImpactMalfunction(MalfunctionFactory.METEORITE_IMPACT_DAMAGE);
-	}
-	
-	/**
 	 * Time passing for building.
-	 * 
+	 *
 	 * @param time amount of time passing (in millisols)
 	 */
 	@Override
@@ -1426,21 +1077,17 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 			return false;
 		}
 
-		// Get the building's functions
-		if (functions == null)
-			functions = determineFunctions();
-		
 		// Send time to each building function.
 		for (Function f : functions)
 			f.timePassing(pulse);
-	
+
 		// If powered up, active time passing.
 		if (powerModeCache == PowerMode.FULL_POWER)
-			malfunctionManager.activeTimePassing(pulse.getElapsed());
-		
+			malfunctionManager.activeTimePassing(pulse);
+
 		// Update malfunction manager.
-		malfunctionManager.timePassing(pulse); 
-		
+		malfunctionManager.timePassing(pulse);
+
 		if (pulse.isNewSol()) {
 			// Determine if a meteorite impact will occur within the new sol
 			checkForMeteoriteImpact(pulse);
@@ -1454,69 +1101,50 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		return functions;
 	}
 
-//	public Map<Integer, ItemResource> getItemMap() {
-//		return itemMap;
-//	}
-
 	/*
 	 * Checks for possible meteorite impact for this building
 	 */
 	private void checkForMeteoriteImpact(ClockPulse pulse) {
-		// check for the passing of each day
-
+		// Reset the impact time
 		int moment_of_impact = 0;
 
-		Settlement settlement = unitManager.getSettlementByID(settlementID);
-		BuildingManager manager = settlement.getBuildingManager();
-					
 		// if assuming a gauissan profile, p = mean + RandomUtil.getGaussianDouble() * standardDeviation
 		// Note: Will have 70% of values will fall between mean +/- standardDeviation, i.e., within one std deviation
-		double probability = floorArea * manager.getProbabilityOfImpactPerSQMPerSol();
-//	 		logger.info(nickName + " : " + Math.round(probability*1_000_000D)/1_000_000D + " %.");
-		// probability is in percentage unit between 0% and 100%
+		double probability = floorArea * getBuildingManager().getProbabilityOfImpactPerSQMPerSol();
+		// Probability is in percentage unit between 0% and 100%
 		if (probability > 0 && RandomUtil.getRandomDouble(100D) <= probability) {
-//				 		logger.info("Sensors just picked up the new probability of a meteorite impact for " + nickName
-//				 		+ " in " + settlement + " to be " + Math.round(probability*100D)/100D + " %.");
 			isImpactImminent = true;
-			// set a time for the impact to happen any time between 0 and 1000 milisols
+			// Set a time for the impact to happen any time between 0 and 1000 milisols
 			moment_of_impact = RandomUtil.getRandomInt(1000);
 		}
 
 		if (isImpactImminent) {
-			
+
 			int now = pulse.getMarsTime().getMillisolInt();
 			// Note: at the fastest sim speed, up to ~5 millisols may be skipped.
 			// need to set up detection of the impactTimeInMillisol with a +/- 3 range.
-			int delta = (int) Math.sqrt(Math.sqrt(pulse.getMasterClock().getTimeRatio()));
+			int delta = (int) Math.sqrt(Math.sqrt(pulse.getMasterClock().getActualTR()));
+			
 			if (now > moment_of_impact - 2 * delta && now < moment_of_impact + 2 * delta) {
-				LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-						"[" + settlement + "] A meteorite impact over " + nickName + " is imminent.");
-				// Reset the boolean immmediately. This is for keeping track of whether the
-				// impact has occurred at msols
+				logger.log(this, Level.INFO, 0, "A meteorite impact over is imminent.");
+
+				// Reset the boolean immediately for keeping track of whether 
+				// the impact has occurred
 				isImpactImminent = false;
-				// find the length this meteorite can penetrate
-				double penetrated_length = manager.getWallPenetration();
+				// Find the length this meteorite can penetrate
+				double penetrated_length = getBuildingManager().getWallPenetration();
 
-				double wallThickness = 0;
-
-				if (buildingType.toLowerCase().contains("greenhouse"))
-					// if it's a greenhouse
-					wallThickness = wall_thickness_inflatable;
-				else
-					wallThickness = WALL_THICKNESS_ALUMINUM;
-
-				if (penetrated_length >= wallThickness) {
+				if (penetrated_length >= getWallThickness()) {
 					// Yes it's breached !
 					// Simulate the meteorite impact as a malfunction event for now
-					try {
-						malfunctionManager.activateMalfunction(MalfunctionFactory
-								.getMeteoriteImpactMalfunction(MalfunctionFactory.METEORITE_IMPACT_DAMAGE),
-								true);
-					} catch (Exception e) {
-						e.printStackTrace(System.err);
-					}
+					Malfunction mal = malfunctionManager.triggerMalfunction(MalfunctionFactory
+							.getMalfunctionByName(MalfunctionFactory.METEORITE_IMPACT_DAMAGE),
+							true, this);
 
-					String victimName = "None";
+					logger.log(this, Level.INFO, 0, mal.getName() + " just occurred.");
+					logger.log(this, Level.INFO, 0, "EventType: " + mal.getMalfunctionMeta().getName() + ".");
+					
+					String victimNames = null;
 //					String task = "N/A";
 
 					// check if someone under this roof may have seen/affected by the impact
@@ -1524,60 +1152,93 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 						if (person.getBuildingLocation() == this
 								&& RandomUtil.lessThanRandPercent(METEORITE_IMPACT_PROBABILITY_AFFECTED)) {
 
-							// TODO: someone got hurt, declare medical emergency
-							// TODO: delineate the accidents from those listed in malfunction.xml
+							// Note 1: someone got hurt, declare medical emergency
+							// Note 2: delineate the accidents from those listed in malfunction.xml
 							// currently, malfunction whether a person gets hurt is handled by Malfunction
 							// above
 							int resilience = person.getNaturalAttributeManager()
 									.getAttribute(NaturalAttributeType.STRESS_RESILIENCE);
 							int courage = person.getNaturalAttributeManager()
 									.getAttribute(NaturalAttributeType.COURAGE);
-							double factor = 1 + RandomUtil.getRandomDouble(1) - resilience / 100 - courage / 100D;
+							double factor = 1 + RandomUtil.getRandomDouble(1) - resilience / 100D - courage / 100D;
+							PhysicalCondition pc = person.getPhysicalCondition();
 							if (factor > 1)
-								person.getPhysicalCondition().setStress(person.getStress() * factor);
+								pc.setStress(pc.getStress() * factor);
 
-							victimName = person.getName();
-//							task = person.getTaskDescription();
-							malfunctionMeteoriteImpact.setTraumatized(victimName);
+							if (victimNames != null)
+								victimNames += ", " + person.getName();
+							else
+								victimNames = person.getName();
+							
+							mal.setTraumatized(victimNames);
 
-							logger.warning(victimName + " was traumatized by the meteorite impact in " + this + " at "
-									+ settlement);
+							// Store the meteorite fragment in the settlement
+							settlement.storeAmountResource(ResourceUtil.meteoriteID, getBuildingManager().getDebrisMass());
+
+							logger.log(this, Level.INFO, 0, "Found " + Math.round(getBuildingManager().getDebrisMass() * 100.0)/100.0
+									+ " kg of meteorite fragments in " + getNickName() + ".");
+
+							if (pc.getStress() > 30)
+								logger.log(this, Level.WARNING, 0, victimNames + " was traumatized by the meteorite impact");
+
 						}
-						// else {
-						// logger.info(person.getName() + " did not witness the latest meteorite impact
-						// in " + this + " at " + settlement);
-						// }
-					}
+						
+					} // loop for persons
+
+					// If it's not breached, how to record the damage
+					logger.log(this, Level.INFO, 0, "Meteorite Impact event observed but damage not detected.");
+
+					if (victimNames == null)
+						victimNames = "";
+						
+					HistoricalEvent hEvent = new HazardEvent(
+							EventType.HAZARD_ACTS_OF_GOD,
+							getAssociatedSettlement(),
+							mal.getMalfunctionMeta().getName(),
+							"",
+							victimNames,
+							getName(), 
+							getAssociatedSettlement().getName(),
+							getAssociatedSettlement().getCoordinates().getCoordinateString());
+
+					if (eventManager == null)
+						eventManager = Simulation.instance().getEventManager();
+					
+					eventManager.registerNewEvent(hEvent);
+
+					fireUnitUpdate(UnitEventType.METEORITE_EVENT);
 				}
 			}
 		}
 	}
 
+	/**
+	 * Get the wall thickness based on the construction type.
+	 */
+	private double getWallThickness() {
+		switch(construction) {
+			case SOLID:
+				return 0.0000254;
+			case INFLATABLE:
+				return 0.0000018;
+			case SEMI_SOLID:
+				return 0.0000100;
+			default:
+				return 0;
+		}
+	}
+
+	public ConstructionType getConstruction() {
+		return construction;
+	}
+
 	public Coordinates getLocation() {
-		return getSettlement().getCoordinates();
-	}
-
-	/**
-	 * Gets the building's inhabitable ID number.
-	 * 
-	 * @return id.
-	 */
-	public int getInhabitableID() {
-		return inhabitableID;
-	}
-
-	/**
-	 * Sets the building's settlement inhabitable ID number.
-	 * 
-	 * @param id.
-	 */
-	public void setInhabitableID(int id) {
-		inhabitableID = id;
+		return settlement.getCoordinates();
 	}
 
 	/**
 	 * Gets the building's settlement template ID number.
-	 * 
+	 *
 	 * @return id.
 	 */
 	public int getTemplateID() {
@@ -1585,16 +1246,31 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 	}
 
 	/**
+	 * Gets the zone # where this building is at. It's zero by default. 
+	 * Astronomy Observatory is located at zone 1.
+	 *
+	 * @return zone.
+	 */
+	public int getZone() {
+		return zone;
+	}
+
+	/**
 	 * Sets the building's settlement template ID number.
-	 * 
+	 *
 	 * @param id.
 	 */
 	public void setTemplateID(int id) {
 		templateID = id;
 	}
 
+	/**
+	 * Gets the settlement it is currently associated with.
+	 *
+	 * @return settlement or null if none.
+	 */
 	public Settlement getSettlement() {
-		return unitManager.getSettlementByID(settlementID); // getSettlement();
+		return settlement;
 	}
 
 	public void extractHeat(double heat) {
@@ -1603,22 +1279,12 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 			furnace = (ThermalGeneration) getFunction(FunctionType.THERMAL_GENERATION);
 		if (heating == null)
 			heating = furnace.getHeating();
-		
+
 		heating.setHeatLoss(heat);
 	}
 
 	public double getCurrentAirPressure() {
 		return getSettlement().getBuildingAirPressure(this);
-	}
-	
-	@Override
-	public String getImmediateLocation() {
-		return getLocationTag().getImmediateLocation();
-	}
-
-	@Override
-	public String getLocale() {
-		return getLocationTag().getLocale();
 	}
 
 	@Override
@@ -1626,34 +1292,35 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		return this;
 	}
 
+	/**
+	 * Gets the settlement the person is currently associated with.
+	 *
+	 * @return associated settlement or null if none.
+	 */
 	@Override
 	public Settlement getAssociatedSettlement() {
-		return getSettlement(); 
-	}
-
-	@Override
-	public Unit getUnit() {
-		return this;
-	}
-	
-	public int getBuildingID() {
-		return bid;
+		return getSettlement();
 	}
 
 	public void reinit() {
-		// transient instances
+		settlement = unitManager.getSettlementByID(settlementID);
+
+		// Get the building's functions
+		if (functions == null) {
+			BuildingSpec spec = SimulationConfig.instance().getBuildingConfiguration().getBuildingSpec(buildingType);
+			functions = buildFunctions(spec);
+		}
 	}
-	
+
+	// TODO this is wrong as names can change. This is just used to identify if there are multiple floors.
 	public boolean isAHabOrHub() {
-		if (buildingType.contains(" Hab")
-				|| buildingType.contains(" Hub"))
-			return true;
-		return false;
-	}
-	
+        return buildingType.contains(" Hab")
+                || buildingType.contains(" Hub");
+    }
+
 	/**
 	 * Checks if the building has a lab with a particular science type
-	 * 
+	 *
 	 * @param type
 	 * @return
 	 */
@@ -1663,36 +1330,197 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 
 		return lab.hasSpecialty(type);
 	}
-	
+
+	@Override
+	public UnitType getUnitType() {
+		return UnitType.BUILDING;
+	}
+
 	/**
-	 * Reset uniqueCount to the current number of building
+	 * Is this unit inside a settlement
+	 *
+	 * @return true if the unit is inside a settlement
 	 */
-	public static void reinitializeIdentifierCount() {
-		uniqueCount = unitManager.getBuildingsNum() + Unit.FIRST_BUILDING_UNIT_ID;
-	} 
-	
-	public boolean equals(Object obj) {
-		if (this == obj) return true;
-		if (obj == null) return false;
-		if (this.getClass() != obj.getClass()) return false;
-		Building b = (Building) obj;
-		return this.identifier == b.getIdentifier()
-			&& this.buildingType.equals(b.getBuildingType());
-//			&& this.nickName.equals(b.getNickName());
+	@Override
+	public boolean isInSettlement() {
+		return true;
+	}
+
+	/**
+	 * Gets the amount resource stored
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAmountResourceStored(int resource) {
+		return getSettlement().getAmountResourceStored(resource);
+	}
+
+	/**
+	 * Stores the amount resource
+	 *
+	 * @param resource the amount resource
+	 * @param quantity
+	 * @return excess quantity that cannot be stored
+	 */
+	@Override
+	public double storeAmountResource(int resource, double quantity) {
+		return getSettlement().storeAmountResource(resource, quantity);
+	}
+
+	/**
+	 * Retrieves the resource
+	 *
+	 * @param resource
+	 * @param quantity
+	 * @return quantity that cannot be retrieved
+	 */
+	@Override
+	public double retrieveAmountResource(int resource, double quantity) {
+		return getSettlement().retrieveAmountResource(resource, quantity);
+	}
+
+	/**
+	 * Gets the capacity of a particular amount resource
+	 *
+	 * @param resource
+	 * @return capacity
+	 */
+	@Override
+	public double getAmountResourceCapacity(int resource) {
+		return getSettlement().getAmountResourceCapacity(resource);
+	}
+
+	/**
+	 * Obtains the remaining storage space of a particular amount resource
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAmountResourceRemainingCapacity(int resource) {
+		return getSettlement().getAmountResourceRemainingCapacity(resource);
+	}
+
+	/**
+	 * Does it have unused space or capacity for a particular resource ?
+	 * 
+	 * @param resource
+	 * @return
+	 */
+	@Override
+	public boolean hasAmountResourceRemainingCapacity(int resource) {
+		return getSettlement().hasAmountResourceRemainingCapacity(resource);
 	}
 	
+	/**
+	 * Gets all stored amount resources
+	 *
+	 * @return all stored amount resources.
+	 */
+	@Override
+	public Set<Integer> getAmountResourceIDs() {
+		return getSettlement().getAmountResourceIDs();
+	}
+
+	/**
+	 * Sets the unit's container unit.
+	 *
+	 * @param newContainer the unit to contain this unit.
+	 */
+	@Override
+	public void setContainerUnit(Unit newContainer) {
+		if (newContainer != null) {
+			if (newContainer.equals(getContainerUnit())) {
+				return;
+			}
+			// 1. Set Coordinates
+			setCoordinates(newContainer.getCoordinates());
+			// 2. Set LocationStateType
+			currentStateType = LocationStateType.INSIDE_SETTLEMENT;
+			// 3. Set containerID
+			// Q: what to set for a deceased person ?
+			setContainerID(newContainer.getIdentifier());
+			// 4. Fire the container unit event
+			fireUnitUpdate(UnitEventType.CONTAINER_UNIT_EVENT, newContainer);
+		}
+	}
+
+	/**
+	 * Gets the unit's container unit. Returns null if unit has no container unit.
+	 *
+	 * @return the unit's container unit
+	 */
+	@Override
+	public Unit getContainerUnit() {
+		if (unitManager == null) // for maven test
+			return null;
+		return unitManager.getSettlementByID(containerID);
+	}
+
+	/**
+	 * Gets the holder's unit instance
+	 *
+	 * @return the holder's unit instance
+	 */
+	@Override
+	public Unit getHolder() {
+		return this;
+	}
+
+	@Override
+	public int storeItemResource(int resource, int quantity) {
+		return getSettlement().storeItemResource(resource, quantity);
+	}
+
+	@Override
+	public int retrieveItemResource(int resource, int quantity) {
+		return getSettlement().retrieveItemResource(resource, quantity);
+	}
+
+
+	@Override
+	public int getItemResourceStored(int resource) {
+		return getSettlement().getItemResourceStored(resource);
+	}
+
+	/**
+	 * Gets the remaining quantity of an item resource
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public int getItemResourceRemainingQuantity(int resource) {
+		return getSettlement().getItemResourceRemainingQuantity(resource);
+	}
+
+	@Override
+	public Set<Integer> getItemResourceIDs() {
+		return getSettlement().getItemResourceIDs();
+	}
+	
+	@Override
+	public double getCargoCapacity() {
+		return 0;
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		return super.equals(obj);
+	}
+
 	/**
 	 * Gets the hash code for this object.
-	 * 
+	 *
 	 * @return hash code.
 	 */
+	@Override
 	public int hashCode() {
-		int hashCode = nickName.hashCode();
-		hashCode *= identifier;
-		hashCode *= buildingType.hashCode();
-		return hashCode;
+		return super.hashCode();
 	}
-	
+
 	/**
 	 * Prepare object for garbage collection.
 	 */
@@ -1702,12 +1530,10 @@ public class Building extends Structure implements Malfunctionable, Indoor, // C
 		lifeSupport = null;
 		roboticStation = null;
 		powerGen = null;
-		buildingConfig = null;
 		heatModeCache = null;
 		buildingType = null;
 		powerModeCache = null;
 		heatModeCache = null;
-//		malfunctionManager.destroy();
 		malfunctionManager = null;
 	}
 }

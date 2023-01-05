@@ -1,24 +1,88 @@
-/**
+/*
  * Mars Simulation Project
  * MissionAgenda.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-15
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.core.reportingAuthority;
 
-public interface MissionAgenda {
+import java.io.Serializable;
+import java.util.Collections;
+import java.util.List;
 
-	public void reportFindings();
+import org.mars_sim.msp.core.logging.SimLogger;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 
-	public void gatherSamples();
-
-	public int[][] getMissionModifiers();
+/**
+ * Mission agenda for a ReportingAuthority to follow. It defines a set
+ * of subagendas that specific actual targets for the RA.
+ */
+public class MissionAgenda implements Serializable {
+	/** default serial id. */
+	private static final long serialVersionUID = 1L;
 	
-//	public void setMissionDirectives();
+	private static SimLogger logger = SimLogger.getLogger(MissionAgenda.class.getName());
+
+	private List<MissionSubAgenda> subs;
+	private String name;
+	private String objective;
+	private String findings;
+	private String samples;
 	
-	public String getObjectiveName();
+	MissionAgenda(String name, String objective, List<MissionSubAgenda> subs, String findings, String samples) {
+		super();
+		this.name = name;
+		this.objective = objective;
+		this.subs = Collections.unmodifiableList(subs);
+		this.findings = findings;
+		this.samples = samples;
+	}
 
-	String[] getPhases();
+	/**
+	 * Gets the agendas for this mission.
+	 * 
+	 * @return
+	 */
+	public List<MissionSubAgenda> getAgendas() {
+		return subs;
+	}
 
+	/**
+	 * Gets unique name.
+	 */
+	public String getName() {
+		return name;
+	}
+	
+	/**
+	 * Gets the overall objective.
+	 * 
+	 * @return
+	 */
+	public String getObjectiveName() {
+		return objective;
+	}
+
+	/**
+	 * Reports some findings by a Worker. This may adjust characteristics of the RA.
+	 * 
+	 * @param unit
+	 */
+	public void reportFindings(Worker unit) {
+		logger.fine(unit, name + ": " + findings);
+	}
+
+	/**
+	 * Gathers some samples as part of this agenda.
+	 * 
+	 * @param unit
+	 */
+	public void gatherSamples(Worker unit) {
+		logger.fine(unit, name + ": " + samples);
+	}
+	
+	public String toString() {
+		return name;
+	}
 }

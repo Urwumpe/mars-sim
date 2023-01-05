@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * GlassPane.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -121,6 +121,7 @@ public class GlassPane {
 /**
  * We have to provide our own glass pane so that it can paint.
  */
+@SuppressWarnings("serial")
 class MyGlassPane extends JComponent
                   implements ItemListener {
     Point point;
@@ -209,15 +210,15 @@ class CBListener extends MouseInputAdapter {
                                         glassPanePoint,
                                         contentPane);
         if (containerPoint.y < 0) { //we're not in the content pane
-            if (containerPoint.y + menuBar.getHeight() >= 0) { 
+//            if (containerPoint.y + menuBar.getHeight() >= 0) { 
                 //The mouse event is over the menu bar.
                 //Could handle specially.
-            } else { 
+//            } else { 
                 //The mouse event is over non-system window 
                 //decorations, such as the ones provided by
                 //the Java look and feel.
                 //Could handle specially.
-            }
+//            }
         } else {
             //The mouse event is probably over the content pane.
             //Find out exactly which component it's over.  
@@ -237,7 +238,7 @@ class CBListener extends MouseInputAdapter {
                 component.dispatchEvent(new MouseEvent(component,
                                                      e.getID(),
                                                      e.getWhen(),
-                                                     e.getModifiers(),
+                                                     e.getModifiersEx(),
                                                      componentPoint.x,
                                                      componentPoint.y,
                                                      e.getClickCount(),

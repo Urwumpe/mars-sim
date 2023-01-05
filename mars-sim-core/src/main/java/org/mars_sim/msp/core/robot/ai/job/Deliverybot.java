@@ -1,51 +1,34 @@
-/**
+/*
  * Mars Simulation Project
  * Deliverybot.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-01
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.robot.ai.job;
 
-import java.io.Serializable;
-import java.util.Iterator;
-
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.ConsolidateContainers;
-import org.mars_sim.msp.core.person.ai.task.LoadVehicleGarage;
-import org.mars_sim.msp.core.person.ai.task.UnloadVehicleGarage;
+import org.mars_sim.msp.core.person.ai.mission.Delivery;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.RoboticAttributeType;
-import org.mars_sim.msp.core.robot.RoboticAttributeManager;
+import org.mars_sim.msp.core.structure.ObjectiveType;
 import org.mars_sim.msp.core.structure.Settlement;
 
-public class Deliverybot
-extends RobotJob
-implements Serializable {
+public class Deliverybot extends RobotJob {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	private static double TRADING_RANGE = 1500D;
-	private static double SETTLEMENT_MULTIPLIER = 3D;
+	private static final double POP_PER_BOT = 15D;
 
 	/**
 	 * Constructor.
 	 */
 	public Deliverybot() {
 		// Use Job constructor.
-		super(Deliverybot.class);
-
-		//jobTasks.add(LoadVehicleEVA.class); //determine to what extend the walking bug is affecting the outdoor portion of this task
-        jobTasks.add(LoadVehicleGarage.class);
-        //jobTasks.add(UnloadVehicleEVA.class); //determine to what extend the walking bug is affecting the outdoor portion of this task
-        jobTasks.add(UnloadVehicleGarage.class);
-        jobTasks.add(ConsolidateContainers.class); //determine to what extend the walking bug is affecting the outdoor portion of this task
-
-		//jobMissionStarts.add(Trade.class);
-		//jobMissionJoins.add(Trade.class);
-        //jobMissionStarts.add(TravelToSettlement.class);
-		//jobMissionJoins.add(TravelToSettlement.class);
-
+		super();
+		
+        jobMissionStarts.add(Delivery.class);
 	}
 
 	/**
@@ -53,6 +36,7 @@ implements Serializable {
 	 * @param robot the robot to check.
 	 * @return capability (min 0.0).
 	 */
+	@Override
 	public double getCapability(Robot robot) {
 
 		double result = 0D;
@@ -60,14 +44,14 @@ implements Serializable {
 		int tradingSkill = robot.getSkillManager().getSkillLevel(SkillType.TRADING);
 		result = tradingSkill;
 
-		RoboticAttributeManager attributes = robot.getRoboticAttributeManager();
+		NaturalAttributeManager attributes = robot.getNaturalAttributeManager();
 
 		// Add experience aptitude.
-		int experienceAptitude = attributes.getAttribute(RoboticAttributeType.EXPERIENCE_APTITUDE);
+		int experienceAptitude = attributes.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
 		result+= result * ((experienceAptitude - 50D) / 100D);
 
 		// Add conversation.
-		int conversation = attributes.getAttribute(RoboticAttributeType.CONVERSATION);
+		int conversation = attributes.getAttribute(NaturalAttributeType.CONVERSATION);
 		result+= result * ((conversation - 50D) / 100D);
 
 		return result;
@@ -78,19 +62,15 @@ implements Serializable {
 	 * @param settlement the settlement in need.
 	 * @return the base need >= 0
 	 */
-	public double getSettlementNeed(Settlement settlement) {
+	@Override
+	public double getOptimalCount(Settlement settlement) {
 
-        double result = 0D;
-
-        Iterator<Settlement> i = unitManager.getSettlements().iterator();
-        while (i.hasNext()) {
-            Settlement otherSettlement = i.next();
-            if (otherSettlement != settlement) {
-                double distance = settlement.getCoordinates().getDistance(otherSettlement.getCoordinates());
-                if (distance <= TRADING_RANGE) result += SETTLEMENT_MULTIPLIER;
-            }
-        }
+        double result = settlement.getAllAssociatedPeople().size()/POP_PER_BOT;
+		if (settlement.getObjective() == ObjectiveType.TRADE_CENTER) {
+			result += 1D;
+		}
 
 		return result;
 	}
+	
 }

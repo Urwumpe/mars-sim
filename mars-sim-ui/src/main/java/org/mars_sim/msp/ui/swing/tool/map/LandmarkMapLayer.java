@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * LandmarkMapLayer.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-31
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.map;
@@ -16,7 +16,7 @@ import java.util.List;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.IntPoint;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.Landmark;
+import org.mars_sim.msp.core.environment.Landmark;
 
 /**
  * The LandmarkMapLayer is a graphics layer to display landmarks.
@@ -52,14 +52,9 @@ public class LandmarkMapLayer implements MapLayer {
 	/** Horizontal offset for artificial objects. */
 	private int AO_LABEL_HORIZONTAL_OFFSET = 1;
 	
-	private static final List<Landmark> landmarks = Simulation.instance().getMars().getSurfaceFeatures().getLandmarks();
+	private static final List<Landmark> landmarks = Simulation.instance().getSurfaceFeatures().getLandmarks();
 
-	private static final double angle = CannedMarsMap.HALF_MAP_ANGLE;
-	
-//	private double width = 50;
-//	
-//	private double height = 50;
-	
+	private double angle = Map.HALF_MAP_ANGLE;
 
 	/**
 	 * Displays the layer on the map image.

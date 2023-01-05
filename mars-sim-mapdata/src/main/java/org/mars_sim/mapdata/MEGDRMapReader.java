@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MEGDRMapReader.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-15
  * @author Manny Kung
  */
 
@@ -10,7 +10,6 @@ package org.mars_sim.mapdata;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -18,13 +17,8 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 import com.google.common.io.ByteStreams;
 
@@ -33,20 +27,27 @@ import me.lemire.integercompression.FastPFOR;
 import me.lemire.integercompression.IntWrapper;
 import me.lemire.integercompression.IntegerCODEC;
 import me.lemire.integercompression.VariableByte;
-import me.lemire.integercompression.differential.IntegratedBinaryPacking;
-import me.lemire.integercompression.differential.IntegratedIntCompressor;
-import me.lemire.integercompression.differential.IntegratedVariableByte;
-import me.lemire.integercompression.differential.SkippableIntegratedComposition;
 
+/**
+ * This class reads the topographical or elevation data of MOLA Mission Experiment 
+ * Gridded Data Records (MEGDRs) acquired by MGS mission. 
+ * See https://pds-geosciences.wustl.edu/missions/mgs/megdr.html.
+ */
 public class MEGDRMapReader {
 
-	private static final String FILE = "/maps/megt90n000cb.img";
-	private static final String COMPRESSED = "720x1440_JavaFastPFOR_compressed";
-//	private static final String UNCOMPRESSED = "720x1440_uncompressed";
-	
 	public static final int HEIGHT = 720; //2880;
 	public static final int WIDTH = 1440; //5760;
-	
+
+	// megt90n000cb.img has a resolution of 4 pixels per degree (or 0.25 by 0.25 degrees)
+	// map scale : 14.818 km per pixel
+	private static final String PATH = "/maps/";
+	static final String IMG_FILE = "megt90n000cb.img";
+	static final String FILE = PATH + IMG_FILE;
+	private static final String COMPRESSED = "720x1440_JavaFastPFOR_compressed";
+//	private static final String UNCOMPRESSED = "720x1440_uncompressed";
+
+	// megt90n000eb.img has a resolution of 16 pixels per degree (or 0.0625 by 0.0625 degrees)
+	// map scale : 3.705 km per pixel
 //	private static final String FILE = "/maps/megt90n000eb.img";
 //	private static final String COMPRESSED = "2880x5760_JavaFastPFOR_compressed";
 //	private static final String UNCOMPRESSED = "2880x5760_uncompressed";
@@ -56,7 +57,7 @@ public class MEGDRMapReader {
 	
 	// Each number occupies 2 bytes
 	private static final int BUFFER_SIZE = 2;
-	private static final byte[] buffer = new byte[BUFFER_SIZE]; 
+//	private static final byte[] buffer = new byte[BUFFER_SIZE]; 
 	
 	// Each number occupies ? bytes
 	private static final int COMPRESSED_BUFFER_SIZE = 4;
@@ -64,6 +65,7 @@ public class MEGDRMapReader {
 	
 	private static int COMPRESSED_N;
 	
+	// Future: switch to using JavaFastPFOR to save memory.
 	private int[] elevation = new int[HEIGHT*WIDTH]; // has 1036800 values ; OR [720*2880] = 2073600 values
 	
 	public static void main(String[] args) throws IOException {
@@ -78,27 +80,22 @@ public class MEGDRMapReader {
 	public MEGDRMapReader() {
 	}
 	
-	private int convert4BytesToInt(byte[] data) {
-	    if (data == null || data.length != 4) return 0x0;
-	    // ----------
-	    return (int)( // NOTE: type cast not necessary for int
-	            (0xff & data[0]) << 24  |
-	            (0xff & data[1]) << 16  |
-	            (0xff & data[2]) << 8   |
-	            (0xff & data[3]) << 0
-	            );
-	}
-	
 	private int convert2ByteToInt(byte[] data) {
 	    if (data == null || data.length != 2) return 0x0;
 	    // ----------
 	    return (int)( // NOTE: type cast not necessary for int
 	            (0xff & data[0]) << 8  |
 	            (data[0]) << 8  |
-	            (0xff & data[1]) << 0
+	            (0xff & data[1])
 	            );
 	}
 	
+	/**
+	 * Converts byte array to int array.
+	 * 
+	 * @param data
+	 * @return
+	 */
 	public int[] convertByteArrayToIntArray(byte[] data) {
         if (data == null || data.length % 2 != 0) return null;
         // ----------
@@ -111,33 +108,37 @@ public class MEGDRMapReader {
         return ints;
     }
 	
-	
-	public int[] loadElevation() {
-//		URL url = MEGDRMapReader.class.getResource(FILE);
-//		InputStream inputStream = null;
-//		try {
-//			inputStream = url.openStream();
-//		} catch (IOException e1) {
-//			// TODO Auto-generated catch block
-//			e1.printStackTrace();
-//		}
-//		ClassLoader classloader = Thread.currentThread().getContextClassLoader();
-//		InputStream inputStream = ClassLoaderUtil.getResourceAsStream(FILE, MEGDRMapReader.class);	
-		 
-		InputStream inputStream = MEGDRMapReader.class.getResourceAsStream(FILE); //new BufferedInputStream(new FileInputStream(inputFile));
-
+	/**
+	 * Loads the elevation data into int array.
+	 * 
+	 * @return
+	 */
+	public int[] loadElevation() {	 
+		InputStream inputStream = null; //MEGDRMapReader.class.getResourceAsStream(FILE); //new BufferedInputStream(new FileInputStream(inputFile));
+//		BufferedInputStream bis = null;
+		
 	    try {
-	    	
-//			System.out.println("inputStream is " + inputStream + "   av : " + inputStream.available()); //  av : 2073600
-			
+	    	// open input stream test.txt for reading purpose.
+	    	inputStream = MEGDRMapReader.class.getResourceAsStream(FILE);
+			// input stream is converted to buffered input stream
+//			bis = new BufferedInputStream(inputStream);
+			// read number of bytes available
+//			int numByte = bis.available();
+			// byte array declared
+//			byte[] bytes = new byte[numByte];
+			// Use ByteStreams to convert to byte array
 			byte[] bytes = ByteStreams.toByteArray(inputStream);
 			
+//			System.out.println("# of bytes: " + bytes.length);
+			// It has a total of 2073600 bytes.
+			
 			elevation = convertByteArrayToIntArray(bytes);
-			int size = elevation.length;
-			for (int j=0; j<size; j++) {
+
+//			int size = elevation.length;
+//			for (int j=0; j<size; j++) {
 //				if (j % WIDTH == 0) System.out.println();
 //				System.out.print(elevation[j] + " ");
-			}
+//			}
 			
 //		    int i = 0;  
 //			while (inputStream.read(buffer) != -1) {
@@ -148,61 +149,23 @@ public class MEGDRMapReader {
 //				System.out.print(elevation[i] + " ");// + buffer[0] + " " + buffer[1]);
 //				i++;
 //			}
-//        
+			
+        if (inputStream != null)
 	        inputStream.close();
 	        
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-//			
-////	        System.out.println("Size of unsorted integers from " + elevation.length * 4/1024 + " KB ");
-////	        System.out.println("elevation.length : " + elevation.length);
-//	    	System.out.println();
-//	        System.out.println("last index is : " + i);
-////	        System.out.println(elevation.length);
-// 
+//        if (bis != null)
+//        	bis.close();
+        
+		} catch (Exception e) {
+			 System.out.println("Problems in inputStream: " + e.getMessage());
 
-//        BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
-//        
-//        int i = 0;
-//	    
-//	    try {
-//	    	
-//	    	byte num = 0;
-//	    	int last = 0;
-//			System.out.println("inputStream is " + inputStream + "   av : " + inputStream.available()); //  av : 2073600
-//			
-//			while ((num = in.read()) != -1) {
-//				// Combine the 2 bytes into a 16-bit number
-//				//				elevation[i] =  (0xff & buffer[0] << 8) | (0xff & buffer[1]);
-//				if (i % 2 == 0) {
-//					elevation[i] = (last << 8) | (num & 0xff);
-//					if (i % WIDTH == 0) System.out.println();
-//						System.out.print(elevation[i] + " ");
-//				}
-//				else
-//					last = num;
-//
-//				i++;
-//			}
-//        
-//	        inputStream.close();
-//	        
-//		} catch (IOException e) {
-//			e.printStackTrace();
-//		}
-			
-//		        System.out.println("Size of unsorted integers from " + elevation.length * 4/1024 + " KB ");
-//		        System.out.println("elevation.length : " + elevation.length);
-//	    System.out.println();
-//	    System.out.println("last index is : " + (i - 1));
-		        
+		}
+	    
         return elevation;
         
 //        try {
 //			write(OUTPUT, elevation);
 //		} catch (IOException e) {
-//			e.printStackTrace();
 //		}
 //        
 //        write2ByteArray(UNCOMPRESSED, elevation);
@@ -218,64 +181,7 @@ public class MEGDRMapReader {
 //        useJavaFastPFOR();
 	}
 	
-	public void test() {
-//        int[] nums = getIndex();
-//        int maxIndex = nums[0];
-//        int max = nums[1];
-//        int minIndex = nums[2];
-//        int min = nums[3];
-//        
-//        System.out.println(
-//    		  "max : " + String.valueOf(max)
-//      		+ "   maxIndex : " + String.valueOf(maxIndex)
-//      		+ "   min : " + String.valueOf(min)
-//      		+ "   minIndex : " + String.valueOf(minIndex)
-//    		  ); 
-//      
-////      max : 21134   maxIndex : 418507   min : -8068   minIndex : 707288  
-//        
-//        int r = (int)(Math.round(1.0 * maxIndex / WIDTH)) - 1; // = 291 - 1
-//      
-//        int c = maxIndex - r * WIDTH ; // = 418507 - 290 * 1440 = 907
-//        
-//        double phi = Math.round(1.0 * r / HEIGHT * Math.PI * 100.0)/100.0;
-//        
-//        double theta = Math.round((1.0 * c / WIDTH * 2.0 * Math.PI -  Math.PI)* 100.0)/100.0;
-//        
-//        System.out.println(
-//        		  "r : " + String.valueOf(r)
-//          		+ "   c : " + String.valueOf(c)
-//          		+ "  (" + String.valueOf(phi) 
-//          		+ ", " + String.valueOf(theta)
-//          		+ ")" //+ new Coordinates(phi, theta); 
-//        		);
-          
-        // Note: new Coordinates(1.27, 0.82) --> 17.23° N 46.98° E
-        
-        
-//        int[][] el = new int[HEIGHT][WIDTH];
-//        
-//        for (int k=0; k < HEIGHT * WIDTH; k++) {
-//        	
-//        	if (k % WIDTH == 0) {
-//            	int [] row = new int[WIDTH];
-//
-//        		el = elevation[k]; 
-//        		
-//        	}
-//        			
-//        }
-        	
-//        List <Integer> list = new ArrayList <Integer> ();
-//        for (int j : elevation)
-//        	list.add(j);
-        
-//        Integer largest = Collections.max(list);
-//        System.out.println("largest : " + String.valueOf(largest)); // largest : 21134
-//        Integer least = Collections.min(list);
-//        System.out.println("  least : " + String.valueOf(least)); // least : -8068
-	}
-	
+
 	public int[] getIndex() {
 		int min = 0;
 		int max = 0; 
@@ -366,23 +272,23 @@ public class MEGDRMapReader {
     }
     
     public void writeIntArray(String filename, int[]x) throws IOException{
-    	  BufferedWriter outputWriter = null;
-    	  outputWriter = new BufferedWriter(new FileWriter(filename));
-    	  
-//    	  outputWriter.write(Arrays.toString(x));
-    	  
+    	try (FileWriter fr = new FileWriter(filename)) {
+    	  BufferedWriter outputWriter = new BufferedWriter(fr);
+    	      	  
     	  for (int i = 0; i < x.length; i++) {
-    	    // Maybe:
-//    	    outputWriter.write(Integer.valueOf(x[i]));
-    	    // Or:
     	    outputWriter.write(Integer.toString(x[i]));
     	    outputWriter.newLine();
     	  }
     	  
     	  outputWriter.flush();  
     	  outputWriter.close();  
+    	}
     }
     
+    /**
+     * Uses Java Fast PFOR library to compress and uncompress arrays of integers. 
+     * See https://github.com/lemire/JavaFastPFOR.
+     */
     public void useJavaFastPFOR() {
 //        int ChunkSize = 8192 ; //16384; //32768; // size of each chunk, choose a multiple of 128
         final int N = elevation.length;
@@ -424,7 +330,9 @@ public class MEGDRMapReader {
 //        
 //        lastcodec.compress(data, inputoffset, TotalSize % ChunkSize, compressed, outputoffset);
             
-        System.out.println("Reduce size of unsorted integers from "+data.length*4/1024+"KB to "+outputoffset.intValue()*4/1024+"KB");
+        System.out.println("Reduce size of unsorted integers from "
+        		+ data.length*4/1024+"KB to " 
+        		+ outputoffset.intValue()*4/1024+"KB");
         System.out.println("compressed.length : " + compressed.length + "    N + 1024 : " + (N + 1024));
 
         // we can repack the data: (optional)
@@ -489,7 +397,7 @@ public class MEGDRMapReader {
         		recovered2,
         		recoffset2);
         
-//        //CODEC type 2
+//        // CODEC type 2
 //        // We are *not* assuming that the original array length is known, however
 //        // we assume that the chunk size (ChunkSize) is known.
 //        int[] recovered2 = new int[ChunkSize];
@@ -557,12 +465,8 @@ public class MEGDRMapReader {
     	try (BufferedOutputStream stream = new BufferedOutputStream(
                 new FileOutputStream(filename))) {
     		stream.write(data);
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			 System.out.println("Problems in write4ByteArray's FileOutputStream: " + e.getMessage());
 		}
     }
     
@@ -578,7 +482,7 @@ public class MEGDRMapReader {
     		
     		data[i*2]     = (byte)((array[i] >> 8) & 0xff);
 //    		data[i*2]     = (byte)((array[i] >> 8));
-    		data[i*2 + 1] = (byte)((array[i] >> 0) & 0xff);
+    		data[i*2 + 1] = (byte)((array[i]) & 0xff);
  		
 //    		data[i*4]     = (byte)((array[i] >> 24) & 0xff);
 //    		data[i*4 + 1] = (byte)((array[i] >> 16) & 0xff);
@@ -596,51 +500,11 @@ public class MEGDRMapReader {
     	try (BufferedOutputStream stream = new BufferedOutputStream(
                 new FileOutputStream(filename))) {
     		stream.write(data);
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			 System.out.println("Problems in write2ByteArray's FileOutputStream: " + e.getMessage());
 		}
     }
-    
-    public int[] read2ByteArray(String filename) {
 
-    	int[] array = new int[elevation.length];
-		InputStream inputStream = null;
-		try {
-			inputStream = new BufferedInputStream(new FileInputStream(filename));
-		} catch (FileNotFoundException e1) {
-			e1.printStackTrace();
-		}
-		
-	    int i = 0;
-	    
-        try {
-			while (inputStream.read(buffer) != -1) {
-				// Combine the ? bytes into a 16-bit integer
-//				array[i] =  (0xff & buffer[0] << 8) | (0xff & buffer[1] );
-				array[i] =  (buffer[0] << 8) | (buffer[1] & 0xff);
-						
-				// NOTE: type cast not necessary for int
-
-//				if (i % WIDTH == 0) System.out.println();
-//				System.out.print(compressed[i] + " " + cBuffer[0] + " " + cBuffer[1] + " " + el2[i]);
-				i++;
-			}
-			
-	        inputStream.close();
-	        
-		} catch (IOException e) {
-			e.printStackTrace();
-		} 
-   
-        System.out.println("int[] reassembled from file. length : " + array.length);
-        
-        return array;
-
-    }
     
     public int[] read4ByteArray(String filename) {
 
@@ -648,17 +512,10 @@ public class MEGDRMapReader {
 //    	byte[] data = new byte[compressed.length * 4];
 //    	int size = data.length;
     	
-		InputStream inputStream = null;
-		try {
-			inputStream = new BufferedInputStream(new FileInputStream(filename));
-		} catch (FileNotFoundException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
+		try (InputStream inputStream = new BufferedInputStream(new FileInputStream(filename))) {
 		
-	    int i = 0;
+			int i = 0;
 	    
-        try {
 			while (inputStream.read(cBuffer) != -1) {
 				// Combine the ? bytes into a 16-bit integer
 //				compressed[i] =  (0xff & cBuffer[0] << 8) | (0xff & cBuffer[1] );
@@ -677,95 +534,18 @@ public class MEGDRMapReader {
 			
 	        inputStream.close();
 	        
-		} catch (IOException e) {
-			e.printStackTrace();
-		} 
+		}
+        catch (IOException e) {
+			 System.out.println("Problems in read4ByteArray's FileInputStream: " + e.getMessage());
+		}
    
         System.out.println("int[] reassembled from file. length : " + compressed.length);
         
         return compressed;
-        
-//    	try (BufferedInputStream stream = new BufferedInputStream(
-//                new FileInputStream(COMPRESSED))) {
-//    		stream.read(data);
-//		} catch (FileNotFoundException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		} catch (IOException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-//	
-//    	
-//    	for (int i=0; i<size; i++) {
-//
-//    		compressed[i*4]     = (byte)((data[i*4] >> 24) & 0xff);
-//    		compressed[i*4 + 1] = (byte)((data >> 16) & 0xff);
-//    		compressed[i*4 + 2] = (byte)((data >> 8) & 0xff);
-//    		compressed[i*4 + 3] = (byte)((data >> 0) & 0xff);
-//  		
-////    	    ByteBuffer bb = ByteBuffer.allocate(4); 
-////    	    bb.putInt(i); 
-////    	    data[i*4] = bb.array()[0];
-////    	    data[i*4 + 1] = bb.array()[1];
-////    	    data[i*4 + 2] = bb.array()[2];
-////    	    data[i*4 + 3] = bb.array()[3];
-//    	    
-//    	}
-
     }
     
-    static IntegratedIntCompressor iic = new IntegratedIntCompressor(
-            new SkippableIntegratedComposition(
-                new IntegratedBinaryPacking(),
-                new IntegratedVariableByte()));
-
-    public static int[] fromBitsetFileToArray(String filename) throws IOException {
-        Path path = Paths.get(filename);
-        byte[] data = Files.readAllBytes(path);
-        // we determine cardinality
-        int card = 0;
-        for(int k = 0 ; k < data.length; ++k) {
-            int bv = data[k] & 0xFF;
-            card += Integer.bitCount(bv);
-        }
-        int[] answer = new int[card];
-        int pos = 0;
-        for(int k = 0 ; k < data.length; ++k) {
-            int bv = data[k] & 0xFF;
-            for(int b = 0 ; b < 8; ++b)
-                if ( ( (bv >> b) & 1 ) == 1) {
-                    answer[pos++] = b + k * 8;
-                }
-        }
-        if(pos != card) throw new RuntimeException("bug");
-        return answer;
-    }
-
-    public static void zipStats(String filename) throws IOException {
-        Path path = Paths.get(filename);
-        byte[] input = Files.readAllBytes(path);
-        
-        System.out.println("I will try to compress the original bitmap using zip.");
-
-        long bef = System.nanoTime();
-        
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ZipOutputStream zos = new ZipOutputStream(baos);
-        zos.setLevel(9);
-        ZipEntry entry = new ZipEntry(filename);
-        entry.setSize(input.length);
-        zos.putNextEntry(entry);
-        zos.write(input);
-        zos.closeEntry();
-        zos.close();
-        
-        byte[] result = baos.toByteArray();
-        long aft = System.nanoTime();
-        
-        System.out.println("zip encoding speed:"+input.length*1000.0/(aft-bef)+" million of bytes per second");
-        System.out.println("zip compression ratio at best level : "+input.length * 1.0 / result.length);
-    }
-        
-    
+//    static IntegratedIntCompressor iic = new IntegratedIntCompressor(
+//            new SkippableIntegratedComposition(
+//                new IntegratedBinaryPacking(),
+//                new IntegratedVariableByte()));
 }

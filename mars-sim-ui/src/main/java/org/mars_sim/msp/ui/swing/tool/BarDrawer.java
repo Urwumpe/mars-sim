@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * BarDrawer.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Manny Kung
  */
 
@@ -21,7 +21,6 @@ import java.awt.Dimension;
 import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.LinearGradientPaint;
 import java.awt.Paint;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
@@ -34,9 +33,9 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 
 /**
- *
  * @author Administrator
  */
+@SuppressWarnings("serial")
 public class BarDrawer extends TexturedPanel {
 
     private int colorIndex;
@@ -49,12 +48,12 @@ public class BarDrawer extends TexturedPanel {
 		Color.decode("#973ADE"),
 		Color.decode("#DE3A3A")
     };
-    
+
     public LinkedHashMap<FileCollectionPanel, Double> collectionMap;
 
     public BarDrawer(LinkedHashMap<FileCollectionPanel, Double> collectionMap) throws IOException {
 		this.collectionMap = collectionMap;
-	
+
 		this.collectionMap = new LinkedHashMap<FileCollectionPanel, Double>();
 	//	collectionMap.put("Pictures", 13d);
 	//	collectionMap.put("Music", 12d);
@@ -64,13 +63,11 @@ public class BarDrawer extends TexturedPanel {
 	//	collectionMap.put("Compressed Files", 10d);
 	//	collectionMap.put("Downloads Folder", 1d);
 	//	collectionMap.put("Another collection", 22d);
-	
-	
+
 	//	collectionMap.put("Pictures", 66d);
 	//	collectionMap.put("Music", 1d);
 	//	collectionMap.put("Videos", 33d);
-	
-	
+
 		FileCollectionPanel fcp1 = new FileCollectionPanel();
 		fcp1.setTitle("Pictures");
 		FileCollectionPanel fcp2 = new FileCollectionPanel();
@@ -88,42 +85,43 @@ public class BarDrawer extends TexturedPanel {
 		super.paintComponent(gr);
 		Graphics2D g = (Graphics2D) gr;
 		setPreferredSize(new Dimension(getWidth(), 150));
-	
-		Map desktopHints = (Map) (Toolkit.getDefaultToolkit().getDesktopProperty("awt.font.desktophints"));
+
+		Map<?, ?> desktopHints = (Map<?, ?>) (Toolkit.getDefaultToolkit().getDesktopProperty("awt.font.desktophints"));
 		if (desktopHints != null) {
 		    g.addRenderingHints(desktopHints);
 		}
-	
+
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
 			RenderingHints.VALUE_ANTIALIAS_ON);
-	
+
 		colorIndex = 0;
 		int realWidth = getWidth() - 1;
 		int heightOfBar = (int) (getHeight() - 50);
-	
+
 	//	g.setColor(Color.decode("#cccccc"));
-		double radius = getHeight() / 3;
+		double radius = getHeight() / 3.0;
 		RoundRectangle2D r = new RoundRectangle2D.Double(0, 0, realWidth, heightOfBar, radius, radius * 2);
-	
+
 		g.setClip(getBounds());
 		g.setColor(Color.black);
-		double barSegment = realWidth / collectionMap.size();
+		
+		double barSegment = 1.0 * realWidth / collectionMap.size();
 		if (barSegment > 120) {
 		    barSegment = 120;
 		}
 		int collectionNameX = 0;
-	
+
 		int x = 0;
 //		for (FileCollectionPanel fcp : collectionMap.keySet()) {
-//	
+//
 //		    g.setColor(getNextColor());
-//	
+//
 //		    double percentage = collectionMap.get(fcp) + adjustmentNeeded(collectionMap, fcp);
 //		    double width = (((double) percentage / 100) * realWidth);
-//	
+//
 //		    g.setClip(r);
 //		    g.fillRect(x, 0, (int) width, heightOfBar);
-//	
+//
 //		    g.setFont(g.getFont().deriveFont(14f));
 //		    String titleShortened = fcp.getTitle();
 //		    int lettersToRemove = 1;
@@ -132,7 +130,7 @@ public class BarDrawer extends TexturedPanel {
 //			lettersToRemove++;
 //			titleShortened += "...";
 //		    }
-//	
+//
 //		    g.setClip(getBounds());
 //		    g.setClip(0, 0, getWidth(), getHeight());
 //		    g.fillRect(collectionNameX + 15, heightOfBar + 10, 10, 10);
@@ -142,47 +140,47 @@ public class BarDrawer extends TexturedPanel {
 //		    System.out.println("collectionNameX = " + collectionNameX);
 //		    g.setFont(g.getFont().deriveFont(11f));
 //		    g.drawString(Double.toString(collectionMap.get(fcp)) + "%", collectionNameX + 30, heightOfBar + 20 + g.getFontMetrics().getHeight());
-//	
+//
 //		    collectionNameX += barSegment;
 //		    x = x + (int) width;
 //		}
-	
+
 		// draw lines
 		g.setClip(r);
 		for (int lineX = 15; lineX < realWidth - 1; lineX += 25) {
 		    g.setColor(new Color(255, 255, 255, 75));
 		    g.drawLine(lineX, 0, lineX - 15, heightOfBar - 1);
-	
+
 		    int gray = 128;
 		    Color grayTransparent = new Color(gray, gray, gray, 75);
 		    g.setColor(grayTransparent);
 		    g.drawLine(lineX - 1, 0, lineX - 16, heightOfBar - 1);
 		}
-	
-	
+
+
 		// adding gradient
-		Paint p = new GradientPaint(0.0f, 0.0f, new Color(255, 255, 255, 255), 0.0f, getHeight(), 
+		Paint p = new GradientPaint(0.0f, 0.0f, new Color(255, 255, 255, 255), 0.0f, getHeight(),
 				new Color(255, 255, 255, 0));
 
 //		Paint p2 = new LinearGradientPaint(
-//				0.0f, 0.0f, getWidth(), getHeight(), new float[]{0.5f, 1.0f}, 
+//				0.0f, 0.0f, getWidth(), getHeight(), new float[]{0.5f, 1.0f},
 //			    new Color[] {
 //			        new Color(255, 255, 255, 0),
 //			        new Color(255, 255, 255, 128),
 //			        new Color(255, 255, 255, 0),
 //			    });
-		
-//		Paint p2 = new LinearGradientPaint(0.0f, 0.0f, getWidth(), getHeight()/8, 
-//			new float[]{0.5f, .75f}, 
+
+//		Paint p2 = new LinearGradientPaint(0.0f, 0.0f, getWidth(), getHeight()/8,
+//			new float[]{0.5f, .75f},
 //			new Color[]{
-//					new Color(255, 255, 255, 128), 
+//					new Color(255, 255, 255, 128),
 //					new Color(255, 255, 255, 0)
 //			});
-				
+
 		g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.75f));
-		
+
 		g.setPaint(p);
-		
+
 		g.fillRect(0, 0, getWidth(), getHeight());
     }
 
@@ -194,7 +192,7 @@ public class BarDrawer extends TexturedPanel {
 		for (int i = 0; i < cArr.length; i++) {
 		    cArr[i] = s.charAt(i);
 		}
-	
+
 		return new String(cArr);
     }
 
@@ -212,54 +210,55 @@ public class BarDrawer extends TexturedPanel {
      * @return
      */
     public double adjustmentNeeded(LinkedHashMap<FileCollectionPanel, Double> map, FileCollectionPanel fcp) {
-	double minVal = Double.MAX_VALUE;
-	FileCollectionPanel smallestFcp = null;
-	for (FileCollectionPanel currentCollection : map.keySet()) {
-	    double val = map.get(currentCollection);
-	    if (minVal > val) {
-		minVal = val;
-		smallestFcp = currentCollection;
-	    }
-	}
-
-	double total = 0;
-	for (Double val : map.values()) {
-	    total += val;
-	}
-
-	if ((total < 100d) && (smallestFcp.equals(fcp))) {
-	    return 100d - total;
-	}
-
-	return 0;
+		double minVal = Double.MAX_VALUE;
+		FileCollectionPanel smallestFcp = null;
+		for (FileCollectionPanel currentCollection : map.keySet()) {
+		    double val = map.get(currentCollection);
+		    if (minVal > val) {
+			minVal = val;
+			smallestFcp = currentCollection;
+		    }
+		}
+	
+		double total = 0;
+		for (Double val : map.values()) {
+		    total += val;
+		}
+	
+		if (total < 100d && smallestFcp != null && smallestFcp.equals(fcp)) {
+		    return 100d - total;
+		}
+	
+		return 0;
     }
 
     public Color getSelectedColor() {
-	return colors[colorIndex];
+    	return colors[colorIndex];
     }
 
     public Color getNextColor() {
-	if (colorIndex < 0 || colorIndex >= colors.length - 1) {
-	    colorIndex = 0;
-	} else {
-	    colorIndex++;
-	}
-
-	return colors[colorIndex];
+		if (colorIndex < 0 || colorIndex >= colors.length - 1) {
+		    colorIndex = 0;
+		} else {
+		    colorIndex++;
+		}
+	
+		return colors[colorIndex];
     }
 
     public static void main(String[] args) throws IOException {
-	JFrame frame = new JFrame();
-
-	frame.add(new BarDrawer(null));
-	frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-	frame.setSize(600, 150);
-	frame.setVisible(true);
+		JFrame frame = new JFrame();
+	
+		frame.add(new BarDrawer(null));
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame.setSize(600, 150);
+		frame.setVisible(true);
     }
 }
 
+@SuppressWarnings("serial")
 class FileCollectionPanel extends JPanel {
-
+	
     private String title;
 
     public FileCollectionPanel() {
@@ -269,13 +268,13 @@ class FileCollectionPanel extends JPanel {
      * @return the title
      */
     public String getTitle() {
-	return title;
+    	return title;
     }
 
     /**
      * @param title the title to set
      */
     public void setTitle(String title) {
-	this.title = title;
+    	this.title = title;
     }
 }

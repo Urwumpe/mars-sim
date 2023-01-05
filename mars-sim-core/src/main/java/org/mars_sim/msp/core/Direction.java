@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * Direction.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-28
  * @author Scott Davis
  */
 package org.mars_sim.msp.core;
@@ -12,17 +12,17 @@ import java.io.Serializable;
  * Direction. Represents an angular direction. It provides some useful static
  * methods involving directions.
  */
-public class Direction implements Cloneable, Serializable {
+public class Direction implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	// Data members
 	/** Direction in radians. */
-	private double direction;
+	private double dir;
 
 	// Static data members
-	private static double TWO_PI = 2 * Math.PI;
+	private static final double TWO_PI = 2 * Math.PI;
 
 	/**
 	 * Constructs a Direction object, hence a constructor. 0 = North, clockwise
@@ -30,16 +30,9 @@ public class Direction implements Cloneable, Serializable {
 	 * @param direction direction in radians
 	 */
 	public Direction(double direction) {
-		this.direction = cleanDirection(direction);
+		this.dir = cleanDirection(direction);
 	}
-
-	/**
-	 * Clones this Direction object.
-	 */
-	public Object clone() {
-		return new Direction(direction);
-	}
-
+	
 	/**
 	 * Returns true if object is an equal direction.
 	 * 
@@ -48,8 +41,8 @@ public class Direction implements Cloneable, Serializable {
 	 */
 	public boolean equals(Object obj) {
 		boolean result = false;
-		if (obj instanceof Direction) {
-			if (((Direction) obj).direction == direction)
+		if (obj instanceof Direction
+			&& ((Direction) obj).dir == dir) {
 				result = true;
 		}
 		return result;
@@ -61,14 +54,14 @@ public class Direction implements Cloneable, Serializable {
 	 * @return hash code.
 	 */
 	public int hashCode() {
-		return (int) (direction * 1000D);
+		return (int) (dir * 1000D);
 	}
 
 	/**
 	 * Gets the string value of the object.
 	 */
 	public String toString() {
-		return "" + direction;
+		return "" + dir;
 	}
 
 	/**
@@ -77,16 +70,7 @@ public class Direction implements Cloneable, Serializable {
 	 * @return direction in radians
 	 */
 	public double getDirection() {
-		return direction;
-	}
-
-	/**
-	 * Sets the direction. 0 = North, clockwise
-	 * 
-	 * @param direction new direction
-	 */
-	public void setDirection(double direction) {
-		this.direction = cleanDirection(direction);
+		return dir;
 	}
 
 	/**
@@ -95,7 +79,7 @@ public class Direction implements Cloneable, Serializable {
 	 * @return the sine of the direction
 	 */
 	public double getSinDirection() {
-		return Math.sin(direction);
+		return Math.sin(dir);
 	}
 
 	/**
@@ -104,7 +88,7 @@ public class Direction implements Cloneable, Serializable {
 	 * @return the cosine of the direction
 	 */
 	public double getCosDirection() {
-		return Math.cos(direction);
+		return Math.cos(dir);
 	}
 
 	/**
@@ -113,7 +97,7 @@ public class Direction implements Cloneable, Serializable {
 	 * @param raw direction
 	 * @return cleaned direction
 	 */
-	private double cleanDirection(double direction) {
+	private static double cleanDirection(double direction) {
 
 		while (direction < 0D) {
 			direction += TWO_PI;
@@ -122,10 +106,6 @@ public class Direction implements Cloneable, Serializable {
 		while (direction > TWO_PI) {
 			direction -= TWO_PI;
 		}
-
-//        if ((direction < 0.0) || (direction > TWO_PI)) {
-//            direction = Math.IEEEremainder(direction, TWO_PI);
-//        }
 
 		return direction;
 	}

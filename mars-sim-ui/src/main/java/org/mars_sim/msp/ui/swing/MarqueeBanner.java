@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MarqueeBanner.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing;
@@ -22,7 +22,7 @@ public class MarqueeBanner extends JInternalFrame {
 
 	private static final long serialVersionUID = -3982731599287212804L;
 	private MainDesktopPane desktop;
-	private String s;
+//	private String s;
 
 	public MarqueeBanner(MainDesktopPane desktop) {
 		super("Marquee Banner", false, true, false, true); //$NON-NLS-1$
@@ -106,8 +106,7 @@ public class MarqueeBanner extends JInternalFrame {
 	 *            the announcement text.
 	 */
 	public void setAnnouncement(String newText) {
-
-		if (!newText.equals(""))
-			s = newText;
+//		if (!newText.equals(""))
+//			s = newText;
 	}
 }

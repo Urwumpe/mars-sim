@@ -1,12 +1,11 @@
-/**
+/*
  * Mars Simulation Project
  * ManufactureGood.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -14,18 +13,19 @@ import java.util.List;
 import java.util.Map;
 
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.manufacture.ManufactureProcess;
 import org.mars_sim.msp.core.manufacture.ManufactureProcessInfo;
 import org.mars_sim.msp.core.manufacture.ManufactureUtil;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.RoboticAttributeType;
-import org.mars_sim.msp.core.robot.ai.job.Makerbot;
+import org.mars_sim.msp.core.robot.RobotType;
+import org.mars_sim.msp.core.structure.OverrideType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
@@ -37,14 +37,15 @@ import org.mars_sim.msp.core.tool.RandomUtil;
 /**
  * A task for working on a manufacturing process.
  */
-public class ManufactureGood extends Task implements Serializable {
+public class ManufactureGood extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-//	private static Logger logger = Logger.getLogger(ManufactureGood.class.getName());
+	private static SimLogger logger = SimLogger.getLogger(ManufactureGood.class.getName());
 
+	
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.manufactureGood"); //$NON-NLS-1$
 
@@ -65,73 +66,52 @@ public class ManufactureGood extends Task implements Serializable {
 	 * @param person the person to perform the task
 	 */
 	public ManufactureGood(Person person) {
-		super(NAME, person, true, false, STRESS_MODIFIER, true, 25);
+		super(NAME, person, true, false, STRESS_MODIFIER, SkillType.MATERIALS_SCIENCE, 100D, 25);
 
-		// Initialize data members
-		if (person.isInSettlement()) {
-
-			// Get available manufacturing workshop if any.
-			Building manufactureBuilding = getAvailableManufacturingBuilding(person);
-			if (manufactureBuilding != null) {
-				setDescription(Msg.getString("Task.description.manufactureGood.building",
-						 manufactureBuilding.getNickName())); //$NON-NLS-1$
-				workshop = manufactureBuilding.getManufacture();
-				// Walk to manufacturing building.
-				walkToTaskSpecificActivitySpotInBuilding(manufactureBuilding, false);
-				
-				// Initialize phase
-				addPhase(MANUFACTURE);
-				setPhase(MANUFACTURE);
-				
-			} else {
-				endTask();
-			}
-
-		} else {
-			endTask();
-		}
-	}
-
-	public ManufactureGood(Robot robot) {
-		super(NAME, robot, true, false, STRESS_MODIFIER, true, 10D + RandomUtil.getRandomDouble(50D));
-
-		// Initialize data members
-		if (robot.isInSettlement()) {
-
-			// Get available manufacturing workshop if any.
-			Building manufactureBuilding = getAvailableManufacturingBuilding(robot);
-			if (manufactureBuilding != null) {
-				setDescription(Msg.getString("Task.description.manufactureGood.building",
-						 manufactureBuilding.getNickName())); //$NON-NLS-1$
-				workshop = manufactureBuilding.getManufacture();
-				// Walk to manufacturing building.
-				walkToTaskSpecificActivitySpotInBuilding(manufactureBuilding, false);
-				
-				// Initialize phase
-				addPhase(MANUFACTURE);
-				setPhase(MANUFACTURE);
-			} else {
-				endTask();
-			}
-
-
-		} else {
-			endTask();
-		}
-	}
-
-	@Override
-	public FunctionType getLivingFunction() {
-		return FunctionType.MANUFACTURE;
-	}
-
-	@Override
-	public FunctionType getRoboticFunction() {
-		return FunctionType.MANUFACTURE;
+		init();
 	}
 
 	/**
-	 * Cancel any manufacturing processes that's beyond the skill of any people
+	 * Constructor.
+	 * 
+	 * @param robot the robot to perform the task
+	 */
+	public ManufactureGood(Robot robot) {
+		super(NAME, robot, true, false, STRESS_MODIFIER, SkillType.MATERIALS_SCIENCE, 100D,
+				10D + RandomUtil.getRandomDouble(50D));
+
+		init();
+	}
+	
+	private void init() {
+		// Initialize data members
+		if (worker.isInSettlement()) {
+
+			// Get available manufacturing workshop if any.
+			Building manufactureBuilding = getAvailableManufacturingBuilding(worker);
+			if (manufactureBuilding != null) {
+				setDescription(Msg.getString("Task.description.manufactureGood.building",
+						 manufactureBuilding.getNickName())); //$NON-NLS-1$
+				workshop = manufactureBuilding.getManufacture();
+
+				// Walk to manufacturing building.
+				walkToTaskSpecificActivitySpotInBuilding(manufactureBuilding, FunctionType.MANUFACTURE, false);
+				
+				// Initialize phase
+				addPhase(MANUFACTURE);
+				setPhase(MANUFACTURE);
+			} else {
+				endTask();
+			}
+
+
+		} else {
+			endTask();
+		}
+	}
+
+	/**
+	 * Cancels any manufacturing processes that's beyond the skill of any people
 	 * associated with the settlement.
 	 * 
 	 * @param settlement
@@ -151,7 +131,7 @@ public class ManufactureGood extends Task implements Serializable {
 
 			skillManager = null;
 			for (Robot tempRobot : settlement.getAllAssociatedRobots()) {
-				if (tempRobot.getBotMind().getRobotJob() instanceof Makerbot) {
+				if (tempRobot.getRobotType() == RobotType.MAKERBOT) {
 					// if (skillManager == null)
 					skillManager = tempRobot.getSkillManager();
 					int skill = skillManager.getSkillLevel(SkillType.MATERIALS_SCIENCE);
@@ -163,11 +143,13 @@ public class ManufactureGood extends Task implements Serializable {
 
 			for (Building building : settlement.getBuildingManager().getBuildings(FunctionType.MANUFACTURE)) {
 				Manufacture manufacturingFunction = building.getManufacture();
-				List<ManufactureProcess> processes = new ArrayList<ManufactureProcess>(
+				List<ManufactureProcess> processes = new ArrayList<>(
 						manufacturingFunction.getProcesses());
 				for (ManufactureProcess process : processes) {
 					int processSkillLevel = process.getInfo().getSkillLevelRequired();
-					if (processSkillLevel > highestSkillLevel) {
+					// NOTE: allow a low material science skill person to have access to do the next 2 levels 
+					// of skill process or else difficult tasks are not learned.
+					if (processSkillLevel - 2 > highestSkillLevel) {
 						// Cancel manufacturing process.
 						manufacturingFunction.endManufacturingProcess(process, true);
 					}
@@ -176,90 +158,22 @@ public class ManufactureGood extends Task implements Serializable {
 		}
 	}
 
-//	public static void cancelDifficultManufacturingProcesses(Robot robot) {
-//
-//		Settlement settlement = robot.getSettlement();
-//		if (settlement != null) {
-//			int highestSkillLevel = 0;
-//			SkillManager skillManager = null;
-//			for (Person tempPerson : settlement.getAllAssociatedPeople()) {
-//				if (skillManager == null)
-//					skillManager = tempPerson.getSkillManager();
-//				int skill = skillManager.getSkillLevel(SkillType.MATERIALS_SCIENCE);
-//				if (skill > highestSkillLevel) {
-//					highestSkillLevel = skill;
-//				}
-//			}
-//
-//			skillManager = null;
-//			for (Robot tempRobot : settlement.getAllAssociatedRobots()) {
-//				if (robot.getBotMind().getRobotJob() instanceof Makerbot) {
-//					if (skillManager == null)
-//						skillManager = tempRobot.getSkillManager();
-//					int skill = skillManager.getSkillLevel(SkillType.MATERIALS_SCIENCE);
-//					if (skill > highestSkillLevel) {
-//						highestSkillLevel = skill;
-//					}
-//				}
-//			}
-//
-//			BuildingManager buildingManager = robot.getSettlement().getBuildingManager();
-//			for (Building building : buildingManager.getBuildings(FunctionType.MANUFACTURE)) {
-//				Manufacture manufacturingFunction = building.getManufacture();
-//				List<ManufactureProcess> processes = new ArrayList<ManufactureProcess>(
-//						manufacturingFunction.getProcesses());
-//				for (ManufactureProcess process : processes) {
-//					int processSkillLevel = process.getInfo().getSkillLevelRequired();
-//					if (processSkillLevel > highestSkillLevel) {
-//						// Cancel manufacturing process.
-//						manufacturingFunction.endManufacturingProcess(process, true);
-//					}
-//				}
-//			}
-//		}
-//	}
-
 	/**
-	 * Gets an available manufacturing building that the person can use. Returns
+	 * Gets an available manufacturing building that the worker can use. Returns
 	 * null if no manufacturing building is currently available.
 	 * 
-	 * @param person the person
+	 * @param worker the worker
 	 * @return available manufacturing building
 	 */
-	public static Building getAvailableManufacturingBuilding(Person person) {
+	public static Building getAvailableManufacturingBuilding(Worker worker) {
 
 		Building result = null;
 
-		SkillManager skillManager = person.getSkillManager();
+		SkillManager skillManager = worker.getSkillManager();
 		int skill = skillManager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
 
-		if (person.isInSettlement()) {
-			List<Building> manufacturingBuildings = person.getSettlement().getBuildingManager().getBuildings(FunctionType.MANUFACTURE);
-			manufacturingBuildings = BuildingManager.getNonMalfunctioningBuildings(manufacturingBuildings);
-			manufacturingBuildings = getManufacturingBuildingsNeedingWork(manufacturingBuildings, skill);
-			manufacturingBuildings = getBuildingsWithProcessesRequiringWork(manufacturingBuildings, skill);
-			manufacturingBuildings = getHighestManufacturingTechLevelBuildings(manufacturingBuildings);
-			manufacturingBuildings = BuildingManager.getLeastCrowdedBuildings(manufacturingBuildings);
-
-			if (manufacturingBuildings.size() > 0) {
-				Map<Building, Double> manufacturingBuildingProbs = BuildingManager.getBestRelationshipBuildings(person,
-						manufacturingBuildings);
-				result = RandomUtil.getWeightedRandomObject(manufacturingBuildingProbs);
-			}
-		}
-
-		return result;
-	}
-
-	public static Building getAvailableManufacturingBuilding(Robot robot) {
-
-		Building result = null;
-
-		SkillManager skillManager = robot.getSkillManager();
-		int skill = skillManager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
-
-		if (robot.isInSettlement()) {
-			List<Building> manufacturingBuildings = robot.getSettlement().getBuildingManager().getBuildings(FunctionType.MANUFACTURE);
+		if (worker.isInSettlement()) {
+			List<Building> manufacturingBuildings = worker.getSettlement().getBuildingManager().getBuildings(FunctionType.MANUFACTURE);
 			manufacturingBuildings = BuildingManager.getNonMalfunctioningBuildings(manufacturingBuildings);
 			manufacturingBuildings = getManufacturingBuildingsNeedingWork(manufacturingBuildings, skill);
 			manufacturingBuildings = getBuildingsWithProcessesRequiringWork(manufacturingBuildings, skill);
@@ -285,12 +199,12 @@ public class ManufactureGood extends Task implements Serializable {
 	 */
 	private static List<Building> getManufacturingBuildingsNeedingWork(List<Building> buildingList, int skill) {
 
-		List<Building> result = new ArrayList<Building>();
+		List<Building> result = new ArrayList<>();
 
 		Iterator<Building> i = buildingList.iterator();
 		while (i.hasNext()) {
 			Building building = i.next();
-			if (building.getManufacture().requiresManufacturingWork(skill)) {
+			if (building.getManufacture().requiresWork(skill)) {
 				result.add(building);
 			}
 		}
@@ -308,7 +222,7 @@ public class ManufactureGood extends Task implements Serializable {
 	 */
 	private static List<Building> getBuildingsWithProcessesRequiringWork(List<Building> buildingList, int skill) {
 
-		List<Building> result = new ArrayList<Building>();
+		List<Building> result = new ArrayList<>();
 		// Add all buildings with processes requiring work.
 		Iterator<Building> i = buildingList.iterator();
 		while (i.hasNext()) {
@@ -358,7 +272,7 @@ public class ManufactureGood extends Task implements Serializable {
 	 */
 	private static List<Building> getHighestManufacturingTechLevelBuildings(List<Building> buildingList) {
 
-		List<Building> result = new ArrayList<Building>();
+		List<Building> result = new ArrayList<>();
 
 		int highestTechLevel = 0;
 		Iterator<Building> i = buildingList.iterator();
@@ -382,18 +296,18 @@ public class ManufactureGood extends Task implements Serializable {
 	}
 
 	/**
-	 * Gets the highest manufacturing process goods value for the person and the
+	 * Gets the highest manufacturing process goods value for the worker and the
 	 * manufacturing building.
 	 * 
-	 * @param person                the person to perform manufacturing.
+	 * @param worker the worker to perform manufacturing.
 	 * @param manufacturingBuilding the manufacturing building.
 	 * @return highest process good value.
 	 */
-	public static double getHighestManufacturingProcessValue(Person person, Building manufacturingBuilding) {
+	public static double getHighestManufacturingProcessValue(Worker worker, Building manufacturingBuilding) {
 
 		double highestProcessValue = 0D;
 
-		int skillLevel = person.getSkillManager().getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
+		int skillLevel = worker.getSkillManager().getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
 
 		Manufacture manufacturingFunction = manufacturingBuilding.getManufacture();
 		int techLevel = manufacturingFunction.getTechLevel();
@@ -415,71 +329,6 @@ public class ManufactureGood extends Task implements Serializable {
 		return highestProcessValue;
 	}
 
-	public static double getHighestManufacturingProcessValue(Robot robot, Building manufacturingBuilding) {
-
-		double highestProcessValue = 0D;
-
-		int skillLevel = robot.getSkillManager().getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
-
-		Manufacture manufacturingFunction = manufacturingBuilding.getManufacture();
-		int techLevel = manufacturingFunction.getTechLevel();
-
-		Iterator<ManufactureProcessInfo> i = ManufactureUtil
-				.getManufactureProcessesForTechSkillLevel(techLevel, skillLevel).iterator(); // java.util.ConcurrentModificationException
-		while (i.hasNext()) {
-			ManufactureProcessInfo process = i.next();
-			if (ManufactureUtil.canProcessBeStarted(process, manufacturingFunction)
-					|| isProcessRunning(process, manufacturingFunction)) {
-				Settlement settlement = manufacturingBuilding.getSettlement();
-				double processValue = ManufactureUtil.getManufactureProcessValue(process, settlement);
-				if (processValue > highestProcessValue) {
-					highestProcessValue = processValue;
-				}
-			}
-		}
-
-		return highestProcessValue;
-	}
-
-	@Override
-	protected void addExperience(double time) {
-		// Add experience to "Materials Science" skill
-		// (1 base experience point per 100 millisols of work)
-		// Experience points adjusted by person's "Experience Aptitude"
-		// attribute.
-		double newPoints = time / 100D;
-		int experienceAptitude = 0;
-		if (person != null)
-			experienceAptitude = person.getNaturalAttributeManager()
-					.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
-		else if (robot != null)
-			experienceAptitude = robot.getRoboticAttributeManager()
-					.getAttribute(RoboticAttributeType.EXPERIENCE_APTITUDE);
-
-		newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
-		newPoints *= getTeachingExperienceModifier();
-		if (person != null)
-			person.getSkillManager().addExperience(SkillType.MATERIALS_SCIENCE, newPoints, time);
-		else if (robot != null)
-			robot.getSkillManager().addExperience(SkillType.MATERIALS_SCIENCE, newPoints, time);
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(1);
-		results.add(SkillType.MATERIALS_SCIENCE);
-		return results;
-	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		if (person != null)
-			return person.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
-		else if (robot != null)
-			return robot.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
-		return 0;
-	}
-
 	@Override
 	protected double performMappedPhase(double time) {
 		if (getPhase() == null) {
@@ -499,89 +348,73 @@ public class ManufactureGood extends Task implements Serializable {
 	 */
 	private double manufacturePhase(double time) {
 
-		if (person != null) {
-			if (person.isOutside()) {
-				endTask();
-				return 0;
-			}
-		}
-		else if (robot != null) {
-			if (robot.isOutside()) {
-				endTask();
-				return 0;
-			}
-		}
-			
-		// Check if workshop has malfunction.
-		if (workshop.getBuilding().getMalfunctionManager().hasMalfunction()) {
+		if (worker.isOutside()) {
 			endTask();
 			return 0;
 		}
+			
+		// Check if workshop has malfunction.
+		Building entity = workshop.getBuilding();
+		if (entity.getMalfunctionManager().hasMalfunction()) {
+			logger.info(worker, 30_000L, "Manufacturing halted due to malfunction.");
+			endTask();
+			return time * .75;
+		}
 
-		else {
-	        // Cancel any manufacturing processes that's beyond the skill of any people
-	        // associated with the settlement.
-			ManufactureGood.cancelDifficultManufacturingProcesses(workshop.getBuilding().getSettlement());
-	        
-			// Determine amount of effective work time based on "Materials Science"
-			// skill.
-			double workTime = time;
-			int skill = getEffectiveSkillLevel();
-			if (skill == 0) {
-				workTime /= 2;
-			} else {
-				workTime += workTime * (.2D * (double) skill);
-			}
-	
-			// Apply work time to manufacturing processes.
-			while ((workTime > 0D) && !isDone()) {
-				ManufactureProcess process = getRunningManufactureProcess();
-				if (process != null) {
-					double remainingWorkTime = process.getWorkTimeRemaining();
-					double providedWorkTime = workTime;
-					if (providedWorkTime > remainingWorkTime) {
-						providedWorkTime = remainingWorkTime;
-					}
-					process.addWorkTime(providedWorkTime);
-					workTime -= providedWorkTime;
-	
-					if ((process.getWorkTimeRemaining() <= 0D) && (process.getProcessTimeRemaining() <= 0D)) {
-						workshop.endManufacturingProcess(process, false);
-					}
+        // Cancel any manufacturing processes that's beyond the skill of any people
+        // associated with the settlement.
+		ManufactureGood.cancelDifficultManufacturingProcesses(entity.getSettlement());
+        
+		// Determine amount of effective work time based on "Materials Science"
+		// skill.
+		double workTime = time;
+		int skill = getEffectiveSkillLevel();
+		if (skill == 0) {
+			workTime /= 2;
+		} else {
+			workTime += workTime * (.2D * (double) skill);
+		}
+
+		// Apply work time to manufacturing processes.
+		while ((workTime > 0D) && !isDone()) {
+			ManufactureProcess process = getRunningManufactureProcess();
+			if (process != null) {
+				double remainingWorkTime = process.getWorkTimeRemaining();
+				double providedWorkTime = workTime;
+				if (providedWorkTime > remainingWorkTime) {
+					providedWorkTime = remainingWorkTime;
 				}
+				process.addWorkTime(providedWorkTime);
+				workTime -= providedWorkTime;
+
+				if ((process.getWorkTimeRemaining() <= 0D) && (process.getProcessTimeRemaining() <= 0D)) {
+					workshop.endManufacturingProcess(process, false);
+				}
+			}
+			
+			else {
+				if (!worker.getSettlement().getProcessOverride(OverrideType.MANUFACTURE))
+					process = createNewManufactureProcess();
 				
-				else {
-	
-					if (person != null) {
-						if (!person.getSettlement().getManufactureOverride())
-							process = createNewManufactureProcess();
-					}
-					
-					else if (robot != null) {
-						if (!robot.getSettlement().getManufactureOverride())
-							process = createNewManufactureProcess();
-					}
-					
-					if (process == null) {
-						endTask();
-					}
+				if (process == null) {
+					endTask();
 				}
-	
-				if (process != null)
-					// Prints description
-					setDescription(Conversion.capitalize(process.toString())); // $NON-NLS-1$
-				else
-					setDescription(Msg.getString("Task.description.manufactureGood.inspecting")); //$NON-NLS-1$
-	
 			}
-	
-			// Add experience
-			addExperience(time);
-	
-			// Check for accident in workshop.
-			checkForAccident(time);
+
+			if (process != null)
+				// Prints description
+				setDescription(Conversion.capitalize(process.toString())); // $NON-NLS-1$
+			else
+				setDescription(Msg.getString("Task.description.manufactureGood.inspecting")); //$NON-NLS-1$
 
 		}
+
+		// Add experience
+		addExperience(time);
+
+		// Check for accident in workshop.
+		checkForAccident(entity, 0.005D, time);
+
 		
 		return 0D;
 	}
@@ -619,7 +452,7 @@ public class ManufactureGood extends Task implements Serializable {
 		Iterator<ManufactureProcess> i = manufactureBuilding.getProcesses().iterator();
 		while (i.hasNext()) {
 			ManufactureProcess process = i.next();
-			if (process.getInfo().getName() == processInfo.getName()) {
+			if (process.getInfo().getName().equals(processInfo.getName())) {
 				result = true;
 			}
 		}
@@ -635,23 +468,19 @@ public class ManufactureGood extends Task implements Serializable {
 	private ManufactureProcess createNewManufactureProcess() {
 		ManufactureProcess result = null;
 
-		if (workshop.getCurrentProcesses() < workshop.getNumPrintersInUse()) {
+		if (workshop.getCurrentTotalProcesses() < workshop.getNumPrintersInUse()) {
 
 			int skillLevel = getEffectiveSkillLevel();
 			int techLevel = workshop.getTechLevel();
 
 			// Determine all manufacturing processes that are possible and profitable.
-			Map<ManufactureProcessInfo, Double> processProbMap = new HashMap<ManufactureProcessInfo, Double>();
+			Map<ManufactureProcessInfo, Double> processProbMap = new HashMap<>();
 			Iterator<ManufactureProcessInfo> i = ManufactureUtil
 					.getManufactureProcessesForTechSkillLevel(techLevel, skillLevel).iterator();
 			while (i.hasNext()) {
 				ManufactureProcessInfo processInfo = i.next();
 				if (ManufactureUtil.canProcessBeStarted(processInfo, workshop)) {
-					double processValue = 0;
-					if (person != null)
-						processValue = ManufactureUtil.getManufactureProcessValue(processInfo, person.getSettlement());
-					else if (robot != null)
-						processValue = ManufactureUtil.getManufactureProcessValue(processInfo, robot.getSettlement());
+					double processValue = ManufactureUtil.getManufactureProcessValue(processInfo, worker.getSettlement());
 
 					if (processValue > 0D) {
 						processProbMap.put(processInfo, processValue);
@@ -674,44 +503,5 @@ public class ManufactureGood extends Task implements Serializable {
 		}
 
 		return result;
-	}
-
-	/**
-	 * Check for accident in manufacturing building.
-	 * 
-	 * @param time the amount of time working (in millisols)
-	 */
-	private void checkForAccident(double time) {
-
-		double chance = .005D;
-
-		// Materials science skill modification.
-		int skill = getEffectiveSkillLevel();
-		if (skill <= 3) {
-			chance *= (4 - skill);
-		} else {
-			chance /= (skill - 2);
-		}
-
-		// Modify based on the workshop building's wear condition.
-		chance *= workshop.getBuilding().getMalfunctionManager().getWearConditionAccidentModifier();
-
-		if (RandomUtil.lessThanRandPercent(chance * time)) {
-
-			if (person != null) {
-//				logger.info("[" + person.getLocationTag().getShortLocationName() +  "] " + person.getName() + " has accident while manufacturing good.");
-				workshop.getBuilding().getMalfunctionManager().createASeriesOfMalfunctions(person);
-			} else if (robot != null) {
-//				logger.info("[" + robot.getLocationTag().getShortLocationName() +  "] " + robot.getName() + " has accident while manufacturing godd.");
-				workshop.getBuilding().getMalfunctionManager().createASeriesOfMalfunctions(robot);
-			}
-		}
-	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
-
-		workshop = null;
 	}
 }

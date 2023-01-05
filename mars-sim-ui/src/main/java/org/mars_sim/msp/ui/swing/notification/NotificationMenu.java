@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * NotificationMenu.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -34,11 +34,8 @@ public class NotificationMenu implements ActionListener, MenuListener {
 
 	private MainWindowMenu mainWindowMenu; // Needed and do NOT delete
 	
-	
-	// 2014-12-04 Added notification related items
 	private JCheckBoxMenuItem medicalMenuItem;
 	private JCheckBoxMenuItem malfunctionMenuItem;
-	// 2014-12-17 Added confirmMenuItem
 	private JRadioButtonMenuItem confirmMenuItem;
 	private JRadioButtonMenuItem threeMenuItem;
 	private JRadioButtonMenuItem twoMenuItem;
@@ -46,7 +43,7 @@ public class NotificationMenu implements ActionListener, MenuListener {
 	private JRadioButtonMenuItem showAllMenuItem ;
 	private JRadioButtonMenuItem showLastThreeMenuItem ;
 	private JRadioButtonMenuItem showLastOneMenuItem ;
-	// 2014-12-17 Added isConfirmButtonEnabled
+
 	private boolean isConfirmEachEnabled  = false;
 	private boolean showMedical = true;
 	private boolean showMalfunction = true;
@@ -245,29 +242,20 @@ public class NotificationMenu implements ActionListener, MenuListener {
 		//MainDesktopPane desktop = mainWindow.getDesktop();
 
 		if (selectedItem == medicalMenuItem) {
-			if (medicalMenuItem.isSelected()) 
-				showMedical = true;
-			else 
-				showMedical = false;
+            showMedical = medicalMenuItem.isSelected();
 			//System.out.println("selectedItem ==  medicalMenuItem");
 			//System.out.println("showMedical is " + showMedical);
 		}
 			
 		if (selectedItem ==  malfunctionMenuItem) {
-			if (malfunctionMenuItem.isSelected()) 
-				showMalfunction = true;
-			else 
-				showMalfunction = false;		
+            showMalfunction = malfunctionMenuItem.isSelected();
 			//System.out.println("selectedItem ==  malfunctionMenuItem");
 			//System.out.println("showMalfunction is " + showMalfunction);			
 		}
 		
 		// 2014-12-17 confirmMenuItem
 		if (selectedItem ==  confirmMenuItem){
-			if (confirmMenuItem.isSelected()) 
-				isConfirmEachEnabled = true;
-			else 
-				isConfirmEachEnabled = false;	
+            isConfirmEachEnabled = confirmMenuItem.isSelected();
 		}
 		
 		if (selectedItem ==  threeMenuItem) displayTime = 3;

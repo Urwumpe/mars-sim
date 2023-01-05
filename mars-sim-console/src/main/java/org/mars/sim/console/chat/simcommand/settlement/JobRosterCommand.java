@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * JobRosterCommand.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand.settlement;
 
 import java.util.ArrayList;
@@ -8,9 +15,10 @@ import java.util.stream.Collectors;
 
 import org.mars.sim.console.chat.ChatCommand;
 import org.mars.sim.console.chat.Conversation;
+import org.mars.sim.console.chat.simcommand.CommandHelper;
 import org.mars.sim.console.chat.simcommand.StructuredResponse;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.job.JobUtil;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.structure.Settlement;
 
 /**
@@ -23,8 +31,8 @@ public class JobRosterCommand extends AbstractSettlementCommand {
 	
 	private static final String DESC = "Job roster details";
 
-	private static final String PERSON_ROSTER = "%" + PERSON_WIDTH + "s - %s%n";
-	private static final String JOB_ROSTER = "%" + JOB_WIDTH + "s - %s%n";
+	private static final String PERSON_ROSTER = "%" + CommandHelper.PERSON_WIDTH + "s - %s%n";
+	private static final String JOB_ROSTER = "%" + CommandHelper.JOB_WIDTH + "s - %s%n";
 
 	
 	private JobRosterCommand() {
@@ -45,20 +53,20 @@ public class JobRosterCommand extends AbstractSettlementCommand {
 				.sorted((p1, p2) -> p1.getName().compareTo(p2.getName())).collect(Collectors.toList());
 
 		for (Person p : list) {
-			String job = p.getMind().getJob().getName(p.getGender());
+			String job = p.getMind().getJob().getName();
 			response.append(String.format(PERSON_ROSTER, p.getName(), job));
 		}
 
-		response.append(System.lineSeparator());
+		response.appendBlankLine();
 		response.appendHeading("Job Roster by Job");
-		Map<String, List<Person>> map = JobUtil.getJobMap(settlement);
-
-		List<String> jobList = new ArrayList<>(map.keySet());
-		Collections.sort(jobList);
-		for (String jobStr : jobList) {
-			List<Person> plist = map.get(jobStr);
+		Map<JobType, List<Person>> map = getJobMap(settlement);	
+		List<JobType> sorted = new ArrayList<>(map.keySet());
+		Collections.sort(sorted);
+		
+		for (JobType job : sorted) {
+			List<Person> plist = map.get(job);
 			Collections.sort(plist);
-
+			String jobStr = job.getName();
 			for (Person p : plist) {
 				response.append(String.format(JOB_ROSTER, jobStr, p.getName()));
 				jobStr = "";
@@ -67,5 +75,17 @@ public class JobRosterCommand extends AbstractSettlementCommand {
 		
 		context.println(response.getOutput());
 		return true;
+	}
+	
+	/**
+	 * Returns a map of job with a list of person occupying that position
+	 * 
+	 * @param s
+	 * @returnMind().getJob()
+	 */
+	public static Map<JobType, List<Person>> getJobMap(Settlement s)
+	{
+		return 	s.getAllAssociatedPeople().stream()
+				.collect(Collectors.groupingBy(p -> p.getMind().getJob()));
 	}
 }

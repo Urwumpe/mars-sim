@@ -1,26 +1,26 @@
-/**
+/*
  * Mars Simulation Project
  * TabPanelConstruction.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-09
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
 import javax.swing.JCheckBox;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.structure.OverrideType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.construction.ConstructionManager;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
@@ -28,9 +28,9 @@ import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 public class TabPanelConstruction
 extends TabPanel {
 
+	private static final String HELMET_ICON = Msg.getString("icon.helmet"); //$NON-NLS-1$
+	
 	// Data members
-	/** Is UI constructed. */
-	private boolean uiDone = false;
 	/** The Settlement instance. */
 	private Settlement settlement;
 	private ConstructionSitesPanel sitesPanel;
@@ -46,8 +46,8 @@ extends TabPanel {
 		// Use the TabPanel constructor
 		super(
 			Msg.getString("TabPanelConstruction.title"), //$NON-NLS-1$
-			null,
-			Msg.getString("TabPanelConstruction.tooltip"), //$NON-NLS-1$
+			ImageLoader.getNewIcon(HELMET_ICON),
+			Msg.getString("TabPanelConstruction.title"), //$NON-NLS-1$
 			unit, desktop
 		);
 
@@ -55,36 +55,14 @@ extends TabPanel {
 
 	}
 	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
+	@Override
+	protected void buildUI(JPanel content) {
 		
 		ConstructionManager manager = settlement.getConstructionManager();
 
-		JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(titlePanel);
-
-		JLabel titleLabel = new JLabel(Msg.getString("TabPanelConstruction.label"), JLabel.CENTER); //$NON-NLS-1$
-		titleLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		//titleLabel.setForeground(new Color(102, 51, 0)); // dark brown
-		titlePanel.add(titleLabel);
-
-		JPanel mainContentPanel = new JPanel(new GridLayout(2, 1));
-		centerContentPanel.add(mainContentPanel, BorderLayout.CENTER);
-
-		sitesPanel = new ConstructionSitesPanel(manager);
-		mainContentPanel.add(sitesPanel);
-
-		buildingsPanel = new ConstructedBuildingsPanel(manager);
-		mainContentPanel.add(buildingsPanel);
-
-		// Create bottom panel.
-		JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-//		bottomPanel.setBorder(new MarsPanelBorder());
-		centerContentPanel.add(bottomPanel, BorderLayout.SOUTH);
+		// Create override panel.
+		JPanel overridePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+		content.add(overridePanel, BorderLayout.NORTH);
 
 		// Create override check box.
 		overrideCheckbox = new JCheckBox(Msg.getString("TabPanelConstruction.checkbox.overrideConstructionAndSalvage")); //$NON-NLS-1$
@@ -94,8 +72,17 @@ extends TabPanel {
 				setConstructionOverride(overrideCheckbox.isSelected());
 			}
 		});
-		overrideCheckbox.setSelected(settlement.getConstructionOverride());
-		bottomPanel.add(overrideCheckbox);
+		overrideCheckbox.setSelected(settlement.getProcessOverride(OverrideType.CONSTRUCTION));
+		overridePanel.add(overrideCheckbox);
+		
+		JPanel mainContentPanel = new JPanel(new GridLayout(2, 1));
+		content.add(mainContentPanel, BorderLayout.CENTER);
+
+		sitesPanel = new ConstructionSitesPanel(manager);
+		mainContentPanel.add(sitesPanel);
+
+		buildingsPanel = new ConstructedBuildingsPanel(manager);
+		mainContentPanel.add(buildingsPanel);
 	}
 
 	/**
@@ -103,26 +90,26 @@ extends TabPanel {
 	 * @param constructionOverride true if construction/salvage building missions are overridden.
 	 */
 	private void setConstructionOverride(boolean constructionOverride) {
-		settlement.setConstructionOverride(constructionOverride);
+		settlement.setProcessOverride(OverrideType.CONSTRUCTION, constructionOverride);
 	}
 
 	@Override
 	public void update() {
-		if (!uiDone)
-			this.initializeUI();
-		
 		sitesPanel.update();
 		buildingsPanel.update();
 
 		// Update construction override check box if necessary.
-		if (settlement.getConstructionOverride() != overrideCheckbox.isSelected()) 
-			overrideCheckbox.setSelected(settlement.getConstructionOverride());
+		if (settlement.getProcessOverride(OverrideType.CONSTRUCTION) != overrideCheckbox.isSelected()) 
+			overrideCheckbox.setSelected(settlement.getProcessOverride(OverrideType.CONSTRUCTION));
 	}
 	
 	/**
 	 * Prepare object for garbage collection.
 	 */
+	@Override
 	public void destroy() {
+		super.destroy();
+		
 		settlement = null;
 		sitesPanel = null;
 		buildingsPanel = null;

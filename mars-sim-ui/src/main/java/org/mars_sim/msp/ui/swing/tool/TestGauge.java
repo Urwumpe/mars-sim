@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TestGauge.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -20,11 +20,11 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 
-import org.mars_sim.msp.ui.steelseries.gauges.DisplayCircular;
-import org.mars_sim.msp.ui.steelseries.tools.BackgroundColor;
-import org.mars_sim.msp.ui.steelseries.tools.FrameDesign;
-import org.mars_sim.msp.ui.steelseries.tools.LcdColor;
-import org.mars_sim.msp.ui.steelseries.tools.LedColor;
+import eu.hansolo.steelseries.gauges.DisplayCircular;
+import eu.hansolo.steelseries.tools.BackgroundColor;
+import eu.hansolo.steelseries.tools.FrameDesign;
+import eu.hansolo.steelseries.tools.LcdColor;
+import eu.hansolo.steelseries.tools.LedColor;
 
 
 public class TestGauge {

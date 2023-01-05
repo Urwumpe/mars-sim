@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * SpringUtilities.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-20
  * @author Manny Kung
  */
 
@@ -39,7 +39,6 @@
 package org.mars_sim.msp.ui.swing.tool;
 
 import javax.swing.*;
-import javax.swing.SpringLayout;
 import java.awt.*;
 
 /**
@@ -125,14 +124,14 @@ public class SpringUtilities {
             if (i % cols == 0) { //start of new row
                 lastRowCons = lastCons;
                 cons.setX(initialXSpring);
-            } else { //x position depends on previous component
+            } else if (lastCons != null) { //x position depends on previous component
                 cons.setX(Spring.sum(lastCons.getConstraint(SpringLayout.EAST),
                                      xPadSpring));
             }
 
             if (i / cols == 0) { //first row
                 cons.setY(initialYSpring);
-            } else { //y position depends on previous row
+            } else if (lastRowCons != null) { //y position depends on previous row
                 cons.setY(Spring.sum(lastRowCons.getConstraint(SpringLayout.SOUTH),
                                      yPadSpring));
             }
@@ -141,14 +140,16 @@ public class SpringUtilities {
 
         //Set the parent's size.
         SpringLayout.Constraints pCons = layout.getConstraints(parent);
-        pCons.setConstraint(SpringLayout.SOUTH,
+        if (lastCons != null) {
+        	pCons.setConstraint(SpringLayout.SOUTH,
                             Spring.sum(
                                 Spring.constant(yPad),
                                 lastCons.getConstraint(SpringLayout.SOUTH)));
-        pCons.setConstraint(SpringLayout.EAST,
+        	pCons.setConstraint(SpringLayout.EAST,
                             Spring.sum(
                                 Spring.constant(xPad),
                                 lastCons.getConstraint(SpringLayout.EAST)));
+        }
     }
 
     /* Used by makeCompactGrid. */

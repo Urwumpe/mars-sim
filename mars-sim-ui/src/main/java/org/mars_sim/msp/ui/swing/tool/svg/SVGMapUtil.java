@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SVGMapUtil.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.svg;
@@ -48,7 +48,8 @@ public final class SVGMapUtil {
         }
         finally {
             try {
-                inputStream.close();
+            	if (inputStream != null)
+            		inputStream.close();
             }
             catch (IOException e) {
                 e.printStackTrace(System.err);

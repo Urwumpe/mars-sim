@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MeteorologyStudyFieldMissionCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -33,6 +33,7 @@ import com.alee.laf.progressbar.WebProgressBar;
 /**
  * A panel for displaying meteorology study field mission information.
  */
+@SuppressWarnings("serial")
 public class MeteorologyStudyFieldMissionCustomInfoPanel extends MissionCustomInfoPanel
 		implements ScientificStudyListener {
 
@@ -169,12 +170,9 @@ public class MeteorologyStudyFieldMissionCustomInfoPanel extends MissionCustomIn
 	 * @return true if primary researcher.
 	 */
 	private boolean isStudyPrimaryResearcher(Person researcher, ScientificStudy study) {
-		boolean result = false;
+		boolean result = researcher.equals(study.getPrimaryResearcher());
 
-		if (researcher.equals(study.getPrimaryResearcher()))
-			result = true;
-
-		return result;
+        return result;
 	}
 
 	/**
@@ -185,12 +183,9 @@ public class MeteorologyStudyFieldMissionCustomInfoPanel extends MissionCustomIn
 	 * @return true if collaborative researcher.
 	 */
 	private boolean isStudyCollaborativeResearcher(Person researcher, ScientificStudy study) {
-		boolean result = false;
+		boolean result = study.getCollaborativeResearchers().contains(researcher);
 
-		if (study.getCollaborativeResearchers().contains(researcher))
-			result = true;
-
-		return result;
+        return result;
 	}
 
 	/**

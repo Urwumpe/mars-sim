@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * VehicleWindow.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
@@ -39,48 +39,55 @@ public class VehicleWindow extends UnitWindow {
 	 */
 	public VehicleWindow(MainDesktopPane desktop, Vehicle vehicle) {
 		// Use UnitWindow constructor
-		super(desktop, vehicle, true);
+		super(desktop, vehicle, vehicle.getAssociatedSettlement().getName() + " - " + vehicle.getNickName(), true);
 		this.vehicle = vehicle;
 
 		// Add tab panels
 		if (vehicle instanceof Crewable) {
 			Crewable crewableVehicle = (Crewable) vehicle;
-			if (crewableVehicle.getCrewNum() > 0)
+			if (crewableVehicle.getCrewCapacity() > 0)
 				addTabPanel(new TabPanelCrew(vehicle, desktop));
-			else if (crewableVehicle.getRobotCrewNum() > 0)
+			else if (crewableVehicle.getRobotCrewCapacity() > 0)
 				addTabPanel(new TabPanelBots(vehicle, desktop));
 		}
 
-		addTabPanel(new TabPanelMission(vehicle, desktop));
-		
 		addTabPanel(new InventoryTabPanel(vehicle, desktop));
+	
+		addTabPanel(new LocationTabPanel(vehicle, desktop));
 
 		if (vehicle instanceof Rover) {
+
+			addTabPanel(new TabPanelEVA(vehicle, desktop));		
 			Rover rover = (Rover) vehicle;
 			if (rover.hasLab())
-				addTabPanel(new LaboratoryTabPanel(rover, desktop));
-			// TODO: Add sickbay tab panel.
-		}
+				addTabPanel(new LaboratoryTabPanel(rover, desktop));		
+			// Future: Add sickbay tab panel.
+		}		
 
-		addTopPanel(new LocationTabPanel(vehicle, desktop));
-		addTopPanel(new TabPanelLog(vehicle, desktop));
+
+		addTabPanel(new TabPanelLog(vehicle, desktop));
 		addTabPanel(new MaintenanceTabPanel(vehicle, desktop));
+		addTabPanel(new TabPanelMission(vehicle, desktop));	
 		addTabPanel(new NotesTabPanel(vehicle, desktop));
-
-		addTabPanel(new NavigationTabPanel(vehicle, desktop));
 
 		salvaged = vehicle.isSalvaged();
 		if (salvaged)
 			addTabPanel(new SalvageTabPanel(vehicle, desktop));
 
 		addTabPanel(new TabPanelTow(vehicle, desktop));
-
+		
 		sortTabPanels();
+
+		addFirstPanel(new NavigationTabPanel(vehicle, desktop));
+		
+		// Add to tab panels. 
+		addTabIconPanels();
 	}
 
 	/**
 	 * Updates this window.
 	 */
+	@Override
 	public void update() {
 		super.update();
 		// Check if equipment has been salvaged.
@@ -91,7 +98,9 @@ public class VehicleWindow extends UnitWindow {
 		}
 	}
 
+	@Override
 	public void destroy() {
+		super.destroy();
 		vehicle = null;
 	}
 

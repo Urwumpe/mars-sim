@@ -1,13 +1,13 @@
-/**
+/*
  * Mars Simulation Project
  * MapDataFactory.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-15
  * @author Scott Davis
  */
 
  package org.mars_sim.mapdata;
 
- /**
+/**
   * A factory for map data.
   */
  class MapDataFactory {
@@ -17,7 +17,7 @@
  	static final int TOPO_MAP_DATA = 1; 		// "topographical map data";
  	static final int GEOLOGY_MAP_DATA = 2; 		// "geological ages map data"
 
-// 	private boolean decompressed = false;
+// 	private boolean decompressed = false;s
 
  	// Data members.
  	private MapData surfaceMapData;
@@ -28,7 +28,7 @@
  	 * Constructor.
  	 */
  	MapDataFactory() {
-
+ 		// nothing
  	}
 
  	/**
@@ -38,7 +38,6 @@
  	 * @return the map data.
  	 */
  	MapData getMapData(int mapType) {
- 		MapData result = null;
 
  		// Decompress the dat maps
 // 		if (!decompressed) {
@@ -46,7 +45,9 @@
 // 			// Only need to do it once
 // 			decompressed = true;
 // 		}
-
+ 		
+ 		MapData result = null;
+ 		
  		if (mapType == SURFACE_MAP_DATA) {
  			result = getSurfaceMapData();
  		} else if (mapType == TOPO_MAP_DATA) {
@@ -56,7 +57,7 @@
  		} else {
  			throw new IllegalArgumentException("mapType: " + mapType + " not a valid type.");
  		}
-
+ 		
  		return result;
  	}
 

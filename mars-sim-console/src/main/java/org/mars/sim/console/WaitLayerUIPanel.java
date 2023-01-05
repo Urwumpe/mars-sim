@@ -1,10 +1,9 @@
-/**
+/*
  * Mars Simulation Project
  * WaitLayerUIPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Manny Kung
  */
-
 package org.mars.sim.console;
 
 import java.awt.AlphaComposite;
@@ -32,7 +31,7 @@ public class WaitLayerUIPanel extends LayerUI<JPanel> implements ActionListener 
 	private Timer mTimer;
 	private int mAngle;
 	private int mFadeCount;
-	private int mFadeLimit = 5;//15;
+	private int mFadeLimit = 5;
 
 	@Override
 	public void paint(Graphics g, JComponent c) {
@@ -57,11 +56,11 @@ public class WaitLayerUIPanel extends LayerUI<JPanel> implements ActionListener 
 		int cx = w / 2;
 		int cy = h / 2;
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g2.setStroke(new BasicStroke(s / 4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+		g2.setStroke(new BasicStroke(s/4f,  BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 		g2.setPaint(Color.white);
 		g2.rotate(Math.PI * mAngle / 180, cx, cy);
 		for (int i = 0; i < 12; i++) {
-			float scale = (11.0f - (float) i) / 11.0f;
+			float scale = (11.0f - i) / 11.0f;
 			g2.drawLine(cx + s, cy, cx + s * 2, cy);
 			g2.rotate(-Math.PI / 6, cx, cy);
 			f = scale * fade;
@@ -110,6 +109,7 @@ public class WaitLayerUIPanel extends LayerUI<JPanel> implements ActionListener 
 		mIsFadingOut = true;
 	}
 
+	@SuppressWarnings("rawtypes")
 	@Override
 	public void applyPropertyChange(PropertyChangeEvent pce, JLayer l) {
 		if ("tick".equals(pce.getPropertyName())) {

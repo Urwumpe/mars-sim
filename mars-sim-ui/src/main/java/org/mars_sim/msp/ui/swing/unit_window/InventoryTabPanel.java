@@ -1,57 +1,61 @@
-/**
+/*
  * Mars Simulation Project
  * InventoryTabPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-20
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.ui.swing.unit_window;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Point;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
+import javax.swing.border.EmptyBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 
-import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.equipment.Container;
+import org.mars_sim.msp.core.equipment.EVASuit;
 import org.mars_sim.msp.core.equipment.Equipment;
+import org.mars_sim.msp.core.equipment.EquipmentOwner;
+import org.mars_sim.msp.core.equipment.EquipmentType;
+import org.mars_sim.msp.core.equipment.ItemHolder;
+import org.mars_sim.msp.core.equipment.ResourceHolder;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ItemResource;
+import org.mars_sim.msp.core.resource.ItemResourceUtil;
+import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.resource.Resource;
-import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.tool.AlphanumComparator;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 
-import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
 
@@ -61,81 +65,67 @@ import com.alee.laf.scroll.WebScrollPane;
 @SuppressWarnings("serial")
 public class InventoryTabPanel extends TabPanel implements ListSelectionListener {
 
-	/** default logger. */
-	private static final Logger logger = Logger.getLogger(InventoryTabPanel.class.getName());
+	private static final String INVENTORY_ICON = Msg.getString("icon.inventory"); //$NON-NLS-1$
+
 	private static final String WHITESPACE = "  ";
-	
-	/** Is UI constructed. */
-	private boolean uiDone = false;
-	
-	/** The Inventory instance. */
-	private Inventory inv; 
-	
+
+	private final DecimalFormat formatter0 = new DecimalFormat("#,###,###,###");
+	private final DecimalFormat formatter2 = new DecimalFormat("#,###,###,###.##");
+
     private ResourceTableModel resourceTableModel;
+    private ItemTableModel itemTableModel;
     private EquipmentTableModel equipmentTableModel;
-    
+
+    private JTable resourceTable;
+    private JTable itemTable;
     private JTable equipmentTable;
-    private JTable resourcesTable;
     
-	private List<Equipment> equipmentList = new ArrayList<>();
+    private Unit unit;
 
     /**
-     * Constructor
+     * Constructor.
+     * 
      * @param unit the unit to display.
      * @param desktop the main desktop.
      */
     public InventoryTabPanel(Unit unit, MainDesktopPane desktop) {
         // Use the TabPanel constructor
-        super("Inventory", null, "Inventory", unit, desktop);
-
-        inv = unit.getInventory();
+        super(null, ImageLoader.getNewIcon(INVENTORY_ICON), "Inventory", unit, desktop);
+        
+        this.unit = unit;
 	}
-	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
-		
-        // Create inventory label panel.
-        WebPanel inventoryLabelPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-        topContentPanel.add(inventoryLabelPanel);
 
-        // Create inventory label
-        WebLabel titleLabel = new WebLabel("Inventory", WebLabel.CENTER);
-		titleLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		//titleLabel.setForeground(new Color(102, 51, 0)); // dark brown
-        inventoryLabelPanel.add(titleLabel);
+	@Override
+	protected void buildUI(JPanel content) {
 
         // Create inventory content panel
-        WebPanel inventoryContentPanel = new WebPanel(new GridLayout(2, 1, 0, 0));
-        centerContentPanel.add(inventoryContentPanel, BorderLayout.CENTER);
+        WebPanel inventoryContentPanel = new WebPanel(new GridLayout(3, 1, 0, 0));
+        content.add(inventoryContentPanel, BorderLayout.CENTER);
 
         // Create resources panel
         WebScrollPane resourcesPanel = new WebScrollPane();
-//        resourcesPanel.setBorder(new MarsPanelBorder());
+        resourcesPanel.setBorder(new EmptyBorder(2, 2, 2, 2));
         inventoryContentPanel.add(resourcesPanel);
 
         // Create resources table model
-        resourceTableModel = new ResourceTableModel(inv);
+        resourceTableModel = new ResourceTableModel(getUnit());
 
         // Create resources table
-        resourcesTable = new ZebraJTable(resourceTableModel);
-        resourcesTable.setPreferredScrollableViewportSize(new Dimension(200, 75));
-        resourcesTable.getColumnModel().getColumn(0).setPreferredWidth(120);
-        resourcesTable.getColumnModel().getColumn(1).setPreferredWidth(50);
-        resourcesTable.getColumnModel().getColumn(2).setPreferredWidth(50);
-        
-        resourcesTable.setRowSelectionAllowed(true);//setCellSelectionEnabled(true);
-        resourcesPanel.setViewportView(resourcesTable);
+        resourceTable = new ZebraJTable(resourceTableModel);
+        resourceTable.setPreferredScrollableViewportSize(new Dimension(200, 75));
+        resourceTable.getColumnModel().getColumn(0).setPreferredWidth(140);
+        resourceTable.getColumnModel().getColumn(1).setPreferredWidth(30);
+        resourceTable.getColumnModel().getColumn(2).setPreferredWidth(30);
+
+        resourceTable.setRowSelectionAllowed(true);
+        resourcesPanel.setViewportView(resourceTable);
 
 		// Added sorting
-        resourcesTable.setAutoCreateRowSorter(true);
-        
+        resourceTable.setAutoCreateRowSorter(true);
+
 		// Override default cell renderer for formatting double values.
-        resourcesTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2, true));
-        
+//        resourcesTable.setDefaultRenderer(Number.class, new NumberCellRenderer(2, true));
+
 		// Align the preference score to the left of the cell
 //		DefaultTableCellRenderer leftRenderer = new DefaultTableCellRenderer();
 //		leftRenderer.setHorizontalAlignment(SwingConstants.LEFT);
@@ -144,99 +134,135 @@ public class InventoryTabPanel extends TabPanel implements ListSelectionListener
 		// Align the preference score to the right of the cell
 		DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
 		rightRenderer.setHorizontalAlignment(SwingConstants.RIGHT);
-		resourcesTable.getColumnModel().getColumn(0).setCellRenderer(rightRenderer);
-//		resourcesTable.getColumnModel().getColumn(1).setCellRenderer(rightRenderer);
-//		resourcesTable.getColumnModel().getColumn(2).setCellRenderer(rightRenderer);
-		
+		resourceTable.getColumnModel().getColumn(0).setCellRenderer(rightRenderer);
+		resourceTable.getColumnModel().getColumn(1).setCellRenderer(rightRenderer);
+		resourceTable.getColumnModel().getColumn(2).setCellRenderer(rightRenderer);
+
 		// Added setTableStyle()
-		TableStyle.setTableStyle(resourcesTable);
+		TableStyle.setTableStyle(resourceTable);
 
      	// Added resourcesSearchable
 //     	TableSearchable searchable = SearchableUtils.installSearchable(resourcesTable);
 //        searchable.setPopupTimeout(5000);
 //     	searchable.setCaseSensitive(false);
 
+        // Create item panel
+        WebScrollPane itemPanel = new WebScrollPane();
+        itemPanel.setBorder(new EmptyBorder(2, 2, 2, 2));
+        inventoryContentPanel.add(itemPanel);
+
+        // Create item table model
+        itemTableModel = new ItemTableModel(getUnit());
+
+        // Create item table
+        itemTable = new ZebraJTable(itemTableModel);
+        itemTable.setPreferredScrollableViewportSize(new Dimension(200, 75));
+        itemTable.getColumnModel().getColumn(0).setPreferredWidth(110);
+        itemTable.getColumnModel().getColumn(1).setPreferredWidth(30);
+        itemTable.getColumnModel().getColumn(2).setPreferredWidth(30);
+        itemTable.getColumnModel().getColumn(3).setPreferredWidth(30);
+        itemTable.getColumnModel().getColumn(4).setPreferredWidth(30);
+
+        itemTable.setRowSelectionAllowed(true);
+        itemPanel.setViewportView(itemTable);
+
+		// Added sorting
+        itemTable.setAutoCreateRowSorter(true);
+
+		// Align the preference score to the right of the cell
+//		DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
+//		rightRenderer.setHorizontalAlignment(SwingConstants.RIGHT);
+		itemTable.getColumnModel().getColumn(0).setCellRenderer(rightRenderer);
+//		itemTable.getColumnModel().getColumn(1).setCellRenderer(rightRenderer);
+//		itemTable.getColumnModel().getColumn(2).setCellRenderer(rightRenderer);
+//		itemTable.getColumnModel().getColumn(3).setCellRenderer(rightRenderer);
+
+		// Added setTableStyle()
+		TableStyle.setTableStyle(itemTable);
+
         // Create equipment panel
         WebScrollPane equipmentPanel = new WebScrollPane();
-//        equipmentPanel.setBorder(new MarsPanelBorder());
+        equipmentPanel.setBorder(new EmptyBorder(2, 2, 2, 2));
         inventoryContentPanel.add(equipmentPanel);
 
-        // Create equipment table model
-        equipmentTableModel = new EquipmentTableModel(inv);
-
-        // Create equipment table
-        equipmentTable = new ZebraJTable(equipmentTableModel);
-        equipmentTable.setPreferredScrollableViewportSize(new Dimension(200, 75));
-        equipmentTable.setRowSelectionAllowed(true);//.setCellSelectionEnabled(true);
-        equipmentTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        equipmentTable.getSelectionModel().addListSelectionListener(this);
-        equipmentPanel.setViewportView(equipmentTable);
-
-        equipmentTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2, true));
-		
-        equipmentTable.getColumnModel().getColumn(0).setPreferredWidth(60);
-        equipmentTable.getColumnModel().getColumn(1).setPreferredWidth(80);
-        equipmentTable.getColumnModel().getColumn(2).setPreferredWidth(30);
-        equipmentTable.getColumnModel().getColumn(3).setPreferredWidth(70);
-		
-		// Align the preference score to the center of the cell
-		DefaultTableCellRenderer renderer2 = new DefaultTableCellRenderer();
-		renderer2.setHorizontalAlignment(SwingConstants.RIGHT);
-		equipmentTable.getColumnModel().getColumn(0).setCellRenderer(renderer2);
-		equipmentTable.getColumnModel().getColumn(1).setCellRenderer(renderer2);
-		equipmentTable.getColumnModel().getColumn(2).setCellRenderer(renderer2);
-		equipmentTable.getColumnModel().getColumn(3).setCellRenderer(renderer2);
-		
-		// Added sorting
-        equipmentTable.setAutoCreateRowSorter(true);
-
-		// Add a mouse listener to hear for double-clicking a person (rather than single click using valueChanged()
-        equipmentTable.addMouseListener(new MouseAdapter() {
-		    public void mousePressed(MouseEvent me) {
-		    	JTable table =(JTable) me.getSource();
-		        Point p = me.getPoint();
-		        int row = table.rowAtPoint(p);
-		        int col = table.columnAtPoint(p);
-		        if (me.getClickCount() == 2) {
-		            if (row > 0 && col > 0) {
-		    		    String name = ((Equipment)equipmentTable.getValueAt(row, 1)).getName();
-//    		    		System.out.println("name : " + name + "   row : " + row);
-		    		    for (Equipment e : equipmentList) {
-//	    		    		System.out.println("nickname : " + e.getName());
-		    		    	if (e.getName().equalsIgnoreCase(name)) {
-//		    		    		System.out.println("name : " + name + "   nickname : " + e.getName());
-				    		    desktop.openUnitWindow(e, false);
-		    		    	}
-		    		    } 	    			
-		    	    }
-		        }
-		    }
-		});
-		
-		// Added setTableStyle()
-		TableStyle.setTableStyle(equipmentTable);
-
+        if (!(unit instanceof Container) && !(unit instanceof EVASuit)) {
+	        // Create equipment table model
+	        equipmentTableModel = new EquipmentTableModel(getUnit());
+	
+	        // Create equipment table
+	        equipmentTable = new ZebraJTable(equipmentTableModel);
+	        equipmentTable.setPreferredScrollableViewportSize(new Dimension(200, 75));
+	        equipmentTable.setRowSelectionAllowed(true);
+	        equipmentTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+	        equipmentTable.getSelectionModel().addListSelectionListener(this);
+	        equipmentPanel.setViewportView(equipmentTable);
+	
+	        equipmentTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2, true));
+	
+	        equipmentTable.getColumnModel().getColumn(0).setPreferredWidth(60);
+	        equipmentTable.getColumnModel().getColumn(1).setPreferredWidth(80);
+	        equipmentTable.getColumnModel().getColumn(2).setPreferredWidth(30);
+	        equipmentTable.getColumnModel().getColumn(3).setPreferredWidth(70);
+	
+			// Align the preference score to the center of the cell
+			DefaultTableCellRenderer renderer2 = new DefaultTableCellRenderer();
+			renderer2.setHorizontalAlignment(SwingConstants.RIGHT);
+			equipmentTable.getColumnModel().getColumn(0).setCellRenderer(renderer2);
+			equipmentTable.getColumnModel().getColumn(1).setCellRenderer(renderer2);
+			equipmentTable.getColumnModel().getColumn(2).setCellRenderer(renderer2);
+			equipmentTable.getColumnModel().getColumn(3).setCellRenderer(renderer2);
+	
+			// Added sorting
+	        equipmentTable.setAutoCreateRowSorter(true);
+	
+			// Add a mouse listener to hear for double-clicking a person (rather than single click using valueChanged()
+	        equipmentTable.addMouseListener(new MouseAdapter() {
+			    public void mousePressed(MouseEvent event) {
+	
+			    	// If double-click, open person window.
+					if (event.getClickCount() >= 2) {
+						Point p = event.getPoint();
+						int row = equipmentTable.rowAtPoint(p);
+						
+						String name = (String)equipmentTable.getValueAt(row, 0);					
+						Equipment e = equipmentTableModel.getEquipment(name);
+	
+						if (e != null && e.getUnitType() != UnitType.EVA_SUIT 
+								&& e.getUnitType() != UnitType.CONTAINER) {
+							getDesktop().openUnitWindow(e, false);
+						}
+					}
+			    }
+			});
+	
+			// Added setTableStyle()
+			TableStyle.setTableStyle(equipmentTable);
+        }
     }
 
+	
+	
     /**
      * Updates the info on this panel.
      */
+	@Override
     public void update() {
-		if (!uiDone)
-			initializeUI();
-		
+
         resourceTableModel.update();
+        itemTableModel.update();
         equipmentTableModel.update();
-		TableStyle.setTableStyle(resourcesTable);
+		TableStyle.setTableStyle(resourceTable);
+		TableStyle.setTableStyle(itemTable);
 		TableStyle.setTableStyle(equipmentTable);
+        resourceTable.repaint();
+        itemTable.repaint();
         equipmentTable.repaint();
-        resourcesTable.repaint();
     }
 
     /**
      * Called whenever the value of the selection changes.
      *
-     * @param e the event that characterizes the change.
+     * @param ev the event that characterizes the change.
      */
     public void valueChanged(ListSelectionEvent ev) {
 //        int row = equipmentTable.getSelectedRow();
@@ -252,7 +278,7 @@ public class InventoryTabPanel extends TabPanel implements ListSelectionListener
 ////		    		System.out.println("name : " + name + "   nickname : " + e.getNickName());
 //	    		    desktop.openUnitWindow(e, false);
 //		    	}
-//		    } 	
+//		    }
 //        }
     }
 
@@ -264,42 +290,65 @@ public class InventoryTabPanel extends TabPanel implements ListSelectionListener
 		/** default serial id. */
 		private static final long serialVersionUID = 1L;
 
-		private int counts = 0;
-		
-		private Inventory inventory;
-		
-		private Map<Resource, Number> resources;
-		private Map<Resource, Number> capacity;
-		private List<Resource> keys;
-		
-		private DecimalFormat decFormatter = new DecimalFormat("#,###,##0");
+		private Map<Resource, Number> resources = new HashMap<>();
+		private Map<Resource, Number> capacity = new HashMap<>();
+		private List<Resource> keys = new ArrayList<>();
 
-        private ResourceTableModel(Inventory inventory) {
-            this.inventory = inventory;
-            keys = new ArrayList<Resource>();
-            resources = new HashMap<Resource, Number>();
-            capacity = new HashMap<Resource, Number>();
+		private Unit unit;
 
-            keys.addAll(inventory.getAllAmountResourcesStored(false));
-            Iterator<Resource> iAmount = keys.iterator();
-            while (iAmount.hasNext()) {
-                AmountResource resource = (AmountResource) iAmount.next();
-                resources.put(resource, inventory.getAmountResourceStored(resource, false));
-                capacity.put(resource, inventory.getAmountResourceCapacity(resource, false));
-            }
+        private ResourceTableModel(Unit unit) {
+        	this.unit = unit;
+        	loadResources(keys, resources, capacity);
+        }
 
-            Set<ItemResource> itemResources = inventory.getAllItemRsStored();
-            keys.addAll(itemResources);
-            Iterator<ItemResource> iItem = itemResources.iterator();
-            while (iItem.hasNext()) {
-                ItemResource resource = iItem.next();
-                resources.put(resource, inventory.getItemResourceNum(resource));
-                capacity.put(resource, null);
-            }
+        private void loadResources(List<Resource> kys, Map<Resource, Number> res, Map<Resource, Number> cap) {
+           	// Has equipment resources
+        	if (unit instanceof EVASuit) {
+        		EVASuit e = (EVASuit) unit;
+        		Set<AmountResource> arItems = e.getAmountResourceIDs().stream()
+  					  .map(ar -> ResourceUtil.findAmountResource(ar))
+  					  .filter(Objects::nonNull)
+  					  .collect(Collectors.toSet());
+
+		  		kys.addAll(arItems);
+		        for (AmountResource resource : arItems) {
+		        	res.put(resource, e.getAmountResourceStored(resource.getID()));
+		        	cap.put(resource, e.getAmountResourceCapacity(resource.getID()));
+		        }
+        	}
+
+           	// Has equipment resources
+        	else if (unit instanceof EquipmentOwner) {
+        		EquipmentOwner eo = (EquipmentOwner) unit;
+        		Set<AmountResource> arItems = eo.getAmountResourceIDs().stream()
+    					  .map(ar -> ResourceUtil.findAmountResource(ar))
+    					  .filter(Objects::nonNull)
+    					  .collect(Collectors.toSet());
+
+  		  		kys.addAll(arItems);
+  		        for (AmountResource resource : arItems) {
+  		        	res.put(resource, eo.getAmountResourceStored(resource.getID()));
+  		        	cap.put(resource, eo.getAmountResourceCapacity(resource.getID()));
+  		        }
+        	}
+
+        	// New approach based on interfaces
+        	else if (unit instanceof ResourceHolder) {
+        		ResourceHolder holder = (ResourceHolder) unit;
+        		Set<AmountResource> arItems = holder.getAmountResourceIDs().stream()
+        					  .map(ar -> ResourceUtil.findAmountResource(ar))
+        					  .filter(Objects::nonNull)
+        					  .collect(Collectors.toSet());
+
+        		kys.addAll(arItems);
+ 	            for (AmountResource resource : arItems) {
+ 	                res.put(resource, holder.getAmountResourceStored(resource.getID()));
+ 	                cap.put(resource, holder.getAmountResourceCapacity(resource.getID()));
+ 	            }
+        	}
 
             // Sort resources alphabetically by name.
-            keys.stream().sorted(new AlphanumComparator()).collect(Collectors.toList());
-//            Collections.sort(keys);
+            kys.stream().sorted(new AlphanumComparator()).collect(Collectors.toList());
         }
 
         public int getRowCount() {
@@ -329,243 +378,363 @@ public class InventoryTabPanel extends TabPanel implements ListSelectionListener
         public Object getValueAt(int row, int column) {
             if (column == 0) {
     			// Capitalize Resource Names
-            	Object result = keys.get(row);
-            	return Conversion.capitalize(result.toString()) + " ";
+            	return keys.get(row).getName();
             }
             else if (column == 1) {
-            	Resource resource = keys.get(row);
-            	Number number = resources.get(resource);
-            	if (resource instanceof AmountResource) {
-            		number = Math.round((Double) resources.get(resource)*100.0)/100.0;
-//            		result = decFormatter.format(amount);
-            		//result = amount + "";
-            	}
-            	return number;
+            	return formatter2.format(resources.get(keys.get(row)));
             }
             else if (column == 2) {
             	Number number = capacity.get(keys.get(row));
-            	return (number == null) ? 0 : decFormatter.format(number);
+            	return (number == null) ? 0 + "": formatter0.format(number);
             }
-            else return 0;
+            return 0 + "";
         }
 
-//        public void updateRow() {
-//            int rowCount = getRowCount();
-//            String[] row = new String[rowCount];
-//            for (int index = 0; index < rowCount; index++) {
-//                row[index] = rowCount + "x" + index;
-//            }
-//            fireTableRowsInserted(rowCount, rowCount);
-//        }      
-//        
         public void update() {
-        	try {
-        		List<Resource> newResourceKeys = new ArrayList<Resource>();
-        		newResourceKeys.addAll(inventory.getAllAmountResourcesStored(false));
-        		Map<Resource, Number> newResources = new HashMap<Resource, Number>();
-        		Map<Resource, Number> newCapacity = new HashMap<Resource, Number>();
-        		Iterator<Resource> i = newResourceKeys.iterator();
-        		while (i.hasNext()) {
-        			AmountResource resource = (AmountResource) i.next();
-        			newResources.put(resource, inventory.getAmountResourceStored(resource, false));
-        			newCapacity.put(resource, inventory.getAmountResourceCapacity(resource, false));
-        		}
+    		List<Resource> newResourceKeys = new ArrayList<>();
+			Map<Resource, Number> newResources = new HashMap<>();
+    		Map<Resource, Number> newCapacity = new HashMap<>();
 
-        		Set<ItemResource> itemResources = inventory.getAllItemRsStored();
-        		newResourceKeys.addAll(itemResources);
-            	//Iterator<ItemResource> iItem = itemResources.iterator();
-            	//while (iItem.hasNext()) {
-            	for (ItemResource resource : itemResources) {//= iItem.next();
-            		newResources.put(resource, inventory.getItemResourceNum(resource));
-            		newCapacity.put(resource, null);
-            	}
+    		loadResources(newResourceKeys, newResources, newCapacity);
 
-            	// Sort resources alphabetically by name.
-//                Collections.sort(newResourceKeys);
+    		if (!keys.equals(newResourceKeys)
+    				|| !resources.equals(newResources)
+    				|| !capacity.equals(newCapacity)) {
+    			resources = newResources;
+    			capacity = newCapacity;
+    			keys = newResourceKeys;
+    			fireTableDataChanged();
 
-                counts++;
-        		if (counts % 10 == 10 || !resources.equals(newResources)) {
-//            		if (getRowCount() == newResources.size()) {
-                   		counts = 0;
-            			resources = newResources;
-            			capacity = newCapacity;
-            			keys = newResourceKeys;
-            			fireTableDataChanged();
-//                			((AbstractTableModel)this).fireTableCellUpdated(counts, counts);
-//            		}
-//            		else {
-//               			counts = 0;
-//            			resources = newResources;
-//            			capacity = newCapacity;
-//            			keys = newResourceKeys;
-//            			fireTableDataChanged();
-//            		}
-        		}
-        		
-                keys.stream().sorted(new AlphanumComparator()).collect(Collectors.toList());
-//              Collections.sort(keys);
-        	}
-        	catch(Exception e) {
-        	    e.printStackTrace(System.err);
-            }
+    		}
+
+            keys.stream().sorted(new AlphanumComparator()).collect(Collectors.toList());
+    	}
+    }
+
+	/**
+	 * Internal class used as model for the item resource table.
+	 */
+	private class ItemTableModel extends AbstractTableModel {
+
+		/** default serial id. */
+		private static final long serialVersionUID = 1L;
+
+		private Map<Resource, Number> quantity = new HashMap<>();
+		private Map<Resource, Double> mass = new HashMap<>();		
+		private Map<Resource, Double> reliabilities = new HashMap<>();
+		private Map<Resource, Double> mtbf = new HashMap<>();
+		private List<Resource> keys = new ArrayList<>();
+
+		private Unit unit;
+
+        private ItemTableModel(Unit unit) {
+        	this.unit = unit;
+        	loadItems(keys, quantity, mass, reliabilities, mtbf);
         }
+
+        private void loadItems(List<Resource> kys, Map<Resource, Number> quan, Map<Resource, Double> mass, Map<Resource, Double> rel, Map<Resource, Double> mtbf) {
+           	// Has equipment resources
+        	if (unit instanceof EVASuit) {
+        		EVASuit e = (EVASuit) unit;
+        		Set<Resource> irItems = e.getItemResourceIDs().stream()
+            				.map(ir -> ItemResourceUtil.findItemResource(ir))
+            				.filter(Objects::nonNull)
+            		        .collect(Collectors.toSet());
+
+            	kys.addAll(irItems);
+ 	            for(Resource resource : irItems) {
+ 	                quan.put(resource, e.getItemResourceStored(resource.getID()));
+ 	                mass.put(resource, ((ItemResource)resource).getMassPerItem());
+ 	                rel.put(resource, ((Part)resource).getReliability());
+ 	               mtbf.put(resource, ((Part)resource).getMTBF());
+ 	            }
+        	}
+
+           	// Has equipment resources
+        	else if (unit instanceof EquipmentOwner) {
+        		EquipmentOwner eo = (EquipmentOwner) unit;
+        		Set<Resource> irItems = eo.getItemResourceIDs().stream()
+            				.map(ir -> ItemResourceUtil.findItemResource(ir))
+            				.filter(Objects::nonNull)
+            		        .collect(Collectors.toSet());
+
+            	kys.addAll(irItems);
+ 	            for (Resource resource : irItems) {
+ 	                quan.put(resource, eo.getItemResourceStored(resource.getID()));
+ 	                mass.put(resource, ((ItemResource)resource).getMassPerItem()); 	                
+ 	                rel.put(resource, ((Part)resource).getReliability());
+ 	               mtbf.put(resource, ((Part)resource).getMTBF());
+ 	            }
+        	}
+
+          	// Has Item resources
+        	else if (unit instanceof ItemHolder) {
+        		ItemHolder holder = (ItemHolder) unit;
+        		Set<Resource> irItems = holder.getItemResourceIDs().stream()
+            				.map(ir -> ItemResourceUtil.findItemResource(ir))
+            				.filter(Objects::nonNull)
+            		        .collect(Collectors.toSet());
+
+            	kys.addAll(irItems);
+ 	            for(Resource resource : irItems) {
+ 	                quan.put(resource, holder.getItemResourceStored(resource.getID()));
+ 	                mass.put(resource, ((ItemResource)resource).getMassPerItem());	                
+ 	                rel.put(resource, ((Part)resource).getReliability());
+ 	               mtbf.put(resource, ((Part)resource).getMTBF());
+ 	            }
+        	}
+
+            // Sort resources alphabetically by name.
+            kys.stream().sorted(new AlphanumComparator()).collect(Collectors.toList());
+        }
+
+        public int getRowCount() {
+            return keys.size();
+        }
+
+        public int getColumnCount() {
+            return 5;
+        }
+
+        public Class<?> getColumnClass(int columnIndex) {
+            Class<?> dataType = super.getColumnClass(columnIndex);
+            if (columnIndex >= 0) dataType = String.class;
+            else if (columnIndex >= 1) dataType = Integer.class;
+            else if (columnIndex >= 2) dataType = Double.class;
+            else if (columnIndex >= 3) dataType = Double.class;
+            else if (columnIndex >= 4) dataType = Double.class;
+            return dataType;
+        }
+
+        public String getColumnName(int columnIndex) {
+			// Internationalized and capitalized column headers
+            if (columnIndex == 0) return Msg.getString("InventoryTabPanel.item.header.name");
+            else if (columnIndex == 1) return Msg.getString("InventoryTabPanel.item.header.quantity");
+            else if (columnIndex == 2) return Msg.getString("InventoryTabPanel.item.header.mass");           
+            else if (columnIndex == 3) return Msg.getString("InventoryTabPanel.item.header.reliability");
+            else return Msg.getString("InventoryTabPanel.item.header.mtbf");
+        }
+
+        public Object getValueAt(int row, int column) {
+            if (column == 0) {
+    			// Capitalize Resource Names
+            	return keys.get(row).getName();
+            }
+            else if (column == 1) {
+				return formatter0.format(quantity.get(keys.get(row)));
+            }
+            else if (column == 2) {
+            	return formatter2.format(mass.get(keys.get(row)));
+            }
+            else if (column == 3) {
+            	return formatter2.format(reliabilities.get(keys.get(row)));
+            }
+            else if (column == 4) {
+            	return formatter2.format(mtbf.get(keys.get(row)));
+            }
+            return 0 + "";
+        }
+
+        public void update() {
+        	List<Resource> newResourceKeys = new ArrayList<>();
+        	Map<Resource, Number> newQ = new HashMap<>();
+			Map<Resource, Double> newMass = new HashMap<>();
+			Map<Resource, Double> newReliabilities = new HashMap<>();
+			Map<Resource, Double> newMTBF = new HashMap<>();
+
+    		loadItems(newResourceKeys, newQ, newMass, newReliabilities, newMTBF);
+
+    		if (!keys.equals(newResourceKeys)
+    				|| !quantity.equals(newQ)
+    				|| !mass.equals(newQ)   				
+    				|| !reliabilities.equals(newReliabilities)
+    				|| !mtbf.equals(newMTBF)
+    				) {
+    			quantity = newQ;
+    			mass = newMass;
+    			reliabilities = newReliabilities;
+    			mtbf = newMTBF;
+    			keys = newResourceKeys;
+    			fireTableDataChanged();
+    		}
+
+            keys.stream().sorted(new AlphanumComparator()).collect(Collectors.toList());
+    	}
     }
 
 	/**
 	 * Internal class used as model for the equipment table.
 	 */
-	private class EquipmentTableModel extends AbstractTableModel {
+	public class EquipmentTableModel extends AbstractTableModel {
 
-		/** default serial id. */
-		private static final long serialVersionUID = 1L;
+		private List<Equipment> equipmentList = new ArrayList<>();
 
-		private Inventory inventory;
-		private Map<String, String> types;
-		private Map<String, String> equipment;
-		private Map<String, Double> mass;
-		
+		private Map<String, String> types = new HashMap<>();
+		private Map<String, Double> mass = new HashMap<>();
+		private Map<String, String> owner = new HashMap<>();
+		private Map<String, String> content = new HashMap<>();
+
+		private Unit unit;
+
 		/**
-		 * hidden constructor.
+		 * Constructor.
+		 * 
 		 * @param inventory {@link Inventory}
 		 */
-		private EquipmentTableModel(Inventory inventory) {
-			this.inventory = inventory;
-			// Sort equipment alphabetically by name.
-			types = new HashMap<>();
-			equipment = new HashMap<>();
-			mass = new HashMap<>();
-			for (Equipment e : inventory.findAllEquipment()) {
-				types.put(e.getName(), e.getType());
-				equipment.put(e.getName(), showOwner(e));
-				mass.put(e.getName(), e.getMass());
-				equipmentList.add(e);
-			}
-			equipmentList.stream().sorted(new AlphanumComparator()).collect(Collectors.toList());
-//			Collections.sort(equipmentList);
+		public EquipmentTableModel(Unit unit) {
+			this.unit = unit;
+			equipmentList = new ArrayList<>(((EquipmentOwner)unit).getEquipmentSet());
+			loadModel();
 		}
 
-		private String showOwner(Equipment e) {
+  		private void loadModel() {
+  			
+            if (unit.getUnitType() == UnitType.PERSON
+            		|| unit.getUnitType() == UnitType.ROBOT
+            		|| unit.getUnitType() == UnitType.VEHICLE
+            		|| unit.getUnitType() == UnitType.SETTLEMENT
+            		) {
+            	for (Equipment e : equipmentList) {
+					String name = e.getName();
+					types.put(name, e.getEquipmentType().getName());
+					owner.put(name, getOwner(e));
+					content.put(name, getContent(e));
+					mass.put(name, e.getMass());
+				}
+            }
+
+			// Sort equipment alphabetically by name.
+			equipmentList.stream().sorted(new AlphanumComparator()).collect(Collectors.toList());
+		}
+
+		private String getOwner(Equipment e) {
 			String s = "";
-			String item = e.getName().toLowerCase();
-			if (item.contains("eva")) {
-				Person p = (Person) e.getLastOwner();
+			if (e.getEquipmentType() == EquipmentType.EVA_SUIT) {
+				Person p = e.getLastOwner();
 				if (p != null)
 					s = p.getName();
-				//else 
-				//	s = unit.getContainerUnit().getName();		
-			}
-			else if (e instanceof Robot) {
-				;// TODO: determine ownership of a bot
-			}
-//			if (item.contains("box") || item.contains("canister") 
-//					|| item.contains("barrel") || item.contains("bag")) {
-//				Person p = (Person) ((Equipment) unit).getLastOwner();	
-//			}
-			else {		
-				List<AmountResource> ars = new ArrayList<>(e.getInventory().getAllAmountResourcesStored(false));
-				if (ars.size() > 1) logger.info(e.getName() + " has " + ars.size() + " resources.");
-//				for (AmountResource ar : ars) {
-//					s = Conversion.capitalize(ar.getName());
-//                }
-				if (ars.size() > 0)
-					s = Conversion.capitalize(ars.get(0).getName());
 			}
 			return s;
-//			return bool ? "yes" : "no";
 		}
 
+		private String getContent(Equipment e) {
+			String s = "";
+			if (e instanceof Container) {
+				int resource = ((Container)e).getResource();
+				if (resource != -1) {
+					s = ResourceUtil.findAmountResourceName(resource);
+				}
+			}
+
+			return s;
+		}
+
+		public Equipment getEquipment(String name) {
+			for (Equipment e: equipmentList) {
+				if (e.getName().equalsIgnoreCase(name)) {
+					return e;
+				}
+			}
+			return null;
+		}
+		
 		public int getRowCount() {
-			return equipment.size();
+			return equipmentList.size();
 		}
 
 		public int getColumnCount() {
 			return 4;
 		}
-		
+
 		public Class<?> getColumnClass(int columnIndex) {
 			Class<?> dataType = super.getColumnClass(columnIndex);
 			if (columnIndex == 0) dataType = String.class;
-			else if (columnIndex == 1) dataType = Equipment.class;
-			else if (columnIndex == 2) dataType = Double.class;
+			else if (columnIndex == 1) dataType = Double.class;
+			else if (columnIndex == 2) dataType = String.class;
 			else if (columnIndex == 3) dataType = String.class;
 			return dataType;
 		}
-		
+
 		public String getColumnName(int columnIndex) {
 			if (columnIndex == 0) return Msg.getString("InventoryTabPanel.Equipment.header.type"); //$NON-NLS-1$
-			else if (columnIndex == 1) return Msg.getString("InventoryTabPanel.Equipment.header.name"); //$NON-NLS-1$
-			else if (columnIndex == 2) return Msg.getString("InventoryTabPanel.Equipment.header.mass"); //$NON-NLS-1$
-			else if (columnIndex == 3) return Msg.getString("InventoryTabPanel.Equipment.header.status"); //$NON-NLS-1$
+			else if (columnIndex == 1) return Msg.getString("InventoryTabPanel.Equipment.header.mass"); //$NON-NLS-1$
+			else if (columnIndex == 2) return Msg.getString("InventoryTabPanel.Equipment.header.owner"); //$NON-NLS-1$			
+			else if (columnIndex == 3) return Msg.getString("InventoryTabPanel.Equipment.header.content"); //$NON-NLS-1$
 			else return "unknown";
 		}
 
 		public Object getValueAt(int row, int column) {
-			if (equipmentList != null && row >= 0 && row < equipment.size()) {
-				if (column == 0) return types.get(equipmentList.get(row).getName()) + WHITESPACE;
-				else if (column == 1) return equipmentList.get(row);
-				else if (column == 2) {
+			if (equipmentList != null && row >= 0 && row < owner.size()) {
+				if (column == 0) return equipmentList.get(row).getName();
+				else if (column == 1) {
 					String name = equipmentList.get(row).getName();
 					if (name != null && mass.get(name) != null)
 						return Math.round(mass.get(name)*100.0)/100.0;
 				}
-				else if (column == 3) return equipment.get(equipmentList.get(row).getName()) + WHITESPACE;
+				else if (column == 2) return owner.get(equipmentList.get(row).getName());
+				else if (column == 3) return content.get(equipmentList.get(row).getName());
 			}
 			return "unknown";
 		}
 
 		public void update() {
-			List<Equipment> newNames = new ArrayList<>();
-			Map<String, String> newTypes = new HashMap<>();
-			Map<String, String> newEquipment = new HashMap<>();
-			Map<String, Double> newMass = new HashMap<>();
-			for (Equipment e : inventory.findAllEquipment()) {
-				newTypes.put(e.getName(), e.getType());
-				newEquipment.put(e.getName(), showOwner(e));
-				newMass.put(e.getName(), e.getMass());
-				newNames.add(e);
-			}
 
-			newNames.stream().sorted(new AlphanumComparator()).collect(Collectors.toList());
-			Collections.sort(newNames);//, new NameComparator());
+			if (unit.getUnitType() == UnitType.PERSON
+            		|| unit.getUnitType() == UnitType.ROBOT
+            		|| unit.getUnitType() == UnitType.VEHICLE
+            		|| unit.getUnitType() == UnitType.SETTLEMENT
+            		) {
+				
+				List<Equipment> newEquipmentList = new ArrayList<>(((EquipmentOwner)unit).getEquipmentSet());
+				
+				// Sort equipment alphabetically by name.
+				newEquipmentList.stream().sorted(new AlphanumComparator()).collect(Collectors.toList());
+				
+				if (equipmentList.size() != newEquipmentList.size()
+    				|| !equipmentList.equals(newEquipmentList)) {
 			
-			if (equipmentList.size() != newNames.size() || !equipmentList.equals(newNames)) {
-				equipmentList = newNames;
-				equipment = newEquipment;
-				types = newTypes;
-				fireTableDataChanged();
+	            	for (Equipment e : newEquipmentList) {
+						String name = e.getName();
+						types.put(name, e.getEquipmentType().getName());
+						owner.put(name, getOwner(e));
+						content.put(name, getContent(e));
+						mass.put(name, e.getMass());
+					}
+	            }
 			}
 		}
 	}
-	
+
 	static class NameComparator implements Comparator<Equipment> {
 	     public int compare(Equipment e0, Equipment e1) {
 	    	 String[] names0 = e0.getName().split(" ");
 	    	 String[] names1 = e1.getName().split(" ");
 	    	 int size0 = names0.length;
 	    	 int size1 = names1.length;
-	    	 
+
 	    	 if (!names0[0].equals(names1[0]))
 	    		 return names0[0].compareTo(names1[0]);
-	    	 
+
 	    	 int num0 = Integer.parseInt(names0[size0-1]);
 	    	 int num1 = Integer.parseInt(names1[size1-1]);
-	    	 
+
 	    	 return num0 - num1;
 	     }
 	 }
-	
+
 	/**
 	 * Prepare object for garbage collection.
 	 */
+	@Override
 	public void destroy() {
+		super.destroy();
+		
 		// take care to avoid null exceptions
 		resourceTableModel = null;
 		equipmentTableModel = null;
+		itemTableModel = null;
 		equipmentTable = null;
-		resourcesTable = null;
-		equipmentList.clear();
-		equipmentList = null;
-		    
+		resourceTable = null;
+		itemTable = null;
 	}
-	
 }

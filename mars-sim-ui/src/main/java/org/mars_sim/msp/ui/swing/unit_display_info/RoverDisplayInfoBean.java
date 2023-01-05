@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * RoverDisplayInfoBean.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-06-27
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_display_info;
@@ -30,7 +30,6 @@ public class RoverDisplayInfoBean extends VehicleDisplayInfoBean {
 		super();
 	}
 
-
 	/**
 	 * Gets the icon of this unit
 	 * (non-Javadoc)
@@ -40,19 +39,14 @@ public class RoverDisplayInfoBean extends VehicleDisplayInfoBean {
 	 * @return the icon
 	 */
 	public Icon getButtonIcon(Unit unit) {
-//		Vehicle v = (Vehicle) unit;
-//		Rover rover = (Rover) v;
-		String type = ((Vehicle) unit).getVehicleType();
+		VehicleType type = ((Vehicle) unit).getVehicleType();
 		
-		if (type.equalsIgnoreCase(VehicleType.EXPLORER_ROVER.getName()))
+		if (type == VehicleType.EXPLORER_ROVER)
 			buttonIcon = ImageLoader.getIcon("ExplorerRoverIcon", ImageLoader.VEHICLE_ICON_DIR);
-		else if (type.equalsIgnoreCase(VehicleType.CARGO_ROVER.getName()))
+		else if (type == VehicleType.CARGO_ROVER)
 			buttonIcon = ImageLoader.getIcon("CargoRoverIcon", ImageLoader.VEHICLE_ICON_DIR);
-		else if (type.equalsIgnoreCase(VehicleType.TRANSPORT_ROVER.getName()))
-			buttonIcon = ImageLoader.getIcon("TransportRoverIcon", ImageLoader.VEHICLE_ICON_DIR);
-//		else 
-//			buttonIcon = ImageLoader.getIcon("LUVIcon", ImageLoader.VEHICLE_ICON_DIR);
-//		
+		else if (type == VehicleType.TRANSPORT_ROVER)
+			buttonIcon = ImageLoader.getIcon("TransportRoverIcon", ImageLoader.VEHICLE_ICON_DIR);	
 		return buttonIcon;
 	}
 
@@ -61,10 +55,11 @@ public class RoverDisplayInfoBean extends VehicleDisplayInfoBean {
 	 */
 	public String getSound(Unit unit) {
 		Vehicle rover = (Vehicle) unit;
-    	if (rover.haveStatusType(StatusType.MOVING)) return SoundConstants.SND_ROVER_MOVING;
+		StatusType primStatus = rover.getPrimaryStatus();
+    	if (primStatus == StatusType.MOVING) return SoundConstants.SND_ROVER_MOVING;
     	else if (rover.haveStatusType(StatusType.MAINTENANCE)) return SoundConstants.SND_ROVER_MAINTENANCE;
     	else if (rover.haveStatusType(StatusType.MALFUNCTION)) return SoundConstants.SND_ROVER_MALFUNCTION;
-    	else if (rover.haveStatusType(StatusType.GARAGED) || rover.haveStatusType(StatusType.PARKED)) return SoundConstants.SND_ROVER_PARKED;
+    	else if ((primStatus == StatusType.GARAGED) || (primStatus == StatusType.PARKED)) return SoundConstants.SND_ROVER_PARKED;
     	else return "";
 	}
 }

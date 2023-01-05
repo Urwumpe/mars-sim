@@ -1,445 +1,319 @@
-/**
+/*
  * Mars Simulation Project
  * BuildingPanelEVA.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-12
  * @author Manny Kung
  */
-
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.Collection;
 
-import javax.swing.AbstractListModel;
-import javax.swing.BorderFactory;
-import javax.swing.JList;
-import javax.swing.UIManager;
-import javax.swing.border.Border;
-import javax.swing.border.EtchedBorder;
-import javax.swing.border.TitledBorder;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.SpringLayout;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.structure.Airlock.AirlockMode;
 import org.mars_sim.msp.core.structure.building.function.BuildingAirlock;
 import org.mars_sim.msp.core.structure.building.function.EVA;
-import org.mars_sim.msp.core.time.ClockListener;
-import org.mars_sim.msp.core.time.ClockPulse;
-import org.mars_sim.msp.core.time.MasterClock;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
+import org.mars_sim.msp.ui.swing.unit_window.UnitListPanel;
 
-import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
 
 
 /**
- * The BuildingPanelEVA class presents the EVA activities 
+ * The BuildingPanelEVA class presents the EVA activities
  * of a building.
  */
 @SuppressWarnings("serial")
-public class BuildingPanelEVA extends BuildingFunctionPanel implements MouseListener, ClockListener {
-	private static final String UNLOCKED = "UNLOCKED";
-	private static final String LOCKED = "LOCKED";
+public class BuildingPanelEVA extends BuildingFunctionPanel {
 	
-	private int capCache;
+	private static final String SUIT_ICON = Msg.getString("icon.suit"); //$NON-NLS-1$
+
+	private static final String UNLOCKED = "Unlocked";
+	private static final String LOCKED = "Locked";
+
 	private int innerDoorCache;
 	private int outerDoorCache;
 	private int occupiedCache;
 	private int emptyCache;
+	
 	private double cycleTimeCache;
+	private boolean activationCache;
+	private boolean transitionCache;
 	
 	private String operatorCache = "";
 	private String airlockStateCache = "";
 	private String innerDoorStateCache = "";
 	private String outerDoorStateCache = "";
 	
-//	private WebLabel capLabel;
-	private WebLabel innerDoorLabel;
-	private WebLabel outerDoorLabel;
-	private WebLabel occupiedLabel;
-	private WebLabel emptyLabel;
-	private WebLabel operatorLabel;
-	private WebLabel airlockStateLabel;
-	private WebLabel cycleTimeLabel;
-	private WebLabel innerDoorStateLabel;
-	private WebLabel outerDoorStateLabel;
-	
-	private ListModel listModel;
-	private JList<Person> occupants;
-	private WebScrollPane scrollPanel;
-	
-	private EVA eva; 
-	private BuildingAirlock airlock;
+	private AirlockMode airlockModeCache;
 
-	private static Simulation sim;
-	private static UnitManager unitManager;
-	private static MasterClock masterClock;
-	
+	private JTextField innerDoorLabel;
+	private JTextField outerDoorLabel;
+	private JTextField occupiedLabel;
+	private JTextField emptyLabel;
+	private JTextField operatorLabel;
+	private JTextField airlockStateLabel;
+	private JTextField activationLabel;
+	private JTextField transitionLabel;
+	private JTextField cycleTimeLabel;
+	private JTextField innerDoorStateLabel;
+	private JTextField outerDoorStateLabel;
+	private JTextField airlockModeLabel;
+
+	private UnitListPanel<Person> occupants;
+	private UnitListPanel<Person> reservationList;
+
+	private EVA eva;
+	private BuildingAirlock buildingAirlock;
+
 	/**
 	 * Constructor.
-	 * @param medical the medical care building this panel is for.
+	 * @param eva the eva function of a building this panel is for.
 	 * @param desktop The main desktop.
 	 */
 	public BuildingPanelEVA(EVA eva, MainDesktopPane desktop) {
 
 		// Use BuildingFunctionPanel constructor
-		super(eva.getBuilding(), desktop);
+		super(
+			Msg.getString("BuildingPanelEVA.title"), 
+			ImageLoader.getNewIcon(SUIT_ICON), 
+			eva.getBuilding(), 
+			desktop
+		);
 
 		// Initialize data members
 		this.eva = eva;
-		this.airlock = (BuildingAirlock)eva.getAirlock();
-
-		if (sim == null)
-			sim = Simulation.instance();
-		
-		if (masterClock == null)
-			masterClock = sim.getMasterClock();
-		
-		masterClock.addClockListener(this);
-		unitManager = sim.getUnitManager();
-		
-		// Set panel layout
-		setLayout(new BorderLayout());
+		this.buildingAirlock = (BuildingAirlock)eva.getAirlock();
+	}
+	
+	/**
+	 * Build the UI
+	 * 
+	 * @param content
+	 */
+	@Override
+	protected void buildUI(JPanel content) {
 
 		// Create label panel
-		WebPanel labelPanel = new WebPanel(new GridLayout(10, 1, 0, 0));
-		add(labelPanel, BorderLayout.NORTH);
-		labelPanel.setOpaque(false);
-		labelPanel.setBackground(new Color(0,0,0,128));
-	
-		// Create medical care label
-		WebLabel titleLabel = new WebLabel(Msg.getString("BuildingPanelEVA.title"), WebLabel.CENTER);
-		titleLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		//medicalCareLabel.setForeground(new Color(102, 51, 0)); // dark brown
-		labelPanel.add(titleLabel);
+		WebPanel topPanel = new WebPanel(new BorderLayout());
+		content.add(topPanel, BorderLayout.NORTH);
 
+		WebPanel labelGrid = new WebPanel(new SpringLayout());
+		topPanel.add(labelGrid, BorderLayout.NORTH);
 		
-		// Create capacity label
-//		capLabel = new WebLabel(Msg.getString("BuildingPanelEVA.capacity",
-//				eva.getAirlockCapacity()), WebLabel.CENTER);
-//		labelPanel.add(capLabel);
-
-		
-		// Create outerDoorLabel
-		outerDoorLabel = new WebLabel(Msg.getString("BuildingPanelEVA.outerDoor.number",
-				eva.getNumAwaitingOuterDoor()), WebLabel.CENTER);
-		labelPanel.add(outerDoorLabel);
-
 		// Create innerDoorLabel
-		innerDoorLabel = new WebLabel(Msg.getString("BuildingPanelEVA.innerDoor.number",
-				eva.getNumAwaitingInnerDoor()), WebLabel.CENTER);
-		labelPanel.add(innerDoorLabel);
-		
-		
+		innerDoorLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.innerDoor.number"),
+									  eva.getNumAwaitingInnerDoor(), 4, null);
+
 		if (eva.getAirlock().isInnerDoorLocked())
 			innerDoorStateCache = LOCKED;
 		else {
 			innerDoorStateCache = UNLOCKED;
 		}
 		// Create innerDoorStateLabel
-		innerDoorStateLabel = new WebLabel(Msg.getString("BuildingPanelEVA.innerDoor.state",
-				innerDoorStateCache), WebLabel.CENTER);
-		labelPanel.add(innerDoorStateLabel);
-		
-		
+		innerDoorStateLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.innerDoor.state"),
+										   innerDoorStateCache, 8, null);
+
+		// Create outerDoorLabel
+		outerDoorLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.outerDoor.number"),
+									  eva.getNumAwaitingOuterDoor(), 4, null);
+
 		if (eva.getAirlock().isOuterDoorLocked())
 			outerDoorStateCache = LOCKED;
 		else {
 			outerDoorStateCache = UNLOCKED;
 		}
 		// Create outerDoorStateLabel
-		outerDoorStateLabel = new WebLabel(Msg.getString("BuildingPanelEVA.outerDoor.state",
-				outerDoorStateCache), WebLabel.CENTER);
-		labelPanel.add(outerDoorStateLabel);
-		
+		outerDoorStateLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.outerDoor.state"),
+										   outerDoorStateCache, 8, null);
 		
 		// Create occupiedLabel
-		occupiedLabel = new WebLabel(Msg.getString("BuildingPanelEVA.occupied",
-				eva.getNumOccupied()), WebLabel.CENTER);
-		labelPanel.add(occupiedLabel);
-		
-		
+		occupiedLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.occupied"),
+									 eva.getNumInChamber(), 4, null);
+
+		// Create activationLabel
+		activationLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.airlock.activation"),
+										 buildingAirlock.isActivated() + "", 8, null);
+
 		// Create emptyLabel
-		emptyLabel = new WebLabel(Msg.getString("BuildingPanelEVA.empty",
-				eva.getNumEmptied()), WebLabel.CENTER);
-		labelPanel.add(emptyLabel);
-			
-		
-		// Create OperatorLabel
-		operatorLabel = new WebLabel(Msg.getString("BuildingPanelEVA.operator",
-				eva.getOperatorName()), WebLabel.CENTER);
-		labelPanel.add(operatorLabel);
-		
-		
+		emptyLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.empty"),
+								  eva.getNumEmptied(), 4, null);
+
 		// Create airlockStateLabel
-		airlockStateLabel = new WebLabel(Msg.getString("BuildingPanelEVA.airlock.state",
-				eva.getAirlock().getState().toString()), WebLabel.CENTER);
-		labelPanel.add(airlockStateLabel);
-		
+		airlockStateLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.airlock.state"),
+										 buildingAirlock.getState().toString(), 8, null);
 
 		// Create cycleTimeLabel
-		cycleTimeLabel = new WebLabel(Msg.getString("BuildingPanelEVA.airlock.cycleTime",
-				Math.round(eva.getAirlock().getRemainingCycleTime()*10.0)/10.0), WebLabel.CENTER);
-		labelPanel.add(cycleTimeLabel);
+		cycleTimeLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.airlock.cycleTime"),
+									  DECIMAL_PLACES1.format(buildingAirlock.getRemainingCycleTime()), 4, null);
 		
+		// Create transitionLabel
+		transitionLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.airlock.transition"),
+				 buildingAirlock.isTransitioning() + "", 8, null);
 		
-		UIManager.getDefaults().put("TitledBorder.titleColor", Color.darkGray);
-		Border lowerEtched = BorderFactory.createEtchedBorder(EtchedBorder.LOWERED);
-		TitledBorder title = BorderFactory.createTitledBorder(
-	        		lowerEtched, " " + Msg.getString("BuildingPanelEVA.titledBorder") + " ");
-//	      title.setTitleJustification(TitledBorder.RIGHT);
-		Font titleFont = UIManager.getFont("TitledBorder.font");
-		title.setTitleFont(titleFont.deriveFont(Font.ITALIC + Font.BOLD));
-	        
+		// Create airlockModeLabel
+		airlockModeLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.airlock.mode"),
+				 buildingAirlock.getAirlockMode().getName() + "", 8, null);
+
+		// Create OperatorLabel
+		operatorLabel = addTextField(labelGrid, Msg.getString("BuildingPanelEVA.operator"),
+									 eva.getOperatorName(), 12, null);
+		
+		SpringUtilities.makeCompactGrid(labelGrid,
+                6, 4, //rows, cols
+                10, INITY_DEFAULT,        //initX, initY
+                XPAD_DEFAULT, YPAD_DEFAULT);       //xPad, yPad	
+		
 		// Create occupant panel
 		WebPanel occupantPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		occupantPanel.setBorder(title);
-//		populationDisplayPanel.setBorder(new MarsPanelBorder());
-		add(occupantPanel, BorderLayout.SOUTH);
-		
-		// Create scroll panel for occupant list.
-		scrollPanel = new WebScrollPane();
-		scrollPanel.setPreferredSize(new Dimension(150, 100));
-		occupantPanel.add(scrollPanel);
+		addBorder(occupantPanel, Msg.getString("BuildingPanelEVA.titledB.occupants"));
+		content.add(occupantPanel, BorderLayout.CENTER);
 
-		// Create occupant list model
-		listModel = new ListModel(airlock);
+		// Create occupant list 
+		MainDesktopPane desktop = getDesktop();
+		occupants = new UnitListPanel<>(desktop, new Dimension(150, 100)) {
+			@Override
+			protected Collection<Person> getData() {
+				return getUnitsFromIds(buildingAirlock.getAllInsideOccupants());
+			}
+		};
+		occupantPanel.add(occupants);
 
-		// Create occupant list
-		occupants = new JList<Person>(listModel);
-		occupants.addMouseListener(this);
-		scrollPanel.setViewportView(occupants);
+		// Create reservation panel
+		WebPanel reservationPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+		addBorder(reservationPanel, Msg.getString("BuildingPanelEVA.titledB.Reserved"));
+		content.add(reservationPanel, BorderLayout.SOUTH);
 
+		reservationList = new UnitListPanel<>(desktop, new Dimension(150, 100)) {
+			@Override
+			protected Collection<Person> getData() {
+				return getUnitsFromIds(buildingAirlock.getReserved());
+			}		
+		};	
+		reservationPanel.add(reservationList);
 	}
 
 	@Override
 	public void update() {
-		// Update CapLabel
-//		if (capCache != eva.getAirlockCapacity()) {
-//			capCache = eva.getAirlockCapacity();
-//			capLabel.setText(Msg.getString("BuildingPanelEVA.capacity", capCache));
-//		}
 
 		// Update innerDoorLabel
-		if (innerDoorCache != eva.getNumAwaitingInnerDoor()) {
-			innerDoorCache = eva.getNumAwaitingInnerDoor();
-			innerDoorLabel.setText(Msg.getString("BuildingPanelEVA.innerDoor.number", innerDoorCache));
+		int inner = eva.getNumAwaitingInnerDoor();
+		if (innerDoorCache != inner) {
+			innerDoorCache = inner;
+			innerDoorLabel.setText(Integer.toString(inner));
 		}
-		
+
 		// Update outerDoorLabel
-		if (outerDoorCache != eva.getNumAwaitingOuterDoor()) {
-			outerDoorCache = eva.getNumAwaitingOuterDoor();
-			outerDoorLabel.setText(Msg.getString("BuildingPanelEVA.outerDoor.number", outerDoorCache));
+		int outer = eva.getNumAwaitingOuterDoor();
+		if (outerDoorCache != outer) {
+			outerDoorCache = outer;
+			outerDoorLabel.setText(Integer.toString(outer));
 		}
-		
+
 		// Update occupiedLabel
-		if (occupiedCache != eva.getNumOccupied()) {
-			occupiedCache = eva.getNumOccupied();
-			occupiedLabel.setText(Msg.getString("BuildingPanelEVA.occupied", occupiedCache));
-		}	
-		
+		int numChamber = eva.getNumInChamber();
+		if (occupiedCache != numChamber) {
+			occupiedCache = numChamber;
+			occupiedLabel.setText(Integer.toString(numChamber));
+		}
+
 		// Update emptyLabel
-		if (emptyCache != eva.getNumEmptied()) {
-			emptyCache = eva.getNumEmptied();
-			emptyLabel.setText(Msg.getString("BuildingPanelEVA.empty", emptyCache));
-		}	
-		
+		int emptyNumChamber = eva.getNumEmptied();
+		if (emptyCache != emptyNumChamber) {
+			emptyCache = emptyNumChamber;
+			emptyLabel.setText(Integer.toString(emptyNumChamber));
+		}
+
 		// Update operatorLabel
-		if (!operatorCache.equals(eva.getOperatorName())) {
-			operatorCache = eva.getOperatorName();
-			operatorLabel.setText(Msg.getString("BuildingPanelEVA.operator", operatorCache));
-		}	
-		
-		// Update airlockStateLabel
-		if (!airlockStateCache.equalsIgnoreCase(eva.getAirlock().getState().toString())) {
-			airlockStateCache = eva.getAirlock().getState().toString();
-			airlockStateLabel.setText(Msg.getString("BuildingPanelEVA.airlock.state", airlockStateCache));
+		String name = eva.getOperatorName();
+		if (!operatorCache.equalsIgnoreCase(name)) {
+			operatorCache = name;
+			operatorLabel.setText(name);
 		}
 		
 		// Update cycleTimeLabel
-		if (cycleTimeCache != Math.round(eva.getAirlock().getRemainingCycleTime()*10.0)/10.0) {
-			cycleTimeCache = Math.round(eva.getAirlock().getRemainingCycleTime()*10.0)/10.0;
-			cycleTimeLabel.setText(Msg.getString("BuildingPanelEVA.airlock.cycleTime", cycleTimeCache));
+		double time = buildingAirlock.getRemainingCycleTime();
+		if (cycleTimeCache != time) {
+			cycleTimeCache = time;
+			cycleTimeLabel.setText(DECIMAL_PLACES1.format(cycleTimeCache));
 		}
-		
+
 		String innerDoorState = "";
-		if (eva.getAirlock().isInnerDoorLocked())
+		if (buildingAirlock.isInnerDoorLocked())
 			innerDoorState = LOCKED;
 		else {
 			innerDoorState = UNLOCKED;
 		}
-		
+
 		// Update innerDoorStateLabel
 		if (!innerDoorStateCache.equalsIgnoreCase(innerDoorState)) {
 			innerDoorStateCache = innerDoorState;
-			innerDoorStateLabel.setText(Msg.getString("BuildingPanelEVA.innerDoor.state", innerDoorState));
+			innerDoorStateLabel.setText(innerDoorState);
 		}
-		
+
 		String outerDoorState = "";
-		if (eva.getAirlock().isOuterDoorLocked())
+		if (buildingAirlock.isOuterDoorLocked())
 			outerDoorState = LOCKED;
 		else {
 			outerDoorState = UNLOCKED;
 		}
-		
+
 		// Update outerDoorStateLabel
 		if (!outerDoorStateCache.equalsIgnoreCase(outerDoorState)) {
 			outerDoorStateCache = outerDoorState;
-			outerDoorStateLabel.setText(Msg.getString("BuildingPanelEVA.outerDoor.state", outerDoorState));
+			outerDoorStateLabel.setText(outerDoorState);
+		}
+
+		// Update airlockStateLabel
+		String state = buildingAirlock.getState().toString();
+		if (!airlockStateCache.equalsIgnoreCase(state)) {
+			airlockStateCache = state;
+			airlockStateLabel.setText(state);
+		}
+		
+		// Update activationLabel
+		boolean activated = buildingAirlock.isActivated();
+		if (activationCache != activated) {
+			activationCache = activated;
+			activationLabel.setText(Boolean.toString(activated));
+		}
+
+		// Update activationLabel
+		boolean transition = buildingAirlock.isTransitioning();
+		if (transitionCache != transition) {
+			transitionCache = transition;
+			transitionLabel.setText(Boolean.toString(transition));
+		}
+		
+		// Update airlockModeLabel
+		AirlockMode airlockMode = buildingAirlock.getAirlockMode();
+		if (airlockModeCache != airlockMode) {
+			airlockModeCache = airlockMode;
+			airlockModeLabel.setText(airlockMode.getName());
 		}
 		
 		// Update occupant list
-		listModel.update();
-		scrollPanel.validate();
-	}
-	
-	/**
-	 * List model for airlock occupant.
-	 */
-	private class ListModel extends AbstractListModel<Person> {
-
-		private BuildingAirlock airlock;
-		private List<Person> list;
-		private Set<Integer> set;
-		
-		private ListModel(BuildingAirlock airlock) {
-			this.airlock = airlock;
-						
-			set = airlock.getOccupants();
-			list = new ArrayList<>(4);
-			
-			for (int i: set) {
-				list.add(unitManager.getPersonByID(i));
-			}
-
-			Collections.sort(list);
-		}
-
-		@Override
-		public Person getElementAt(int index) {
-
-			Person result = null;
-
-			if ((index >= 0) && (index < airlock.getNumOccupants())) {
-				result = list.get(index);
-			}
-
-			return result;
-		}
-
-		@Override
-		public int getSize() {
-			return airlock.getNumOccupants();
-		}
-
-		/**
-		 * Update the population list model.
-		 */
-		public void update() {
-
-			Set<Integer> newSet = airlock.getOccupants();
-			
-			if (!set.containsAll(newSet)
-					|| !newSet.containsAll(set)) {
-
-				set = newSet;
-				
-				list = new ArrayList<>(5);
-				
-				for (int i: newSet) {
-					list.add(unitManager.getPersonByID(i));
-				}
-
-				Collections.sort(list);
-				
-				fireContentsChanged(this, 0, getSize());
-			}
-		}
-	}
-
-	/**
-	 * Mouse clicked event occurs.
-	 * 
-	 * @param event the mouse event
-	 */
-	public void mouseClicked(MouseEvent event) {
-		// If double-click, open person window.
-		if (event.getClickCount() >= 2) {
-			Person person = (Person) occupants.getSelectedValue();
-			if (person != null) {
-				desktop.openUnitWindow(person, false);
-			}
-		}
-	}
-
-	public void mousePressed(MouseEvent arg0) {
-	}
-
-	public void mouseReleased(MouseEvent arg0) {
-	}
-
-	public void mouseEntered(MouseEvent arg0) {
-	}
-
-	public void mouseExited(MouseEvent arg0) {
+		occupants.update();
+		reservationList.update();
 	}
 
 	@Override
-	public void clockPulse(ClockPulse pulse) {
-		// TODO Auto-generated method stub
-	}
-
-	@Override
-	public void uiPulse(double time) {
-		update();
-	}
-
-	@Override
-	public void pauseChange(boolean isPaused, boolean showPane) {
-		// TODO Auto-generated method stub	
-	}
-
-//	/**
-//	 * Action event occurs.
-//	 * 
-//	 * @param event the action event
-//	 */
-//	public void actionPerformed(ActionEvent event) {
-//		// If the population monitor button was pressed, create tab in monitor tool.
-//		desktop.addModel(new PersonTableModel((Settlement) unit, true));
-//	}
-
 	public void destroy() {
-//		capLabel = null;
-		innerDoorLabel = null;
-		outerDoorLabel = null;
-		occupiedLabel = null;
-		emptyLabel = null;
-		operatorLabel = null;
-		airlockStateLabel = null;
-		cycleTimeLabel = null;
-		innerDoorStateLabel = null;
-		outerDoorStateLabel = null;
-		
-		listModel = null;
+		super.destroy();
+
 		occupants = null;
-		scrollPanel = null;
+		reservationList = null;
 		
 		eva = null;
-		airlock = null;
-
+		buildingAirlock = null;
 	}
 }
-	

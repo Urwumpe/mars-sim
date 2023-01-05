@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * TabPanelFavorite.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-09
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.unit_window.person;
@@ -12,10 +12,6 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,24 +19,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import javax.swing.Box;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.DefaultListCellRenderer;
+import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ShiftType;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule.OneActivity;
+import org.mars_sim.msp.core.person.ai.task.util.TaskManager;
+import org.mars_sim.msp.core.person.ai.task.util.TaskManager.OneActivity;
 import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.structure.Shift;
+import org.mars_sim.msp.core.structure.ShiftSlot;
+import org.mars_sim.msp.core.structure.ShiftSlot.WorkStatus;
 import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.JComboBoxMW;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
@@ -52,7 +51,6 @@ import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 import com.alee.laf.scroll.WebScrollPane;
 import com.alee.laf.text.WebTextField;
-//import com.alee.managers.language.data.TooltipWay;
 import com.alee.managers.tooltip.TooltipManager;
 import com.alee.managers.tooltip.TooltipWay;
 
@@ -62,30 +60,20 @@ import com.alee.managers.tooltip.TooltipWay;
 @SuppressWarnings("serial")
 public class TabPanelSchedule extends TabPanel {
 
-	private static final String SOL = "  Sol ";
-	private static final String SPACES = "   ";
+	private static final String SCH_ICON = Msg.getString("icon.schedule"); //$NON-NLS-1$
 
-	/** Is UI constructed. */
-	private boolean uiDone = false;
-	
-	private boolean conciseCache;
+	private static final String SOL = "  Sol ";
+
 	private boolean isRealTimeUpdate;
 	private int todayCache = 1;
 	private int today;
-	private int start;
-	private int end;
 	private int theme;
-//	private int selectedSolCache;
 	
 	private Integer selectedSol;
 	private Integer todayInteger;
 
-	private ShiftType shiftType;
-	private ShiftType shiftCache = null;
-
 	private JTable table;
 
-	private WebCheckBox conciseBox;
 	private WebCheckBox realTimeBox;
 	private WebTextField shiftTF;
 	private WebLabel shiftLabel;
@@ -94,17 +82,17 @@ public class TabPanelSchedule extends TabPanel {
 	private DefaultComboBoxModel<Object> comboBoxModel;
 	private ScheduleTableModel scheduleTableModel;
 
-	private List<OneActivity> activities = new ArrayList<OneActivity>();
+	private List<OneActivity> activities = new ArrayList<>();
 	private List<Integer> solList;
 	private Map<Integer, List<OneActivity>> allActivities;
 
 	/** The Person instance. */
 	private Person person = null;
-	
 	/** The Robot instance. */
 	private Robot robot = null;
 	
-	private TaskSchedule taskSchedule;
+	private ShiftSlot taskSchedule;
+	private TaskManager taskManager;
 	
 	private static MarsClock marsClock;
 
@@ -116,73 +104,52 @@ public class TabPanelSchedule extends TabPanel {
 	 */
 	public TabPanelSchedule(Unit unit, MainDesktopPane desktop) {
 		// Use the TabPanel constructor
-		super(Msg.getString("TabPanelSchedule.title"), //$NON-NLS-1$
-				null, Msg.getString("TabPanelSchedule.tooltip"), //$NON-NLS-1$
-				unit, desktop);
+		super(
+			null,
+			ImageLoader.getNewIcon(SCH_ICON),
+			Msg.getString("TabPanelSchedule.title"), //$NON-NLS-1$
+			unit, desktop
+		);
 
 		// Prepare combo box
 		if (unit instanceof Person) {
 			person = (Person) unit;
-		} else if (unit instanceof Robot) {
+		} else {
 			robot = (Robot) unit;
 		}
 	}
-	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	@SuppressWarnings("unchecked")
-	public void initializeUI() {
-		uiDone = true;
+
+	@Override
+	protected void buildUI(JPanel content) {
 		
 		if (marsClock == null)
-			marsClock = Simulation.instance().getMasterClock().getMarsClock();
-		
-//		this.desktop = desktop;
+			marsClock = getSimulation().getMasterClock().getMarsClock();
+
 		isRealTimeUpdate = true;
 
 		// Prepare combo box
 		if (person != null) {
-			taskSchedule = person.getTaskSchedule();
+			taskSchedule = person.getShiftSlot();
+			taskManager = person.getTaskManager();
 		} 
-		
-		else if (robot != null) {
-			taskSchedule = robot.getTaskSchedule();
+		else {
+			taskManager = robot.getTaskManager();
 		}
-
-//		allActivities = taskSchedule.getAllActivities();
-
-		// Create label panel.
-		WebPanel labelPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(labelPanel);
-
-		// Prepare label
-		WebLabel label = new WebLabel(Msg.getString("TabPanelSchedule.label"), WebLabel.CENTER); //$NON-NLS-1$
-		label.setFont(new Font("Serif", Font.BOLD, 14));
-		labelPanel.add(label);
 
 		// Create the button panel.
 		WebPanel buttonPane = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(buttonPane);// , BorderLayout.NORTH);
 
+		Unit unit = getUnit();
 		if (unit instanceof Person) {
 
-			shiftType = taskSchedule.getShiftType();
-			shiftCache = shiftType;
 			shiftLabel = new WebLabel(Msg.getString("TabPanelSchedule.shift.label"), WebLabel.CENTER); //$NON-NLS-1$
 
 			TooltipManager.setTooltip(shiftLabel, Msg.getString("TabPanelSchedule.shift.toolTip"), TooltipWay.down); //$NON-NLS-1$
 			buttonPane.add(shiftLabel);
 
 			shiftTF = new WebTextField();
-			start = taskSchedule.getShiftStart();
-			end = taskSchedule.getShiftEnd();
-			
-			if (shiftCache == ShiftType.OFF || shiftCache == ShiftType.ON_CALL)
-				shiftTF.setText(shiftCache.toString());
-			else
-				shiftTF.setText(shiftCache.toString() + " : (" + start + " to " + end + ")");
+			String shiftDesc = getShiftDescription(taskSchedule);
+			shiftTF.setText(shiftDesc);
 			
 			shiftTF.setEditable(false);
 			shiftTF.setColumns(15);
@@ -192,67 +159,24 @@ public class TabPanelSchedule extends TabPanel {
 
 		}
 
-		Box box = Box.createHorizontalBox();
-		centerContentPanel.add(box, BorderLayout.NORTH);
+		WebPanel topPanel = new WebPanel(new BorderLayout());
+		content.add(topPanel, BorderLayout.NORTH);
+		topPanel.add(buttonPane, BorderLayout.NORTH);
 
-		// Create hideRepeatedTaskBox.
-		conciseBox = new WebCheckBox(Msg.getString("TabPanelSchedule.checkbox.showRepeatedTask")); //$NON-NLS-1$
-		conciseBox.setFont(new Font("Serif", Font.PLAIN, 12));
-		TooltipManager.setTooltip(conciseBox, Msg.getString("TabPanelSchedule.tooltip.showRepeatedTask"), TooltipWay.down); //$NON-NLS-1$
-//		conciseBox.addActionListener(new ActionListener() {
-//			public void actionPerformed(ActionEvent arg0) {
-//				if (conciseBox.isSelected()) {
-//					conciseCache = true;
-//				} else {
-//					conciseCache = false;
-//				}
-//				
-//				if (isRealTimeUpdate)
-//					scheduleTableModel.update(todayInteger);
-//				else
-//					scheduleTableModel.update(selectedSol);
-//			}
-//		});
-		conciseBox.addItemListener(new ItemListener() {    
-             public void itemStateChanged(ItemEvent e) {                 
- 				if (conciseBox.isSelected()) {
-					conciseCache = true;
-				} else {
-					conciseCache = false;
-				}
-				
-				if (isRealTimeUpdate)
-					scheduleTableModel.update(todayInteger);
-				else
-					scheduleTableModel.update(selectedSol); 
-             }    
-	  	});
-		
-		// Set the initial state of the hide check box
-		conciseBox.setSelected(conciseCache);
-		box.add(conciseBox);
-		box.add(Box.createHorizontalGlue());
-
-//		today = taskSchedule.getSolCache();
 		today = marsClock.getMissionSol();
 		
 		todayInteger = (Integer) today;
 		solList = new CopyOnWriteArrayList<Integer>();
 
-		allActivities = taskSchedule.getAllActivities();
-
-		for (int i = 1; i < today + 1; i++) {
+		allActivities = taskManager.getAllActivities();
+		int lowerSol = today - TaskManager.NUM_SOLS;
+		if (lowerSol < 1)
+			lowerSol = 1;
+		for (int i = lowerSol; i < today + 1; i++) {
 			if (!solList.contains(i))
 				solList.add(i);
 		}
 		
-//		for (int key : allActivities.keySet()) {
-//			solList.add(key);
-//		}
-//
-//		if (!solList.contains(today))
-//			solList.add(today);
-
 		// Create comboBoxModel
 		Collections.sort(solList, Collections.reverseOrder());
 		comboBoxModel = new DefaultComboBoxModel<Object>();
@@ -260,7 +184,7 @@ public class TabPanelSchedule extends TabPanel {
 		solList.forEach(s -> comboBoxModel.addElement(s));
 
 		// Create comboBox
-		solBox = new JComboBoxMW<Object>(comboBoxModel);
+		solBox = new JComboBoxMW<>(comboBoxModel);
 		solBox.setPreferredSize(new Dimension(80, 25));
 		solBox.setPrototypeDisplayValue(new Dimension(80, 25));
 		solBox.setSelectedItem(todayInteger);
@@ -272,8 +196,7 @@ public class TabPanelSchedule extends TabPanel {
 		WebPanel solPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));	
 		solPanel.add(solBox);
 
-		box.add(solPanel);
-		box.add(Box.createHorizontalGlue());
+		topPanel.add(solPanel, BorderLayout.CENTER);
 
 		selectedSol = (Integer) solBox.getSelectedItem();
 		
@@ -281,15 +204,13 @@ public class TabPanelSchedule extends TabPanel {
 			solBox.setSelectedItem(todayInteger);
 
 		solBox.setSelectedItem((Integer) 1);
-		solBox.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				selectedSol = (Integer) solBox.getSelectedItem();
-				if (selectedSol != null) // e.g. when first loading up
-					scheduleTableModel.update((int) selectedSol);
-				if (selectedSol == todayInteger)
-					// Binds comboBox with realTimeUpdateCheckBox
-					realTimeBox.setSelected(true);
-			}
+		solBox.addActionListener(e -> {
+			selectedSol = (Integer) solBox.getSelectedItem();
+			if (selectedSol != null) // e.g. when first loading up
+				scheduleTableModel.update((int) selectedSol);
+			if (selectedSol != null && selectedSol.equals(todayInteger))
+				// Binds comboBox with realTimeUpdateCheckBox
+				realTimeBox.setSelected(true);
 		});
 
 		// Create realTimeUpdateCheckBox.
@@ -299,28 +220,27 @@ public class TabPanelSchedule extends TabPanel {
 		realTimeBox.setFont(new Font("Serif", Font.PLAIN, 12));
 		TooltipManager.setTooltip(realTimeBox, Msg.getString("TabPanelSchedule.tooltip.realTimeUpdate"),
 				TooltipWay.down);
-		realTimeBox.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				if (realTimeBox.isSelected()) {
-					isRealTimeUpdate = true;
-					scheduleTableModel.update(today);
-					solBox.setSelectedItem(todayInteger);
-				} else
-					isRealTimeUpdate = false;
-			}
+		realTimeBox.addActionListener(s -> {
+			if (realTimeBox.isSelected()) {
+				isRealTimeUpdate = true;
+				scheduleTableModel.update(today);
+				solBox.setSelectedItem(todayInteger);
+			} else
+				isRealTimeUpdate = false;
 		});
-		box.add(realTimeBox);
-
+		
+		topPanel.add(realTimeBox, BorderLayout.WEST);
+		topPanel.add(new WebPanel(new JLabel("                    ")), BorderLayout.EAST);
+		
 		// Create schedule table model
 		if (unit instanceof Person)
 			scheduleTableModel = new ScheduleTableModel((Person) unit);
-		else if (unit instanceof Robot)
+		else 
 			scheduleTableModel = new ScheduleTableModel((Robot) unit);
 
 		// Create attribute scroll panel
 		WebScrollPane scrollPanel = new WebScrollPane();
-//		scrollPanel.setBorder(new MarsPanelBorder());
-		centerContentPanel.add(scrollPanel);
+		content.add(scrollPanel);
 
 		// Create schedule table
 		table = new ZebraJTable(scheduleTableModel);
@@ -364,15 +284,30 @@ public class TabPanelSchedule extends TabPanel {
 			scheduleTableModel.update(selectedSol);
 	}
 
+	public static String getShiftDescription(ShiftSlot shift) {
+		WorkStatus status = shift.getStatus();
+		
+		Shift s = shift.getShift();
+		switch(status) {
+			case ON_CALL:
+				return "On Call";
+			case ON_DUTY:
+				return s.getName() + " : OnDuty ends @ " + s.getEnd();
+			case OFF_DUTY:
+				return s.getName() + " : Off Duty start @ " + s.getStart();
+			case ON_LEAVE:
+				return s.getName() + " : On Leave";
+		}
+		return "";
+	}
+
 	/**
 	 * Updates the info on this panel.
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
 	public void update() {
-		if (!uiDone)
-			initializeUI();
-		
+
 		int t = -1;
 
 		if (theme != t) {
@@ -381,53 +316,31 @@ public class TabPanelSchedule extends TabPanel {
 		}
 
 		if (person != null) {
-			shiftType = taskSchedule.getShiftType();
-
-			// if (shiftCache != null)
-			if (shiftCache != shiftType) {
-				shiftCache = shiftType;
-				start = taskSchedule.getShiftStart();
-				end = taskSchedule.getShiftEnd();
-				
-				if (shiftCache == ShiftType.OFF || shiftCache == ShiftType.ON_CALL)
-					shiftTF.setText(shiftCache.toString());
-				else
-					shiftTF.setText(shiftCache.toString() + " : (" + start + " to " + end + ")");
-			}
+			String shiftDesc = getShiftDescription(person.getShiftSlot());		
+			shiftTF.setText(shiftDesc);
 		}
 
-//		today = taskSchedule.getSolCache();
 		today = marsClock.getMissionSol();
 		
 		todayInteger = (Integer) today;
-
 		selectedSol = (Integer) solBox.getSelectedItem(); 
+		
 		// necessary or else if (isRealTimeUpdate) below will have NPE
-
+		
 		// Update the sol combobox at the beginning of a new sol
 		if (today != todayCache) {
-
-			for (int i = 1; i < today + 1; i++) {
+			int lowerSol = today - TaskManager.NUM_SOLS;
+			if (lowerSol < 1)
+				lowerSol = 1;
+			for (int i = lowerSol; i < today + 1; i++) {
 				if (!solList.contains(i))
 					solList.add(i);
 			}
 			
 			// Update allActivities
-			allActivities = taskSchedule.getAllActivities();
-			
-//			for (int key : allActivities.keySet()) {
-//				// System.out.println("key is " + key);
-//				// if (key > max) max = key;
-//				solList.add(key);
-//			}
-//			// OptionalInt max = solList.stream().mapToInt((x) -> x).max();
-//			// solList.add(max + 1);
-//			if (!solList.contains(today))
-//				solList.add(today);
+			allActivities = taskManager.getAllActivities();
 
 			Collections.sort(solList, Collections.reverseOrder());
-//			DefaultComboBoxModel<Object> newComboBoxModel = new DefaultComboBoxModel<Object>();
-//			solList.forEach(s -> newComboBoxModel.addElement(s));
 
 			for (int s : solList) {
 				// Check if this element exist
@@ -455,7 +368,7 @@ public class TabPanelSchedule extends TabPanel {
 		}
 
 		// Checks if the user is still looking at a previous sol's schedule
-		if (selectedSol != todayInteger) {
+		if (selectedSol != null && !selectedSol.equals(todayInteger)) {
 			// If yes, turn off the Real Time Update automatically
 			isRealTimeUpdate = false;
 			realTimeBox.setSelected(false);
@@ -529,7 +442,7 @@ public class TabPanelSchedule extends TabPanel {
 	 */
 	private class ScheduleTableModel extends AbstractTableModel {
 
-		DecimalFormat fmt = new DecimalFormat("000");
+		DecimalFormat fmt = new DecimalFormat("000.00");
 
 		/**
 		 * hidden constructor.
@@ -556,13 +469,15 @@ public class TabPanelSchedule extends TabPanel {
 		public Class<?> getColumnClass(int columnIndex) {
 			Class<?> dataType = super.getColumnClass(columnIndex);
 			if (columnIndex == 0)
+				dataType = Double.class;
+			else if (columnIndex == 1)
 				dataType = String.class;
-			if (columnIndex == 1)
+			else if (columnIndex == 2)
 				dataType = String.class;
-			if (columnIndex == 2)
+			else if (columnIndex == 3)
 				dataType = String.class;
-			if (columnIndex == 3)
-				dataType = String.class;
+			else
+				dataType = null;
 			return dataType;
 		}
 
@@ -582,14 +497,15 @@ public class TabPanelSchedule extends TabPanel {
 
 		@Override
 		public Object getValueAt(int row, int column) {
+			OneActivity activity = activities.get(row);
 			if (column == 0)
-				return fmt.format(activities.get(row).getStartTime());
+				return fmt.format(activity.getStartTime());
 			else if (column == 1)
-				return taskSchedule.convertTaskDescription(activities.get(row).getDescription());
+				return activity.getDescription();
 			else if (column == 2)
-				return taskSchedule.convertTaskPhase(activities.get(row).getPhase());
+				return activity.getPhase();
 			else if (column == 3) {
-				return taskSchedule.convertMissionName(activities.get(row).getMission());
+				return activity.getMission();
 			}
 			else
 				return null;
@@ -597,84 +513,31 @@ public class TabPanelSchedule extends TabPanel {
 
 
 		/**
-		 * Prepares a list of activities done on the selected day
+		 * Prepares a list of activities done on the selected sol.
 		 * 
 		 * @param selectedSol
 		 */
 		public void update(int selectedSol) {		
-			List<OneActivity> activityList = new ArrayList<OneActivity>();
+			List<OneActivity> activityList = new ArrayList<>();
 			
-			allActivities = taskSchedule.getAllActivities();
+			allActivities = taskManager.getAllActivities();
 			// Load the schedule of a particular sol
 			if (allActivities.containsKey(selectedSol))
 				activityList.addAll(allActivities.get(selectedSol));
-			
-			if (conciseCache) {
-				activities = hideRepeated(activityList);
-			}
-			else {
-				activities = activityList;
-			}
+
+			activities = activityList;
 			
 			fireTableDataChanged();
-		}
-		
-		/**
-		 * Hides all the repeated tasks from the schedule on a particular selected sol
-		 * 
-		 * @param oneDaySchedule
-		 */
-		public List<OneActivity> hideRepeated(List<OneActivity> oneDaySchedule) {
-			OneActivity lastTask = null;
-			String lastDes = "";
-			String lastPhase = "";
-//			String lastMission = "";
-			
-			OneActivity currentTask = null;
-			String currentDes = "";
-			String currentPhase = "";
-//			String currentMission = "";
-			
-			// Check if user selected hide repeated tasks checkbox
-			if (oneDaySchedule != null) {
-				// Show only non-repeating consecutive tasks
-				List<OneActivity> displaySchedule = new ArrayList<OneActivity>(oneDaySchedule);
-
-				int size = displaySchedule.size();
-
-				for (int i = size - 1; i >= 0; i--) {
-					currentTask = displaySchedule.get(i);
-					currentDes = taskSchedule.convertTaskDescription(currentTask.getDescription());
-					currentPhase = taskSchedule.convertTaskPhase(currentTask.getPhase());
-//					currentMission = taskSchedule.convertTaskPhase(currentTask.getMission());
-					
-					// Make sure this is NOT the very first task (i = 0) of the day
-					if (i != 0) {
-						lastTask = displaySchedule.get(i - 1);
-						lastDes = taskSchedule.convertTaskDescription(lastTask.getDescription());
-						lastPhase = taskSchedule.convertTaskPhase(lastTask.getPhase());
-//						lastMission = taskSchedule.convertTaskPhase(lastTask.getMission());
-						
-						// Check if the last task is the same as the current task
-						if (lastDes.equals(currentDes)
-								&& lastPhase.equals(currentPhase)
-//								&& lastMission.equals(currentMission)
-								) {
-							displaySchedule.remove(i);
-							size = displaySchedule.size();
-						}
-					}
-				}
-				return displaySchedule;
-			}
-			return oneDaySchedule;
 		}
 	}
 
 	/**
 	 * Prepares for deletion.
 	 */
+	@Override
 	public void destroy() {
+		super.destroy();
+		
 		if (solBox != null)
 			solBox.removeAllItems();
 		if (comboBoxModel != null)
@@ -686,7 +549,6 @@ public class TabPanelSchedule extends TabPanel {
 		comboBoxModel = null;
 		solList = null;
 		table = null;
-		conciseBox = null;
 		realTimeBox = null;
 		shiftTF = null;
 		shiftLabel = null;
@@ -694,8 +556,6 @@ public class TabPanelSchedule extends TabPanel {
 		person = null;
 		robot = null;
 		taskSchedule = null;
-		desktop = null;
-
 	}
 
 }

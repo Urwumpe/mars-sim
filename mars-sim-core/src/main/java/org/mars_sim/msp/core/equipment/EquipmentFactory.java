@@ -1,28 +1,21 @@
-/**
+/*
  * Mars Simulation Project
  * EquipmentFactory.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-10-04
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.equipment;
 
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.mars_sim.msp.core.Coordinates;
+import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.structure.Settlement;
 
 /**
  * A factory for equipment units.
  */
 public final class EquipmentFactory {
 
-	// Cache maps.
-	/** The equipment map cache. */
-	private static final Map<String, Equipment> equipmentTypeCache = new ConcurrentHashMap<String, Equipment>(6);
-	/** The equipment name set cache. */
-	private static Set<String> equipmentNamesCache;
+	private static UnitManager unitManager;
 
 	/**
 	 * Private constructor for static factory class.
@@ -31,137 +24,98 @@ public final class EquipmentFactory {
 	}
 
 	/**
-	 * Gets a set of all equipment names.
-	 * 
-	 * @return set of equipment name strings.
+	 * Create a new piece of Equipment. This may be temporary to be shared.
+	 * @param type
+	 * @param settlement
+	 * @param temp
+	 * @return
 	 */
-	public static Set<String> getEquipmentNames() {
+	public static synchronized Equipment createEquipment(EquipmentType type, Settlement settlement) {
+		// Create the name upfront
+		String newName = Equipment.generateName(type.getName());
 
-		if (equipmentNamesCache == null) {
-			equipmentNamesCache = EquipmentType.getNameSet();
+		Equipment newEqm = null;
+		switch (type) {
+		case EVA_SUIT:
+			newEqm = new EVASuit(newName, settlement);
+			// Store a pressure suit inside the EVA suit
+//			((EVASuit)newEqm).storeItemResource(ItemResourceUtil.pressureSuitID, 1);
+			break;
+
+		case BAG:
+		case BARREL:
+		case GAS_CANISTER:
+		case LARGE_BAG:
+			newEqm = new GenericContainer(newName, type, false, settlement);
+			break;
+			
+		case SPECIMEN_BOX:
+		case THERMAL_BOTTLE:
+		case WHEELBARROW:			
+			// Reusable Containers
+			newEqm = new GenericContainer(newName, type, true, settlement);
+			break;
+		default:
+			throw new IllegalStateException("Equipment: " + type + " could not be constructed.");
 		}
 
-		return equipmentNamesCache;
+		unitManager.addUnit(newEqm);
+		// Add this equipment as being owned by this settlement
+		settlement.addEquipment(newEqm);
+		// Set the container unit
+		newEqm.setContainerUnit(settlement);
 
-	}
-
-	/**
-	 * Gets the equipment object
-	 * 
-	 * @param id		the equipment resource id.
-	 * @param location 	the location of the equipment.
-	 * @param temp 		is this equipment only temporary?
-	 * @return {@link Equipment}
-	 */
-	public static Equipment createEquipment(int id, Coordinates location, boolean temp) {
-		return createEquipment(EquipmentType.convertID2Enum(id).getName(), location, temp);
+		return newEqm;
 	}
 
 	/**
 	 * Gets an equipment instance from an equipment type string.
-	 * 
+	 *
 	 * @param type     the equipment type string.
 	 * @param location the location of the equipment.
-	 * @param temp     is this equipment only temporary?
 	 * @return {@link Equipment}
 	 * @throws Exception if error creating equipment instance.
 	 */
-	public static Equipment createEquipment(String type, Coordinates location, boolean temp) {
-		if (temp) {
-			if (equipmentTypeCache.containsKey(type))
-				// since it's temporary, it doesn't matter if the location has been defined
-				return equipmentTypeCache.get(type);
-			else {
-				Equipment equipment = createEquipment(type, location, false);
-				equipmentTypeCache.put(type, equipment);
-				return equipment;
-			}
-		}
-		if (Bag.TYPE.equalsIgnoreCase(type))
-			return new Bag(location);
-		else if (Barrel.TYPE.equalsIgnoreCase(type))
-			return new Barrel(location);
-		else if (EVASuit.TYPE.equalsIgnoreCase(type))
-			return new EVASuit(location);
-		else if (GasCanister.TYPE.equalsIgnoreCase(type))
-			return new GasCanister(location);
-		else if (LargeBag.TYPE.equalsIgnoreCase(type))
-			return new LargeBag(location);
-		else if (SpecimenBox.TYPE.equalsIgnoreCase(type))
-			return new SpecimenBox(location);
-		else
-			throw new IllegalStateException("Equipment: " + type + " could not be constructed.");
-	}
-
-	/**
-	 * Gets an equipment instance from an equipment class.
-	 * 
-	 * @param equipmentClass the equipment class to use.
-	 * @param location       the location of the equipment.
-	 * @param temp           is this equipment only temporary?
-	 * @return  {@link Equipment}
-	 * @throws Exception if error creating equipment instance.
-	 */
-	public static Equipment createEquipment(Class<? extends Equipment> equipmentClass, Coordinates location,
-			boolean temp) {
-		return createEquipment(EquipmentType.convertClass2Type(equipmentClass).getName(), location, temp);
-	}
-
-	/**
-	 * Gets the class of equipment.
-	 * 
-	 * @param type the equipment type string.
-	 * @return the equipment class.
-	 * @throws Exception if equipment class could not be found.
-	 */
-	public static Class<? extends Equipment> getEquipmentClass(String type) {
-		if (Bag.TYPE.equalsIgnoreCase(type))
-			return Bag.class;
-		else if (Barrel.TYPE.equalsIgnoreCase(type))
-			return Barrel.class;
-		else if (EVASuit.TYPE.equalsIgnoreCase(type))
-			return EVASuit.class;
-		else if (GasCanister.TYPE.equalsIgnoreCase(type))
-			return GasCanister.class;
-		else if (LargeBag.TYPE.equalsIgnoreCase(type))
-			return LargeBag.class;
-		else if (SpecimenBox.TYPE.equalsIgnoreCase(type))
-			return SpecimenBox.class;
-		else
-			throw new IllegalStateException("Class for equipment: " + type + " could not be found.");
-	}
-
-	/**
-	 * Gets the equipment class with its resource id
-	 * 
-	 * @param id  	resource id.
-	 * @return the 	equipment class.
-	 */
-	public static Class<? extends Equipment> getEquipmentClass(int id) {
-		return getEquipmentClass(EquipmentType.convertID2Enum(id).getName());
+	public static Equipment createEquipment(String type, Settlement settlement) {
+		// Create a new instance of the equipment
+		return createEquipment(EquipmentType.convertName2Enum(type), settlement);
 	}
 
 	/**
 	 * Gets the empty mass of the equipment.
-	 * 
+	 *
 	 * @param type the equipment type string.
 	 * @return empty mass (kg).
 	 * @throws Exception if equipment mass could not be determined.
 	 */
-	public static double getEquipmentMass(String type) {
-		if (Bag.TYPE.equalsIgnoreCase(type))
-			return Bag.EMPTY_MASS;
-		else if (Barrel.TYPE.equalsIgnoreCase(type))
-			return Barrel.EMPTY_MASS;
-		else if (EVASuit.TYPE.equalsIgnoreCase(type))
+	public static double getEquipmentMass(EquipmentType type) {
+		switch (type) {
+		case BAG:
+			return 0.1;
+		case BARREL:
+			return 1.3;
+		case EVA_SUIT:
 			return EVASuit.emptyMass;
-		else if (GasCanister.TYPE.equalsIgnoreCase(type))
-			return GasCanister.EMPTY_MASS;
-		else if (LargeBag.TYPE.equalsIgnoreCase(type))
-			return LargeBag.EMPTY_MASS;
-		else if (SpecimenBox.TYPE.equalsIgnoreCase(type))
-			return SpecimenBox.EMPTY_MASS;
-		else
+		case GAS_CANISTER:
+			return 4.0;
+		case LARGE_BAG:
+			return 0.2;
+		case SPECIMEN_BOX:
+			return 0.65;
+		case THERMAL_BOTTLE:
+			return 1.0;		
+		case WHEELBARROW:
+			return 12;	
+		default:
 			throw new IllegalStateException("Class for equipment: " + type + " could not be found.");
+		}
+	}
+
+	/**
+	 * Set up the default Unit Manager to use.
+	 * @param mgr
+	 */
+	public static void initialise(UnitManager mgr) {
+		unitManager = mgr;
 	}
 }

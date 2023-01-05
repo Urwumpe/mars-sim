@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
- * PieChartView.java
- * @version 3.1.2 2020-09-02
+ * PieChartTab.java
+ * @date 2021-11-14
  * @author Barry Evans
  */
 
@@ -47,6 +47,7 @@ import org.mars_sim.msp.ui.swing.MainDesktopPane;
  * The column specified should ideally not return a Number value since the
  * algorithm works best on a distinct data set values.
  */
+@SuppressWarnings("serial")
 class PieChartTab extends MonitorTab {
 
     /**
@@ -266,7 +267,7 @@ class PieChartTab extends MonitorTab {
      * @param column Index of the column to collate.
      */
     public PieChartTab(MonitorModel model, int column) {
-        super(model, false, ImageLoader.getNewIcon(MonitorWindow.PIE_ICON));
+        super(model, false, false, ImageLoader.getNewIcon(MonitorWindow.PIE_ICON));
 
         String title = model.getName() + " - " + model.getColumnName(column);
         setName(title);
@@ -278,7 +279,7 @@ class PieChartTab extends MonitorTab {
 
         pieModel.calculate();
 
-        // 2015-10-18 Changed to 3D pie
+        // Use 3D pie
         final PiePlot3D plot = (PiePlot3D)chart.getPlot();
 
         //plot.setCircular(false);
@@ -294,7 +295,7 @@ class PieChartTab extends MonitorTab {
 
         chartpanel = new ChartPanel(chart, true);
 
-        // 2015-10-18 Added setting below to keep the aspect ratio of 8:5
+        // Add setting below to keep the aspect ratio of 8:5
         // see http://www.jfree.org/forum/viewtopic.php?f=3&t=115763
         // Chart will always be drawn to an off-screen buffer that is the same size as the ChartPanel, so no scaling will happen when the offscreen image is copied to the panel.
         chartpanel.setPreferredSize(new Dimension (800, 300));
@@ -319,10 +320,9 @@ class PieChartTab extends MonitorTab {
 
         add(fixedSizePane, BorderLayout.CENTER);
 
-        // 2015-10-18 Added rotator code
+        // Add rotator code
         final Rotator rotator = new Rotator(plot);
         rotator.start();
-		//System.out.println("PieChartTab : just done calling constructor");
     }
 
     /**
@@ -332,8 +332,6 @@ class PieChartTab extends MonitorTab {
      * @param desktop main window of simulation.
      */
     public void displayProps(MainDesktopPane desktop) {
-        //System.out.println("PieChartTab.java : start calling displayProp()");
-
         // Show modal column selector
         int column = ColumnSelector.createPieSelector(desktop, getModel());
         if (column >= 0) {
@@ -386,6 +384,7 @@ class PieChartTab extends MonitorTab {
 * The rotator.
 *
 */
+@SuppressWarnings("serial")
 class Rotator extends Timer implements ActionListener {
 
 	 /** The plot. */
@@ -417,5 +416,4 @@ class Rotator extends Timer implements ActionListener {
 	         this.angle = 0;
 	     }
 	 }
-
 }

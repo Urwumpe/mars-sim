@@ -1,9 +1,10 @@
-///**
-// * Mars Simulation Project
-// * DesktopPane.java
-// * @version 3.1.2 2020-09-02
-// * @author Manny Kung
-// */
+/**
+ * Mars Simulation Project
+ * DesktopPane.java
+ * @version 3.2.0 2021-06-20
+ * @author Manny Kung
+ */
+
 //package org.mars_sim.msp.ui.swing;
 //
 //import java.awt.Color;
@@ -32,7 +33,7 @@
 //	/** default serial id. */
 //	private static final long serialVersionUID = 1L;
 //	/** default logger. */
-//	private static Logger logger = Logger.getLogger(DesktopPane.class.getName());
+//	private static final Logger logger = Logger.getLogger(DesktopPane.class.getName());
 //
 //	/** True if this MainDesktopPane hasn't been displayed yet. */
 //	private boolean firstDisplay;

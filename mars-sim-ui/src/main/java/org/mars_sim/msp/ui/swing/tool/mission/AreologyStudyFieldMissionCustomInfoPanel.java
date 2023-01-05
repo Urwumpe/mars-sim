@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * AreologyStudyFieldMissionCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -33,6 +33,7 @@ import com.alee.laf.progressbar.WebProgressBar;
 /**
  * A panel for displaying areology study field mission information.
  */
+@SuppressWarnings("serial")
 public class AreologyStudyFieldMissionCustomInfoPanel
 extends MissionCustomInfoPanel
 implements ScientificStudyListener {
@@ -164,9 +165,7 @@ implements ScientificStudyListener {
 	 * @return true if primary researcher.
 	 */
 	private boolean isStudyPrimaryResearcher(Person researcher, ScientificStudy study) {
-		boolean result = false;
-
-		if (researcher.equals(study.getPrimaryResearcher())) result = true;
+		boolean result = researcher.equals(study.getPrimaryResearcher());
 
 		return result;
 	}
@@ -178,9 +177,7 @@ implements ScientificStudyListener {
 	 * @return true if collaborative researcher.
 	 */
 	private boolean isStudyCollaborativeResearcher(Person researcher, ScientificStudy study) {
-		boolean result = false;
-
-		if (study.getCollaborativeResearchers().contains(researcher)) result = true;
+		boolean result = study.getCollaborativeResearchers().contains(researcher);
 
 		return result;
 	}

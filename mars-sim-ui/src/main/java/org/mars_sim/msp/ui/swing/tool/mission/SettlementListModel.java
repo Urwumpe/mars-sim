@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * SettlementListModel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-03
  * @author Manny Kung
  */
 
@@ -21,6 +21,7 @@ import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.UnitManagerEvent;
 import org.mars_sim.msp.core.UnitManagerEventType;
 import org.mars_sim.msp.core.UnitManagerListener;
+import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.structure.Settlement;
 
 /**
@@ -47,12 +48,12 @@ public class SettlementListModel extends AbstractListModel<Settlement> implement
 			addSettlement(i.next());
 
 		// Add list as unit manager listener.
-		unitManager.addUnitManagerListener(this);
+		unitManager.addUnitManagerListener(UnitType.SETTLEMENT, this);
 	}
 
 	/**
 	 * Adds a settlement to this list.
-	 * 
+	 *
 	 * @param settlement {@link Settlement} the settlement to add.
 	 */
 	public void addSettlement(Settlement settlement) {
@@ -65,7 +66,7 @@ public class SettlementListModel extends AbstractListModel<Settlement> implement
 
 	/**
 	 * Removes a settlement from this list.
-	 * 
+	 *
 	 * @param settlement {@link Settlement} settlement to remove.
 	 */
 	public void removeSettlement(Settlement settlement) {
@@ -81,7 +82,7 @@ public class SettlementListModel extends AbstractListModel<Settlement> implement
 	@Override
 	public void unitManagerUpdate(UnitManagerEvent event) {
 
-		if (event.getUnit() instanceof Settlement) {
+		if (event.getUnit().getUnitType() == UnitType.SETTLEMENT) {
 
 			Settlement settlement = (Settlement) event.getUnit();
 
@@ -94,10 +95,10 @@ public class SettlementListModel extends AbstractListModel<Settlement> implement
 			}
 		}
 	}
-	
+
 	/**
 	 * Gets the list size.
-	 * 
+	 *
 	 * @return size.
 	 */
 	@Override
@@ -107,7 +108,7 @@ public class SettlementListModel extends AbstractListModel<Settlement> implement
 
 	/**
 	 * Gets the list element at a given index.
-	 * 
+	 *
 	 * @param index the index.
 	 * @return the object at the index or null if one.
 	 */
@@ -122,7 +123,7 @@ public class SettlementListModel extends AbstractListModel<Settlement> implement
 
 	/**
 	 * Checks if the list contains a given settlement.
-	 * 
+	 *
 	 * @param settlement the settlement to check for.
 	 * @return true if list contains the settlement.
 	 */
@@ -132,7 +133,7 @@ public class SettlementListModel extends AbstractListModel<Settlement> implement
 
 	/**
 	 * Gets the index a given settlement is at.
-	 * 
+	 *
 	 * @param settlement the settlement to check for.
 	 * @return the index for the settlement or -1 if not in list.
 	 */
@@ -149,8 +150,7 @@ public class SettlementListModel extends AbstractListModel<Settlement> implement
 	public void destroy() {
 		settlements.clear();
 		settlements = null;
-		unitManager.removeUnitManagerListener(this);
-		unitManager = null;
+		unitManager.removeUnitManagerListener(UnitType.SETTLEMENT, this);
 	}
 
 	/**
@@ -193,6 +193,6 @@ public class SettlementListModel extends AbstractListModel<Settlement> implement
 	@Override
 	public void unitUpdate(UnitEvent event) {
 		// TODO Auto-generated method stub
-		
+
 	}
 }

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * TabPanelScience.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-09
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -9,14 +9,13 @@ package org.mars_sim.msp.ui.swing.unit_window.structure;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.text.DecimalFormat;
 import java.util.List;
 
+import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
@@ -26,15 +25,12 @@ import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.tool.science.ScienceWindow;
@@ -52,10 +48,9 @@ import com.alee.laf.scroll.WebScrollPane;
 public class TabPanelScience
 extends TabPanel {
 
+	private static final String SCIENCE_ICON = Msg.getString("icon.science"); //$NON-NLS-1$
+
 	// Data members
-	/** Is UI constructed. */
-	private boolean uiDone = false;
-	
 	/** The Settlement instance. */
 	private Settlement settlement;
 	
@@ -67,8 +62,6 @@ extends TabPanel {
 
 	private StudyTableModel studyTableModel;
 	private AchievementTableModel achievementTableModel;
-
-	private ScientificStudyManager manager = Simulation.instance().getScientificStudyManager();
 	
 	/**
 	 * Constructor.
@@ -78,49 +71,33 @@ extends TabPanel {
 	public TabPanelScience(Settlement settlement, MainDesktopPane desktop) {
 		// Use the TabPanel constructor
 		super(
-			Msg.getString("TabPanelScience.title"), //$NON-NLS-1$
 			null,
+			ImageLoader.getNewIcon(SCIENCE_ICON),
 			Msg.getString("TabPanelScience.tooltip"), //$NON-NLS-1$
 			settlement, desktop
 		);
 
 		this.settlement = settlement;
-
 	}
 	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
-		
-		// Create the title panel.
-		WebPanel titlePane = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(titlePane);
-
-		// Create the title label.
-		WebLabel titleLabel = new WebLabel(Msg.getString("TabPanelScience.label"), WebLabel.CENTER); //$NON-NLS-1$
-		titleLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		//titleLabel.setForeground(new Color(102, 51, 0)); // dark brown
-		titlePane.add(titleLabel);
+	@Override
+	protected void buildUI(JPanel content){
 
 		// Create the main panel.
 		WebPanel mainPane = new WebPanel(new GridLayout(2, 1, 0, 0));
-		centerContentPanel.add(mainPane);
+		content.add(mainPane);
 
 		// Create the studies panel.
-		WebPanel studiesPane = new WebPanel(new BorderLayout());
-//		studiesPane.setBorder(new MarsPanelBorder());
+		WebPanel studiesPane = new WebPanel(new BorderLayout(5, 5));
 		mainPane.add(studiesPane);
 
 		// Create the studies label.
 		WebLabel studiesLabel = new WebLabel(Msg.getString("TabPanelScience.scientificStudies"), WebLabel.CENTER); //$NON-NLS-1$
+		studiesLabel.setFont(ITALIC_FONT);
 		studiesPane.add(studiesLabel, BorderLayout.NORTH);
 
 		// Create the study scroll panel.
 		WebScrollPane studyScrollPane = new WebScrollPane();
-//		studyScrollPane.setBorder(new MarsPanelBorder());
 		studyScrollPane.setHorizontalScrollBarPolicy(WebScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 		studiesPane.add(studyScrollPane, BorderLayout.CENTER);
 
@@ -134,6 +111,13 @@ extends TabPanel {
 		studyTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
 		studyTable.getColumnModel().getColumn(2).setCellRenderer(renderer);
 		studyTable.getColumnModel().getColumn(3).setCellRenderer(renderer);
+		studyTable.getColumnModel().getColumn(4).setCellRenderer(renderer);
+		
+		studyTable.getColumnModel().getColumn(0).setPreferredWidth(5);
+		studyTable.getColumnModel().getColumn(1).setPreferredWidth(40);
+		studyTable.getColumnModel().getColumn(2).setPreferredWidth(5);
+		studyTable.getColumnModel().getColumn(3).setPreferredWidth(80);
+		studyTable.getColumnModel().getColumn(4).setPreferredWidth(80);
 		
 		studyTable.setPreferredScrollableViewportSize(new Dimension(225, -1));
 //		studyTable.setCellSelectionEnabled(false);
@@ -158,7 +142,7 @@ extends TabPanel {
 		studiesPane.add(buttonPane, BorderLayout.SOUTH);
 
 		// Create the science tool button.
-		scienceToolButton = new WebButton(ImageLoader.getIcon(Msg.getString("img.science"))); //$NON-NLS-1$
+		scienceToolButton = new WebButton(ImageLoader.getIcon(Msg.getString("icon.science"))); //$NON-NLS-1$
 		scienceToolButton.setEnabled(false);
 		scienceToolButton.setMargin(new Insets(1, 1, 1, 1));
 		scienceToolButton.setToolTipText(Msg.getString("TabPanelScience.tooltip.science")); //$NON-NLS-1$
@@ -180,16 +164,17 @@ extends TabPanel {
 
 		// Create the achievement label.
 		WebLabel achievementLabel = new WebLabel(Msg.getString("TabPanelScience.scientificAchievement"), WebLabel.CENTER); //$NON-NLS-1$
+		achievementLabel.setFont(TITLE_FONT);
 		achievementLabelPane.add(achievementLabel);
 
-		DecimalFormat formatter = new DecimalFormat(Msg.getString("TabPanelScience.decimalFormat")); //$NON-NLS-1$
-		String totalAchievementString = formatter.format(settlement.getTotalScientificAchievement());
+		String totalAchievementString = DECIMAL_PLACES1.format(settlement.getTotalScientificAchievement());
 		totalAchievementLabel = new WebLabel(
 			Msg.getString(
 				"TabPanelScience.totalAchievementCredit", //$NON-NLS-1$
 				totalAchievementString
-			),WebLabel.CENTER
+			), WebLabel.CENTER
 		);
+		totalAchievementLabel.setFont(ITALIC_FONT);	
 		achievementLabelPane.add(totalAchievementLabel);
 
 		// Create the achievement scroll panel.
@@ -219,12 +204,7 @@ extends TabPanel {
 	}
 
 	@Override
-	public void update() {
-		if (!uiDone)
-			initializeUI();
-		
-		TableStyle.setTableStyle(studyTable);
-		TableStyle.setTableStyle(achievementTable);
+	public void update() {		
 
 		// Get selected study in table if any.
 		int selectedStudyIndex = studyTable.getSelectedRow();
@@ -246,9 +226,7 @@ extends TabPanel {
 
 		// Update total achievement label.
 		Settlement settlement = (Settlement) getUnit();
-		DecimalFormat formatter = new DecimalFormat(Msg.getString("TabPanelScience.decimalFormat")); //$NON-NLS-1$
-		String totalAchievementString = formatter.format(settlement.getTotalScientificAchievement());
-		//totalAchievementLabel.setText(Msg.getString("TabPanelScience.totalAchievementCredit") + totalAchievementString); //$NON-NLS-1$
+		String totalAchievementString = DECIMAL_PLACES1.format(settlement.getTotalScientificAchievement());
 		totalAchievementLabel.setText(Msg.getString("TabPanelScience.totalAchievementCredit", totalAchievementString)); //$NON-NLS-1$
 	}
 
@@ -267,7 +245,7 @@ extends TabPanel {
 		int selectedStudyIndex = studyTable.getSelectedRow();
 		if (selectedStudyIndex >= 0) {
 			ScientificStudy selectedStudy = studyTableModel.getStudy(selectedStudyIndex);
-			((ScienceWindow) desktop.getToolWindow(ScienceWindow.NAME)).setScientificStudy(selectedStudy);
+			((ScienceWindow) getDesktop().getToolWindow(ScienceWindow.NAME)).setScientificStudy(selectedStudy);
 			getDesktop().openToolWindow(ScienceWindow.NAME);
 		}
 	}
@@ -285,7 +263,8 @@ extends TabPanel {
 		private List<ScientificStudy> studies;
 
 		/**
-		 * Constructor
+		 * Constructor.
+		 * 
 		 * @param settlement the settlement.
 		 */
 		private StudyTableModel(Settlement settlement) {
@@ -295,36 +274,37 @@ extends TabPanel {
 			this.settlement = settlement;
 
 			// Get all studies the settlement is primary for.
-//			ScientificStudyManager manager = Simulation.instance().getScientificStudyManager();
-			studies = manager.getAllStudies(settlement);
+			studies = getSimulation().getScientificStudyManager().getAllStudies(settlement);
 		}
 
 		/**
 		 * Returns the number of columns in the model.
+		 * 
 		 * @return the number of columns in the model.
 		 */
 		public int getColumnCount() {
-			return 4;
+			return 5;
 		}
 
 		@Override
 		public String getColumnName(int column) {
 			if (column == 0) 
-				return Msg.getString("TabPanelScience.column.study"); //$NON-NLS-1$
+				return Msg.getString("TabPanelScience.column.id"); //$NON-NLS-1$
 			else if (column == 1) 
-				return Msg.getString("TabPanelScience.column.level"); //$NON-NLS-1$
+				return Msg.getString("TabPanelScience.column.study"); //$NON-NLS-1$
 			else if (column == 2) 
+				return Msg.getString("TabPanelScience.column.level"); //$NON-NLS-1$
+			else if (column == 3) 
 				return Msg.getString("TabPanelScience.column.phase"); //$NON-NLS-1$
-			else if (column == 3)
+			else if (column == 4)
 				return Msg.getString("TabPanelScience.column.researcher"); //$NON-NLS-1$
-
-//			if (columnIndex == 0) return Msg.getString("TabPanelScience.column.study"); //$NON-NLS-1$
-//			else if (columnIndex == 1) return Msg.getString("TabPanelScience.column.phase"); //$NON-NLS-1$
-			else return null;
+			
+			return null;
 		}
 
 		/**
 		 * Returns the number of rows in the model.
+		 * 
 		 * @return the number of rows in the model.
 		 */
 		public int getRowCount() {
@@ -333,6 +313,7 @@ extends TabPanel {
 
 		/**
 		 * Returns the value for the cell at columnIndex and rowIndex.
+		 * 
 		 * @param rowIndex the row whose value is to be queried.
 		 * @param columnIndex the column whose value is to be queried.
 		 * @return the value Object at the specified cell.
@@ -341,28 +322,24 @@ extends TabPanel {
 			String result = null;
 			if ((rowIndex >= 0) && (rowIndex < studies.size())) {
 				ScientificStudy study = studies.get(rowIndex);
-				
+
 				if (columnIndex == 0) 
-					result = Conversion.capitalize(study.getScience().getName());
+					result = study.getID() + "";
 				else if (columnIndex == 1) 
+					result = study.getScience().getName();
+				else if (columnIndex == 2) 
 					result = study.getDifficultyLevel() + "";
-				else if (columnIndex == 2) {
-					if (study.isCompleted()) result = Conversion.capitalize(study.getCompletionState());
-					else result = Conversion.capitalize(study.getPhase());
-				}
 				else if (columnIndex == 3) {
+					if (study.isCompleted()) result = study.getCompletionState();
+					else result = study.getPhase();
+				}
+				else {
 					String researcherN = "";	
 					if (study.getPrimaryResearcher() != null) {
 						researcherN = study.getPrimaryResearcher().getName();
-						result = Conversion.capitalize(researcherN);
+						result = researcherN;
 					}
 				}
-				
-//				if (columnIndex == 0) result = Conversion.capitalize(study.toString());
-//				else if (columnIndex == 1) {
-//					if (study.isCompleted()) result = study.getCompletionState();
-//					else result = study.getPhase();
-//				}
 
 			}
 			return result;
@@ -372,7 +349,7 @@ extends TabPanel {
 		 * Updates the table model.
 		 */
 		private void update() {
-			List<ScientificStudy> newStudies = manager.getAllStudies(settlement);
+			List<ScientificStudy> newStudies = getSimulation().getScientificStudyManager().getAllStudies(settlement);
 			if (!newStudies.equals(studies)) studies = newStudies;
 			fireTableDataChanged();
 		}

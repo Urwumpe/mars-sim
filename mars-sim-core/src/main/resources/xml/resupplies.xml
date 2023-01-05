@@ -4,11 +4,12 @@
 	<!ELEMENT resupply (building*, vehicle*, equipment*, person?, resource*, part*, part-package*)>
 	<!ATTLIST resupply name CDATA #REQUIRED>
 	<!ELEMENT building EMPTY>
+	<!ATTLIST building zone CDATA #IMPLIED>	
 	<!ATTLIST building type CDATA #REQUIRED>
 	<!ATTLIST building width CDATA #IMPLIED>
 	<!ATTLIST building length CDATA #IMPLIED>
-	<!ATTLIST building x-location CDATA #REQUIRED>
-	<!ATTLIST building y-location CDATA #REQUIRED>
+	<!ATTLIST building xloc CDATA #REQUIRED>
+	<!ATTLIST building yloc CDATA #REQUIRED>
 	<!ATTLIST building facing CDATA #REQUIRED>
 	<!ELEMENT vehicle EMPTY>
 	<!ATTLIST vehicle type CDATA #REQUIRED>
@@ -32,39 +33,173 @@
 <!-- Settlement resupply missions from Earth. -->
 <resupply-list>
 
+	<resupply name="Standard Resupply 1">
+	
+	    <!-- Containers-->
+		<equipment type="barrel" number="24" />
+		<equipment type="bag" number="24" />
+		<equipment type="gas canister" number="24" />		
+		<equipment type="large bag" number="24" />
+		<equipment type="specimen box" number="24" />
+    	<equipment type="thermal bottle" number="8" />	
+ 	    <equipment type="wheelbarrow" number="8" />	   	
+	
+	    <!-- Life Support Resources -->
+	    <resource name="food" amount="1000.0" />
+	    <resource name="water" amount="4000.0" />
+	    <resource name="oxygen" amount="1000.0" />
+
+		<!-- Gases -->
+	    <resource name="argon" amount="60.0" />
+	
+		<!-- Crop related -->
+	    <resource name="fertilizer" amount="50.0" />
+	
+	    <!-- Crop tissues -->
+	    <resource name="blueberry tissue" amount="1.0" />
+	    <resource name="cabbage tissue" amount="1.0" />
+	    <resource name="carrot tissue" amount="1.0" />
+	    <resource name="celery tissue" amount="1.0" />
+	    <resource name="corn tissue" amount="1.0" />
+	
+	    <resource name="cranberry tissue" amount="1.0" />
+	    <resource name="cucumber tissue" amount="1.0" />
+	    <resource name="garlic tissue" amount="1.0" />
+	    <resource name="ginger tissue" amount="1.0" />
+	    <resource name="green bell pepper tissue" amount="1.0" />
+	
+	    <resource name="kidney bean tissue" amount="1.0" />
+	    <resource name="lettuce tissue" amount="1.0" />
+	    <resource name="morel mushroom tissue" amount="1.0" />
+	    <resource name="peanut tissue" amount="1.0" />
+	    <resource name="peas tissue" amount="1.0" />
+	    
+	    <resource name="potato tissue" amount="1.0" />
+	    <resource name="quinoa tissue" amount="1.0" />
+	    <resource name="radish tissue" amount="1.0" />	    
+	    <resource name="red beet tissue" amount="1.0" />
+	    <resource name="rice tissue" amount="1.0" />
+	    
+	    <resource name="sesame tissue" amount="1.0" />	    
+	    <resource name="soybean tissue" amount="1.0" />
+	   	<resource name="spring onion tissue" amount="1.0" />
+	    <resource name="strawberry tissue" amount="1.0" />
+	    <resource name="sugarcane tissue" amount="1.0" />
+	    
+	   	<resource name="sweet potato tissue" amount="1.0" />
+	    <resource name="swiss chard tissue" amount="1.0" />
+	    <resource name="taro tissue" amount="1.0" />
+	    <resource name="tomato tissue" amount="1.0" />
+	    <resource name="wheat tissue" amount="1.0" />
+	    
+	    <resource name="white mustard tissue" amount="1.0" />
+	    <resource name="white onion tissue" amount="1.0" />
+	    <resource name="yam tissue" amount="1.0" />
+	    
+	    <!-- Seeds -->
+	    <resource name="mustard seed" amount="50.0" />
+	    <resource name="sesame seed" amount="50.0" />
+	
+	    <!-- Food Derived Items -->
+	    <resource name="mustard" amount="50.0" />
+	
+	    <!-- Kitchen Resources -->
+	    <resource name="chlorine" amount="50.0" />
+	    <resource name="Sodium Hypochlorite" amount="20.0" />
+	    <resource name="Acetic Acid Bacteria" amount="20.0" />
+	    <resource name="Nitrosomonas spp" amount="20.0" />
+	    <resource name="Nitrospira spp" amount="20.0" />
+	    
+	    <resource name="Rhizobia" amount="20.0" />
+	    <resource name="bisphenol-A" amount="100.0" />
+	    <resource name="toilet tissue" amount="100.0" />
+	    <resource name="paper" amount="100.0" />
+	    <resource name="napkin" amount="100.0" />
+	    
+	    <resource name="bleaching chemical" amount="50.0" />
+	    <resource name="Baking Powder" amount="100.0" />
+	    <resource name="pulp" amount="100.0" />
+	    <resource name="Honey" amount="100.0" />
+	    <resource name="Yeast" amount="50.0" />
+	    
+	    <resource name="Epsom Salt" amount="50.0" />
+	    <resource name="Table Salt" amount="50.0" />
+	    <resource name="Sugar" amount="50.0" />	    
+	
+	    <!-- Food Derived Items -->
+	    <resource name="mustard" amount="50.0" />
+	    <resource name="Tofu" amount="50.0" />
+	    <resource name="Roasted Peanut" amount="50.0" />
+	    <resource name="White Bread" amount="50.0" />
+	    <resource name="White Bun" amount="50.0" />
+	    
+	    <resource name="Veggie Patty" amount="50.0" />
+	    <resource name="Wheat Bread" amount="50" />
+	    <resource name="Wheat Bun" amount="50" />
+	    <resource name="Soy Protein" amount="50.0" />
+	    <resource name="Peanut Butter" amount="50.0" />
+	    
+	    <resource name="Soy Sprout" amount="50.0" />
+	    <resource name="Soybean Oil" amount="50.0" />
+	    <resource name="Peanut Oil" amount="50.0" />
+	    <resource name="Garlic Oil" amount="50.0" />
+	    <resource name="Sesame Oil" amount="50.0" />
+	    
+	    <resource name="Cane Fiber" amount="100.0" />
+	    <resource name="Rice Vinegar" amount="50.0" />
+	    <resource name="Soy Sauce" amount="50.0" />
+	    <resource name="Soymilk" amount="50.0" />
+	    <resource name="Soy Flour" amount="50.0" />
+	    
+	    <resource name="Wheat Flour" amount="50.0" />
+	    <resource name="Granola Bar" amount="10.0" />
+
+	    <!-- Utility Resources -->
+	    <resource name="iron powder" amount="10.0" />  
+	
+	        	
+	</resupply>
+	
 	<!-- Resupply mission from Earth. -->
 	<!-- name: the unique name of the resupply mission. -->
-	<resupply name="Mars Direct Base Resupply 1">
+	<resupply name="Resupply for Phase 1">
 
 		<!-- A new building for the settlement. -->
 		<!-- type: the type of building (see buildings.xml) -->
-		<!-- x-location the preferred East/West placement position of the building in meters from the settlement center.
+		<!-- xloc the preferred East/West placement position of the building in meters from the settlement center.
 		     (positive:West, negative:East) -->
-		<!-- y-location the preferred North/South placement position of the building in meters from the settlement center.
+		<!-- yloc the preferred North/South placement position of the building in meters from the settlement center.
 		     (positive:North, negative:South) -->
 		<!-- The facing of the building in degrees clockwise from North. -->
-		<building type="Lander Hab" x-location="0.0" y-location="13.0" facing="0.0" />
+		<building type="Lander Hab" xloc="0.0" yloc="13.0" facing="0.0" />
 		
-		<building type="Inflatable Greenhouse" x-location="-12.0" y-location="13.0" facing="270.0" />
+		<building type="Inflatable Greenhouse" xloc="-12.0" yloc="13.0" facing="270.0" />
 
-		<building type="MD1 Nuclear Reactor" x-location="60.0" y-location="-80.0" facing="0.0" />
+		<building type="MD1 Nuclear Reactor" xloc="60.0" yloc="-80.0" facing="0.0" />
 
-		<building type="ERV Base" x-location="40.0" y-location="-15.0" facing="45.0" />
+		<building type="ERV-A" xloc="120.0" yloc="45.0" facing="0.0" />
+		<building type="ERV-B" xloc="120.0" yloc="-15.0" facing="0.0" />
+								
+		<building type="Hallway" length="4.0" xloc="0.0" yloc="6.5" facing="0.0" />
+		<building type="Hallway" length="3.0" xloc="-6.0" yloc="13.0" facing="270.0" />
 
-		<building type="Hallway" length="4.0" x-location="0.0" y-location="6.5" facing="0.0" />
-		<building type="Hallway" length="3.0" x-location="-6.0" y-location="13.0" facing="270.0" />
-
-		<building type="Large Sabatier Processor" x-location="0.0" y-location="-45.0" facing="90.0" />
+		<building type="Large Sabatier Processor" xloc="0.0" yloc="-45.0" facing="90.0" />
 			
 		<!-- New equipment -->
 		<!-- type: the type of equipment. -->
-		<!-- number: the number of this type of equipment. -->
-		<equipment type="EVA Suit" number="16" />
-		<equipment type="Gas Canister" number="100" />
-		<equipment type="Bag" number="100" />
-		<equipment type="Large Bag" number="100" />
-		<equipment type="Barrel" number="100" />
-
+		<!-- number: the number of this type of equipment. -->		
+		
+		<equipment type="EVA Suit" number="8" />
+							
+		 <!-- Containers-->
+		<equipment type="barrel" number="80" />
+		<equipment type="bag" number="80" />
+		<equipment type="gas canister" number="80" />		
+		<equipment type="large bag" number="80" />
+		<equipment type="specimen box" number="80" />
+    	<equipment type="thermal bottle" number="4" />			
+   	    <equipment type="wheelbarrow" number="4" />
+   	      
 		<!-- New immigrants from Earth. -->
 		<!-- number: the number of immigrants. -->
 		<person number="4" />
@@ -72,9 +207,6 @@
 		<!-- Resource provided in this resupply. -->
 		<!-- type: the type of resource (see resources.txt) -->
 		<!-- amount: the amount of the resource (kg) -->
-		<resource name="hydrogen" amount="2000.0" />
-		<resource name="methane" amount="2000.0" />
-		<resource name="food" amount="1657.0" />
 
 		<!-- Part packages (see part_packages.xml) -->
 		<!-- name: the part package name. -->
@@ -83,29 +215,39 @@
 
 	</resupply>
 
-	<resupply name="Mars Direct Base Resupply 2">
-		<building type="Lander Hab" x-location="0.0" y-location="26.0" facing="0.0" />
-		<building type="Inflatable Greenhouse" x-location="-12.0" y-location="26.0" facing="270.0" />
+	<resupply name="Resupply for Phase 2">
+		<building type="Lander Hab" xloc="0.0" yloc="26.0" facing="0.0" />
+		<building type="Inflatable Greenhouse" xloc="-12.0" yloc="26.0" facing="270.0" />
 	
-		<building type="MD4 Nuclear Reactor" x-location="100.0" y-location="-100" facing="0.0" />
+		<building type="MD4 Nuclear Reactor" xloc="100.0" yloc="-100" facing="0.0" />
 		
-		<building type="ERV Base" x-location="40.0" y-location="15.0" facing="135.0" />		
-	
-		<building type="Hallway" length="4.0" x-location="0.0" y-location="19.5" facing="0.0" />
-		<building type="Hallway" length="3.0" x-location="-6.0" y-location="26.0" facing="270.0" />
+		<building type="ERV-A" xloc="160.0" yloc="45.0" facing="0.0" />
+		<building type="ERV-B" xloc="160.0" yloc="-15.0" facing="0.0" />
+						
+		<building type="Hallway" length="4.0" xloc="0.0" yloc="19.5" facing="0.0" />
+		<building type="Hallway" length="3.0" xloc="-6.0" yloc="26.0" facing="270.0" />
 		
-		<building type="Large Sabatier Processor" x-location="0.0" y-location="-50.0" facing="90.0" />
+		<building type="Atmospheric Processor" xloc="20" yloc="-50.0" facing="90.0" />
+		
+		<building type="Large Sabatier Processor" xloc="0.0" yloc="-50.0" facing="90.0" />
 					
 		<vehicle type="Explorer Rover" number="1" />
 		<vehicle type="Transport Rover" number="1" />
 		<vehicle type="Light Utility Vehicle" number="1" />
-		<equipment type="EVA Suit" number="24" />
-		<equipment type="Gas Canister" number="140" />
-		<equipment type="Barrel" number="140" />
-		<equipment type="Bag" number="140" />
-		<equipment type="Large Bag" number="140" />
-		<equipment type="Specimen Box" number="140" />
-		
+		<vehicle type="Delivery Drone" number="1" />
+					
+	    
+		<equipment type="EVA Suit" number="8" />
+							
+		 <!-- Containers-->
+		<equipment type="barrel" number="80" />
+		<equipment type="bag" number="80" />
+		<equipment type="gas canister" number="80" />		
+		<equipment type="large bag" number="80" />
+		<equipment type="specimen box" number="80" />
+    	<equipment type="thermal bottle" number="4" />	
+ 	    <equipment type="wheelbarrow" number="2" />
+ 	    	    		
 		<person number="4" />
 		
 		<resource name="hydrogen" amount="1000.0" />
@@ -115,52 +257,65 @@
 		
 	</resupply>
 
-	<resupply name="Mars Direct Base Resupply 3">
+	<resupply name="Resupply for Phase 3">
 
-		<building type="Astronomy Observatory" x-location="-55.0" y-location="-20.05" facing="90.0" />
+		<building zone ="1" type="Astronomy Observatory" xloc="-55.0" yloc="-20.05" facing="90.0" />
 		
-		<building type="MD4 Nuclear Reactor" x-location="120.0" y-location="-100" facing="0.0" />
+		<building type="MD4 Nuclear Reactor" xloc="120.0" yloc="-100" facing="0.0" />
 						
-		<building type="ERV Base" x-location="40.0" y-location="-15.0" facing="45.0" />			
-		<building type="Atmospheric Processor" x-location="0.0" y-location="-20.0" facing="90.0" />
-		<building type="Large Sabatier Processor" x-location="-30.0" y-location="-20.0" facing="90.0" />
+		<building type="ERV-A" xloc="200.0" yloc="45.0" facing="0.0" />
+		<building type="ERV-B" xloc="200.0" yloc="-15.0" facing="0.0" />
+									
+		<building type="Atmospheric Processor" xloc="20" yloc="-60.0" facing="90.0" />												
+		<building type="Atmospheric Processor" xloc="20" yloc="-70.0" facing="90.0" />
+		<building type="Atmospheric Processor" xloc="20" yloc="-80.0" facing="90.0" />
+		<building type="Atmospheric Processor" xloc="20" yloc="-90.0" facing="90.0" />
+		<building type="Atmospheric Processor" xloc="20" yloc="-100.0" facing="90.0" />
+						
+		<building type="Large Sabatier Processor" xloc="-30.0" yloc="-20.0" facing="90.0" />
 
-		<building type="Command and Control" x-location="0.0" y-location="38" facing="270.0" />
-		<building type="Lounge" x-location="-11.0" y-location="38" facing="270.0" />
-		<building type="Residential Quarters" x-location="-22.0" y-location="38" facing="270.0" />
-		<building type="Infirmary" x-location="-33.0" y-location="38" facing="270.0" />
-		<building type="Laboratory" x-location="-44.0" y-location="38" facing="270.0" />
-		<building type="Workshop" x-location="-55.0" y-location="38" facing="270.0" />
+		<building type="Command and Control" xloc="0.0" yloc="38" facing="270.0" />
+		<building type="Lounge" xloc="-11.0" yloc="38" facing="270.0" />
+		<building type="Residential Quarters" xloc="-22.0" yloc="38" facing="270.0" />
+		<building type="Infirmary" xloc="-33.0" yloc="38" facing="270.0" />
+		<building type="Laboratory" xloc="-44.0" yloc="38" facing="270.0" />
+		<building type="Workshop" xloc="-55.0" yloc="38" facing="270.0" />
 		
-		<building type="Garage" x-location="-55.0" y-location="53.5" facing="0.0" />
+		<building type="Garage" xloc="-55.0" yloc="53.5" facing="0.0" />
 		
-		<building type="Large Greenhouse" x-location="-44.0" y-location="21.0" facing="0.0" />
+		<building type="Large Greenhouse" xloc="-44.0" yloc="21.0" facing="0.0" />
 
-		<building type="Hallway" length="4.0" x-location="0.0" y-location="32.5" facing="0.0" />
-		<building type="Hallway" length="2.0" x-location="-5.5" y-location="38" facing="270.0" />
+		<building type="Hallway" length="4.0" xloc="0.0" yloc="32.5" facing="0.0" />
+		<building type="Hallway" length="2.0" xloc="-5.5" yloc="38" facing="270.0" />
 
-		<building type="Hallway" length="2.0" x-location="-16.5" y-location="38" facing="270.0" />
-		<building type="Hallway" length="2.0" x-location="-27.5" y-location="38" facing="270.0" />
-		<building type="Hallway" length="2.0" x-location="-38.5" y-location="38" facing="270.0" />
-		<building type="Hallway" length="2.0" x-location="-49.5" y-location="38" facing="270.0" />
-		<building type="Hallway" length="4.0" x-location="-44.0" y-location="32.0" facing="0.0" />
+		<building type="Hallway" length="2.0" xloc="-16.5" yloc="38" facing="270.0" />
+		<building type="Hallway" length="2.0" xloc="-27.5" yloc="38" facing="270.0" />
+		<building type="Hallway" length="2.0" xloc="-38.5" yloc="38" facing="270.0" />
+		<building type="Hallway" length="2.0" xloc="-49.5" yloc="38" facing="270.0" />
+		<building type="Hallway" length="4.0" xloc="-44.0" yloc="32.0" facing="0.0" />
 
-<!-- 		<building type="Hallway" length="5.0" x-location="-55.0" y-location="43.5" facing="0.0" /> -->
-		<building type="Hallway" length="4.0" x-location="-55.0" y-location="43.5" facing="0.0" />
+<!-- 		<building type="Hallway" length="5.0" xloc="-55.0" yloc="43.5" facing="0.0" /> -->
+		<building type="Hallway" length="4.0" xloc="-55.0" yloc="43.5" facing="0.0" />
 
-		<building type="Large Sabatier Processor" x-location="0.0" y-location="-55.0" facing="90.0" />
-		<building type="Large Sabatier Processor" x-location="0.0" y-location="-60.0" facing="90.0" />
-		<building type="Large Sabatier Processor" x-location="0.0" y-location="-65.0" facing="90.0" />	
+		<building type="Large Sabatier Processor" xloc="0.0" yloc="-55.0" facing="90.0" />
+		<building type="Large Sabatier Processor" xloc="0.0" yloc="-60.0" facing="90.0" />
+		<building type="Large Sabatier Processor" xloc="0.0" yloc="-65.0" facing="90.0" />	
 			
 		<vehicle type="Explorer Rover" number="2" />
 		<vehicle type="Transport Rover" number="2" />
 		<vehicle type="Light Utility Vehicle" number="1" />
-		<equipment type="EVA Suit" number="48" />
-		<equipment type="Gas Canister" number="260" />
-		<equipment type="Barrel" number="260" />
-		<equipment type="Bag" number="260" />
-		<equipment type="Large Bag" number="260" />
-		<equipment type="Specimen Box" number="260" />
+		<vehicle type="Delivery Drone" number="1" />
+		
+		<equipment type="EVA Suit" number="24" />
+		
+		 <!-- Containers-->
+		<equipment type="barrel" number="80" />
+		<equipment type="bag" number="80" />
+		<equipment type="gas canister" number="80" />		
+		<equipment type="large bag" number="80" />
+		<equipment type="specimen box" number="80" />
+    	<equipment type="thermal bottle" number="12" />	
+ 	    <equipment type="wheelbarrow" number="12" />
 		
 		<person number="12" />
 		

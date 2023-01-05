@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * TableTab.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-07
  * @author Barry Evans
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
@@ -24,7 +24,6 @@ import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
-import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.event.TableModelEvent;
 import javax.swing.table.JTableHeader;
@@ -34,6 +33,7 @@ import javax.swing.table.TableColumnModel;
 
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.NumberCellRenderer;
 import org.mars_sim.msp.ui.swing.tool.RowNumberTable;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
@@ -47,14 +47,14 @@ import com.alee.laf.scroll.WebScrollPane;
 @SuppressWarnings("serial")
 abstract class TableTab extends MonitorTab {
 
-	private JTableHeader header;
-	private TableCellRenderer tableCellRenderer;
+	protected static final NumberCellRenderer DIGIT2_RENDERER = new NumberCellRenderer(2, true);
+	protected static final NumberCellRenderer DIGIT3_RENDERER = new NumberCellRenderer(3, true);
+
 	private TableProperties propsWindow;
 
 	// These icons are used to render the sorting images on the column header
 	private static Icon ascendingIcon = null;
 	private static Icon descendingIcon = null;
-	// private final static Icon TABLEICON = ImageLoader.getIcon("Table");
 
 	/** Table component. */
 	protected JTable table;
@@ -66,17 +66,16 @@ abstract class TableTab extends MonitorTab {
 	private int sortedColumn = 0;
 
 	/**
-	 * Create a table within a tab displaying the specified model.
-	 * 
+	 * Creates a table within a tab displaying the specified model.
+	 *
 	 * @param model           The model of Units to display.
 	 * @param mandatory       Is this table view mandatory.
 	 * @param singleSelection Does this table only allow single selection?
 	 */
-	public TableTab(final MonitorWindow window, MonitorModel model, boolean mandatory, boolean singleSelection,
+	public TableTab(final MonitorWindow window, final MonitorModel model, boolean mandatory, boolean singleSelection,
 			String icon) {
-		super(model, mandatory, ImageLoader.getNewIcon(icon));
-
-
+		super(model, mandatory, true, ImageLoader.getNewIcon(icon));
+	
 		// Can not create icons until UIManager is up and running
 		if (ascendingIcon == null) {
 			Color baseColor = UIManager.getColor("Label.background");
@@ -96,6 +95,7 @@ abstract class TableTab extends MonitorTab {
 				 * Overriding table change so that selections aren't cleared when rows are
 				 * deleted.
 				 */
+				@Override
 				public void tableChanged(TableModelEvent e) {
 
 					if (e.getType() == TableModelEvent.DELETE) {
@@ -119,47 +119,52 @@ abstract class TableTab extends MonitorTab {
 						super.tableChanged(e);
 				}
 
-//                /**
-//                 * Display the cell contents as a tooltip. Useful when cell
-//                 * contents in wider than the cell
-//                 
-//                public String getToolTipText(MouseEvent e) {
-//                	// TODO: create tooltip text for greenhouse crop
-//                    return getCellText(e);
-//                };
+                /**
+                 * Display the cell contents as a tooltip. Useful when cell
+                 * contents in wider than the cell
+				 */
+				@Override
+                public String getToolTipText(MouseEvent e) {
+                	// Future: Figure out how to create a custom tooltip text for showing the greenhouse crop in Crop tab
+                    return getCellText(e);
+                };
 
 			};
 
 			// call it a click to display details button when user double clicks the table
 			table.addMouseListener(new MouseListener() {
-				public void mouseReleased(MouseEvent e) {
-				}
-
-				public void mousePressed(MouseEvent e) {
-				}
-
-				public void mouseExited(MouseEvent e) {
-				}
-
-				public void mouseEntered(MouseEvent e) {
-				}
-
+				@Override
 				public void mouseClicked(MouseEvent e) {
 					if (e.getClickCount() == 2 && !e.isConsumed()) {
 						window.displayDetails();
 					}
 				}
+				@Override
+				public void mousePressed(MouseEvent e) {
+					// nothing	
+				}
+				@Override
+				public void mouseReleased(MouseEvent e) {
+					// nothing	
+				}
+				@Override
+				public void mouseEntered(MouseEvent e) {
+					// nothing				
+				}
+				@Override
+				public void mouseExited(MouseEvent e) {
+					// nothing			
+				}
 			});
 
 			sortedModel.addTableModelListener(table);
-
+		
 			// Add a mouse listener for the mouse event selecting the sorted column
 			// Not the best way but no double click is provided on Header class
-			// Get the TableColumn header to display sorted column	
-			header = (JTableHeader) table.getTableHeader();
-			// theRenderer = new TableHeaderRenderer(header.getDefaultRenderer());
-			// header.setDefaultRenderer(theRenderer);
+			// Get the TableColumn header to display sorted column
+			JTableHeader header = (JTableHeader) table.getTableHeader();
 			header.addMouseListener(new MouseAdapter() {
+				@Override
 				public void mouseClicked(MouseEvent e) {
 					// Find the column at this point
 					int column = header.columnAtPoint(e.getPoint());
@@ -175,8 +180,8 @@ abstract class TableTab extends MonitorTab {
 				 * Overriding table change so that selections aren't cleared when rows are
 				 * deleted.
 				 */
+				@Override
 				public void tableChanged(TableModelEvent e) {
-					// System.out.println("table is " + table.getName());
 
 					if (e.getType() == TableModelEvent.DELETE) {
 						// Store selected row objects.
@@ -191,7 +196,7 @@ abstract class TableTab extends MonitorTab {
 						while (i.hasNext()) {
 							Object selectedObject = i.next();
 							for (int x = 0; x < model.getRowCount(); x++) {
-								if (selectedObject == model.getObject(x))
+								if (selectedObject.equals(model.getObject(x)))
 									addRowSelectionInterval(x, x);
 							}
 						}
@@ -200,18 +205,15 @@ abstract class TableTab extends MonitorTab {
 				}
 
 				/**
-				 * Display the cell contents as a tooltip. Useful when cell contents in wider
+				 * Displays the cell contents as a tooltip. Useful when cell contents in wider
 				 * than the cell
 				 */
+				@Override
 				public String getToolTipText(MouseEvent e) {
 					return getCellText(e);
 				};
 			};
-
 		}
-
-		// Apply sorting for multiple columns
-//		table.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
 
 		// Enable use of RowFilter with Swingbits
 		// see https://github.com/eugener/oxbow/wiki/Table-Filtering
@@ -223,7 +225,7 @@ abstract class TableTab extends MonitorTab {
 
 		// Added RowNumberTable
 		JTable rowTable = new RowNumberTable(table);
-		
+
 		TableStyle.setTableStyle(rowTable);
 		// Add a scrolled window and center it with the table
 		JScrollPane scroller = new JScrollPane(table, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
@@ -233,27 +235,33 @@ abstract class TableTab extends MonitorTab {
 		scroller.setCorner(WebScrollPane.UPPER_LEFT_CORNER, rowTable.getTableHeader());
 
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-
+		
+		// setAutoCreateRowSorter() and MultisortTableHeaderCellRenderer would cause no tab to be created
+//		table.setAutoCreateRowSorter(true);
+		// Apply sorting for multiple columns
+//		table.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
+		
 		TableStyle.setTableStyle(table);
-		
+
 		add(scroller, BorderLayout.CENTER);
-		
+
 		setName(model.getName());
 		setSortColumn(0);
 
-		// Add ColumnResizer
-		SwingUtilities.invokeLater(() -> {
-			 adjustColumnWidth(table);
-		});
-		
+		if (table != null) {
+			// Use column resizer
+			// Note: may need to use SwingUtilities.invokeLater(() -> adjustColumnWidth(table))
+			adjustColumnWidth(table);
+			// Update the selected row after each sorting
+			table.setUpdateSelectionOnSort(true);
+		}
 	}
 
 	public JTable getTable() {
-		// System.out.println("table is "+ table);
 		return table;
 	}
 
-	public void adjustColumnWidth(JTable table) {
+	public static void adjustColumnWidth(JTable table) {
 		// Gets max width for cells in column as the preferred width
 		TableColumnModel columnModel = table.getColumnModel();
 		for (int col = 0; col < table.getColumnCount(); col++) {
@@ -266,16 +274,12 @@ abstract class TableTab extends MonitorTab {
 		    Component header = rendCol.getTableCellRendererComponent(table, tableColumn.getHeaderValue(), false, false, 0, col);
 		    int maxWidth = header.getPreferredSize().width + 15;
 		    w = Math.max(w, maxWidth);
-//		    System.out.println("maxWidth :"+maxWidth);
-		    
+
 			for (int row = 0; row < table.getRowCount(); row++) {
-				if (tableCellRenderer == null)
-					tableCellRenderer = table.getCellRenderer(row, col);
+				TableCellRenderer tableCellRenderer = table.getCellRenderer(row, col);
 				Component c = table.prepareRenderer(tableCellRenderer, row, col);
 				int width = c.getPreferredSize().width + table.getIntercellSpacing().width + 15;
 				preferredWidth = Math.max(width, preferredWidth);
-//		        System.out.println("preferredWidth :"+preferredWidth);
-//		        System.out.println("Width :"+width);
 
 		        if (preferredWidth <= maxWidth){
 			        // Exceeded the maximum width, no need to check other rows
@@ -283,7 +287,7 @@ abstract class TableTab extends MonitorTab {
 		            break;
 		        }
 			}
-			
+
 			preferredWidth = Math.max(w, preferredWidth);
 			tableColumn.setPreferredWidth(preferredWidth);
 		}
@@ -337,7 +341,7 @@ abstract class TableTab extends MonitorTab {
 		int indexes[] = {};
 		if (table != null)
 			indexes = table.getSelectedRows();
-		ArrayList<Object> selectedRows = new ArrayList<Object>();
+		List<Object> selectedRows = new ArrayList<>();
 		for (int indexe : indexes) {
 			Object selected = target.getObject(indexe);
 			if (selected != null)
@@ -348,9 +352,9 @@ abstract class TableTab extends MonitorTab {
 	}
 
 	/**
-	 * Get the cell contents under the MouseEvent, this will be displayed as a
+	 * Gets the cell contents under the MouseEvent, this will be displayed as a
 	 * tooltip.
-	 * 
+	 *
 	 * @param e MouseEvent triggering tool tip.
 	 * @return Tooltip text.
 	 */
@@ -362,15 +366,12 @@ abstract class TableTab extends MonitorTab {
 		if ((column >= 0) && (row >= 0)) {
 			Object cell = table.getValueAt(row, column);
 			if (cell != null) {
-				// TODO: below is NOT working
-//            	MonitorModel target = (sortedModel != null ? sortedModel : getModel());
-//                if (target instanceof CropTableModel) {
-//                	System.out.println("It's CropTableModel");
-//                	CropTableModel model = (CropTableModel) (table.getModel());
-//                	result = model.getToolTip(row, column);
-//                }
-//                
-//                else               	
+				if (cell instanceof Integer) {
+					return ((Integer) cell).intValue()  + "" ;
+				}
+				else if (cell instanceof Double) {
+					return Math.round(((Double) cell).doubleValue() * 10_000.0)/10_000.0 + "" ;
+				}
 				result = cell.toString();
 			}
 		}
@@ -378,7 +379,7 @@ abstract class TableTab extends MonitorTab {
 	}
 
 	/**
-	 * Remove this view.
+	 * Removes this tab.
 	 */
 	public void removeTab() {
 		super.removeTab();
@@ -389,6 +390,11 @@ abstract class TableTab extends MonitorTab {
 		}
 	}
 
+	/**
+	 * Sets this column.
+	 * 
+	 * @param index
+	 */
 	private void setSortColumn(int index) {
 		if (sortedModel != null) {
 			if (sortedColumn == index) {
@@ -400,13 +406,9 @@ abstract class TableTab extends MonitorTab {
 	}
 
 	public void destroy() {
-		// super.destroy();
-		header = null;
-		tableCellRenderer = null;
 		propsWindow = null;
-
 	}
-	
+
 	/**
 	 * This internal class provides a fixed image icon that is drawn using a
 	 * Graphics object. It represents an arrow Icon that can be other ascending or
@@ -494,5 +496,5 @@ abstract class TableTab extends MonitorTab {
 			return theResult;
 		}
 	}
-	
+
 }

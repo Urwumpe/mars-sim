@@ -1,12 +1,11 @@
-/**
+/*
  * Mars Simulation Project
  * SelfTreatMedicalProblemMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-05
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -15,35 +14,32 @@ import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.task.SelfTreatHealthProblem;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.Treatment;
-import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.MedicalCare;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.SickBay;
+import org.mars_sim.msp.core.vehicle.VehicleType;
 
 /**
  * Meta task for the SelfTreatHealthProblem task.
  */
-public class SelfTreatHealthProblemMeta implements MetaTask, Serializable {
+public class SelfTreatHealthProblemMeta extends FactoryMetaTask {
 
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
+	private static final double VALUE = 1000.0;
 
-	private static final int VALUE = 1000;
-	
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.selfTreatHealthProblem"); //$NON-NLS-1$
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
+    public SelfTreatHealthProblemMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.ANY_HOUR);
+	}
+
 
     @Override
     public Task constructInstance(Person person) {
@@ -58,29 +54,28 @@ public class SelfTreatHealthProblemMeta implements MetaTask, Serializable {
         if (person.isInside()) {
 	        // Check if person has health problems that can be self-treated.
         	int size = getSelfTreatableHealthProblems(person).size();
-        	
+
 	        boolean hasSelfTreatableProblems = (size > 0);
-	
+
 	        // Check if person has available medical aids.
 	        boolean hasAvailableMedicalAids = hasAvailableMedicalAids(person);
-	
-	
+
 	        if (hasSelfTreatableProblems && hasAvailableMedicalAids) {
 	            result = VALUE * size;
 	        }
-	
+
 	        double pref = person.getPreference().getPreferenceScore(this);
-	        
+
 	        if (pref > 0)
 	        	result = result * 3D;
-        	
+
 	        // Effort-driven task modifier.
 	        result *= person.getPerformanceRating();
-	
+
 	        if (result < 0) result = 0;
 
         }
-        
+
         return result;
     }
 
@@ -91,7 +86,7 @@ public class SelfTreatHealthProblemMeta implements MetaTask, Serializable {
      */
     private List<HealthProblem> getSelfTreatableHealthProblems(Person person) {
 
-        List<HealthProblem> result = new ArrayList<HealthProblem>();
+        List<HealthProblem> result = new ArrayList<>();
 
         Iterator<HealthProblem> i = person.getPhysicalCondition().getProblems().iterator();
         while (i.hasNext()) {
@@ -184,7 +179,7 @@ public class SelfTreatHealthProblemMeta implements MetaTask, Serializable {
 
         boolean result = false;
 
-        if (person.getVehicle() instanceof Rover) {
+        if (VehicleType.isRover(person.getVehicle().getVehicleType())) {
             Rover rover = (Rover) person.getVehicle();
             if (rover.hasSickBay()) {
                 SickBay sickBay = rover.getSickBay();
@@ -214,16 +209,4 @@ public class SelfTreatHealthProblemMeta implements MetaTask, Serializable {
 
         return result;
     }
-
-	@Override
-	public Task constructInstance(Robot robot) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 }

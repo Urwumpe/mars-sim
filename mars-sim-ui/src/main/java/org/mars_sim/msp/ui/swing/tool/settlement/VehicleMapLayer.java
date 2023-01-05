@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * VehicleMapLayer.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.settlement;
@@ -20,15 +20,13 @@ import org.apache.batik.gvt.GraphicsNode;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionPhase;
-import org.mars_sim.msp.core.person.ai.mission.RoverMission;
-import org.mars_sim.msp.core.person.ai.mission.Trade;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
 import org.mars_sim.msp.core.person.ai.task.LoadVehicleEVA;
 import org.mars_sim.msp.core.person.ai.task.LoadVehicleGarage;
+import org.mars_sim.msp.core.person.ai.task.LoadingController;
 import org.mars_sim.msp.core.person.ai.task.UnloadVehicleEVA;
 import org.mars_sim.msp.core.person.ai.task.UnloadVehicleGarage;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
 import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -158,14 +156,11 @@ public class VehicleMapLayer implements SettlementMapLayer {
 	 * @return true if vehicle is being repaired or maintained.
 	 */
 	private boolean isVehicleRepairOrMaintenance(Vehicle vehicle) {
-		boolean result = false;
+		boolean result = vehicle.isReservedForMaintenance();
 
 		// Check if vehicle is reserved for maintenance.
-		if (vehicle.isReservedForMaintenance()) {
-			result = true;
-		}
 
-		// Check if vehicle has malfunction.
+        // Check if vehicle has malfunction.
 		if (vehicle.getMalfunctionManager().hasMalfunction()) {
 			result = true;;
 		}
@@ -200,14 +195,8 @@ public class VehicleMapLayer implements SettlementMapLayer {
 		Mission mission = missionManager.getMissionForVehicle(vehicle);
 		if ((mission != null) && (mission instanceof VehicleMission)) {
 			VehicleMission vehicleMission = (VehicleMission) mission;
-			MissionPhase missionPhase = vehicleMission.getPhase();
-			if ((RoverMission.EMBARKING.equals(missionPhase) || Trade.LOAD_GOODS.equals(missionPhase)) && 
-					!mission.getPhaseEnded()) {
-				result = true;
-			}
-			else if (RoverMission.DISEMBARKING.equals(missionPhase) || Trade.UNLOAD_GOODS.equals(missionPhase)) {
-				result = true;
-			}
+			LoadingController lp = vehicleMission.getLoadingPlan();
+			result = (lp != null) && !lp.isCompleted();
 		}
 
 		// Otherwise, check if someone is actively loading or unloading the vehicle at a settlement.
@@ -367,7 +356,7 @@ public class VehicleMapLayer implements SettlementMapLayer {
 		Iterator<Part> i = vehicle.getPossibleAttachmentParts().iterator();
 		while (i.hasNext()) {
 			Part part = i.next();
-			if (vehicle.getInventory().getItemResourceNum(part) > 0) {
+			if (vehicle.getItemResourceStored(part.getID()) > 0) {
 				// Use SVG image for part if available.
 				GraphicsNode partSvg = SVGMapUtil.getAttachmentPartSVG(part.getName().toLowerCase());
 				GraphicsNode vehicleSvg = SVGMapUtil.getVehicleSVG(vehicle.getDescription().toLowerCase());

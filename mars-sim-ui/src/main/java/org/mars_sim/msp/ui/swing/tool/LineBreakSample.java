@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * LineBreakSample.java
- * @version 3.1.2 2020-11-01
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -15,7 +15,6 @@ import java.awt.event.WindowEvent;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.swing.BorderFactory;
 import javax.swing.JFrame;
 
 public class LineBreakSample {//extends JApplet {

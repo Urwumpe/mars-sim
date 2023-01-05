@@ -1,31 +1,25 @@
 /**
  * Mars Simulation Project
  * RelaxMeta.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.task.Relax;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.structure.building.Building;
 
 /**
  * Meta task for the Relax task.
  */
-public class RelaxMeta implements MetaTask, Serializable {
-
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
+public class RelaxMeta extends FactoryMetaTask{
 
     /** Task name */
     private static final String NAME = Msg.getString(
@@ -35,13 +29,13 @@ public class RelaxMeta implements MetaTask, Serializable {
     private static final double WORK_SHIFT_MODIFIER = .25D;
 
     /** default logger. */
-    private static Logger logger = Logger.getLogger(RelaxMeta.class.getName());
+    private static final Logger logger = Logger.getLogger(RelaxMeta.class.getName());
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
-
+    public RelaxMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.ANY_HOUR);
+		setTrait(TaskTrait.RELAXATION);
+	}
+   
     @Override
     public Task constructInstance(Person person) {
     	return new Relax(person);
@@ -54,39 +48,18 @@ public class RelaxMeta implements MetaTask, Serializable {
         // Crowding modifier
         if (person.isInside()) {
 
-        	result = 0.1D;
-        	
-            // Probability affected by the person's stress and fatigue.
-            PhysicalCondition condition = person.getPhysicalCondition();
-            double fatigue = condition.getFatigue();
-            double stress = condition.getStress();
-            double hunger = condition.getHunger();
-              
-            if (fatigue > 1000 || stress > 75 || hunger > 667)
-            	return 0;
-            else
-            	result += fatigue / 2000 + stress / 200 + hunger / 2000;
-            
+        	result = 0.5D;
+        	         
             double pref = person.getPreference().getPreferenceScore(this);
             
           	result = result + result * pref/6D;
             if (result < 0) result = 0;
             
-            try {
-                Building recBuilding = Relax.getAvailableRecreationBuilding(person);
-                if (recBuilding != null) {
-                    result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(person, recBuilding);
-                    result *= TaskProbabilityUtil.getRelationshipModifier(person, recBuilding);
-                }
-            }
-            catch (Exception e) {
-                logger.log(Level.SEVERE, e.getMessage());
-            }
-            
+            Building recBuilding = Relax.getAvailableRecreationBuilding(person);
+            result *= getBuildingModifier(recBuilding, person);
 
             // Modify probability if during person's work shift.
-            int millisols = marsClock.getMillisolInt();
-            boolean isShiftHour = person.getTaskSchedule().isShiftHour(millisols);
+            boolean isShiftHour = person.isOnDuty();
             if (isShiftHour) {
                 result*= WORK_SHIFT_MODIFIER;
             }
@@ -95,18 +68,5 @@ public class RelaxMeta implements MetaTask, Serializable {
         }
 
         return result;
-    }
-
-	@Override
-	public Task constructInstance(Robot robot) {
-    	return null;
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-        return 0;
-	}
-	
-    public void destroy() {
     }
 }

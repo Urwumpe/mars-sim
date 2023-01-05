@@ -1,30 +1,29 @@
 /**
  * Mars Simulation Project
  * ConstructionSite.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-15
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.core.structure.construction;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import org.mars_sim.msp.core.BoundedObject;
 import org.mars_sim.msp.core.LocalBoundedObject;
+import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.UnitManager;
-import org.mars_sim.msp.core.person.ai.mission.MissionMember;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.Structure;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.vehicle.GroundVehicle;
 
 /**
@@ -32,7 +31,7 @@ import org.mars_sim.msp.core.vehicle.GroundVehicle;
  */
 public class ConstructionSite
 extends Structure
-implements Serializable, LocalBoundedObject {
+implements  LocalBoundedObject {
 
     /** default serial id. */
     private static final long serialVersionUID = 1L;
@@ -46,31 +45,26 @@ implements Serializable, LocalBoundedObject {
     public static final String REMOVE_CONSTRUCTION_STAGE_EVENT = "removing construction stage";
     public static final String CREATE_BUILDING_EVENT = "creating new building";
     public static final String REMOVE_BUILDING_EVENT = "removing old building";
-	
-    /** The unit count for this settlement. */
-	private static int uniqueCount = Unit.FIRST_SITE_UNIT_ID;
 
     // Data members
-	/** Unique identifier for this site. */
-	private int identifier;
+
 	/** construction skill for this site. */
     private int constructionSkill;
 
     private double width;
     private double length;
-    private double xLocation;
-    private double yLocation;
+    private LocalPosition position;
     private double facing;
 
     private boolean undergoingConstruction;
     private boolean undergoingSalvage;
     private boolean manual, isSitePicked;
-    
+
     private boolean isMousePickedUp;
 
     private transient List<ConstructionListener> listeners;
 
-    private Collection<MissionMember> members;
+    private Collection<Worker> members;
     private List<GroundVehicle> vehicles;
 
     private ConstructionStage foundationStage;
@@ -80,55 +74,25 @@ implements Serializable, LocalBoundedObject {
     private Settlement settlement;
     private ConstructionStageInfo stageInfo;
 
-	private static UnitManager unitManager = Simulation.instance().getUnitManager();
-
-	/**
-	 * Must be synchronised to prevent duplicate ids being assigned via different
-	 * threads.
-	 * 
-	 * @return
-	 */
-	private static synchronized int getNextIdentifier() {
-		return uniqueCount++;
-	}
-	
-	/**
-	 * Get the unique identifier for this settlement
-	 * 
-	 * @return Identifier
-	 */
-	public int getIdentifier() {
-		return identifier;
-	}
-	
-	public void incrementID() {
-		// Gets the identifier
-		this.identifier = getNextIdentifier();
-	}
-	
     /**
      * Constructor
      */
-    public ConstructionSite(Settlement settlement) {// , ConstructionManager constructionManager) {
-    	super("A construction site", settlement.getCoordinates());
+    public ConstructionSite(Settlement settlement) {
+    	super("A Construction Site", settlement.getCoordinates());
 
     	this.constructionManager = settlement.getConstructionManager();
     	this.settlement = settlement;
 
-    	// Add this site to the lookup map
-    	unitManager.addSiteID(this);
-    	
     	width = 0D;
         length = 0D;
-        xLocation = 0D;
-        yLocation = 0D;
+        position = LocalPosition.DEFAULT_POSITION;
         facing = 0D;
         foundationStage = null;
         frameStage = null;
         buildingStage = null;
         undergoingConstruction = false;
         undergoingSalvage = false;
-        listeners = Collections.synchronizedList(new ArrayList<ConstructionListener>());
+        listeners = Collections.synchronizedList(new ArrayList<>());
     }
 
     @Override
@@ -158,31 +122,14 @@ implements Serializable, LocalBoundedObject {
     }
 
     @Override
-    public double getXLocation() {
-        return xLocation;
+    public LocalPosition getPosition() {
+    	return position;
     }
-
-    /**
-     * Sets the X location of the construction site.
-     * @param xLocation x location in meters from center of settlement (West: positive, East: negative).
-     */
-    public void setXLocation(double xLocation) {
-        this.xLocation = xLocation;
-    }
-
-    @Override
-    public double getYLocation() {
-        return yLocation;
-    }
-
-    /**
-     * Sets the Y location of the construction site.
-     * @param yLocation y location in meters from center of settlement (North: positive, South: negative).
-     */
-    public void setYLocation(double yLocation) {
-        this.yLocation = yLocation;
-    }
-
+    
+	public void setPosition(LocalPosition position2) {
+		this.position = position2;
+	}
+	
     @Override
     public double getFacing() {
         return facing;
@@ -383,6 +330,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Creates a new building from the construction site.
+     * 
      * @param manager the settlement's building manager.
      * @return newly constructed building.
      * @throws Exception if error constructing building.
@@ -395,14 +343,18 @@ implements Serializable, LocalBoundedObject {
         int id = manager.getNextTemplateID();
         String buildingType = buildingStage.getInfo().getName();
         String uniqueName = manager.getBuildingNickName(buildingType);
-
-        Building newBuilding = new Building(id, buildingType, uniqueName, width, length,
-                xLocation, yLocation, facing, settlement.getBuildingManager());
+        
+        int zone = 0;
+        
+        Building newBuilding = new Building(id, zone, buildingType, uniqueName,
+        		new BoundedObject(position, width, length, facing),
+                settlement.getBuildingManager());
+        
         manager.addBuilding(newBuilding, true);
 
         // Record completed building name.
         constructionManager = settlement.getConstructionManager();
-        MarsClock timeStamp = (MarsClock) Simulation.instance().getMasterClock().getMarsClock().clone();
+        MarsClock timeStamp = new MarsClock(Simulation.instance().getMasterClock().getMarsClock());
         constructionManager.addConstructedBuildingLogEntry(buildingStage.getInfo().getName(), timeStamp);
 
         // Clear construction value cache.
@@ -454,7 +406,7 @@ implements Serializable, LocalBoundedObject {
      */
     public final void addConstructionListener(ConstructionListener newListener) {
         if (listeners == null)
-            listeners = Collections.synchronizedList(new ArrayList<ConstructionListener>());
+            listeners = Collections.synchronizedList(new ArrayList<>());
         if (!listeners.contains(newListener)) listeners.add(newListener);
     }
 
@@ -464,7 +416,7 @@ implements Serializable, LocalBoundedObject {
      */
     public final void removeConstructionListener(ConstructionListener oldListener) {
         if (listeners == null)
-            listeners = Collections.synchronizedList(new ArrayList<ConstructionListener>());
+            listeners = Collections.synchronizedList(new ArrayList<>());
         if (listeners.contains(oldListener)) listeners.remove(oldListener);
     }
 
@@ -483,7 +435,7 @@ implements Serializable, LocalBoundedObject {
      */
     final void fireConstructionUpdate(String updateType, Object target) {
         if (listeners == null)
-            listeners = Collections.synchronizedList(new ArrayList<ConstructionListener>());
+            listeners = Collections.synchronizedList(new ArrayList<>());
         synchronized(listeners) {
             Iterator<ConstructionListener> i = listeners.iterator();
             while (i.hasNext()) i.next().constructionUpdate(
@@ -491,28 +443,28 @@ implements Serializable, LocalBoundedObject {
         }
     }
 
-    @Override
-    public String toString() {
-        StringBuilder result = new StringBuilder("Site");
-
-        ConstructionStage stage = getCurrentConstructionStage();
-        if (stage != null) {
-            result.append(": ").append(stage.getInfo().getName());
-            if (undergoingConstruction) result.append(" - Under Construction");
-            else if (undergoingSalvage) result.append(" - Under Salvage");
-            else if (hasUnfinishedStage()) {
-                if (stage.isSalvaging()) result.append(" - Salvage Unfinished");
-                else result.append(" - Construction Unfinished");
-            }
-        }
-
-        return result.toString();
-    }
+	public void relocate() {
+		BuildingConstructionMission.positionNewSite(this);
+	}
 
     public ConstructionManager getConstructionManager() {
     	return constructionManager;
     }
 
+	/**
+	 * Gets the associated settlement this unit is with
+	 *
+	 * @return the associated settlement
+	 */
+	public Settlement getAssociatedSettlement() {
+		return settlement;
+	}
+
+	/**
+	 * Gets the settlement this unit is with
+	 *
+	 * @return the settlement
+	 */
     public Settlement getSettlement() {
     	return settlement;
     }
@@ -525,7 +477,7 @@ implements Serializable, LocalBoundedObject {
     	return constructionSkill;
     }
 
-	public void setMembers(Collection<MissionMember> members) {
+	public void setMembers(Collection<Worker> members) {
 		this.members = members;
 	}
 
@@ -533,7 +485,7 @@ implements Serializable, LocalBoundedObject {
 		this.vehicles = vehicles;
 	}
 
-	public Collection<MissionMember> getMembers() {
+	public Collection<Worker> getMembers() {
 		return members;
 	}
 
@@ -574,21 +526,36 @@ implements Serializable, LocalBoundedObject {
 		isMousePickedUp = value;
 	}
 
-	/**
-	 * Reloads instances after loading from a saved sim
-	 * 
-	 * @param {@link MasterClock}
-	 * @param {{@link MarsClock}
-	 */
-	public static void justReloaded(UnitManager u) {
-		unitManager = u;
+	@Override
+	public UnitType getUnitType() {
+		return UnitType.CONSTRUCTION;
 	}
-	
+
 	/**
-	 * Reset uniqueCount to the current number of building
+	 * Is this unit inside a settlement
+	 *
+	 * @return true if the unit is inside a settlement
 	 */
-	public static void reinitializeIdentifierCount() {
-		uniqueCount = unitManager.getSitesNum() + Unit.FIRST_SITE_UNIT_ID;
-	} 
-	
+	@Override
+	public boolean isInSettlement() {
+		return false;
+	}
+
+	@Override
+    public String toString() {
+		StringBuilder result = new StringBuilder("Site");
+
+		ConstructionStage stage = getCurrentConstructionStage();
+		if (stage != null) {
+			result.append(": ").append(stage.getInfo().getName());
+			if (undergoingConstruction) result.append(" - Under Construction");
+			else if (undergoingSalvage) result.append(" - Under Salvage");
+			else if (hasUnfinishedStage()) {
+				if (stage.isSalvaging()) result.append(" - Salvage Unfinished");
+				else result.append(" - Construction Unfinished");
+			}
+		}
+
+		return result.toString();
+	}
 }

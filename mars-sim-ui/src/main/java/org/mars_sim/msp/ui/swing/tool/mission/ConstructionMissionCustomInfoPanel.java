@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ConstructionMissionCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -24,6 +24,8 @@ import javax.swing.BoundedRangeModel;
 import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.goods.Good;
+import org.mars_sim.msp.core.goods.GoodsUtil;
 import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
@@ -36,8 +38,6 @@ import org.mars_sim.msp.core.structure.construction.ConstructionSite;
 import org.mars_sim.msp.core.structure.construction.ConstructionStage;
 import org.mars_sim.msp.core.structure.construction.ConstructionStageInfo;
 import org.mars_sim.msp.core.structure.construction.ConstructionVehicleType;
-import org.mars_sim.msp.core.structure.goods.Good;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 
 import com.alee.laf.button.WebButton;
@@ -50,8 +50,9 @@ import com.alee.laf.table.WebTable;
 /**
  * A panel for displaying construction custom mission information.
  */
+@SuppressWarnings("serial")
 public class ConstructionMissionCustomInfoPanel
-extends MissionCustomInfoPanel 
+extends MissionCustomInfoPanel
 implements ConstructionListener {
 
     // Data members.
@@ -122,7 +123,7 @@ implements ConstructionListener {
 
         WebPanel lowerContentsPanel = new WebPanel(new BorderLayout(0, 0));
         add(lowerContentsPanel, BorderLayout.CENTER);
-        
+
         // Create remaining construction materials label panel.
         WebPanel remainingMaterialsLabelPane = new WebPanel(new FlowLayout(FlowLayout.LEFT));
         lowerContentsPanel.add(remainingMaterialsLabelPane, BorderLayout.NORTH);
@@ -283,13 +284,13 @@ implements ConstructionListener {
                 	Integer part = j.next();
                     int number = stage.getRemainingParts().get(part);
                     result.append(Msg.NBSP).append(Msg.NBSP)
-                    .append(ResourceUtil.findAmountResource(part).getName()).append(": ").append(number).append(Msg.BR);
+                    .append(ItemResourceUtil.findItemResourceName(part)).append(": ").append(number).append(Msg.BR);
                 }
             }
 
             // Add construction vehicles.
             if (info.getVehicles().size() > 0) {
-                result.append(Msg.BR).append("Construction Vehicles:").append(Msg.BR);
+                result.append(Msg.BR).append("Construction Vehicles").append(Msg.BR);
                 Iterator<ConstructionVehicleType> k = info.getVehicles().iterator();
                 while (k.hasNext()) {
                     ConstructionVehicleType vehicle = k.next();
@@ -298,7 +299,7 @@ implements ConstructionListener {
                     Iterator<Integer> l = vehicle.getAttachmentParts().iterator();
                     while (l.hasNext()) {
                         result.append(Msg.NBSP).append(Msg.NBSP).append(Msg.NBSP).append(Msg.NBSP)
-                        .append(ResourceUtil.findAmountResource(l.next()).getName()).append(Msg.BR);
+                        .append("-").append(ItemResourceUtil.findItemResourceName(l.next())).append(Msg.BR);
                     }
                 }
             }
@@ -373,7 +374,7 @@ implements ConstructionListener {
             Object result = Msg.getString("unknown"); //$NON-NLS-1$
 
             if (row < goodsList.size()) {
-                Good good = goodsList.get(row); 
+                Good good = goodsList.get(row);
                 if (column == 0) {
                     result = good.getName();
                 }
@@ -401,7 +402,7 @@ implements ConstructionListener {
                 while (i.hasNext()) {
                 	Integer resource = i.next();
                     double amount = stage.getRemainingResources().get(resource);
-                    Good good = GoodsUtil.getResourceGood(ResourceUtil.findAmountResource(resource));
+                    Good good = GoodsUtil.getGood(resource);
                     goodsMap.put(good, (int) amount);
                 }
 
@@ -410,7 +411,7 @@ implements ConstructionListener {
                 while (j.hasNext()) {
                 	Integer part = j.next();
                     int num = stage.getRemainingParts().get(part);
-                    Good good = GoodsUtil.getResourceGood(ItemResourceUtil.findItemResource(part));
+                    Good good = GoodsUtil.getGood(part);
                     goodsMap.put(good, num);
                 }
             }

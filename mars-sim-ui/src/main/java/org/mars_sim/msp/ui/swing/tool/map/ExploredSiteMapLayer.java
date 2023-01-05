@@ -1,21 +1,20 @@
-/**
+/*
  * Mars Simulation Project
  * ExploredSiteMapLayer.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-31
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.map;
 
 import java.awt.Component;
 import java.awt.Graphics;
+
 import javax.swing.Icon;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.IntPoint;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.ExploredLocation;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
+import org.mars_sim.msp.core.environment.ExploredLocation;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 
 public class ExploredSiteMapLayer implements MapLayer {
@@ -34,9 +33,7 @@ public class ExploredSiteMapLayer implements MapLayer {
 	private boolean displayReserved;
 	private ExploredLocation selectedSite;
 
-	private double angle = CannedMarsMap.HALF_MAP_ANGLE;
-
-	private SurfaceFeatures surfaceFeatures = Simulation.instance().getMars().getSurfaceFeatures();
+	private double angle = Map.HALF_MAP_ANGLE;
 
 	/**
 	 * Constructor.
@@ -90,13 +87,9 @@ public class ExploredSiteMapLayer implements MapLayer {
 	 * @param g         graphics context of the map display.
 	 */
 	public void displayLayer(Coordinates mapCenter, String mapType, Graphics g) {
-		// SurfaceFeatures surfaceFeatures =
-		// Simulation.instance().getMars().getSurfaceFeatures();
 		for (ExploredLocation site : surfaceFeatures.getExploredLocations()) {
-			boolean displaySite = true;
-			if (site.isReserved() && !displayReserved)
-				displaySite = false;
-			if (site.isMined() && !displayMined)
+			boolean displaySite = !site.isReserved() || displayReserved;
+            if (site.isMined() && !displayMined)
 				displaySite = false;
 			if (!site.isExplored())
 				displaySite = false;

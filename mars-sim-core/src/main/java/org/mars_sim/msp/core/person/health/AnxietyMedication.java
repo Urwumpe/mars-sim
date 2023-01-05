@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * AnxietyMedication.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.health;
@@ -10,12 +10,11 @@ import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.time.ClockPulse;
 
-import java.io.Serializable;
 
 /**
  * A medication that reduces stress.
  */
-public class AnxietyMedication extends Medication implements Serializable {
+public class AnxietyMedication extends Medication {
 
 	private static final long serialVersionUID = 1L;
 
@@ -46,7 +45,7 @@ public class AnxietyMedication extends Medication implements Serializable {
         super.timePassing(pulse);
         
         // Reduce person's stress.
-        condition.setStress(condition.getStress() + (STRESS_REDUCTION * pulse.getElapsed()));
+        condition.reduceStress(STRESS_REDUCTION * pulse.getElapsed());
         
         return true;
     }

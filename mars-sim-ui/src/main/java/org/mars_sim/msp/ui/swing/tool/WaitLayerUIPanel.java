@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * WaitLayerUIPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -29,7 +29,10 @@ public class WaitLayerUIPanel extends LayerUI<JPanel> implements ActionListener 
 
 	private boolean mIsRunning;
 	private boolean mIsFadingOut;
+	private boolean done;
+
 	private Timer mTimer;
+
 	private int mAngle;
 	private int mFadeCount;
 	private int mFadeLimit = 5;//15;
@@ -57,7 +60,7 @@ public class WaitLayerUIPanel extends LayerUI<JPanel> implements ActionListener 
 		int cx = w / 2;
 		int cy = h / 2;
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g2.setStroke(new BasicStroke(s / 4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+		g2.setStroke(new BasicStroke(s / 4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 		g2.setPaint(Color.white);
 		g2.rotate(Math.PI * mAngle / 180, cx, cy);
 		for (int i = 0; i < 12; i++) {
@@ -91,6 +94,12 @@ public class WaitLayerUIPanel extends LayerUI<JPanel> implements ActionListener 
 				mFadeCount++;
 			}
 		}
+
+		done = true;
+	}
+
+	public boolean isRunning() {
+		return mIsRunning;
 	}
 
 	public void start() {
@@ -107,11 +116,23 @@ public class WaitLayerUIPanel extends LayerUI<JPanel> implements ActionListener 
 	}
 
 	public void stop() {
-		mIsFadingOut = true;
+		while (true) {
+			try {
+				Thread.sleep(500L);
+			} catch (InterruptedException e) {
+			    // Restore interrupted state
+			    Thread.currentThread().interrupt();
+			}
+			if (done) {
+				// wait until done become true before setting mIsFadingOut to true
+				mIsFadingOut = true;
+				break;
+			}
+		}
 	}
 
 	@Override
-	public void applyPropertyChange(PropertyChangeEvent pce, JLayer l) {
+	public void applyPropertyChange(PropertyChangeEvent pce, @SuppressWarnings("rawtypes") JLayer l) {
 		if ("tick".equals(pce.getPropertyName())) {
 			l.repaint();
 		}

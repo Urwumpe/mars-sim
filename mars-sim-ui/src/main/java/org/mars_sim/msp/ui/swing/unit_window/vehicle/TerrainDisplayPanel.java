@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TerrainDisplayPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
@@ -15,13 +15,12 @@ import java.awt.Polygon;
 import javax.swing.JPanel;
 import javax.swing.border.LineBorder;
 
-import org.mars_sim.msp.core.vehicle.GroundVehicle;
 import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * The TerrainDisplayPanel class displays the compass direction a vehicle is
- * currently travelling.
+ * currently traveling.
  */
 @SuppressWarnings("serial")
 public class TerrainDisplayPanel extends JPanel {
@@ -31,14 +30,14 @@ public class TerrainDisplayPanel extends JPanel {
 	private boolean uiDone = false;
 	
 	/** The Vehicle instance. */
-	private GroundVehicle vehicle;
+	private Vehicle vehicle;
 	
 	/**
 	 * Constructor
 	 *
 	 * @param vehicle the vehicle to track
 	 */
-	public TerrainDisplayPanel(GroundVehicle vehicle) {
+	public TerrainDisplayPanel(Vehicle vehicle) {
 		// Use WebPanel constructor
 		super();
 
@@ -56,9 +55,10 @@ public class TerrainDisplayPanel extends JPanel {
 			
 		// Set preferred component size.
 		setPreferredSize(new Dimension(102, 52));
-
+		setMinimumSize(new Dimension(102, 52));
+		
 		// Add border
-		setBorder(new LineBorder(Color.green));
+		setBorder(new LineBorder(Color.orange.darker()));
 
 		// Set panel to be opaque.
 		setOpaque(true);
@@ -94,7 +94,7 @@ public class TerrainDisplayPanel extends JPanel {
 
 		// Find terrain grade.
 		double terrainGrade = 0D;
-		if (vehicle.haveStatusType(StatusType.MOVING))
+		if (vehicle.getPrimaryStatus() == StatusType.MOVING)
 			terrainGrade = vehicle.getTerrainGrade();
 
 		// Determine y difference
@@ -106,7 +106,7 @@ public class TerrainDisplayPanel extends JPanel {
 		Polygon terrainShape = new Polygon(xPoints, yPoints, 5);
 
 		// Draw polygon in green
-		g.setColor(Color.green);
+		g.setColor(Color.orange.darker());
 		g.fillPolygon(terrainShape);
 
 		// Draw direction arrow

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * StudyPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission.create;
@@ -12,7 +12,6 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 
 import javax.swing.Box;

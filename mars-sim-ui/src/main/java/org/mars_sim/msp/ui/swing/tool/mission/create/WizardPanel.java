@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * WizardPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
@@ -9,7 +9,7 @@ package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.UnitManager;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
+import org.mars_sim.msp.core.environment.SurfaceFeatures;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 
 import com.alee.laf.panel.WebPanel;
@@ -24,7 +24,7 @@ abstract class WizardPanel extends WebPanel {
 	protected static Simulation sim = Simulation.instance();
 	protected static UnitManager unitManager = sim.getUnitManager();
 	protected static MissionManager missionManager = sim.getMissionManager();
-	protected static SurfaceFeatures surfaceFeatures = sim.getMars().getSurfaceFeatures();
+	protected static SurfaceFeatures surfaceFeatures = sim.getSurfaceFeatures();
 
 
 	// Data members.

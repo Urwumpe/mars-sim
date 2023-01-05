@@ -4,8 +4,6 @@
 
 package org.mars_sim.msp.core.structure.building.function.farming;
 
-import java.io.Serializable;
-
 /******************************************************************************
 * An <CODE>Animal</CODE> is an <CODE>Organism</CODE> with extra methods that
 * deal with eating.
@@ -18,13 +16,13 @@ import java.io.Serializable;
 * @author Michael Main 
 *   <A HREF="mailto:main@colorado.edu"> (main@colorado.edu) </A>
 *
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
 *
 * @see Organism
 * @see Herbivore
 * @see Plant
 ******************************************************************************/
-public class Animal extends Organism implements Serializable {
+public class Animal extends Organism {
 	
 	/** default serial id. */
     private static final long serialVersionUID = 1L;

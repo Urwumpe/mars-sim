@@ -1,10 +1,9 @@
-/**
+/*
  * Mars Simulation Project
  * PopUpMenu.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Manny Kung
  */
-
 package org.mars_sim.msp.ui.swing.tool.navigator;
 
 
@@ -31,12 +30,9 @@ import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ComponentMover;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.settlement.SettlementWindow;
 import org.mars_sim.msp.ui.swing.tool.settlement.UnitInfoPanel;
 
-
-// TODO: is extending to JInternalFrame better?
 public class PopUpMenu extends JPopupMenu {
 
 	private static final long serialVersionUID = 1L;
@@ -76,10 +72,7 @@ public class PopUpMenu extends JPopupMenu {
 //                "Per-pixel translucency is not supported");
 //                System.exit(0);
 //        }
-       
-
     }
-
 
     public void buildItemOne(final Unit unit) {
 
@@ -101,9 +94,9 @@ public class PopUpMenu extends JPopupMenu {
 
                 if (unit instanceof Vehicle) {
                 	Vehicle vehicle = (Vehicle) unit;
-                	description = vehicle.getDescription(vehicle.getVehicleType());
-                	type = Conversion.capitalize(vehicle.getVehicleType());
-                	name = Conversion.capitalize(vehicle.getName());
+                	description = vehicle.getDescription(vehicle.getVehicleTypeString());
+                	type = vehicle.getVehicleTypeString();
+                	name = vehicle.getName();
                 }
                 else {
                 	Building building = (Building) unit;
@@ -151,10 +144,11 @@ public class PopUpMenu extends JPopupMenu {
     }
 
 	public void destroy() {
-		settlement = null;
 		settlement.destroy();
-		unit = null;
+		settlement = null;
 		unit.destroy();
+		unit = null;
 		itemOne = null;
+		desktop = null;
 	}
 }

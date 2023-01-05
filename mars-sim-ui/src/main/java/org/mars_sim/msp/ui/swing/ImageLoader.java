@@ -1,10 +1,9 @@
-/**
+/*
  * Mars Simulation Project
  * ImageLoader.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-03
  * @author Barry Evans
  */
-
 package org.mars_sim.msp.ui.swing;
 
 import java.awt.Image;
@@ -13,34 +12,36 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.logging.Logger;
 
+import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
-import org.mars_sim.msp.ui.swing.tool.settlement.SettlementTransparentPanel;
+import org.mars.sim.console.MarsTerminal;
 
 /**
  * This is a static class that acts as a helper to load Images for use in the
  * UI. It is based on loading the resource form the class path via the
- * ClassLoader assuming all the Images to load a PNG. However other alternative
- * strategies can be easily implemented within this class.
+ * ClassLoader. However other alternative strategies can be easily 
+ * implemented within this class.
  */
 public class ImageLoader {
-	
-	/** default logger. */
-	private static Logger logger = Logger.getLogger(ImageLoader.class.getName());
 
-	private static HashMap<String, ImageIcon> iconCache = new HashMap<String, ImageIcon>();
-	private static HashMap<String, Image> imageCache = new HashMap<String, Image>();
+	/** default logger. */
+	private static final Logger logger = Logger.getLogger(ImageLoader.class.getName());
+
+	private static HashMap<String, ImageIcon> iconCache = new HashMap<>();
+	private static HashMap<String, Image> imageCache = new HashMap<>();
 	private static Toolkit usedToolkit = null;
 
 	/**
-	 * Sub-directory/package for the images
+	 * Sub-directory/package for the images.
 	 */
-	/* [landrus, 26.11.09]: use classloader compatible paths */
-	public final static String IMAGE_DIR = "/images/";
-
-	public final static String ICON_DIR = "/icons/";
-
-	public final static String VEHICLE_ICON_DIR = "/icons/vehicle/";
+	// Note: Switch to classloader compatible paths
+	public static final String IMAGE_DIR = "/images/";
+	public static final String MAPS_DIR = "/maps/";
+	public static final String ICON_DIR = "/icons/";
+	public static final String VEHICLE_ICON_DIR = "/icons/vehicle/";
+	public static final String PNG = "png";
+	public static final String SLASH = "/";
 	
 	/**
 	 * Static singleton
@@ -49,20 +50,20 @@ public class ImageLoader {
 	}
 
 	/**
-	 * Load the image icon with the specified name and a "png" image extension. This
-	 * operation may either create a new Image Icon of returned a previously created
-	 * one.
+	 * Loads the image icon with the specified name and a "png" image extension from
+	 * IMAGE_DIR. This operation may either create a new Image Icon of returned
+	 * a previously created one.
 	 *
 	 * @param imagename
 	 *            Name of the image to load.
 	 * @return ImageIcon containing image of specified name.
 	 */
 	public static ImageIcon getIcon(String imagename) {
-		return getIcon(imagename, "png", IMAGE_DIR);
+		return getIcon(imagename, PNG, IMAGE_DIR);
 	}
-
+	
 	/**
-	 * Load the image icon with the specified name and a "png" image extension. This
+	 * Loads the image icon with the specified name and a "png" image extension. This
 	 * operation may either create a new Image Icon of returned a previously created
 	 * one.
 	 *
@@ -71,60 +72,19 @@ public class ImageLoader {
 	 * @return ImageIcon containing image of specified name.
 	 */
 	public static ImageIcon getIcon(String imagename, String dir) {
-		return getIcon(imagename, "png", dir);
+		return getIcon(imagename, PNG, dir);
 	}
-	
+
 	public static ImageIcon getNewIcon(String imagename) {
-		ImageIcon found = null;
-		
 		if (imagename == null || imagename.equals("")) {
-			return found;
+			return null;
 		}
 		
-//		else if (imagename.contains(".svg")) {
-//    		
-//        	if (imagename.equals(MainWindow.SANDSTORM_SVG)) {
-//        		found = SettlementTransparentPanel.sandstorm;
-//        	}
-//        	else if (imagename.equals(MainWindow.DUST_DEVIL_SVG)) {
-//        		found = SettlementTransparentPanel.dustDevil;
-//        	}
-//        	else if (imagename.equals(MainWindow.SNOWFLAKE_SVG)) {
-//        		found = SettlementTransparentPanel.snowflake;
-//        	}
-//        	else if (imagename.equals(MainWindow.COLD_WIND_SVG)) {
-//        		found = SettlementTransparentPanel.wind;
-//        	}
-//        	else if (imagename.equals("")) {
-//        		found = SettlementTransparentPanel.emptyIcon;
-//        	}
-//    	}
-//    	
-//    	else {
-		
-			String ext = "png";
-			String fullImageName = imagename.endsWith(ext) ? imagename : imagename + "." + ext;
-			found = iconCache.get(fullImageName);
-			if (found == null) {
-				String fileName = fullImageName.startsWith("/") ? fullImageName : "/" + fullImageName;
-	
-				/* [landrus, 26.11.09]: don't use the system classloader in a webstart env. */
-				URL resource = ImageLoader.class.getResource(fileName);// ClassLoader.getSystemResource(fileName);
-				if (resource == null) {
-	    			logger.severe("'" + fileName + "' cannot be found");
-	    		}
-				
-				found = new ImageIcon(resource);
-		    	
-				iconCache.put(fullImageName, found);
-			}
-//    	}
-
-		return found;
+		return getIcon(imagename, PNG, SLASH);
 	}
 
 	/**
-	 * Load the image icon with the specified name. This operation may either create
+	 * Loads the image icon with the specified name. This operation may either create
 	 * a new Image Icon of returned a previously created one.
 	 *
 	 * @param imagename
@@ -132,50 +92,62 @@ public class ImageLoader {
 	 * @param ext
 	 *            the file extension (ex. "png", "jpg").
 	 * @param idr
-	 *            the direcotyr of the file .  
+	 *            the directory of the file .
 	 * @return ImageIcon containing image of specified name.
 	 */
 	public static ImageIcon getIcon(String imagename, String ext, String dir) {
 		String fullImageName = imagename.endsWith(ext) ? imagename : imagename + "." + ext;
 		ImageIcon found = iconCache.get(fullImageName);
 		if (found == null) {
-			String fileName = fullImageName.startsWith("/") ? fullImageName : dir + fullImageName;
+			String fileName = fullImageName.startsWith(SLASH) ? fullImageName : dir + fullImageName;
 //			logger.config("Filename : " + fileName + "   imagename : " + imagename + "    ext : "+ ext + "    dir : " + dir);
 			found = new ImageIcon(ImageLoader.class.getResource(fileName));
-//			if (found == null) {
-//				logger.severe("Filename : " + fileName + " NOT found !");
-//			}
-//			else
-				iconCache.put(fullImageName, found);
+			iconCache.put(fullImageName, found);
 		}
-		
+
 		return found;
 	}
 
 	/**
-	 * Get an image with the specified name. The name should include the suffix
+	 * Gets an image with the specified name. The name should include the suffix
 	 * identifying the format of the image.
 	 *
-	 * @param imagename
+	 * @param imageName
 	 *            Name of image including suffix.
 	 * @return Image found and loaded.
 	 */
-	public static Image getImage(String imagename) {
-		Image newImage = imageCache.get(imagename);
+	public static Image getImage(String imageName) {
+		Image newImage = imageCache.get(imageName);
 		if (newImage == null) {
 
 			if (usedToolkit == null) {
 				usedToolkit = Toolkit.getDefaultToolkit();
 			}
 
-			URL imageURL = ImageLoader.class.getResource(IMAGE_DIR + imagename);
+			URL imageURL = ImageLoader.class.getResource(IMAGE_DIR + imageName);
 			if (imageURL == null) {
-    			logger.severe("'" + IMAGE_DIR + imagename + "' cannot be found");
+				imageURL = ImageLoader.class.getResource(ICON_DIR + imageName);
+				if (imageURL == null) {					
+					imageURL = ImageLoader.class.getResource(MAPS_DIR + imageName);
+					if (imageURL == null) {	
+						logger.severe("'" + imageName + "' cannot be found");
+					}
+				}		
     		}
 
 			newImage = usedToolkit.createImage(imageURL);
-			imageCache.put(imagename, newImage);
+			imageCache.put(imageName, newImage);
 		}
 		return newImage;
+	}
+
+	/**
+	 * Converts from icon to image.
+	 *
+	 * @param icon
+	 * @return
+	 */
+	public static Image iconToImage(Icon icon) {
+		return MarsTerminal.iconToImage(icon);
 	}
 }

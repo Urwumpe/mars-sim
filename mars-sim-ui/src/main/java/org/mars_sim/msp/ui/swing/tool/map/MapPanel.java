@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MapPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-02
  * @author Scott Davis
  */
 
@@ -27,10 +27,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.time.ClockListener;
 import org.mars_sim.msp.core.time.ClockPulse;
-import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
 import org.mars_sim.msp.ui.swing.tool.mission.NavpointPanel;
@@ -43,20 +41,22 @@ public class MapPanel extends WebPanel implements ClockListener {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	private static Logger logger = Logger.getLogger(MapPanel.class.getName());
+	private static final Logger logger = Logger.getLogger(MapPanel.class.getName());
+	
 	private static final double HALF_PI = Math.PI / 2d;
 
 	public final static int MAP_BOX_HEIGHT = NavigatorWindow.HORIZONTAL_SURFACE_MAP;
 	public final static int MAP_BOX_WIDTH = NavigatorWindow.HORIZONTAL_SURFACE_MAP;
 	private static int dragx, dragy;
 
-//	private static final double PERIOD_IN_MILLISOLS = 10D * 500D / MarsClock.SECONDS_PER_MILLISOL; //3;
+	private transient ExecutorService executor;
 
 	// Data members
-//	private double timeCache = 0;
 	private boolean mapError;
 	private boolean wait;
 	private boolean update;
+
+	private double rho = CannedMarsMap.PIXEL_RHO;
 
 	private String mapErrorMessage;
 	private String mapType;
@@ -64,11 +64,6 @@ public class MapPanel extends WebPanel implements ClockListener {
 
 	private List<MapLayer> mapLayers;
 	private Map map;
-
-	// private Thread displayThread;
-	// private Thread createMapThread;
-
-	private static MasterClock masterClock = Simulation.instance().getMasterClock();
 
 	private Coordinates centerCoords;
 
@@ -79,40 +74,21 @@ public class MapPanel extends WebPanel implements ClockListener {
 
 	private MainDesktopPane desktop;
 
-//	private MainScene mainScene;
-
-	private Graphics dbg;
-	private Image dbImage = null;
-	// private long refreshRate;
-	private double rho = CannedMarsMap.PIXEL_RHO;
-
-	// private ThreadPoolExecutor executor;
-	private transient ExecutorService executor;
-
 	public MapPanel(MainDesktopPane desktop, long refreshRate) {
 		super();
 		this.desktop = desktop;
-//		this.mainScene = desktop.getMainScene();
 
-		// executor = ? (ThreadPoolExecutor) Executors.newCachedThreadPool(); //
-		// newFixedThreadPool(1); //
 		executor = Executors.newSingleThreadExecutor();
 
-		masterClock.addClockListener(this);
-
-		// this.refreshRate = refreshRate;
+		// Update the map from the clock once a second
+		desktop.getSimulation().getMasterClock().addClockListener(this, 1000L);
 
 		mapType = SurfMarsMap.TYPE;
 		oldMapType = mapType;
-
-		topoMap = new TopoMarsMap(this);
-		surfMap = new SurfMarsMap(this);
-		geoMap = new GeologyMarsMap(this);
 		
-		map = surfMap;
 		mapError = false;
 		wait = false;
-		mapLayers = new CopyOnWriteArrayList<MapLayer>();
+		mapLayers = new CopyOnWriteArrayList<>();
 		update = true;
 		centerCoords = new Coordinates(HALF_PI, 0D);
 
@@ -127,46 +103,34 @@ public class MapPanel extends WebPanel implements ClockListener {
 	public void setNavWin(NavigatorWindow navwin) {
 		// showMap(centerCoords);
 		setMapType(getMapType());
-		map.drawMap(centerCoords);
+		
+//		if (map != null) map.drawMap(centerCoords);
 
 		// Note: need navWin prior to calling addMouseMotionListener()
 		addMouseMotionListener(new MouseAdapter() {
 
 			@Override
 			public void mouseDragged(MouseEvent e) {
-				// setCursor(new Cursor(Cursor.MOVE_CURSOR));
 				int dx, dy, x = e.getX(), y = e.getY();
 
 				dx = dragx - x;
 				dy = dragy - y;
 
-				if (dx != 0 || dy != 0) {
-					if (x > 0 && x < MAP_BOX_HEIGHT && y > 0 && y < MAP_BOX_HEIGHT) {
-						// double rho = CannedMarsMap.PIXEL_RHO;
-						centerCoords = centerCoords.convertRectToSpherical((double) dx, (double) dy, rho);
-
-						// if (!executor.isTerminated() || !executor.isShutdown() )
-						// executor.execute(new MapTask());
-
-						map.drawMap(centerCoords);
-
-//						paintDoubleBuffer();
-						repaint();
-					}
+				if ((dx != 0 || dy != 0) 
+					 && x > 0 && x < MAP_BOX_WIDTH && y > 0 && y < MAP_BOX_HEIGHT) {
+					centerCoords = centerCoords.convertRectToSpherical((double) dx, (double) dy, rho);
+					map.drawMap(centerCoords);
+					repaint();
 				}
 
 				dragx = x;
 				dragy = y;
-
-				// setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
 			}
 		});
 
 		addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
-				// System.out.println("mousepressed X = " + e.getX());
-				// System.out.println(" Y = " + e.getY());
 				dragx = e.getX();
 				dragy = e.getY();
 				setCursor(new Cursor(Cursor.MOVE_CURSOR));
@@ -188,7 +152,8 @@ public class MapPanel extends WebPanel implements ClockListener {
 	public void setNavpointPanel(NavpointPanel panel) {
 		// showMap(centerCoords);
 		setMapType(getMapType());
-		map.drawMap(centerCoords);
+		
+//		if (map != null) map.drawMap(centerCoords);
 
 		// Note: need navWin prior to calling addMouseMotionListener()
 		addMouseMotionListener(new MouseAdapter() {
@@ -201,33 +166,22 @@ public class MapPanel extends WebPanel implements ClockListener {
 				dx = dragx - x;
 				dy = dragy - y;
 
-				if (dx != 0 || dy != 0) {
-					if (x > 0 && x < MAP_BOX_HEIGHT && y > 0 && y < MAP_BOX_HEIGHT) {
-						// double rho = CannedMarsMap.PIXEL_RHO;
-						centerCoords = centerCoords.convertRectToSpherical((double) dx, (double) dy, rho);
+				if ((dx != 0 || dy != 0)
+					 && x > 0 && x < MAP_BOX_WIDTH && y > 0 && y < MAP_BOX_HEIGHT) {
 
-						// if (!executor.isTerminated() || !executor.isShutdown() )
-						// executor.execute(new MapTask());
-
-						map.drawMap(centerCoords);
-
-//						paintDoubleBuffer();
-						repaint();
-					}
+					centerCoords = centerCoords.convertRectToSpherical((double) dx, (double) dy, rho);
+					map.drawMap(centerCoords);
+					repaint();
 				}
 
 				dragx = x;
 				dragy = y;
-
-				// setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
 			}
 		});
 
 		addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
-				// System.out.println("mousepressed X = " + e.getX());
-				// System.out.println(" Y = " + e.getY());
 				dragx = e.getX();
 				dragy = e.getY();
 				setCursor(new Cursor(Cursor.MOVE_CURSOR));
@@ -301,12 +255,19 @@ public class MapPanel extends WebPanel implements ClockListener {
 	 */
 	public void setMapType(String mapType) {
 		this.mapType = mapType;
-		if (SurfMarsMap.TYPE.equals(mapType))
+		
+		if (SurfMarsMap.TYPE.equals(mapType)) {
+			if (surfMap == null) surfMap = new SurfMarsMap(this);
 			map = surfMap;
-		else if (TopoMarsMap.TYPE.equals(mapType))
+		}
+		else if (TopoMarsMap.TYPE.equals(mapType)) {
+			if (topoMap == null) topoMap = new TopoMarsMap(this);
 			map = topoMap;
-		else if (GeologyMarsMap.TYPE.equals(mapType))
+		}
+		else if (GeologyMarsMap.TYPE.equals(mapType)) {
+			if (geoMap == null) geoMap = new GeologyMarsMap(this);
 			map = geoMap;
+		}
 		showMap(centerCoords);
 	}
 
@@ -324,9 +285,10 @@ public class MapPanel extends WebPanel implements ClockListener {
 		} else if (!centerCoords.equals(newCenter)) {
 			if (newCenter != null) {
 				recreateMap = true;
-				centerCoords.setCoords(newCenter);
-			} else
-				centerCoords = null;
+				centerCoords = newCenter;
+			} 
+//			else
+//				centerCoords = null;
 		}
 
 		if (!mapType.equals(oldMapType)) {
@@ -336,33 +298,8 @@ public class MapPanel extends WebPanel implements ClockListener {
 
 		if (recreateMap) {
 			wait = true;
-			if (!executor.isTerminated() || !executor.isShutdown())
-				executor.execute(new MapTask());
-
-//			//			if ((createMapThread != null) && (createMapThread.isAlive()))
-////				createMapThread.interrupt();
-////				createMapThread = new Thread(new Runnable() {
-//				public void run() {
-//	    			try {
-//	    				mapError = false;
-//	    				map.drawMap(centerCoords);
-//	    			}
-//	    			catch (Exception e) {
-//	    				e.printStackTrace(System.err);
-//	    				mapError = true;
-//	    				mapErrorMessage = e.getMessage();
-//	    			}
-//	    			wait = false;
-//
-//	    			paintDoubleBuffer();
-//	    			repaint();
-//	    		}
-////			});
-////			createMapThread.start();
-//
+			updateDisplay();
 		}
-
-		updateDisplay();
 	}
 
 	class MapTask implements Runnable {
@@ -376,108 +313,24 @@ public class MapPanel extends WebPanel implements ClockListener {
 				mapError = false;
 				map.drawMap(centerCoords);
 			} catch (Exception e) {
-				e.printStackTrace(System.err);
 				mapError = true;
 				mapErrorMessage = e.getMessage();
+				logger.severe("Can't draw surface map: " + e);
 			}
 			wait = false;
 
-//			paintDoubleBuffer();
 			repaint();
 		}
 	}
 
-//	/**
-//	 * Updates the current display
-//
-//    private void updateDisplay() {
-//        if ((displayThread == null) || (!displayThread.isAlive())) {
-//        	displayThread = new Thread(this, "Navpoint Map");
-//        	displayThread.start();
-//        } else {
-//        	displayThread.interrupt();
-//        }
-//    }
-//	 
-
 	public void updateDisplay() {
-		if (update) {
-			if (!executor.isTerminated() || !executor.isShutdown())
+		if ((desktop.isToolWindowOpen(NavigatorWindow.NAME) 
+			|| desktop.isToolWindowOpen(MissionWindow.NAME))
+			&& update 
+			&& (!executor.isTerminated() || !executor.isShutdown())) {
 				executor.execute(new MapTask());
 		}
 	}
-
-//	public void paintComponent(Graphics g) {
-//		super.paintComponent(g);
-//		if (dbImage != null) {
-//			g.drawImage(dbImage, 0, 0, null);
-//		}
-//	}
-
-//	/*
-//	 * Uses double buffering to draws into its own graphics object dbg before
-//	 * calling paintComponent()
-//	 */
-//	public void paintDoubleBuffer() {
-//		if (dbImage == null) {
-//			dbImage = createImage(MAP_BOX_WIDTH, MAP_BOX_HEIGHT);
-//			if (dbImage == null) {
-//				// System.out.println("dbImage is null");
-//				return;
-//			} else
-//				dbg = dbImage.getGraphics();
-//		}
-//
-////        Graphics2D g2d = (Graphics2D) dbg;
-////        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-//
-//		if (wait) {
-//			if (mapImage != null) {
-//				dbg.drawImage(mapImage, 0, 0, this);
-//			}
-//			String message = "Generating Map";
-//			drawCenteredMessage(message, dbg);
-//		} else {
-//			if (mapError) {
-//				logger.log(Level.SEVERE, "mapError: " + mapErrorMessage);
-//				// Display previous map image
-//				if (mapImage != null) {
-//					dbg.drawImage(mapImage, 0, 0, this);
-//				}
-//
-//				// Draw error message
-//				if (mapErrorMessage == null) {
-//					mapErrorMessage = "Null Map";
-//				}
-//				drawCenteredMessage(mapErrorMessage, dbg);
-//			} else {
-//				// Paint black background
-//				dbg.setColor(Color.black);
-//				dbg.fillRect(0, 0, Map.DISPLAY_WIDTH, Map.DISPLAY_HEIGHT);
-//
-//				if (centerCoords != null) {
-//					if (map != null) {
-//						if (map.isImageDone()) {
-//							mapImage = map.getMapImage();
-//							dbg.drawImage(mapImage, 0, 0, this);
-//						}
-//					}
-//
-//					// Display map layers.
-//					// List<MapLayer> tempMapLayers = new ArrayList<MapLayer>(mapLayers);
-//					// Iterator<MapLayer> i = tempMapLayers.iterator();
-//					// while (i.hasNext()) {
-//					// i.next().displayLayer(centerCoords, mapType, dbg);
-//					// }
-//
-//					for (MapLayer l : mapLayers) {
-//						if (dbg != null)
-//							l.displayLayer(centerCoords, mapType, dbg);
-//					}
-//				}
-//			}
-//		}
-//	}
 
 	public void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -549,39 +402,12 @@ public class MapPanel extends WebPanel implements ClockListener {
 
 	@Override
 	public void clockPulse(ClockPulse pulse) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void uiPulse(double time) {
-//		if (mainScene != null) {
-//			if (!mainScene.isMinimized() && mainScene.isMainTabOpen()
-//					&& (desktop.isToolWindowOpen(NavigatorWindow.NAME) || (desktop.isToolWindowOpen(MissionWindow.NAME)
-//							&& ((MissionWindow) desktop.getToolWindow(MissionWindow.NAME)).isNavPointsMapTabOpen()))) {
-//				// TODO: should also check if navpoints tab is open or not
-////				timeCache += time;
-////				if (timeCache > PERIOD_IN_MILLISOLS * time) {
-//				// Repaint map panel
-//				updateDisplay();
-////					timeCache = 0;
-////				}	
-//			}
-//		} else 
-			if (desktop.isToolWindowOpen(NavigatorWindow.NAME) || desktop.isToolWindowOpen(MissionWindow.NAME)
-		// ||desktop.isToolWindowOpen(ResupplyWindow.NAME)
-		) {
-//			timeCache += time;
-//			if (timeCache > PERIOD_IN_MILLISOLS * time) {
-			updateDisplay();
-//				timeCache = 0;
-//			}
-		}
+		updateDisplay();
 	}
 
 	@Override
 	public void pauseChange(boolean isPaused, boolean showPane) {
-		// TODO Auto-generated method stub
+		// placeholder
 	}
 
 	/**
@@ -589,17 +415,13 @@ public class MapPanel extends WebPanel implements ClockListener {
 	 */
 	public void destroy() {
 		// Remove clock listener.
-		masterClock.removeClockListener(this);
+		desktop.getSimulation().getMasterClock().removeClockListener(this);
 		mapLayers = null;
-		centerCoords = null;
 		executor = null;
-		map = null;
 		surfMap = null;
 		topoMap = null;
 		geoMap = null;
 		update = false;
-		dbg = null;
-		dbImage = null;
 		mapImage = null;
 	}
 }

@@ -14,11 +14,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.goods.GoodType;
 import org.mars_sim.msp.core.resource.AmountResource;
-import org.mars_sim.msp.core.resource.ItemResource;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.Part;
-import org.mars_sim.msp.core.resource.PhaseType;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 
@@ -31,35 +30,37 @@ public class ConstructionStageInfoTest extends TestCase {
 
     // Data members
     private ConstructionStageInfo info;
-    
+
     @Override
     protected void setUp() throws Exception {
         super.setUp();
         SimulationConfig.instance().loadConfig();
 
         Map<Integer, Integer> parts = new HashMap<Integer, Integer>(1);
-        Part p = ItemResourceUtil.createItemResource("test part", 1, "test resource description", 1D, 1);  		
+        GoodType type = GoodType.CONSTRUCTION;
+        Part p = ItemResourceUtil.createItemResource("test part", 1, "test resource description", type, 1D, 1);
         parts.put(p.getID(), 1);
-        
+
         Map<Integer, Double> resources = new HashMap<Integer, Double>(1);
-        
-        AmountResource ar = ResourceUtil.createAmountResource(1, "test resource", "test type", "test resource description", PhaseType.SOLID, false, false);
+
+        AmountResource ar = ResourceUtil.sandAR;
         resources.put(ar.getID(), 1D);
-           
-        List<ConstructionVehicleType> vehicles = 
+
+        List<ConstructionVehicleType> vehicles =
             new ArrayList<ConstructionVehicleType>(1);
         List<Integer> attachments = new ArrayList<Integer>(1);
-      
-        Part atth = ItemResourceUtil.createItemResource("attachment part", 2, "test resource description", 1D, 1);  		    
+        GoodType aType = GoodType.VEHICLE;
+        
+        Part atth = ItemResourceUtil.createItemResource("attachment part", 2, "test resource description", aType, 1D, 1);
         attachments.add(atth.getID());
-        
-        vehicles.add(new ConstructionVehicleType("Light Utility Vehicle", LightUtilityVehicle.class, 
+
+        vehicles.add(new ConstructionVehicleType("Light Utility Vehicle", LightUtilityVehicle.class,
                 attachments));
-        
+
         info = new ConstructionStageInfo("test stage", ConstructionStageInfo.FOUNDATION, 10D, 10D, false, 0,
                 false, false, 10000D, 1, null, parts, resources, vehicles);
     }
-    
+
     /*
      * Test method for 'org.mars_sim.msp.simulation.structure.
      * construction.ConstructionStageInfo.getArchitectConstructionSkill()'
@@ -90,7 +91,7 @@ public class ConstructionStageInfoTest extends TestCase {
         	Part part = ItemResourceUtil.findItemResource(id);
             assertEquals("test part", part.getName());
             assertEquals(1D, part.getMassPerItem());
-            assertEquals(1, (int) parts.get(id)); 
+            assertEquals(1, (int) parts.get(id));
         }
     }
 
@@ -113,9 +114,10 @@ public class ConstructionStageInfoTest extends TestCase {
         Iterator<Integer> i = resources.keySet().iterator();
         while (i.hasNext()) {
             Integer id = i.next();
+            AmountResource expected = ResourceUtil.sandAR;
             AmountResource resource = ResourceUtil.findAmountResource(id);
-            assertEquals("test resource", resource.getName());
-            assertEquals(PhaseType.SOLID, resource.getPhase());
+            assertEquals(expected.getName(), resource.getName());
+            assertEquals(expected.getPhase(), resource.getPhase());
             assertEquals(1D, resources.get(id));
         }
     }

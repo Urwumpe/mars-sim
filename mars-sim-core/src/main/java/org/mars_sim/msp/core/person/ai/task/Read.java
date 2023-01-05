@@ -1,24 +1,20 @@
-/**
+/*
  * Mars Simulation Project
  * Read.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-16
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.task.meta.ReadMeta;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
@@ -28,10 +24,13 @@ import org.mars_sim.msp.core.vehicle.Rover;
 /**
  * The Read class is the task of reading
  */
-public class Read extends Task implements Serializable {
+public class Read extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
+	
+    /** default logger. */
+	private static SimLogger logger = SimLogger.getLogger(Read.class.getName());
 
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.read"); //$NON-NLS-1$
@@ -42,35 +41,37 @@ public class Read extends Task implements Serializable {
 	// Static members
 	/** The stress modified per millisol. */
 	private static final double STRESS_MODIFIER = -.1D;
-
-	// private int randomTime;
-
+	
+	/** The selected skill type for this reading session. */
+	private SkillType selectedSkill;
+	
 	/**
 	 * Constructor. This is an effort-driven task.
-	 * 
+	 *
 	 * @param person the person performing the task.
 	 */
 	public Read(Person person) {
-		// Use Task constructor.
-		super(NAME, person, true, false, STRESS_MODIFIER, true, 5D);
+		// Use Task constructor. Skill is set later
+		super(NAME, person, true, false, STRESS_MODIFIER, RandomUtil.getRandomInt(5, 20));
 
-		if (person.isInSettlement() || person.isInVehicle()) {
+		if (person.isInside()) {
 
 			int score = person.getPreference().getPreferenceScore(new ReadMeta());
-			super.setDuration(5 + score);
+			// Modify the duration based on the preference score
+			setDuration(Math.max(5, score + getDuration()));
 			// Factor in a person's preference for the new stress modifier
-			super.setStressModifier(score / 10D + STRESS_MODIFIER);
+			setStressModifier(-score / 20D + STRESS_MODIFIER);
 
-			// set the boolean to true so that it won't be done again today
+			// Set the boolean to true so that it won't be done again today
 			// person.getPreference().setTaskStatus(this, false);
 
 			if (person.isInSettlement()) {
-				
+
 				int rand = RandomUtil.getRandomInt(2);
-				
+
 				if (rand == 0) {
 					// Find a dining place
-					Building dining = EatDrink.getAvailableDiningBuilding(person, false);
+					Building dining = BuildingManager.getAvailableDiningBuilding(person, false);
 					if (dining != null) {
 						walkToActivitySpotInBuilding(dining, FunctionType.DINING, true);
 					}
@@ -82,9 +83,9 @@ public class Read extends Task implements Serializable {
 						}
 					}
 				}
-				
+
 				else if (rand == 1) {
-					Building rec = getAvailableRecreationBuilding(person);
+					Building rec = BuildingManager.getAvailableBuilding(person, FunctionType.RECREATION);
 					if (rec != null) {
 						walkToActivitySpotInBuilding(rec, FunctionType.RECREATION, true);
 					}
@@ -96,7 +97,7 @@ public class Read extends Task implements Serializable {
 						}
 					}
 				}
-				
+
 				else {
 					// Go back to his quarters
 					Building quarters = person.getQuarters();
@@ -116,54 +117,13 @@ public class Read extends Task implements Serializable {
 				}
 			}
 
-			setDescription(Msg.getString("Task.description.read"));
-
+			// Initialize phase
+			addPhase(READING);
+			setPhase(READING);
+			
 		} else {
 			endTask();
 		}
-
-		// Initialize phase
-		addPhase(READING);
-		setPhase(READING);
-	}
-
-	/**
-	 * Performs reading phase.
-	 * 
-	 * @param time the amount of time (millisols) to perform the phase.
-	 * @return the amount of time (millisols) left over after performing the phase.
-	 */
-	private double reading(double time) {
-		setDescription(Msg.getString("Task.description.read"));//$NON-NLS-1$
-		addExperience(time);
-		return 0D;
-	}
-
-	/**
-	 * Gets an available recreation building that the person can use. Returns null
-	 * if no recreation building is currently available.
-	 * 
-	 * @param person the person
-	 * @return available recreation building
-	 */
-	public static Building getAvailableRecreationBuilding(Person person) {
-
-		Building result = null;
-
-		if (person.isInSettlement()) {
-			BuildingManager manager = person.getSettlement().getBuildingManager();
-			List<Building> recreationBuildings = manager.getBuildings(FunctionType.RECREATION);
-			recreationBuildings = BuildingManager.getNonMalfunctioningBuildings(recreationBuildings);
-			recreationBuildings = BuildingManager.getLeastCrowdedBuildings(recreationBuildings);
-
-			if (recreationBuildings.size() > 0) {
-				Map<Building, Double> recreationBuildingProbs = BuildingManager.getBestRelationshipBuildings(person,
-						recreationBuildings);
-				result = RandomUtil.getWeightedRandomObject(recreationBuildingProbs);
-			}
-		}
-
-		return result;
 	}
 
 	@Override
@@ -177,47 +137,49 @@ public class Read extends Task implements Serializable {
 		}
 	}
 
+	/**
+	 * Performs reading phase.
+	 *
+	 * @param time the amount of time (millisols) to perform the phase.
+	 * @return the amount of time (millisols) left over after performing the phase.
+	 */
+	private double reading(double time) {
+		double remainingTime = 0;
+		
+		if ((getTimeCompleted() + time > getDuration()) || isDone()) {
+	        String s = Msg.getString("Task.description.read.detail", selectedSkill.getName()); //$NON-NLS-1$
+	        setDescription(s);
+	        logger.fine(person, 4_000, "Done " + s.toLowerCase() + ".");
+			endTask();
+			return time;
+		}
+
+    	// Pick one skill randomly to improve upon
+        if (selectedSkill == null) {
+        	selectedSkill = person.getSkillManager().getARandomSkillType();
+        
+        	// Future: get this person's most favorite topics
+	        String s = Msg.getString("Task.description.read.detail", selectedSkill.getName()); //$NON-NLS-1$
+	    	// Display reading on a particular subject (skill type)
+			setDescription(s);	
+	        logger.fine(person, 4_000, "Started " + s.toLowerCase() + ".");
+        }
+
+		// Reading serves to improve skill
+		addExperience(time);
+		
+		return remainingTime;
+	}
+	
 	@Override
 	protected void addExperience(double time) {
         // Experience points adjusted by person's "Experience Aptitude" attribute.
         NaturalAttributeManager nManager = person.getNaturalAttributeManager();
         int aptitude = nManager.getAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
-        
-    	// Pick one skill to improve upon
-    	SkillType taskSkill = person.getSkillManager().getARandomSkillType();
-//		int points = person.getSkillManager().getSkillLevel(taskSkill);
-//		double exp = person.getSkillManager().getCumuativeExperience(taskSkill);
-		double learned = 2  * time * (aptitude / 100D) * RandomUtil.getRandomDouble(1);
-		
-//				logger.info(taskSkill.getName() 
-//					+ " - diff: " + diff + "   "
-//					+ "  mod: " + mod + "   "
-//					+ person + " [Lvl : " + teacherSkill + "]'s teaching reward: " + Math.round(reward*1000.0)/1000.0 
-//					+ "   " + student + " [Lvl : " + studentSkill + "]'s learned: " + Math.round(learned*1000.0)/1000.0 + ".");
-		
-		person.getSkillManager().addExperience(taskSkill, learned, time);       
 
-	}
+		double learned = 2 * time * (aptitude / 100D) * RandomUtil.getRandomDouble(1);
 
-	@Override
-	public void endTask() {
-		super.endTask();
-	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		return 0;
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(0);
-		return results;
-	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
+		person.getSkillManager().addExperience(selectedSkill, learned, time);
 
 	}
 }

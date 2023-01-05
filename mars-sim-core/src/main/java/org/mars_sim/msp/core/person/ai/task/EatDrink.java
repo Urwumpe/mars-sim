@@ -1,37 +1,35 @@
-/**
+/*
  * Mars Simulation Project
  * EatDrink.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-06
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LogConsolidated;
+import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.mars.MarsSurface;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.equipment.Container;
+import org.mars_sim.msp.core.equipment.EVASuit;
+import org.mars_sim.msp.core.equipment.ResourceHolder;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PersonConfig;
 import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.meta.HaveConversationMeta;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.meta.ConversationMeta;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingException;
+import org.mars_sim.msp.core.structure.building.BuildingCategory;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
+import org.mars_sim.msp.core.structure.building.function.Function;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.Storage;
 import org.mars_sim.msp.core.structure.building.function.cooking.CookedMeal;
@@ -40,30 +38,20 @@ import org.mars_sim.msp.core.structure.building.function.cooking.PreparedDessert
 import org.mars_sim.msp.core.structure.building.function.cooking.PreparingDessert;
 import org.mars_sim.msp.core.tool.Conversion;
 import org.mars_sim.msp.core.tool.RandomUtil;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * The EatDrink class is a task for eating a meal. The duration of the task is 40
  * millisols. Note: Eating a meal reduces hunger to 0.
  */
-public class EatDrink extends Task implements Serializable {
+public class EatDrink extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(EatDrink.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
-	
-	private static final int HUNGER_CEILING = 1000;
-	private static final int THIRST_CEILING = 500;
-	private static final int RATIO = 250;
-	
-	/** The minimal amount of resource to be retrieved. */
-	private static final double MIN = 0.001;
-	
+	private static SimLogger logger = SimLogger.getLogger(EatDrink.class.getName());
+
 	/** Task name */
-	private static final String JUICE = "juice";
-	private static final String MILK = "milk";
 	private static final String NAME = Msg.getString("Task.description.eatDrink"); //$NON-NLS-1$
 
 	/** Task phases. */
@@ -74,255 +62,367 @@ public class EatDrink extends Task implements Serializable {
 	private static final TaskPhase EAT_DESSERT = new TaskPhase(Msg.getString("Task.phase.eatingDessert")); //$NON-NLS-1$
 	private static final TaskPhase DRINK_WATER = new TaskPhase(Msg.getString("Task.phase.drinkingWater")); //$NON-NLS-1$
 
+	private static final String JUICE = "juice";
+	private static final String MILK = "milk";
+	
 	// Static members
+	private static final int FOOD_ID = ResourceUtil.foodID;
+	private static final int WATER_ID = ResourceUtil.waterID;
+
+	private static final int NUMBER_OF_MEAL_PER_SOL = 3;
+	private static final int NUMBER_OF_DESSERT_PER_SOL = 4;
+	
+	/** The conversion ratio of hunger to one serving of food. */	
+	private static final int HUNGER_RATIO_PER_FOOD_SERVING = 300;
+	/** The conversion ratio of thirst to one serving of water. */	
+	private static final int THIRST_PER_WATER_SERVING = 450;
+	/** The minimal amount of resource to be retrieved. */
+	private static final double MIN = 0.001;
+	
 	/** The stress modified per millisol. */
 	private static final double STRESS_MODIFIER = -1.2D;
 	private static final double DESSERT_STRESS_MODIFIER = -.8D;
-	private static final int NUMBER_OF_MEAL_PER_SOL = 4;
-	private static final int NUMBER_OF_DESSERT_PER_SOL = 4;
-	/** The proportion of the task for eating a meal. */
-	private static final double MEAL_EATING_PROPORTION = .75D;
-	/** The proportion of the task for eating dessert. */
-	private static final double DESSERT_EATING_PROPORTION = .25D;
-	/** Percentage chance that preserved food has gone bad. */
-	// private static final double PRESERVED_FOOD_BAD_CHANCE = 1D; // in %
-	/** Percentage chance that unprepared dessert has gone bad. */
-	// private static final double UNPREPARED_DESSERT_BAD_CHANCE = 1D; // in %
 	/** Mass (kg) of single napkin for meal. */
 	private static final double NAPKIN_MASS = .0025D;
 
-	private static double foodConsumptionRate;
-	private static double dessertConsumptionRate;
+	private double foodConsumedPerServing;
+	private double dessertConsumedPerServing;
+
+	private double millisolPerKgFood;
+	private double millisolPerKgDessert;
 
 	// Data members
+	private boolean food = false;
+	private boolean water = false;
+	private boolean hasNapkin = false;
 	
-	private int meals = 0;	
+	private int meals = 0;
 	private int desserts = 0;
+	
 	private double foodAmount = 0;
-	/** how much eaten [in kg]. */ 
+	/** how much eaten [in kg]. */
 	private double cumulativeProportion = 0;
 	private double totalEatingTime = 0D;
 	private double eatingDuration = 0D;
-	private double totalDessertEatingTime = 0D;
-	private double dessertEatingDuration = 0D;
 	private double waterEachServing;
-	
-	private double startingHunger;
-	private double hunger;
-	private double thirst;
-//	private double energy;
-
-	private boolean hasNapkin = false;
 
 	private CookedMeal cookedMeal;
 	private PreparedDessert nameOfDessert;
 	private Cooking kitchen;
 	private PreparingDessert dessertKitchen;
 	private PhysicalCondition pc;
-
 	private AmountResource unpreparedDessertAR;
 
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param person the person to perform the task
 	 */
 	public EatDrink(Person person) {
-		super(NAME, person, false, false, STRESS_MODIFIER, true, 20D 
-				+ RandomUtil.getRandomDouble(5D) - RandomUtil.getRandomDouble(5D));
-		// 20 milisols ~ 30 mins
-//		logger.info("EatMeal " + person + " containerID : " + person.getContainerID());		
-		sourceName = sourceName.substring(sourceName.lastIndexOf(".") + 1, sourceName.length());
+		super(NAME, person, false, false, STRESS_MODIFIER, 10
+				+ RandomUtil.getRandomDouble(-2, 2));
 
 		pc = person.getPhysicalCondition();
-	
-		double dur = getDuration();
-		eatingDuration = dur * MEAL_EATING_PROPORTION;
-		dessertEatingDuration = dur * DESSERT_EATING_PROPORTION;
 
-		PersonConfig config = SimulationConfig.instance().getPersonConfig();
-		foodConsumptionRate = config.getFoodConsumptionRate() / NUMBER_OF_MEAL_PER_SOL;
-		dessertConsumptionRate = config.getDessertConsumptionRate() / NUMBER_OF_DESSERT_PER_SOL;
-		
-		waterEachServing = pc.getWaterConsumedPerServing() * 1_000D;
-			
-		////////////////////
-	
-//		double foodAmount = 0;
-		double waterAmount = 0;
-		
-		Inventory inv = null;
-		Unit container = person.getContainerUnit();
-		if (container != null) {
-			inv = container.getInventory();	
-			// Take preserved food from inventory if it is available.
-			foodAmount = inv.getAmountResourceStored(ResourceUtil.foodID, false);
-			waterAmount = inv.getAmountResourceStored(ResourceUtil.waterID, false);
+		// Checks if this person has eaten too much already 
+		if (pc.eatTooMuch()
+			// Checks if this person has drank enough water already
+			&& pc.drinkEnoughWater()) {
+			clearTask("Consumed enough today already.");
+			return;
 		}
 		
-		boolean food = false;
-		boolean water = false;
-	
+		double dur = getDuration();
+		eatingDuration = dur;
+
+		foodConsumedPerServing = personConfig.getFoodConsumptionRate() / NUMBER_OF_MEAL_PER_SOL;			
+		millisolPerKgFood = HUNGER_RATIO_PER_FOOD_SERVING / foodConsumedPerServing; 
+		
+		dessertConsumedPerServing = personConfig.getDessertConsumptionRate() / NUMBER_OF_DESSERT_PER_SOL;
+		millisolPerKgDessert = HUNGER_RATIO_PER_FOOD_SERVING / dessertConsumedPerServing;
+		
+		// ~.03 kg per serving
+		waterEachServing = pc.getWaterConsumedPerServing();
+
+		////////////////////
+
+		double waterAmount = 0;
+
+		ResourceHolder rh = person;
+		foodAmount = rh.getAmountResourceStored(FOOD_ID);
+		waterAmount = rh.getAmountResourceStored(WATER_ID);
+		
+		Unit container = person.getContainerUnit();
+		if (container instanceof ResourceHolder) {
+			// Take preserved food from inventory if it is available.
+			rh = (ResourceHolder) container;
+			if (foodAmount == 0)
+				foodAmount = rh.getAmountResourceStored(FOOD_ID);
+			if (waterAmount == 0)
+				waterAmount = rh.getAmountResourceStored(WATER_ID);
+		}
+
 		// Check if a cooked meal is available in a kitchen building at the settlement.
 		Cooking kitchen0 = EatDrink.getKitchenWithMeal(person);
 		if (kitchen0 != null) {
 			meals = kitchen0.getNumberOfAvailableCookedMeals();
-		} 
-		
+		}
+
 		// Check dessert is available in a kitchen building at the settlement.
 		PreparingDessert kitchen1 = EatDrink.getKitchenWithDessert(person);
 		if (kitchen1 != null) {
 			desserts = kitchen1.getAvailableServingsDesserts();
-		} 
-		
-		thirst = pc.getThirst();
-		startingHunger = pc.getHunger();
-		hunger = startingHunger;
-//		energy = pc.getEnergy();
-		
+		}
+
 		boolean hungry = pc.isHungry();
 		boolean thirsty = pc.isThirsty();
-		
+
 		/////////////////////////////////////////////////
-		
+
 		if (person.isInSettlement()) {
-			if (hungry && (foodAmount > 0 || meals > 0 || desserts > 0)) {
-				food = true;
-			}
 			
-			if (thirsty && waterAmount > 0) {
-				water = true;
-			}
+			checkSettlement(hungry, thirsty, waterAmount);
 		}
-		
+
 		else if (person.isInVehicle()) {
-			if (hungry && (foodAmount > 0 || desserts > 0)) {
-				food = true;
-			}
 			
-			if (thirsty && waterAmount > 0) {
-				water = true;
-			}
+			checkVehicle(container, hungry, thirsty, waterAmount);
 		}
-		
+
 		else {
+			// if a person is on EVA suit
 			if (thirsty && waterAmount > 0) {
 				water = true;
 			}
 		}
-		
-		//////////////////////////////
-		
+
 		if (!food && !water) {
 			endTask();
 		}
-		
-		//////////////////////////////		
-		
-		if (food) {
-			
-			if (person.isInSettlement()) {
-				
-				if (desserts > 0) {
-					// Initialize task phase.
-					addPhase(PICK_UP_DESSERT);
-					addPhase(EAT_DESSERT);
-				}
 
-				if (meals > 0) {
-					Building diningBuilding = EatDrink.getAvailableDiningBuilding(person, false);
-					if (diningBuilding != null) {
-						// Initialize task phase.
-						addPhase(LOOK_FOR_FOOD);
-						addPhase(EAT_MEAL);	
-					}
-					
-					boolean want2Chat = true;
-					// See if a person wants to chat while eating
-					int score = person.getPreference().getPreferenceScore(new HaveConversationMeta());
-					if (score > 0)
-						want2Chat = true;
-					else if (score < 0)
-						want2Chat = false;
-					else {
-						int rand = RandomUtil.getRandomInt(1);
-						if (rand == 0)
-							want2Chat = false;
-					}					
-					
-					diningBuilding = EatDrink.getAvailableDiningBuilding(person, want2Chat);
-					if (diningBuilding != null)
-						// Walk to that building.
-						walkToActivitySpotInBuilding(diningBuilding, FunctionType.DINING, true);
-						
-					// Take napkin from inventory if available.
-//					inv = person.getSettlement().getInventory();
-					if (inv != null) {
-						hasNapkin = Storage.retrieveAnResource(NAPKIN_MASS, ResourceUtil.napkinID, inv, false);
-					}				
-				}
-				
-				else if (foodAmount > 0) {
-					// Initialize task phase.
-					addPhase(LOOK_FOR_FOOD);
-					addPhase(EAT_PRESERVED_FOOD);				
-				}			
-			}
+		if (food)
+			goForFood();
+		
+		if (water)
+			goForWater();
+	}
+		
+	private void checkSettlement(boolean hungry, boolean thirsty, double waterAmount) {
+		Building currentBuilding = BuildingManager.getBuilding(person);
+		if (currentBuilding != null && currentBuilding.getCategory() != BuildingCategory.EVA_AIRLOCK) {
+			// Check if there is a local dining building.
+        	Building diningBuilding = BuildingManager.getAvailableDiningBuilding(person.getSettlement(), person);
+        	
+        	if (diningBuilding != null) {
+        		// Initiates a walking task to go back to the settlement
+        		walkToDiningLoc(diningBuilding, false);
+        	}			
+		}
+
+		if (hungry && (foodAmount > 0 || meals > 0 || desserts > 0)) {
+			food = true;
+		}
+
+		if (thirsty && waterAmount > 0) {
+			water = true;
+		}
+	}
+	
+	private void checkVehicle(Unit container, boolean hungry, boolean thirsty, double waterAmount) {
+		 
+		if (UnitType.VEHICLE == container.getUnitType()) {
+
+			ResourceHolder rh = (ResourceHolder) container;
+			if (foodAmount == 0)
+				foodAmount = rh.getAmountResourceStored(FOOD_ID);
+			if (waterAmount == 0)
+				waterAmount = rh.getAmountResourceStored(WATER_ID);
 			
-			else if (person.isInVehicle()) {
-				
-				if (desserts > 0) {
-					// Initialize task phase.
-					addPhase(PICK_UP_DESSERT);
-					addPhase(EAT_DESSERT);
-				}
-									
-				if (foodAmount > 0) {
-					// Initialize task phase.
-					addPhase(LOOK_FOR_FOOD);
-					addPhase(EAT_PRESERVED_FOOD);
-				}
-			}		
+			if (hungry && (foodAmount > 0 || desserts > 0)) {
+				food = true;
+			}
+
+			if (thirsty && waterAmount > 0) {
+				water = true;
+			}
 		}
 		
-		//////////////////////////////
-		
-		if (water) {
-			// Initialize task phase.
-			addPhase(DRINK_WATER);
-			setPhase(DRINK_WATER);
-		}
 		else {
-			// Initialize task phase.
-			setPhase(LOOK_FOR_FOOD);
+			if (hungry && (foodAmount > 0 || desserts > 0)) {
+				food = true;
+			}
+
+			if (thirsty && waterAmount > 0) {
+				water = true;
+			}
+		}
+	}
+	
+	private void goForFood() {
+
+		if (person.isInSettlement()) {
+
+			if (CookMeal.isMealTime(person, 0)) {
+				
+				if (meals > 0) {				
+					goDining();
+				}
+				
+				else {
+					checkFoodDessertAmount();
+				}
+			}
+			else {
+				checkFoodDessertAmount();
+			}
+		}
+
+		else if (person.isInVehicle()) {
+			
+			checkFoodDessertAmount();
 		}
 	}
 
-	@Override
-	public FunctionType getLivingFunction() {
-		return FunctionType.DINING;
+	private void goDining() {
+		
+		Building diningBuilding = BuildingManager.getAvailableDiningBuilding(person, false);
+		if (diningBuilding != null) {
+			// Initialize task phase.
+			addPhase(LOOK_FOR_FOOD);
+			addPhase(EAT_MEAL);
+			setPhase(LOOK_FOR_FOOD);
+			
+			walkToDiningLoc(diningBuilding, false);
+		}
+
+		boolean want2Chat = true;
+		// See if a person wants to chat while eating
+		int score = person.getPreference().getPreferenceScore(new ConversationMeta());
+		if (score > 0)
+			want2Chat = true;
+		else if (score < 0)
+			want2Chat = false;
+		else {
+			int rand = RandomUtil.getRandomInt(1);
+			if (rand == 0)
+				want2Chat = false;
+		}
+
+		diningBuilding = BuildingManager.getAvailableDiningBuilding(person, want2Chat);
+		if (diningBuilding != null)
+			// Walk to that building.
+			walkToActivitySpotInBuilding(diningBuilding, FunctionType.DINING, true);
+
+		// Take napkin from inventory if available.
+		if (person.getSettlement().retrieveAmountResource(ResourceUtil.napkinID, NAPKIN_MASS) > 0)
+			hasNapkin = true;
+	}
+	
+	
+	private void checkFoodDessertAmount() {
+		
+		if (foodAmount > 0 && desserts > 0) {
+			
+			int rand = RandomUtil.getRandomInt(5);
+			if (rand == 0) {
+				addPhase(PICK_UP_DESSERT);
+				addPhase(EAT_DESSERT);
+				setPhase(LOOK_FOR_FOOD);
+			}
+			else {
+				addPhase(LOOK_FOR_FOOD);
+				addPhase(EAT_PRESERVED_FOOD);
+				setPhase(LOOK_FOR_FOOD);
+			}
+		}
+				
+		else if (desserts > 0) {
+			// Initialize task phase.
+			addPhase(PICK_UP_DESSERT);
+			addPhase(EAT_DESSERT);
+			setPhase(LOOK_FOR_FOOD);
+		}
+
+		else if (foodAmount > 0) {
+			// Initialize task phase.
+			addPhase(LOOK_FOR_FOOD);
+			addPhase(EAT_PRESERVED_FOOD);
+			setPhase(LOOK_FOR_FOOD);
+		}
+	}
+	
+	/**
+	 * Walks to an activity in the dining building.
+	 * 
+	 * @param building  the dining building.
+	 * @param allowFail true if walking is allowed to fail.
+	 */
+	protected void walkToDiningLoc(Building building, boolean allowFail) {
+
+		LocalPosition pos = findDiningSpot(building);
+
+		if (pos != null) {
+			// Create subtask for walking to destination.
+			createWalkingSubtask(building, pos, allowFail);
+		}
+	}
+
+	/**
+	 * Finds a dining spot in this building.
+	 * 
+	 * @param building
+	 * @return
+	 */
+	private LocalPosition findDiningSpot(Building building) {
+
+		LocalPosition loc = building.getFunction(FunctionType.DINING).getAvailableActivitySpot(person);
+		
+		if (loc != null) {
+			return loc;
+		}
+		
+		Function f = building.getEmptyActivitySpotFunction();
+		if (f == null) {
+			return null;
+		}
+
+		if (person != null) {
+			// Find available activity spot in building.
+			loc = f.getAvailableActivitySpot(person);
+		} else {
+			// Find available activity spot in building.
+			loc = f.getAvailableActivitySpot(robot);
+		}
+
+		return loc;
+	}
+
+	private void goForWater() {
+		// if water only
+		// Initialize task phase.
+		addPhase(DRINK_WATER);
+		setPhase(DRINK_WATER);
 	}
 
 	/**
 	 * Performs the method mapped to the task's current phase.
-	 * 
+	 *
 	 * @param time the amount of time (millisol) the phase is to be performed.
 	 * @return the remaining time (millisol) after the phase has been performed.
 	 */
 	protected double performMappedPhase(double time) {
 		if (getPhase() == null) {
-//			return time;
 			throw new IllegalArgumentException(person + "'s Task phase is null");
 		}
-		
+
 		if (DRINK_WATER.equals(getPhase())) {
-			return drinkingWaterPhase(time);			
+			return drinkingWaterPhase();
 		} else if (LOOK_FOR_FOOD.equals(getPhase())) {
 			return lookingforFoodPhase(time);
 		} else if (EAT_MEAL.equals(getPhase())) {
 			return eatingMealPhase(time);
 		} else if (EAT_PRESERVED_FOOD.equals(getPhase())) {
-			return eatingPreservedFoodPhase(time);	
+			return eatingPreservedFoodPhase(time);
 		} else if (PICK_UP_DESSERT.equals(getPhase())) {
 			return pickingUpDessertPhase(time);
 		} else if (EAT_DESSERT.equals(getPhase())) {
@@ -334,202 +434,194 @@ public class EatDrink extends Task implements Serializable {
 
 	/**
 	 * Performs the drinking water phase of the task.
-	 * 
+	 *
 	 * @param time the amount of time (millisol) to perform the drinking water phase.
 	 * @return the amount of time (millisol) left after performing the drinking water
 	 *         phase.
 	 */
-	private double drinkingWaterPhase(double time) {
+	private double drinkingWaterPhase() {
+		
 		// Call to consume water
-		consumeWater(true);
-		
-		if (meals > 0 || foodAmount > 0)
-			setPhase(LOOK_FOR_FOOD);
-		else if (desserts > 0)
-			setPhase(PICK_UP_DESSERT);
-		else
-			// Note: must call endTask here to end this task
-			super.endTask();
-		
-		return time *.9;
+		if (!person.getPhysicalCondition().drinkEnoughWater())
+			calculateWater(true);
+
+		return 0;
 	}
-	
+
 	/**
-	 * Perform the pick up the food or the meal phase.
-	 * 
+	 * Performs the pick up the food or the meal phase.
+	 *
 	 * @param time the amount of time (millisol) to perform the phase.
 	 * @return the remaining time (millisol) after the phase has been performed.
 	 */
 	private double lookingforFoodPhase(double time) {
+		double remainingTime = 0;
 
 		// Determine preferred kitchen to get meal.
 		if (kitchen == null) {
 			kitchen = getKitchenWithMeal(person);
 
 			if (kitchen == null) {
-				// If no kitchen found, look for preserved food.
-//				logger.info(person + " couldn't find a kitchen with cooked meals and will look for preserved food.");
-				setPhase(EAT_PRESERVED_FOOD);
-			}
-		}
-	
-		if (kitchen != null) {
-			// Walk to kitchen.
-			walkToActivitySpotInBuilding(kitchen.getBuilding(), FunctionType.DINING, true);
-			
-			// Pick up a meal at kitchen if one is available.
-			cookedMeal = kitchen.chooseAMeal(person);
-			if (cookedMeal != null) {
-
-				setPhase(EAT_MEAL);
-//				setDescription(Msg.getString("Task.description.eatDrink.cooked.pickingUp.detail", cookedMeal.getName())); //$NON-NLS-1$
-//				LogConsolidated.log(logger, Level.FINE, 0, sourceName,
-//						"[" + person.getLocationTag().getLocale() + "] " + person
-//								+ " picked up a cooked meal of '" + cookedMeal.getName() 
-//								+ "' to eat in " + person.getLocationTag().getImmediateLocation() + ".");
-			}
-			else {
-//				logger.info(person + " couldn't find any cooked meals in this kitchen and will look for preserved food.");
-				// If no kitchen found, look for preserved food.
-				setPhase(EAT_PRESERVED_FOOD);
+				choosePreservedFoodOrDessert();
+				return time * .75;
 			}
 		}
 
-		return time *.9;
+		// Walk to kitchen.
+		boolean canWalk = walkToActivitySpotInBuilding(kitchen.getBuilding(), FunctionType.DINING, true);
+
+		// Pick up a meal at kitchen if one is available.
+		cookedMeal = kitchen.chooseAMeal(person);
+		if (cookedMeal != null) {
+			setPhase(EAT_MEAL);
+		}
+		else {
+			choosePreservedFoodOrDessert();
+			return time * .75;
+		}
+		
+		if (canWalk)
+			return remainingTime * .75;
+
+		return remainingTime;
 	}
-	
-	
+
 	/**
-	 * Performs eating preserved food phase
-	 * 
+	 * Chooses either preserved food or dessert randomly
+	 */
+	private void choosePreservedFoodOrDessert() {
+		int rand = RandomUtil.getRandomInt(5);
+		if (rand == 0) {
+			addPhase(EAT_DESSERT);
+			setPhase(EAT_DESSERT);
+		}
+		else {
+			addPhase(EAT_PRESERVED_FOOD);
+			setPhase(EAT_PRESERVED_FOOD);
+		}
+	}
+
+	/**
+	 * Performs eating preserved food phase.
+	 *
 	 * @param time
 	 * @return
 	 */
 	private double eatingPreservedFoodPhase(double time) {
-		double remainingTime = 0D;
-		double eatingTime = time;
-	
-//		int rand = RandomUtil.getRandomInt(3);
-//		
-//		if (rand == 3) {
-//			// try out dessert instead of eating preserved food
-//			setPhase(PICK_UP_DESSERT);
-//			remainingTime = time * .75;
-//		}
-//		else {
-			
-			boolean enoughFood = eatPreservedFood(eatingTime);
-	
-			// If not enough preserved food available, change to dessert phase.
-			if (!enoughFood) {
-//				setPhase(PICK_UP_DESSERT);
-//				remainingTime = time * .5;
-				endTask();
-			}
-			else {
-				// Report eating preserved food.
-				setDescription(Msg.getString("Task.description.eatDrink.preserved")); //$NON-NLS-1$
-				
-				if ((totalEatingTime + eatingTime) >= eatingDuration) {
-					eatingTime = eatingDuration - totalEatingTime;
-				}
-				
-				if (eatingTime < time) {
-					remainingTime = time - eatingTime;
-				}
-
-				if (cumulativeProportion > foodConsumptionRate) {
-					endTask();
-					return remainingTime;
-				}
-				
-				totalEatingTime += eatingTime;
-
-				if (totalEatingTime > getDuration()) {
-					endTask();
-					return remainingTime;	
-				}
-				
-				consumeWater(false);
-			}
-//		}
 		
+		// Checks if this person has eaten too much already 
+		if (pc.eatTooMuch()) {
+			endTask();
+			return time;
+		}
+		
+		// Give a person the chance to eat even if in high fatigue
+		int rand = RandomUtil.getRandomInt(1);
+		if (rand == 1 && pc.getFatigue() > 2_000) {
+			endTask();
+			return time;
+		}
+		
+		double remainingTime = 0;
+		double eatingTime = time;
+
+		double proportion = eatPreservedFood(eatingTime);
+
+		// If not enough preserved food available, change to dessert phase.
+		if (proportion == 0.0) {
+			endTask();
+			return time;
+		}
+		else {
+			// Report eating preserved food.
+			setDescription(Msg.getString("Task.description.eatDrink.preserved")); //$NON-NLS-1$
+
+			// Make sure it does not exceed eatingDuration
+			if ((totalEatingTime + eatingTime) >= eatingDuration) {
+				eatingTime = eatingDuration - totalEatingTime;
+			}
+
+			if (eatingTime < time) {
+				remainingTime = time - eatingTime;
+			}
+
+			if (cumulativeProportion + proportion >= foodConsumedPerServing) {
+				endTask();
+				return remainingTime;
+			}
+			
+			totalEatingTime += eatingTime;
+		}
+
+
 		return remainingTime;
 	}
-	
+
 	/**
 	 * Performs the eating meal phase of the task.
-	 * 
+	 *
 	 * @param time the amount of time (millisol) to perform the eating meal phase.
 	 * @return the amount of time (millisol) left after performing the eating meal
 	 *         phase.
 	 */
 	private double eatingMealPhase(double time) {
-		double remainingTime = 0D;
+		
+		// Checks if this person has eaten too much already 
+		if (pc.eatTooMuch()) {
+			endTask();
+			return time;
+		}
+		
+		// Give a person the chance to eat even if in high fatigue
+		int rand = RandomUtil.getRandomInt(1);
+		if (rand == 1 && pc.getFatigue() > 2_000) {
+			endTask();
+			return time;
+		}
+		
+		double remainingTime = 0;
 		double eatingTime = time;
 		
+		if (cumulativeProportion >= cookedMeal.getDryMass()) {
+			endTask();
+			return remainingTime;
+		}
+
 		if ((totalEatingTime + eatingTime) >= eatingDuration) {
 			eatingTime = eatingDuration - totalEatingTime;
 		}
-
-		if (!person.isInVehicle()) {
-	
-			if (eatingTime > 0D) {
-	
-				if (cookedMeal != null) {
-					// Set descriptoin for eating cooked meal.
-					setDescription(Msg.getString("Task.description.eatDrink.cooked.eating.detail", cookedMeal.getName())); //$NON-NLS-1$
-					// Eat cooked meal.
-					eatCookedMeal(eatingTime);
-					
-					if (cumulativeProportion > cookedMeal.getDryMass()) {
-						endTask();
-					}
-									
-					// If finished eating, change to dessert phase.
-					if (eatingTime < time) {
-//						setPhase(PICK_UP_DESSERT);// EATING_DESSERT);
-						remainingTime = time - eatingTime;
-					}
-
-					totalEatingTime += eatingTime;
-
-					if (totalEatingTime > getDuration())
-						endTask();
-					
-					consumeWater(false);
-					
-				} else {
-					// Eat preserved food if available
-					boolean enoughFood = eatPreservedFood(eatingTime);
-	
-					// If not enough preserved food available, change to dessert phase.
-					if (!enoughFood) {
-						setPhase(PICK_UP_DESSERT);
-						remainingTime = time * .75;
-						return remainingTime;
-					}
-					else {
-						// Report eating preserved food.
-						setDescription(Msg.getString("Task.description.eatDrink.preserved")); //$NON-NLS-1$
-
-						remainingTime = time * .75;
-						return remainingTime;
-					}
-				}
-			}
-		}
 		
+		if (eatingTime > 0) {
+			
+			String s = Msg.getString("Task.description.eatDrink.cooked.eating.detail", cookedMeal.getName());
+			// Set description for eating cooked meal.
+			setDescription(s); //$NON-NLS-1$
+			// Eat cooked meal.
+			eatCookedMeal(eatingTime);
+	
+			// If finished eating, change to dessert phase.
+			if (eatingTime < time) {
+				remainingTime = time - eatingTime;
+			}
+
+			totalEatingTime += eatingTime;
+
+		} else {
+			// Eat preserved food if available
+			setPhase(EAT_PRESERVED_FOOD);
+		}
+
 		return remainingTime;
 	}
 
 	/**
-	 * Perform the pick up dessert phase.
-	 * 
+	 * Performs the pick up dessert phase.
+	 *
 	 * @param time the amount of time (millisol) to perform the phase.
 	 * @return the remaining time (millisol) after the phase has been performed.
 	 */
 	private double pickingUpDessertPhase(double time) {
+		double remainingTime = 0;
 
 		// Determine preferred kitchen to get dessert.
 		if (dessertKitchen == null) {
@@ -537,257 +629,251 @@ public class EatDrink extends Task implements Serializable {
 
 			if (dessertKitchen != null) {
 				// Walk to dessert kitchen.
-				walkToActivitySpotInBuilding(dessertKitchen.getBuilding(), FunctionType.DINING, true);
-				
+				boolean canWalk = walkToActivitySpotInBuilding(dessertKitchen.getBuilding(), FunctionType.DINING, true);
+
 				// Pick up a dessert at kitchen if one is available.
 				nameOfDessert = dessertKitchen.chooseADessert(person);
 
 				if (nameOfDessert != null) {
-					LogConsolidated.log(logger, Level.FINE, 0, sourceName,
-							"[" + person.getLocationTag().getLocale() + "] " + person
-									+ " picked up prepared dessert '" + nameOfDessert.getName() 
-									+ "' to eat/drink in " + person.getLocationTag().getImmediateLocation() + ".");
-					
+					logger.log(worker, Level.FINE, 4_000, "Picked up a serving of '" 
+							+ nameOfDessert.getName() + ".");
 					setPhase(EAT_DESSERT);
-					return time *.85;
+					return remainingTime;
 				}
 				
+				if (canWalk)
+					return remainingTime;
 			}
-			
+
 			else {
 				endTask();
 				// If no dessert kitchen found, go eat preserved food
-//				setPhase(EAT_PRESERVED_FOOD);
-//				return time *.85;
+				return time;
 			}
 		}
 
-		return time *.75;
+		return remainingTime;
 	}
 
 	/**
-	 * Reduce the hunger level
-	 * @param hungerRelieved
-	 */
-	public void reduceHunger(double hungerRelieved) {
-		// Note: once a person has eaten a bit of food,
-		// the hunger index should be reset to HUNGER_CEILING
-		if (hunger > HUNGER_CEILING)
-			hunger = HUNGER_CEILING;		
-
-		// Note : Reduce person's hunger by proportion of food/dessert eaten.
-		hunger = hunger - hungerRelieved;
-		if (hunger < 0D) {
-			hunger = 0D;
-		}
-		
-//		logger.info(person 
-//				+ " new Hunger " + Math.round(currentHunger*100.0)/100.0
-//				+ "   hungerRelieved " + Math.round(hungerRelieved*100.0)/100.0);
-		pc.setHunger(hunger);
-	}
-	
-	/**
-	 * Eat a cooked meal.
-	 * 
+	 * Eats a cooked meal.
+	 *
 	 * @param eatingTime the amount of time (millisols) to eat.
 	 */
-	private void eatCookedMeal(double eatingTime) {
+	private double eatCookedMeal(double eatingTime) {
 		// Obtain the dry mass of the dessert
 		double dryMass = cookedMeal.getDryMass();
 		// Proportion of meal being eaten over this time period.
+		// eatingSpeed ~ 0.1 kg / millisols
 		double proportion = person.getEatingSpeed() * eatingTime;
 
-		if (cumulativeProportion > dryMass) {
-			double excess = cumulativeProportion - dryMass;
-			cumulativeProportion = cumulativeProportion - excess;
+		if (cumulativeProportion + proportion > dryMass) {
+			double excess = cumulativeProportion + proportion - dryMass;
 			proportion = proportion - excess;
 		}
-
+		
 		if (proportion > MIN) {
 			// Add to cumulativeProportion
 			cumulativeProportion += proportion;
 			// Food amount eaten over this period of time.
-			double hungerRelieved = RATIO * proportion / dryMass;
-					
+			double hungerRelieved = HUNGER_RATIO_PER_FOOD_SERVING * proportion / dryMass;
+			// Record the amount consumed
+			pc.recordFoodConsumption(proportion, 1);
 			// Change the hunger level after eating
-			reduceHunger(hungerRelieved);
-			
-			LogConsolidated.log(logger, Level.FINE, 1000, sourceName,
-					"[" + person.getLocationTag().getLocale() + "] "
-					+ person + " ate '" + cookedMeal.getName()
-					+ "' in " + person.getLocationTag().getImmediateLocation() + ".");
-//					+ "   currentHunger " + Math.round(currentHunger*100.0)/100.0
-//					+ "   hungerRelieved " + Math.round(hungerRelieved*100.0)/100.0
-//					+ "   proportion " + Math.round(proportion*1000.0)/1000.0
-//					+ "   EatingSpeed " + Math.round(person.getEatingSpeed()*1000.0)/1000.0
-//					+ "   foodConsumptionRate " + Math.round(foodConsumptionRate*1000.0)/1000.0);
-			
-	
+			pc.reduceHunger(hungerRelieved);
+
+			logger.log(worker, Level.FINE, 4_000, "Eating " + cookedMeal.getName() + ".");
+
 			// Reduce person's stress over time from eating a cooked meal.
 			// This is in addition to normal stress reduction from eating task.
 			double stressModifier = STRESS_MODIFIER * (cookedMeal.getQuality() + 1D);
-			double newStress = pc.getStress() + (stressModifier * eatingTime);
-			pc.setStress(newStress);
-	
+			double deltaStress = stressModifier * eatingTime;
+			pc.reduceStress(deltaStress);
+
 			// Add caloric energy from meal.
-			double caloricEnergyFoodAmount = proportion / dryMass * PhysicalCondition.FOOD_COMPOSITION_ENERGY_RATIO;
+			double caloricEnergyFoodAmount = hungerRelieved * PhysicalCondition.FOOD_COMPOSITION_ENERGY_RATIO;
 			pc.addEnergy(caloricEnergyFoodAmount);
 		}
+		
+		return proportion;
 	}
 
 	/**
-	 * Eat a meal of preserved food.
-	 * 
+	 * Eats a meal of preserved food.
+	 *
 	 * @param eatingTime the amount of time (millisols) to eat.
 	 * @return true if enough preserved food available to eat.
 	 */
-	private boolean eatPreservedFood(double eatingTime) {
-		boolean result = true;
+	private double eatPreservedFood(double eatingTime) {
 
 		// Proportion of food being eaten over this time period.
 		double proportion = person.getEatingSpeed() * eatingTime;
-
-		if (cumulativeProportion > foodConsumptionRate) {
-			double excess = cumulativeProportion - foodConsumptionRate;
-			cumulativeProportion = cumulativeProportion - excess;
-			proportion = proportion - excess;
+		if (cumulativeProportion + proportion > foodConsumedPerServing) {
+			proportion = foodConsumedPerServing - cumulativeProportion;
 		}
-		
-//		logger.info(person + "  proportion: " + proportion);
+
 		if (proportion > MIN) {
 
 			Unit container = person.getContainerUnit();
 			if (person.isInside()) {
-				Inventory inv = container.getInventory();
-	
 				// Take preserved food from inventory if it is available.
-				boolean haveFood = Storage.retrieveAnResource(proportion, ResourceUtil.foodID, inv, true);
-				
+				boolean haveFood = retrieveAnResource(proportion, FOOD_ID, (ResourceHolder)container);
+
 				if (haveFood) {
+					// Record the amount consumed
+					pc.recordFoodConsumption(proportion, 0);
 					// Add to cumulativeProportion
 					cumulativeProportion += proportion;
-					
-//					LogConsolidated.log(logger, Level.INFO, 3_000, sourceName,
-//							"[" + person.getLocationTag().getLocale() + "] " + person 
-//							+ " just ate " + Math.round(proportion*1000.0)/1000.0 + " kg of preserved food.");
-					
 					// Food amount eaten over this period of time.
-					double hungerRelieved = RATIO * proportion / foodConsumptionRate;
-//					logger.info(person + "::eatPreservedFood()"
-//							+ "   currentHunger " + Math.round(currentHunger*100.0)/100.0
-//							+ "   hungerRelieved " + Math.round(hungerRelieved*100.0)/100.0
-//							+ "   proportion " + Math.round(proportion*1000.0)/1000.0
-//							+ "   EatingSpeed " + Math.round(person.getEatingSpeed()*1000.0)/1000.0
-//							+ "   foodConsumptionRate " + Math.round(foodConsumptionRate*1000.0)/1000.0);
-					
+					double hungerRelieved = millisolPerKgFood * proportion;
 					// Consume preserved food after eating
-					reduceHunger(hungerRelieved);
-	
-					// Add caloric energy from the prserved food.
-					double caloricEnergyFoodAmount = proportion / foodConsumptionRate * PhysicalCondition.FOOD_COMPOSITION_ENERGY_RATIO;
+					pc.reduceHunger(hungerRelieved);
+					
+					// Add caloric energy from the preserved food.
+					double caloricEnergyFoodAmount = hungerRelieved * PhysicalCondition.FOOD_COMPOSITION_ENERGY_RATIO;
 					pc.addEnergy(caloricEnergyFoodAmount);
-	
+
 				} else {
-					// Not enough food available to eat.
-					result = false;
-					// Need endTask() below to quit EatDrink
-					endTask();
+					// Not enough food available to eat, will end this task.
+					proportion = 0;
 				}
 			}
 		} else {
-			// Person is not inside a container unit, so end task.
-			result = false;
-			// Need endTask() below to quit EatDrink
-			endTask();
+			// Person is not inside a container unit, will end this task.
+			proportion = 0;
 		}
 
-		if (totalEatingTime > getDuration())
-			endTask();
-		
-		return result;
+		return proportion;
+	}
+
+	/**
+	 * Gets a resource from a provider.
+	 * 
+	 * @param quantity amount to retrieve
+	 * @param resourceID Resource to retrieve
+	 * @param provider The provider of resources.
+	 * @return Did retrieve all ?
+	 */
+	private boolean retrieveAnResource(double quantity, int resourceID, ResourceHolder provider) {
+		return provider.retrieveAmountResource(resourceID, quantity) == 0D;
+	}
+
+
+	/**
+	 * Gets the amount of resource stored by a provider.
+	 * 
+	 * @param provider
+	 * @param resourceID
+	 * @return
+	 */
+	private double getAmountResourceStored(Unit provider, int resourceID) {
+		if (provider instanceof ResourceHolder) {
+			return ((ResourceHolder) provider).getAmountResourceStored(resourceID);
+		}
+
+		return 0;
 	}
 
 	/**
 	 * Performs the eating dessert phase of the task.
-	 * 
+	 *
 	 * @param time the amount of time (millisol) to perform the eating dessert
 	 *             phase.
 	 * @return the amount of time (millisol) left after performing the eating
 	 *         dessert phase.
 	 */
 	private double eatingDessertPhase(double time) {
-
+		
+		// Checks if this person has eaten too much already 
+		if (pc.eatTooMuch()) {
+			endTask();
+			return time;
+		}
+		
+		// Give a person the chance to eat even if in high fatigue
+		int rand = RandomUtil.getRandomInt(1);
+		if (rand == 1 && pc.getFatigue() > 2_000) {
+			endTask();
+			return time;
+		}
+		
 		double remainingTime = 0D;
-
 		double eatingTime = time;
-		if ((totalDessertEatingTime + eatingTime) >= dessertEatingDuration) {
-			eatingTime = dessertEatingDuration - totalDessertEatingTime;
+		
+		if ((totalEatingTime + eatingTime) >= eatingDuration) {
+			eatingTime = eatingDuration - totalEatingTime;
 		}
 
 		if (eatingTime > 0D) {
 
 			if (nameOfDessert != null) {
-				// Eat prepared dessert.
-				checkInDescription(PreparingDessert.convertString2AR(nameOfDessert.getName()), true);
+				// Display what dessert to east
+				showDessertDescription(PreparingDessert.convertString2AR(nameOfDessert.getName()), true);
+				// Eat a serving of prepared dessert
 				eatPreparedDessert(eatingTime);
 
 			} else {
-				// Eat unprepared dessert (fruit, soymilk, etc).
+				// Eat a serving of unprepared dessert (fruit, soymilk, etc).
 				boolean enoughDessert = eatUnpreparedDessert(eatingTime);
 
 				if (enoughDessert) {
-					checkInDescription(unpreparedDessertAR, false);
-									
-					if (cumulativeProportion > nameOfDessert.getDryMass()) {
+					// Display what dessert to east
+					showDessertDescription(unpreparedDessertAR, false);
+					// Obtain the dry mass of the dessert
+					double dryMass = PreparingDessert.getDryMass(PreparingDessert.convertAR2String(unpreparedDessertAR));
+		
+					if (cumulativeProportion> dryMass) {
 						endTask();
 					}
-					
+
 					// If finished eating, end task.
 					if (eatingTime < time) {
 						remainingTime = time - eatingTime;
 					}
-
-					totalEatingTime += eatingTime;
-
-					if (totalEatingTime > getDuration())
-						endTask();
 					
+					totalEatingTime += eatingTime;
 				}
 
 				// If not enough unprepared dessert available, end task.
-				else {// if (!enoughDessert) {
+				else {
 					remainingTime = time;
 					// Need endTask() below to quit EatDrink
 					endTask();
 				}
 			}
 		}
-	
+
 		return remainingTime;
 	}
 
-	private void checkInDescription(AmountResource dessertAR, boolean prepared) {
+	private void showDessertDescription(AmountResource dessertAR, boolean prepared) {
 		String s = dessertAR.getName();
+		String text = "";
 		if (s.contains(MILK) || s.contains(JUICE)) {
-			if (prepared)
-				setDescription(
-						Msg.getString("Task.description.eatDrink.preparedDessert.drink", Conversion.capitalize(s))); //$NON-NLS-1$
-			else
-				setDescription(
-						Msg.getString("Task.description.eatDrink.unpreparedDessert.drink", Conversion.capitalize(s))); //$NON-NLS-1$
+			if (prepared) {
+				text = Msg.getString("Task.description.eatDrink.preparedDessert.drink", Conversion.capitalize(s)); //$NON-NLS-1$
+			}
+			else {
+				text = Msg.getString("Task.description.eatDrink.unpreparedDessert.drink", Conversion.capitalize(s)); //$NON-NLS-1$
+			}
+			
 		} else {
-			if (prepared)
-				setDescription(Msg.getString("Task.description.eatDrink.preparedDessert.eat", Conversion.capitalize(s))); //$NON-NLS-1$
-			else
-				setDescription(
-						Msg.getString("Task.description.eatDrink.unpreparedDessert.eat", Conversion.capitalize(s))); //$NON-NLS-1$
+			if (prepared) {
+				text = Msg.getString("Task.description.eatDrink.preparedDessert.eat", Conversion.capitalize(s)); //$NON-NLS-1$
+			}
+				
+			else {
+				text = Msg.getString("Task.description.eatDrink.unpreparedDessert.eat", Conversion.capitalize(s)); //$NON-NLS-1$
+			}
 		}
+		
+		setDescription(text);
+		logger.log(worker, Level.FINE, 4_000, text + ".");
 	}
 
 	/**
-	 * Eat a prepared dessert.
-	 * 
+	 * Eats a prepared dessert.
+	 *
 	 * @param eatingTime the amount of time (millisols) to eat.
 	 */
 	private void eatPreparedDessert(double eatingTime) {
@@ -796,262 +882,196 @@ public class EatDrink extends Task implements Serializable {
 		// Proportion of dessert being eaten over this time period.
 		double proportion = person.getEatingSpeed() * eatingTime;
 
-		if (cumulativeProportion > dryMass) {
-			double excess = cumulativeProportion - dryMass;
-			cumulativeProportion = cumulativeProportion - excess;
+		if (cumulativeProportion + proportion > dryMass) {
+			double excess = cumulativeProportion + proportion - dryMass;
 			proportion = proportion - excess;
 		}
 		
 		if (proportion > MIN) {
-		
 			// Dessert amount eaten over this period of time.
-	//		double dessertAmount = dessertConsumptionRate * dessertProportion;
 			Unit containerUnit = person.getTopContainerUnit();
-			
+
 			if (containerUnit != null) {
-				Inventory inv = containerUnit.getInventory();
-				
 				// Take dessert resource from inventory if it is available.
-				boolean hasDessert = false;
-				if (inv != null) {
-					// Add to cumulativeProportion
-					cumulativeProportion += proportion;
-					
-					hasDessert = Storage.retrieveAnResource(proportion, nameOfDessert.getName(), inv, true);
-				}
-				
+				// Add to cumulativeProportion
+				cumulativeProportion += proportion;
+
+				boolean hasDessert = retrieveAnResource(proportion,
+							ResourceUtil.findIDbyAmountResourceName(nameOfDessert.getName()),
+							(ResourceHolder)containerUnit);
+
 				if (hasDessert) {
+					// Record the amount consumed
+					pc.recordFoodConsumption(proportion, 2);
 					// Consume water
 					consumeDessertWater(dryMass);
-					
 					// dessert amount eaten over this period of time.
-					double hungerRelieved = RATIO * proportion / dryMass;
-								
+					double hungerRelieved = millisolPerKgDessert * proportion;
 					// Consume unpreserved dessert.
-//					logger.info(person + " ate " +  nameOfDessert.getName()
-//							+ "   hungerRelieved : " + hungerRelieved);
-					reduceHunger(hungerRelieved);
-					
+					pc.reduceHunger(hungerRelieved);
+
 					// Reduce person's stress after eating a prepared dessert.
 					// This is in addition to normal stress reduction from eating task.
 					double stressModifier = DESSERT_STRESS_MODIFIER * (nameOfDessert.getQuality() + 1D);
-					double newStress = pc.getStress() + (stressModifier * eatingTime);
-					pc.setStress(newStress);
-			
+					double deltaStress = stressModifier * eatingTime;
+					pc.reduceStress(deltaStress);
+
 					// Add caloric energy from dessert.
-					double caloricEnergy = proportion / dryMass * PhysicalCondition.FOOD_COMPOSITION_ENERGY_RATIO;
+					double caloricEnergy = hungerRelieved * PhysicalCondition.FOOD_COMPOSITION_ENERGY_RATIO;
 					pc.addEnergy(caloricEnergy);
-					
-				} else {
-					// Not enough dessert resource available to eat.
-	//				result = false;
 				}
 			}
 		}
 	}
 
 	/**
-	 * Calculates the amount of water to consume during a dessert
-	 * 
+	 * Calculates the amount of water to consume during a dessert.
+	 *
 	 * @param dryMass of the dessert
 	 */
-	public void consumeDessertWater(double dryMass) {
-		double currentThirst = Math.min(thirst, THIRST_CEILING);
-		double waterFinal = Math.min(waterEachServing, currentThirst);
+	private void consumeDessertWater(double dryMass) {
 		// Note that the water content within the dessert has already been deducted from
-		// the settlement
-		// when the dessert was made.
-		double waterPortion = 1000 * (PreparingDessert.getDessertMassPerServing() - dryMass);
-		if (waterPortion > 0) {
-			waterFinal = waterFinal - waterPortion;
-		}
-
-		if (waterFinal > 0) {
-			double new_thirst = (currentThirst - waterFinal) / 8 - waterFinal * 5;
-			if (new_thirst < 0)
-				new_thirst = 0;
-			else if (new_thirst > THIRST_CEILING)
-				new_thirst = THIRST_CEILING;
-			pc.setThirst(new_thirst);
-
-			double newStress = pc.getStress() - waterFinal;
-			pc.setStress(newStress);
+		// the settlement when the dessert was made.
+		double proportion = PreparingDessert.getDessertMassPerServing() - dryMass;
+		if (proportion > 0) {
+			// Record the dessert amount consumed
+			pc.recordFoodConsumption(proportion, 2);
+			// Record the water amount consumed
+			pc.recordFoodConsumption(proportion, 3);
+			// Reduce thirst
+			pc.reduceThirst(proportion * THIRST_PER_WATER_SERVING);
+			// Assume dessert can reduce stress
+			pc.reduceStress(proportion * 2);
 		}
 	}
 
 	/**
-	 * Calculates the amount of water to consume
-	 * 
+	 * Calculates the amount of water to consume.
+	 *
 	 * @param is it water only
 	 */
-	public void consumeWater(boolean waterOnly) {
-//		logger.info(person + "::consumeWater()");
+	private void calculateWater(boolean waterOnly) {
 
-		if (!pc.isThirsty())
-			return;
+		double amount = RandomUtil.getRandomDouble(waterEachServing / 2, waterEachServing);
+
+		Unit containerUnit = person.getContainerUnit();
 		
-		thirst = pc.getThirst();
+		EVASuit suit = null;
+
+		if (containerUnit == null) {
+			logger.fine(person, 4_000L, "'s container unit is null.");
+			endTask();
+		}
 		
-		if (thirst > PhysicalCondition.THIRST_THRESHOLD / 2.0) {
-			double currentThirst = Math.min(thirst, THIRST_CEILING);
-			Unit containerUnit = person.getContainerUnit();
-			Inventory inv = null;
+		else if (containerUnit.getUnitType() == UnitType.PLANET) {
+			// Doing EVA outside. Get water from one's EVA suit
+			suit = person.getSuit();
+		}
+
+		// Case 1: drink from EVA suit
+		
+		if (suit != null) {
+			double available = suit.getAmountResourceStored(WATER_ID);
 			
-			if (containerUnit != null) {			
-				if (containerUnit instanceof MarsSurface) {
-					// Doing EVA outside. Get water from one's EVA suit
-					inv = person.getSuit().getInventory();
+			// Test to see if there's enough water
+			if (available >= amount) {
+				logger.fine(person, 4_000L, "Drinking " + Math.round(amount * 100.0)/100.0 + " kg of water from " + suit.getName() + ".");
+				consumeWater(suit, amount, waterOnly);
+			}
+			else if (available > 0) {
+				amount = available;
+				logger.info(person, 10_000L, "Drinking " + Math.round(amount * 100.0)/100.0 + " kg of water from " + suit.getName() + ".");
+				consumeWater(suit, amount, waterOnly);
+			}
+		}
+
+		// Case 2: drink from bottle when being inside the settlement or vehicle
+		else {
+			
+			// Case 0: drink from thermal bottle
+			double availableAmount = 0;
+			
+			// Get the bottle the person is carrying
+			Container bottle = person.lookForThermalBottle();
+					
+			if (bottle == null && person.isInside()) {
+				// Assign the person a thermal bottle
+				bottle = person.assignThermalBottle();
+				logger.fine(person, 4_000L, "Assigned a thermal bottle.");
+			}
+
+			if (bottle != null)  {
+				
+				availableAmount = bottle.getAmountResourceStored(WATER_ID);
+		
+				// Case 1: See if there's enough water in the bottle
+				if (availableAmount >= amount) {
+					consumeWater(bottle, amount, waterOnly);
+					return;
 				}
-				else {
-					// In a vehicle or settlement
-					inv = containerUnit.getInventory();
+				else if (availableAmount > 0) {
+					amount = availableAmount;
+					consumeWater(bottle, amount, waterOnly);
+					return;
 				}
+				
+				// Case 2: See if the person needs to fill up the empty bottle
+				if (availableAmount == 0.0 && containerUnit != null) {
+					// Retrieve the water from settlement/vehicle
+					double missing = ((ResourceHolder)containerUnit).retrieveAmountResource(WATER_ID, 1);
+					// Fill up the bottle with water
+					if (missing < 1) {
+						amount = 1 - missing;
+						person.fillUpThermalBottle(amount);
+					}
+				}	
 			}
 			
-			double waterFinal = Math.min(waterEachServing, currentThirst);
-
-			if (inv != null && waterFinal > 0) {
-				int level = person.getAssociatedSettlement().getWaterRation();
-				double new_thirst = (currentThirst - waterFinal) / 10;
+			if (containerUnit != null)  {
+				int level = person.getAssociatedSettlement().getWaterRationLevel();
+				amount = Math.max(MIN, amount / level);
+				
+				// for either in settlement or vehicle
+				double available = getAmountResourceStored(containerUnit, WATER_ID);
 				// Test to see if there's enough water
-				boolean haswater = false;
-				double amount = waterFinal / 1000D / level;
-
-				if (amount > MIN) {
-					double available = inv.getAmountResourceStored(ResourceUtil.waterID, false);//Storage.retrieveAnResource(amount, ResourceUtil.waterID, inv, false);
-					if (available >= amount)
-						haswater = true;
-				}				
-					
-				if (haswater) {
-					new_thirst = new_thirst - amount * 5_000;
-					if (new_thirst < 0)
-						new_thirst = 0;
-					else if (new_thirst > THIRST_CEILING)
-						new_thirst = THIRST_CEILING;
-					pc.setThirst(new_thirst);
-
-					if (amount > MIN) {
-						Storage.retrieveAnResource(amount, ResourceUtil.waterID, inv, true);
-						// Track the water consumption
-						person.addConsumptionTime(ResourceUtil.waterID, amount);
-						if (waterOnly)
-							setDescription(Msg.getString("Task.description.eatDrink.water")); //$NON-NLS-1$
-						
-//						LogConsolidated.log(logger, Level.INFO, 3_000, sourceName,
-//								"[" + person.getLocationTag().getLocale() + "] " + person
-//										+ " drank " + Math.round(amount * 1000.0) / 1.0
-//										+ " mL of water.");
-					}
-//					LogConsolidated.log(Level.FINE, 1000, sourceName,
-//						 person + " is drinking " + Math.round(amount * 1000.0)/1000.0 + "kg of water"
-//						 + " thirst : " + Math.round(currentThirst* 100.0)/100.0
-//						 + " waterEachServing : " + Math.round(waterEachServing* 100.0)/100.0
-//						 + " waterFinal : " + Math.round(waterFinal* 100.0)/100.0
-//						 + " new_thirst : " + Math.round(new_thirst* 100.0)/100.0, null);
+				if (available >= amount) {
+					consumeWater((ResourceHolder)containerUnit, amount, waterOnly);
 				}
-
-				else if (!haswater) {
-					// Test to see if there's just half of the amount of water
-					amount = waterFinal / 1000D / level / 1.5;
-					if (amount > MIN) {
-						double available = inv.getAmountResourceStored(ResourceUtil.waterID, false);//Storage.retrieveAnResource(amount, ResourceUtil.waterID, inv, false);
-						if (available >= amount)
-							haswater = true;
-					}
-					
-					if (haswater) {
-						new_thirst = new_thirst - amount * 5_000;
-						if (new_thirst < 0)
-							new_thirst = 0;
-						else if (new_thirst > THIRST_CEILING)
-							new_thirst = THIRST_CEILING;
-						pc.setThirst(new_thirst);
-						
-						if (amount > MIN) {
-							Storage.retrieveAnResource(amount, ResourceUtil.waterID, inv, true);
-							// Track the water consumption
-							person.addConsumptionTime(ResourceUtil.waterID, amount);
-							if (waterOnly)
-								setDescription(Msg.getString("Task.description.eatDrink.water")); //$NON-NLS-1$
-							LogConsolidated.log(logger, Level.INFO, 30_000, sourceName,
-									"[" + person.getLocationTag().getLocale() + "] " + person
-											+ " was put on water ration and allocated to drink no more than " 
-											+ Math.round(amount * 1000.0) / 1.0
-											+ " mL of water.");
-						}
-					}
-					else {
-						amount = waterFinal / 1000D / level / 3.0;
-
-						if (amount > MIN) {
-							double available = inv.getAmountResourceStored(ResourceUtil.waterID, false);//Storage.retrieveAnResource(amount, ResourceUtil.waterID, inv, false);
-							if (available >= amount)
-								haswater = true;
-						}
-						
-						if (haswater) {
-							new_thirst = new_thirst - amount * 5_000;
-							if (new_thirst < 0)
-								new_thirst = 0;
-							else if (new_thirst > THIRST_CEILING)
-								new_thirst = THIRST_CEILING;
-							pc.setThirst(new_thirst);
-
-							if (amount > MIN) {
-								Storage.retrieveAnResource(amount, ResourceUtil.waterID, inv, true);
-								// Track the water consumption
-								person.addConsumptionTime(ResourceUtil.waterID, amount);
-								if (waterOnly)
-									setDescription(Msg.getString("Task.description.eatDrink.water")); //$NON-NLS-1$
-								LogConsolidated.log(logger, Level.INFO, 30_000, sourceName,
-										"[" + person.getLocationTag().getLocale() + "] " + person
-												+ " was put on water ration and allocated to drink no more than " 
-												+ Math.round(amount * 1000.0) / 1.0
-												+ " mL of water.");
-							}
-						}
-						
-						else {
-							amount = waterFinal / 1000D / level / 4.5;
-							if (amount > MIN) {
-								double available = inv.getAmountResourceStored(ResourceUtil.waterID, false);//Storage.retrieveAnResource(amount, ResourceUtil.waterID, inv, false);
-								if (available >= amount)
-									haswater = true;
-							}
-							
-							if (haswater) {
-								new_thirst = new_thirst - amount * 5_000;
-								if (new_thirst < 0)
-									new_thirst = 0;
-								else if (new_thirst > THIRST_CEILING)
-									new_thirst = THIRST_CEILING;
-								pc.setThirst(new_thirst);
-
-								if (amount > MIN) {
-									Storage.retrieveAnResource(amount, ResourceUtil.waterID, inv, true);
-									// Track the water consumption
-									person.addConsumptionTime(ResourceUtil.waterID, amount);
-									if (waterOnly)
-										setDescription(Msg.getString("Task.description.eatDrink.water")); //$NON-NLS-1$
-									LogConsolidated.log(logger, Level.INFO, 30_000, sourceName,
-											"[" + person.getLocationTag().getLocale() + "] " + person
-													+ " was put on water ration and allocated to drink no more than " 
-													+ Math.round(amount * 1000.0) / 1.0
-													+ " mL of water.");
-								}
-							}
-						}
-					}
+				else if (available > 0) {
+					amount = available;
+					consumeWater((ResourceHolder)containerUnit, amount, waterOnly);
 				}
 			}
 		}
 	}
 
-	
+	/**
+	 * Consumes the water.
+	 * 
+	 * @param containerUnit
+	 * @param thirst
+	 * @param amount
+	 * @param waterOnly
+	 */
+	private void consumeWater(ResourceHolder rh, double amount, boolean waterOnly) {
+		// Reduce thirst
+		pc.reduceThirst(amount * THIRST_PER_WATER_SERVING);
+		// Retrieve the water
+		rh.retrieveAmountResource(WATER_ID, amount);
+		// Record the amount consumed
+		pc.recordFoodConsumption(amount, 3);
+
+		if (waterOnly) {
+			setDescription(Msg.getString("Task.description.eatDrink.water")); //$NON-NLS-1$
+		}
+
+		if (pc.getThirst() < PhysicalCondition.THIRST_THRESHOLD / 6)
+			endTask();
+	}
+
 	/**
 	 * Eat an unprepared dessert.
-	 * 
+	 *
 	 * @param eatingTime the amount of time (millisols) to eat.
 	 * @return true if enough unprepared dessert was available to eat.
 	 */
@@ -1062,14 +1082,12 @@ public class EatDrink extends Task implements Serializable {
 		// Determine dessert resource type if not known.
 		if (unpreparedDessertAR == null) {
 
-			boolean isThirsty = false;
-			if (pc.getThirst() > 50)
-				isThirsty = true;
-			// Determine list of available dessert resources.
-			List<AmountResource> availableDessertResources = getAvailableDessertResources(dessertConsumptionRate,
+			boolean isThirsty = pc.getThirst() > 50;
+            // Determine list of available dessert resources.
+			List<AmountResource> availableDessertResources = getAvailableDessertResources(dessertConsumedPerServing,
 					isThirsty);
-			if (availableDessertResources.size() > 0) {
-
+			
+			if (!availableDessertResources.isEmpty()) {
 				// Randomly choose available dessert resource.
 				int index = RandomUtil.getRandomInt(availableDessertResources.size() - 1);
 				unpreparedDessertAR = availableDessertResources.get(index);
@@ -1080,58 +1098,46 @@ public class EatDrink extends Task implements Serializable {
 
 		// Consume portion of unprepared dessert resource.
 		if (unpreparedDessertAR != null) {
-			
+
 			// Obtain the dry mass of the dessert
 			double dryMass = PreparingDessert.getDryMass(PreparingDessert.convertAR2String(unpreparedDessertAR));
 			// Proportion of dessert being eaten over this time period.
 			double proportion = person.getEatingSpeed() * eatingTime;
 
-			if (cumulativeProportion > dryMass) {
-				double excess = cumulativeProportion - dryMass;
-				cumulativeProportion = cumulativeProportion - excess;
+			if (cumulativeProportion + proportion > dryMass) {
+				double excess = cumulativeProportion + proportion - dryMass;
 				proportion = proportion - excess;
 			}
-			
+
 			if (proportion > MIN) {
-		
+
 				Unit containerUnit = person.getTopContainerUnit();
-				
-				Inventory inv = null;
-				
-				if (containerUnit != null) {			
-					if (containerUnit instanceof MarsSurface) {
-						// Get dessert from one's EVA suit
-						inv = person.getSuit().getInventory();
-					}
-					else {
-						inv = containerUnit.getInventory();
-					}
-				}
-				
-				if (inv != null) {
+
+				if (containerUnit != null) {
 					// Add to cumulativeProportion
 					cumulativeProportion += proportion;
 					// Take dessert resource from inventory if it is available.
-					boolean hasDessert = Storage.retrieveAnResource(proportion, unpreparedDessertAR, inv, true);
-					
+					boolean hasDessert = Storage.retrieveAnResource(proportion, unpreparedDessertAR, (ResourceHolder) containerUnit, true);
+
 					if (hasDessert) {
 						// Consume water inside the dessert
 						consumeDessertWater(dryMass);
-						
+						// Record the amount consumed
+						pc.recordFoodConsumption(proportion, 2);
 						// dessert amount eaten over this period of time.
-						double hungerRelieved = RATIO * proportion / dessertConsumptionRate;
-				
+						double hungerRelieved = millisolPerKgDessert * proportion;
+
 						// Consume unpreserved dessert.
-						reduceHunger(hungerRelieved);
-						
+						pc.reduceHunger(hungerRelieved);
+
 						// Reduce person's stress after eating an unprepared dessert.
 						// This is in addition to normal stress reduction from eating task.
 						double stressModifier = DESSERT_STRESS_MODIFIER;
-						double newStress = pc.getStress() + (stressModifier * eatingTime);
-						pc.setStress(newStress);
-				
+						double deltaStress = stressModifier * eatingTime;
+						pc.reduceStress(deltaStress);
+
 						// Add caloric energy from dessert.
-						double caloricEnergy = proportion / dessertConsumptionRate * PhysicalCondition.FOOD_COMPOSITION_ENERGY_RATIO;
+						double caloricEnergy = hungerRelieved * PhysicalCondition.FOOD_COMPOSITION_ENERGY_RATIO;
 						pc.addEnergy(caloricEnergy);
 					} else {
 						// Not enough dessert resource available to eat.
@@ -1146,28 +1152,28 @@ public class EatDrink extends Task implements Serializable {
 
 	/**
 	 * Gets a list of available unprepared dessert AmountResource.
-	 * 
+	 *
 	 * @param amountNeeded the amount (kg) of unprepared dessert needed for eating.
 	 * @return list of AmountResource.
 	 */
 	private List<AmountResource> getAvailableDessertResources(double amountNeeded, boolean isThirsty) {
 
-		List<AmountResource> result = new CopyOnWriteArrayList<AmountResource>();
+		List<AmountResource> result = new ArrayList<>();
 
 		Unit containerUnit = person.getContainerUnit();
-		if (!(containerUnit instanceof MarsSurface)) {
-			Inventory inv = containerUnit.getInventory();
 
+		if (containerUnit.getUnitType() != UnitType.PLANET) {
+			ResourceHolder rh = (ResourceHolder)containerUnit;
 			boolean option = true;
 
-			AmountResource[] ARs = PreparingDessert.getArrayOfDessertsAR();
-			for (AmountResource ar : ARs) {
+			AmountResource[] resources = PreparingDessert.getArrayOfDessertsAR();
+			for (AmountResource ar : resources) {
 				if (isThirsty)
 					option = ar.getName().contains(JUICE) || ar.getName().contains(MILK);
-				
+
 				boolean hasAR = false;
 				if (amountNeeded > MIN) {
-					hasAR = Storage.retrieveAnResource(amountNeeded, ar, inv, false);
+					hasAR = Storage.retrieveAnResource(amountNeeded, ar, rh, false);
 				}
 				if (option && hasAR) {
 					result.add(ar);
@@ -1179,50 +1185,8 @@ public class EatDrink extends Task implements Serializable {
 	}
 
 	/**
-	 * Adds experience to the person's skills used in this task.
-	 * 
-	 * @param time the amount of time (ms) the person performed this task.
-	 */
-	protected void addExperience(double time) {
-		// This task adds no experience.
-	}
-
-	/**
-	 * Gets an available dining building that the person can use. Returns null if no
-	 * dining building is currently available.
-	 *
-	 * @param person the person
-	 * @return available dining building
-	 * @throws BuildingException if error finding dining building.
-	 */
-	public static Building getAvailableDiningBuilding(Person person, boolean canChat) {
-		Building result = null;
-
-		if (person.isInSettlement()) {//LocationSituation.IN_SETTLEMENT == person.getLocationSituation()) {
-			Settlement settlement = person.getSettlement();
-			BuildingManager manager = settlement.getBuildingManager();
-			List<Building> diningBuildings = manager.getBuildings(FunctionType.DINING);
-			diningBuildings = BuildingManager.getWalkableBuildings(person, diningBuildings);
-//			diningBuildings = BuildingManager.getNonMalfunctioningBuildings(diningBuildings);
-			if (canChat)
-				// Choose between the most crowded or the least crowded dining hall
-				diningBuildings = BuildingManager.getChattyBuildings(diningBuildings);
-			else
-				diningBuildings = BuildingManager.getLeastCrowdedBuildings(diningBuildings);
-
-			if (diningBuildings.size() > 0) {
-				Map<Building, Double> diningBuildingProbs = BuildingManager.getBestRelationshipBuildings(person,
-						diningBuildings);
-				result = RandomUtil.getWeightedRandomObject(diningBuildingProbs);
-			}
-		}
-
-		return result;
-	}
-
-	/**
 	 * Gets a kitchen in the person's settlement that currently has cooked meals.
-	 * 
+	 *
 	 * @param person the person to check for
 	 * @return the kitchen or null if none.
 	 */
@@ -1246,14 +1210,14 @@ public class EatDrink extends Task implements Serializable {
 	/**
 	 * Gets a kitchen in the person's settlement that currently has prepared
 	 * desserts.
-	 * 
+	 *
 	 * @param person the person to check for
 	 * @return the kitchen or null if none.
 	 */
 	public static PreparingDessert getKitchenWithDessert(Person person) {
 		PreparingDessert result = null;
 		Settlement settlement = person.getSettlement();
-		
+
 		if (settlement != null) {
 			BuildingManager manager = settlement.getBuildingManager();
 			List<Building> dessertBuildings = manager.getBuildings(FunctionType.PREPARING_DESSERT);
@@ -1269,78 +1233,13 @@ public class EatDrink extends Task implements Serializable {
 	}
 
 	/**
-	 * Checks if there is dessert available for the person.
-	 * 
-	 * @param person the person to check.
-	 * @return true if preserved food is available.
+	 * Throws away any napkins.
 	 */
-	public static boolean isDessertAvailable(Person person) {
-		boolean result = false;
-		Unit containerUnit = person.getTopContainerUnit();
-		if (!(containerUnit instanceof MarsSurface)) {
-			Inventory inv = containerUnit.getInventory();
-			
-			// TODO: need to look for all available dessert
-			
-//			if (inv != null && foodConsumptionRate > MIN)
-//				result = inv.getAmountResourceStored(ResourceUtil.foodID, false) > MIN;
-//				Storage.retrieveAnResource(foodConsumptionRate, ResourceUtil.foodID, inv, false);
-		}
-		return result;
-	}
-	
-	/**
-	 * Checks if there is preserved food available for the person.
-	 * 
-	 * @param person the person to check.
-	 * @return true if preserved food is available.
-	 */
-	public static boolean isPreservedFoodAvailable(Person person) {
-		boolean result = false;
-		Unit containerUnit = person.getTopContainerUnit();
-		if (!(containerUnit instanceof MarsSurface)) {
-			Inventory inv = containerUnit.getInventory();
-			if (inv != null && foodConsumptionRate > MIN)
-				result = inv.getAmountResourceStored(ResourceUtil.foodID, false) > MIN;
-//				Storage.retrieveAnResource(foodConsumptionRate, ResourceUtil.foodID, inv, false);
-		}
-		return result;
-	}
-
 	@Override
-	public int getEffectiveSkillLevel() {
-		return 0;
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new CopyOnWriteArrayList<SkillType>();
-		return results;
-	}
-
-	
-	@Override
-	public void endTask() {
-//		logger.info(person + " called endTask()");
+	protected void clearDown() {
 		// Throw away napkin waste if one was used.
-		if (hasNapkin) {
-			Unit containerUnit = person.getContainerUnit();
-			if (person.isInside()) {//!(containerUnit instanceof MarsSurface)) {
-				Inventory inv = containerUnit.getInventory();
-				if (NAPKIN_MASS > 0)
-					Storage.storeAnResource(NAPKIN_MASS, ResourceUtil.solidWasteID, inv, sourceName + "::endTask");
-			}
+		if (hasNapkin && person.isInside()) {
+			((ResourceHolder)person.getContainerUnit()).storeAmountResource(ResourceUtil.solidWasteID, NAPKIN_MASS);
 		}
-		super.endTask();
-	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
-
-		kitchen = null;
-		cookedMeal = null;
-		dessertKitchen = null;
-		nameOfDessert = null;
 	}
 }

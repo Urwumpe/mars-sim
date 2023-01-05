@@ -1,8 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * JComboBoxMW.java
- * @version 3.1.2 2020-09-02
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-28
  * @author stpa
  */
 package org.mars_sim.msp.ui.swing;
@@ -20,10 +19,6 @@ import javax.swing.JComboBox;
 @SuppressWarnings({ "serial", "rawtypes" })
 public class JComboBoxMW<T> extends JComboBox implements MouseWheelListener {
 
-//	private static final long serialVersionUID = -3527247980947082803L;
-
-//	private boolean layingOut = false;
-
 	private boolean wide = true;
 
 	/**
@@ -38,7 +33,7 @@ public class JComboBoxMW<T> extends JComboBox implements MouseWheelListener {
 
 	/**
 	 * constructor.
-	 * 
+	 *
 	 * @param items {@link Vector}<T> the initial items.
 	 */
 	@SuppressWarnings("unchecked")
@@ -49,7 +44,7 @@ public class JComboBoxMW<T> extends JComboBox implements MouseWheelListener {
 
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param model {@link ComboBoxModel}<T>
 	 */
 	@SuppressWarnings("unchecked")
@@ -60,7 +55,7 @@ public class JComboBoxMW<T> extends JComboBox implements MouseWheelListener {
 
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param items T[]
 	 */
 	@SuppressWarnings("unchecked")
@@ -69,6 +64,13 @@ public class JComboBoxMW<T> extends JComboBox implements MouseWheelListener {
 		this.addMouseWheelListener(this);
 	}
 
+	
+	@SuppressWarnings("unchecked")
+	public void replaceModel(ComboBoxModel<T> model) {
+		setModel(model);
+	}
+	
+	
 	/** Use mouse wheel to cycle through items if any. */
 	@Override
 	public void mouseWheelMoved(MouseWheelEvent e) {
@@ -99,7 +101,6 @@ public class JComboBoxMW<T> extends JComboBox implements MouseWheelListener {
 //	public Dimension getSize() {
 //		Dimension dim = super.getSize();
 //		if (!layingOut && isWide())
-//
 //			dim.width = Math.min(dim.width, Toolkit.getDefaultToolkit().getScreenSize().width);
 //		return dim;
 //	}

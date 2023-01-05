@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * AbstractFilter.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-05
  * @author Manny Kung
  */
 

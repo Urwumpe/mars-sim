@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * UnitInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -66,7 +66,7 @@ public class UnitInfoPanel extends WebPanel {
 		setSize(PopUpUnitMenu.WIDTH_1 - 10, PopUpUnitMenu.HEIGHT_1 - 10); 
 		setMaximumSize(PopUpUnitMenu.WIDTH_1 - 10, PopUpUnitMenu.HEIGHT_1 - 10); 
 		
-		String type = "Building Type: ";
+		String type = "Type: ";
 		String description = "Descripion: ";
 //		String text = unitName + "\n\n" 
 //					+ type + "\n" + unitType + "\n\n"

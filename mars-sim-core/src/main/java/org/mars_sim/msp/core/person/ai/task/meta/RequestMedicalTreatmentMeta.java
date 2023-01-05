@@ -1,12 +1,11 @@
 /**
  * Mars Simulation Project
  * RequestMedicalTreatmentMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -15,12 +14,12 @@ import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.task.RequestMedicalTreatment;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.person.health.Treatment;
-import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
@@ -29,19 +28,12 @@ import org.mars_sim.msp.core.vehicle.Crewable;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.SickBay;
 import org.mars_sim.msp.core.vehicle.Vehicle;
+import org.mars_sim.msp.core.vehicle.VehicleType;
 
 /**
  * Meta task for the RequestMedicalTreatment task.
  */
-public class RequestMedicalTreatmentMeta implements MetaTask, Serializable {
-
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
-    
-//	private static Logger logger = Logger.getLogger(RequestMedicalTreatmentMeta.class.getName());
-
-//	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-//			logger.getName().length());
+public class RequestMedicalTreatmentMeta extends FactoryMetaTask {
 
 	private static final int VALUE = 500;
 	
@@ -49,10 +41,12 @@ public class RequestMedicalTreatmentMeta implements MetaTask, Serializable {
     private static final String NAME = Msg.getString(
             "Task.description.requestMedicalTreatment"); //$NON-NLS-1$
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
+    public RequestMedicalTreatmentMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.ANY_HOUR);
+		
+		setTrait(TaskTrait.TREATMENT);
+	}
+    
 
     @Override
     public Task constructInstance(Person person) {
@@ -67,17 +61,17 @@ public class RequestMedicalTreatmentMeta implements MetaTask, Serializable {
         if (person.isOutside())
         	return 0;
         
-        if (person.getPhysicalCondition().getProblems().size() == 0)
+        if (person.getPhysicalCondition().getProblems().isEmpty())
         	return 0;
         
         // Get person's medical skill level.
-//        int personMedicalSkill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
+        int personMedicalSkill = person.getSkillManager().getEffectiveSkillLevel(SkillType.MEDICINE);
 
         // Get the best medical skill level of local people.
         int bestMedicalSkill = getBestLocalMedicalSkill(person);
 
         // Determine all the person's health problems that need treatment.
-        List<HealthProblem> problemsNeedingTreatment = new ArrayList<HealthProblem>();
+        List<HealthProblem> problemsNeedingTreatment = new ArrayList<>();
         Iterator<HealthProblem> i = person.getPhysicalCondition().getProblems().iterator();
         while (i.hasNext()) {
             HealthProblem problem = i.next();
@@ -93,16 +87,15 @@ public class RequestMedicalTreatmentMeta implements MetaTask, Serializable {
                         canTreat = true;
                     }
 
-//                    // Check if person can treat the health problem himself/herself.
-//                    boolean selfTreat = false;
-//                    if (treatment.getSelfAdminister()) {
-//                        if (personMedicalSkill >= treatment.getSkill()) {
-//                            result += VALUE;
-//                            selfTreat = true;
-//                        }
-//                    }
+                    // Check if person can treat the health problem himself/herself.
+                    boolean selfTreat = false;
+                    if (treatment.getSelfAdminister()
+                        && personMedicalSkill >= treatment.getSkill()) {
+                    	result += VALUE;
+                    	selfTreat = true;
+                    }
 
-                    if (canTreat) {// && !selfTreat) {
+                    if (canTreat && !selfTreat) {
                         problemsNeedingTreatment.add(problem);
                     }
                 }
@@ -155,7 +148,7 @@ public class RequestMedicalTreatmentMeta implements MetaTask, Serializable {
      */
     private List<MedicalAid> getAvailableMedicalAids(Person person) {
 
-        List<MedicalAid> result = new ArrayList<MedicalAid>();
+        List<MedicalAid> result = new ArrayList<>();
 
         if (person.isInSettlement()) {
             result = getAvailableMedicalAidsAtSettlement(person);
@@ -174,7 +167,7 @@ public class RequestMedicalTreatmentMeta implements MetaTask, Serializable {
      */
     private List<MedicalAid> getAvailableMedicalAidsAtSettlement(Person person) {
 
-        List<MedicalAid> result = new ArrayList<MedicalAid>();
+        List<MedicalAid> result = new ArrayList<>();
 
         // Check all medical care buildings.
         Iterator<Building> i = person.getSettlement().getBuildingManager().getBuildings(
@@ -206,9 +199,9 @@ public class RequestMedicalTreatmentMeta implements MetaTask, Serializable {
      */
     private List<MedicalAid> getAvailableMedicalAidsInVehicle(Person person) {
 
-        List<MedicalAid> result = new ArrayList<MedicalAid>();
+        List<MedicalAid> result = new ArrayList<>();
 
-        if (person.getVehicle() instanceof Rover) {
+        if (VehicleType.isRover(person.getVehicle().getVehicleType())) {
             Rover rover = (Rover) person.getVehicle();
             if (rover.hasSickBay()) {
                 SickBay sickBay = rover.getSickBay();
@@ -296,16 +289,4 @@ public class RequestMedicalTreatmentMeta implements MetaTask, Serializable {
 
         return result;
     }
-
-	@Override
-	public Task constructInstance(Robot robot) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 }

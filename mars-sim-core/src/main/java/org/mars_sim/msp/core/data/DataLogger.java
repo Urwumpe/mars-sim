@@ -1,3 +1,10 @@
+/*
+ * Mars Simulation Project
+ * DataLogger.java
+ * @date 2022-07-28
+ * @author Barry Evans
+ */
+
 package org.mars_sim.msp.core.data;
 
 import java.io.Serializable;
@@ -6,13 +13,14 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.mars_sim.msp.core.time.ClockPulse;
+import org.mars_sim.msp.core.time.MarsClock;
 
 
 /**
- * Logs data items according to the current Sol. Each sol s a single data item.
+ * Logs data items according to the current Sol. Each sol is a single data item.
  * Only a maximum number of sols is retained.
- * The timestamp of the logger is shifted autumatically via the Simulation.
+ * The timestamp of the logger is shifted automatically via the Simulation.
+ * 
  * @param <T> Data item being recorded
  */
 public abstract class DataLogger<T> implements Serializable {
@@ -20,10 +28,10 @@ public abstract class DataLogger<T> implements Serializable {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	private static int currentSol = 0;
+	private static int currentSol = 1;
 	protected static int currentMsol = 0;
 	
-	private int maxSols = 5;
+	private int maxSols = 7;
 	private int latestSol = 0;
 	protected T currentData = null;
 	protected List<T> dailyData = new LinkedList<T>();
@@ -31,25 +39,26 @@ public abstract class DataLogger<T> implements Serializable {
 	public DataLogger(int maxSols) {
 		super();
 		this.maxSols = maxSols;
-		newSol(1);
 	}
 	
 	/**
-	 * Move time onwards.
+	 * Moves time onwards.
+	 * 
 	 * @param pulse
 	 */
-	public static void changeTime(ClockPulse pulse) {
-		currentSol = pulse.getMarsTime().getMissionSol();
-		currentMsol = pulse.getMarsTime().getMillisolInt();
+	public static void changeTime(MarsClock time) {
+		currentSol = time.getMissionSol();
+		currentMsol = time.getMillisolInt();
 	}
 	
 	/**
 	 * A new sol should be started in the logger.
+	 * 
 	 * @param newSol
 	 */
 	private void newSol(int newSol) {
 		latestSol = newSol;
-		currentData = getDataItem(); 
+		currentData = getNewDataItem(); 
 		dailyData.add(0, currentData);
 		if (dailyData.size() > maxSols) {
 			dailyData.remove(maxSols-1);
@@ -57,13 +66,14 @@ public abstract class DataLogger<T> implements Serializable {
 	}
 	
 	/**
-	 * Create a new data item for a new sol;
+	 * Creates a new data item for a new sol.
+	 * 
 	 * @return
 	 */
-	protected abstract T getDataItem();
+	protected abstract T getNewDataItem();
 
 	/**
-	 * The logger is updating
+	 * The logger is updating.
 	 */
 	protected void updating() {
 		if (latestSol != currentSol) {
@@ -72,7 +82,8 @@ public abstract class DataLogger<T> implements Serializable {
 	}
 
 	/**
-	 * Return a Map if data entries per missionSol. Map is keyed on sol.
+	 * Returns a Map if data entries per missionSol. Map is keyed on sol.
+	 * 
 	 * @return Sol to daily data entries.
 	 */
 	public Map<Integer, T> getHistory() {
@@ -85,7 +96,21 @@ public abstract class DataLogger<T> implements Serializable {
 	}
 
 	/**
-	 * The current sol the Data Logger is recording
+	 * Gets the today's data value in double.
+	 * 
+	 * @return
+	 */
+	public double getTodayDataValue() {
+		double value = 0;
+		if (getHistory().containsKey(currentSol)
+				&& getHistory().get(currentSol) instanceof Double)
+			value = (double)getHistory().get(currentSol);
+		return value;
+	}
+	
+	/**
+	 * Gets the current sol the Data Logger is recording.
+	 * 
 	 * @return
 	 */
 	public int getCurrentSol() {
@@ -93,7 +118,8 @@ public abstract class DataLogger<T> implements Serializable {
 	}
 
 	/**
-	 * Get the data heled for a single sol
+	 * Gets the data held for a single sol.
+	 * 
 	 * @param sol Sol
 	 * @return List of data items
 	 */
@@ -102,7 +128,7 @@ public abstract class DataLogger<T> implements Serializable {
 			throw new IllegalArgumentException("Mission Sol cannot be less than 1");
 		}
 		int idx = latestSol - sol;
-		if (idx >= dailyData.size()) {
+		if ((idx < 0) || (idx >= dailyData.size())) {
 			return null;
 		}
 		else {
@@ -111,24 +137,39 @@ public abstract class DataLogger<T> implements Serializable {
 	}
 	
 	/**
-	 * Get the latest Sol data being captured
+	 * Gets the latest Sol data being captured.
+	 * 
 	 * @return
 	 */
 	public T getTodayData() {
 		return currentData;
 	}
 	
+//	/**
+//	 * Gets the data held for the current sol.
+//	 * 
+//	 * @return
+//	 */
+//	public T getSolData() {
+//		return getSolData(currentSol);
+//	}
+	
 	/**
-	 * Get yesterdays data if it exists
+	 * Checks if yestersol's data valid.
+	 * 
 	 * @return
 	 */
-	public T getYesterdayData() {
-		if (currentSol == 1) {
-			// No yesterday yet
-			return null;
-		}
-		// Use the current sol incase this logger has not recorded an data point for today.
-		int yesterdaySol = currentSol - 1;
-		return getSolData(yesterdaySol);
+	public boolean isYestersolDataValid() {
+		return currentSol - 1 > 0;
 	}
+	
+	/**
+	 * Gets yestersol's data if it exists.
+	 * 
+	 * @return
+	 */
+	public T getYestersolData() {
+		return getSolData(currentSol - 1);
+	}
+	
 }

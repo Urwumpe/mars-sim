@@ -1,17 +1,14 @@
-/**
+/*
  * Mars Simulation Project
  * UnitDisplayInfoFactory.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-06-27
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.unit_display_info;
 
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.equipment.Equipment;
-import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.core.vehicle.VehicleType;
@@ -23,6 +20,7 @@ public final class UnitDisplayInfoFactory {
 
 	// Static bean instances.
 	private static UnitDisplayInfo settlementBean = new SettlementDisplayInfoBean();
+	private static UnitDisplayInfo buildingBean = new BuildingDisplayInfoBean();
 	private static UnitDisplayInfo personBean = new PersonDisplayInfoBean();
 	private static UnitDisplayInfo robotBean = new RobotDisplayInfoBean();
 	private static UnitDisplayInfo roverBean = new RoverDisplayInfoBean();
@@ -30,12 +28,14 @@ public final class UnitDisplayInfoFactory {
 	private static UnitDisplayInfo transportRoverBean = new TransportRoverDisplayInfoBean();
 	private static UnitDisplayInfo cargoRoverBean = new CargoRoverDisplayInfoBean();
 	private static UnitDisplayInfo luvBean = new LUVDisplayInfoBean();
+	private static UnitDisplayInfo deliveryDroneBean = new DroneDisplayInfoBean();
 	private static UnitDisplayInfo equipmentBean = new EquipmentDisplayInfoBean();
 
 	/**
 	 * Private constructor
 	 */
 	private UnitDisplayInfoFactory() {
+		// empty for now
 	}
 
 	/**
@@ -45,29 +45,35 @@ public final class UnitDisplayInfoFactory {
 	 * @return unit display info instance.
 	 */
 	public static UnitDisplayInfo getUnitDisplayInfo(Unit unit) {
-		if (unit instanceof Settlement)
+		if (unit.getUnitType() == UnitType.SETTLEMENT)
 			return settlementBean;
-		else if (unit instanceof Person)
+		else if (unit.getUnitType() == UnitType.PERSON)
 			return personBean;
-		else if (unit instanceof Robot)
+		else if (unit.getUnitType() == UnitType.BUILDING)
+			return buildingBean;
+		else if (unit.getUnitType() == UnitType.ROBOT)
 			return robotBean;
-		else if (unit instanceof Vehicle) {
+		else if (unit.getUnitType() == UnitType.VEHICLE) {
 			Vehicle vehicle = (Vehicle) unit;
+			VehicleType type = vehicle.getVehicleType();
 			if (vehicle instanceof Rover) {
-				String type = vehicle.getVehicleType();
-				if (type.equalsIgnoreCase(VehicleType.EXPLORER_ROVER.getName()))
+				if (type == VehicleType.EXPLORER_ROVER)
 					return explorerRoverBean;
-				else if (type.equalsIgnoreCase(VehicleType.TRANSPORT_ROVER.getName()))
+				else if (type == VehicleType.TRANSPORT_ROVER)
 					return transportRoverBean;
-				else if (type.equalsIgnoreCase(VehicleType.CARGO_ROVER.getName()))
+				else if (type == VehicleType.CARGO_ROVER)
 					return cargoRoverBean;
 				else
 					return roverBean;
-			} else if (vehicle.getVehicleType().equalsIgnoreCase(VehicleType.LUV.getName()))
+			} else if (type == VehicleType.LUV) {
 				return luvBean;
+			} else if (type == VehicleType.DELIVERY_DRONE) {
+				return deliveryDroneBean;
+			}
 			else
 				return null;
-		} else if (unit instanceof Equipment)
+		} else if (unit.getUnitType() == UnitType.EVA_SUIT
+					|| unit.getUnitType() == UnitType.CONTAINER)
 			return equipmentBean;
 		else
 			return null;

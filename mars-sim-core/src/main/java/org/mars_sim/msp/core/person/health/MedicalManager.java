@@ -1,23 +1,23 @@
 /**
  * Mars Simulation Project
  * MedicalManager.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Barry Evans
  */
 package org.mars_sim.msp.core.person.health;
 
-import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.SimulationConfig;
-import org.mars_sim.msp.core.person.PersonConfig;
-import org.mars_sim.msp.core.structure.Settlement;
-
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.person.PersonConfig;
+import org.mars_sim.msp.core.structure.Settlement;
 
 /**
  * This class provides a Factory for the {@link Complaint} class. Some of the
@@ -30,28 +30,22 @@ public class MedicalManager implements Serializable {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	// private static final Logger logger =
-	// Logger.getLogger(MedicalManager.class.getName());
+	// private static final Logger logger = Logger.getLogger(MedicalManager.class.getName());
 
 	public final static int MINUTES_PER_DAY = 24 * 60;
 
 	/** Possible Complaints. */
-	private static Map<ComplaintType, Complaint> complaints;// = new HashMap<ComplaintType, Complaint>();
+//	private static Map<ComplaintType, Complaint> complaints;// = new HashMap<ComplaintType, Complaint>();
 	/** Environmentally Related Complaints. */
-	private static Map<ComplaintType, Complaint> environmentalComplaints;// = new HashMap<ComplaintType, Complaint>();
+	private static Map<ComplaintType, Complaint> environmentalComplaints;
 
-	/** Possible Treatments. */
-	private static Map<String, Treatment> treatments;// = new HashMap<String, Treatment>();
-	/** Treatments to Facilities. */
-	private static Map<Integer, List<Treatment>> supportedTreatments;// = new HashMap<Integer, List<Treatment>>();
+	/** Treatments based on a facility's tech level. */
+	private static Map<Integer, List<Treatment>> supportedTreatments;
 
 	/** Settlement's Postmortem Exam waiting list. */
-	private Map<Integer, List<DeathInfo>> awaitingPostmortemExam;// = new HashMap<Integer, List<Treatment>>();
+	private Map<Integer, List<DeathInfo>> awaitingPostmortemExam;
 	/** Settlement's Death Registry. */
-	private Map<Integer, List<DeathInfo>> deathRegistry;// = new HashMap<Integer, List<Treatment>>();
-
-//	private List<DeathInfo> awaitingPostmortemExam;
-//	private List<DeathInfo> deathRegistry;
+	private Map<Integer, List<DeathInfo>> deathRegistry;
 
 	/** Pre-defined complaint. */
 	private static Complaint starvation;
@@ -66,9 +60,7 @@ public class MedicalManager implements Serializable {
 	/** Pre-defined complaint. */
 	private static Complaint heatStroke;
 
-//	private static SimulationConfig simConfig = SimulationConfig.instance();
-//	private static MedicalConfig medicalConfig;
-//	private static PersonConfig personConfig;
+	private static MedicalConfig medicalConfig;
 
 	/**
 	 * Construct a new {@link MedicalManager}. This also constructs all the
@@ -76,9 +68,9 @@ public class MedicalManager implements Serializable {
 	 * file.
 	 */
 	public MedicalManager() {
-		complaints = new ConcurrentHashMap<ComplaintType, Complaint>();
+		if (medicalConfig == null)
+			medicalConfig = SimulationConfig.instance().getMedicalConfiguration();
 		environmentalComplaints = new ConcurrentHashMap<ComplaintType, Complaint>();
-		treatments = new ConcurrentHashMap<String, Treatment>();
 		supportedTreatments = new ConcurrentHashMap<Integer, List<Treatment>>();
 		
 		awaitingPostmortemExam = new ConcurrentHashMap<>();
@@ -94,21 +86,9 @@ public class MedicalManager implements Serializable {
 	 */
 	public static void initializeInstances() {
 		// Maven test requires the full "SimulationConfig.instance()" declaration here, rather than during class declaration.
-		MedicalConfig medicalConfig = SimulationConfig.instance().getMedicalConfiguration();
-//		System.out.println("medicalConfig : " + medicalConfig);
+		medicalConfig = SimulationConfig.instance().getMedicalConfiguration();
+
 		setUpEnvironmentalComplaints();
-
-		// Create treatments from medical config.
-		Iterator<Treatment> i = medicalConfig.getTreatmentList().iterator();
-		while (i.hasNext())
-			addTreatment(i.next());
-
-		// logger.info("initMedical() : adding Complaints");
-
-		// Create additional complaints from medical config.
-		Iterator<Complaint> j = medicalConfig.getComplaintList().iterator();
-		while (j.hasNext())
-			addComplaint(j.next());
 	}
 
 	/***
@@ -116,43 +96,35 @@ public class MedicalManager implements Serializable {
 	 */
 	private static void setUpEnvironmentalComplaints() {
 		
+		// TODO: Why are these not created via the medical.xml and then lookup by a fixed name ?????
+		// Bad case of magic numbers.
 		// Maven test requires the full "SimulationConfig.instance()" declaration here, rather than during class declaration.
 		PersonConfig personConfig = SimulationConfig.instance().getPersonConfig(); 
 
 		// Most serious complaint
-//		System.out.println("suffocation : " + suffocation);
 		suffocation = createEnvironmentComplaint(ComplaintType.SUFFOCATION, 80, personConfig.getOxygenDeprivationTime(),
 				.5, 20, true);
-//		System.out.println("suffocation : " + suffocation);
-		addEnvComplaint(suffocation);
 
 		// Very serious complaint
 		decompression = createEnvironmentComplaint(ComplaintType.DECOMPRESSION, 70, personConfig.getDecompressionTime(),
 				.5, 30, true);
-		addEnvComplaint(decompression);
 
 		// Somewhat serious complaint
 		heatStroke = createEnvironmentComplaint(ComplaintType.HEAT_STROKE, 40, 200D, 1, 60, true);
-		addEnvComplaint(heatStroke);
 
 		// Serious complaint
 		freezing = createEnvironmentComplaint(ComplaintType.FREEZING, 50, personConfig.getFreezingTime(), 1, 50, false);
-		addEnvComplaint(freezing);
 
-		// Somewhat serious complaint
+		// degrade = (7 - 3) * 1000 millisols
+		double degrade = (personConfig.getWaterDeprivationTime() - personConfig.getDehydrationStartTime()) * 1000D;
 		dehydration = createEnvironmentComplaint(ComplaintType.DEHYDRATION, 20,
-				(personConfig.getWaterDeprivationTime() - personConfig.getDehydrationStartTime()) * 1000D, 1, 80,
+				degrade, 1, 80,
 				false);
-		addEnvComplaint(dehydration);
 
-		// Least serious complaint
+		// degrade = (40 - 7) * 1000 millisols
+		degrade = (personConfig.getFoodDeprivationTime() - personConfig.getStarvationStartTime()) * 1000D;
 		starvation = createEnvironmentComplaint(ComplaintType.STARVATION, 40,
-				(personConfig.getFoodDeprivationTime() - personConfig.getStarvationStartTime()) * 1000D, 1, 60, false);
-		addEnvComplaint(starvation);
-	}
-
-	static void addEnvComplaint(Complaint c) {
-		environmentalComplaints.put(c.getType(), c);
+				degrade, 1, 60, false);
 	}
 
 	/**
@@ -175,67 +147,11 @@ public class MedicalManager implements Serializable {
 	 */
 	private static Complaint createEnvironmentComplaint(ComplaintType type, int seriousness, double degrade,
 			double recovery, double performance, boolean needBedRest) {
-		return new Complaint(type, seriousness, degrade, recovery, 0D, performance, needBedRest, null, null);
-	}
+		Complaint c = new Complaint(type, seriousness, degrade, recovery, 
+				0D, performance, needBedRest, null, null);
 
-//	/**
-//	 * Package friendly factory method.
-//	 * 
-//	 * @param type
-//	 * @param seriousness
-//	 * @param degrade
-//	 * @param recovery
-//	 * @param probability
-//	 * @param performance
-//	 * @param needBedRest
-//	 * @param treatment
-//	 * @param             {@link Complaint}
-//	 */
-//	void createComplaint(ComplaintType type, 
-//			int seriousness, double degrade,
-//			double recovery, double probability, double performance,
-//			boolean bedRest, Treatment recoveryTreatment, Complaint next) {
-//
-//		Complaint complaint = new Complaint(type, seriousness, degrade,
-//				recovery, probability, performance, bedRest, recoveryTreatment, next);
-//		// Add an entry keyed on name.
-//		complaints.put(type, complaint);
-//	}
-
-	/**
-	 * Adds a new complaint to the map.
-	 * 
-	 * @param newComplaint the new complaint to add.
-	 * @throws Exception if complaint already exists in map.
-	 */
-	static void addComplaint(Complaint newComplaint) {
-		if (!complaints.containsKey(newComplaint.getType()))
-			complaints.put(newComplaint.getType(), newComplaint);
-		else
-			throw new IllegalStateException(Msg.getString("MedicalManager.error.complaint", //$NON-NLS-1$
-					newComplaint.getType().toString()));
-	}
-
-	/**
-	 * Package friendly factory method.
-	 */
-	void createTreatment(String name, int skill, double duration, boolean selfHeal, boolean retainAid, int level) {
-		Treatment newTreatment = new Treatment(name, skill, duration, selfHeal, level);
-		treatments.put(name, newTreatment);
-	}
-
-	/**
-	 * Adds a new treatment to the map.
-	 * 
-	 * @param newTreatment the new treatment to add.
-	 * @throws Exception if treatment already exists in map.
-	 */
-	static void addTreatment(Treatment newTreatment) {
-		if (!treatments.containsKey(newTreatment.getName()))
-			treatments.put(newTreatment.getName(), newTreatment);
-		else
-			throw new IllegalStateException(Msg.getString("MedicalManager.error.treatment", //$NON-NLS-1$
-					newTreatment.getName()));
+		environmentalComplaints.put(type, c);
+		return c;
 	}
 
 	/**
@@ -244,16 +160,7 @@ public class MedicalManager implements Serializable {
 	 * @return list of complaints.
 	 */
 	public List<Complaint> getAllMedicalComplaints() {
-		return new CopyOnWriteArrayList<Complaint>();
-	}
-
-	/**
-	 * Gets a list of all environmentally related complaints.
-	 * 
-	 * @return list of environmental complaints.
-	 */
-	public List<Complaint> getAllEnvironmentalComplaints() {
-		return new CopyOnWriteArrayList<Complaint>();
+		return medicalConfig.getComplaintList();
 	}
 
 	/**
@@ -264,23 +171,15 @@ public class MedicalManager implements Serializable {
 	 * @return Matched complaint, if none is found then a null.
 	 */
 	public Complaint getComplaintByName(ComplaintType type) {
-		if (complaints.containsKey(type))
-			return complaints.get(type);
-		else if (environmentalComplaints.containsKey(type))
+		for (Complaint c : medicalConfig.getComplaintList()) {
+			if (type == c.getType())
+				return c;
+		}
+		
+		if (environmentalComplaints.containsKey(type))
 			return environmentalComplaints.get(type);
-		else
-			return null;
-	}
-
-	/**
-	 * This is a finder method that returns a Medical Treatment matching the
-	 * specified name.
-	 * 
-	 * @param name Name of the treatment to retrieve.
-	 * @return Matched Treatment, if none is found then a null.
-	 */
-	public Treatment getTreatmentByName(String name) {
-		return treatments.get(name);
+		
+		return null;
 	}
 
 	/**
@@ -302,19 +201,21 @@ public class MedicalManager implements Serializable {
 	 * @return List of Treatments
 	 */
 	public List<Treatment> getSupportedTreatments(int level) {
-		Integer key = level;
-		List<Treatment> results = supportedTreatments.get(key);
-		if (results == null) {
-			results = new CopyOnWriteArrayList<Treatment>();
-			Iterator<Treatment> iter = treatments.values().iterator();
-			while (iter.hasNext()) {
-				Treatment next = iter.next();
-				if (next.getFacilityLevel() <= level)
-					results.add(next);
-			}
-			Collections.sort(results);
-			supportedTreatments.put(key, results);
+		if (!supportedTreatments.isEmpty() && supportedTreatments.get(level) != null)
+			return supportedTreatments.get(level);
+		
+		List<Treatment> results = new ArrayList<>();
+		List<Treatment> list = SimulationConfig.instance().getMedicalConfiguration().getTreatmentList();
+
+		Iterator<Treatment> iter = list.iterator();
+		while (iter.hasNext()) {
+			Treatment next = iter.next();
+			if (next.getFacilityLevel() <= level)
+				results.add(next);
 		}
+		Collections.sort(results);
+		supportedTreatments.put(level, results);
+
 		return results;
 	}
 
@@ -374,22 +275,7 @@ public class MedicalManager implements Serializable {
 	 * @return true if complaint is environmental complaint.
 	 */
 	public boolean isEnvironmentalComplaint(Complaint complaint) {
-		boolean result = false;
-
-		if (complaint == suffocation)
-			result = true;
-		else if (complaint == dehydration)
-			result = true;
-		else if (complaint == starvation)
-			result = true;
-		else if (complaint == decompression)
-			result = true;
-		else if (complaint == freezing)
-			result = true;
-		else if (complaint == heatStroke)
-			result = true;
-
-		return result;
+		return environmentalComplaints.containsKey(complaint.getType());
 	}
 
 	public void addDeathRegistry(Settlement s, DeathInfo death) {
@@ -405,11 +291,7 @@ public class MedicalManager implements Serializable {
 	}
 
 	public List<DeathInfo> getDeathRegistry(Settlement s) {
-		if (deathRegistry.containsKey(s.getIdentifier())) {
-			return deathRegistry.get(s.getIdentifier());
-		} else {
-			return null;
-		}
+		return deathRegistry.getOrDefault(s.getIdentifier(), null);
 	}
 
 	public void addPostmortemExams(Settlement s, DeathInfo death) {
@@ -426,18 +308,9 @@ public class MedicalManager implements Serializable {
 	public List<DeathInfo> getPostmortemExams(Settlement s) {
 		if (awaitingPostmortemExam.containsKey(s.getIdentifier())) {
 			return awaitingPostmortemExam.get(s.getIdentifier());
-		} else {
-			List<DeathInfo> list = new CopyOnWriteArrayList<>();
-			return list;
 		}
-	}
-
-	/**
-	 * Reloads instances after loading from a saved sim
-	 * 
-	 */
-	public static void justReloaded() {
-//		initMedical();
+		
+		return Collections.emptyList();
 	}
 
 	/**
@@ -445,13 +318,7 @@ public class MedicalManager implements Serializable {
 	 */
 	public void destroy() {
 
-		environmentalComplaints.clear();
 		environmentalComplaints = null;
-		complaints.clear();
-		complaints = null;
-		treatments.clear();
-		treatments = null;
-		supportedTreatments.clear();
 		supportedTreatments = null;
 
 		starvation = null;
@@ -460,7 +327,5 @@ public class MedicalManager implements Serializable {
 		decompression = null;
 		freezing = null;
 		heatStroke = null;
-
-//		simConfig = null;
 	}
 }

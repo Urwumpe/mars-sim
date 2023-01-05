@@ -1,12 +1,10 @@
 /**
  * Mars Simulation Project
  * MissionHistoricalEvent.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission;
-
-import java.io.Serializable;
 
 import org.mars_sim.msp.core.events.HistoricalEvent;
 import org.mars_sim.msp.core.events.HistoricalEventCategory;
@@ -15,7 +13,7 @@ import org.mars_sim.msp.core.person.EventType;
 /**
  * This class represents the historical actions involving missions.
  */
-public class MissionHistoricalEvent extends HistoricalEvent implements Serializable {
+public class MissionHistoricalEvent extends HistoricalEvent {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -28,12 +26,13 @@ public class MissionHistoricalEvent extends HistoricalEvent implements Serializa
 	 * @param whatCause  The cause for this event.
 	 * @param whileDoing the activity the member was engaging.
 	 * @param member     a member of this mission.
-	 * @param location0  the building/vehicle where it occurs.
-	 * @param location1  the settlement/coordinate where it occurs.
+	 * @param container		the building/vehicle where it occurs
+	 * @param homeTown		the associated settlement where it belongs
+	 * @param coordinates	the coordinates where it belongs
 	 */
 	public MissionHistoricalEvent(EventType eventType, Mission mission, String cause, String whileDoing, String member,
-			String location0, String location1, String associatedsettlement) {
+			String container, String homeTown, String coordinates) {
 		// Use HistoricalEvent constructor.
-		super(HistoricalEventCategory.MISSION, eventType, mission, cause, whileDoing, member, location0, location1, associatedsettlement);
+		super(HistoricalEventCategory.MISSION, eventType, mission, cause, whileDoing, member, container, homeTown, coordinates);
 	}
 }

@@ -1,14 +1,12 @@
-/**
+/*
  * Mars Simulation Project
  * TabPanelSponsor.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-09
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.unit_window.person;
 
 import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.Font;
 
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -18,13 +16,12 @@ import javax.swing.SpringLayout;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.reportingAuthority.ReportingAuthorityType;
+import org.mars_sim.msp.core.reportingAuthority.ReportingAuthority;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
-//import com.alee.managers.language.data.TooltipWay;
 import com.alee.managers.tooltip.TooltipManager;
 import com.alee.managers.tooltip.TooltipWay;
 
@@ -35,9 +32,8 @@ import com.alee.managers.tooltip.TooltipWay;
 public class TabPanelSponsor
 extends TabPanel {
 
-	/** Is UI constructed. */
-	private boolean uiDone = false;
-	
+	private static final String EARTH_ICON = Msg.getString("icon.earth"); //$NON-NLS-1$
+
 	/** The Person instance. */
 	private Person person = null;
 	
@@ -49,55 +45,38 @@ extends TabPanel {
 	public TabPanelSponsor(Unit unit, MainDesktopPane desktop) {
 		// Use the TabPanel constructor
 		super(
-			Msg.getString("TabPanelSponsor.title"), //$NON-NLS-1$
 			null,
-			Msg.getString("TabPanelSponsor.tooltip"), //$NON-NLS-1$
+			ImageLoader.getNewIcon(EARTH_ICON),
+			Msg.getString("TabPanelSponsor.title"), //$NON-NLS-1$
 			unit, desktop
 		);
 
 		person = (Person) unit;
 	}
 	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
-		
-		// Create general label panel.
-		JPanel labelPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(labelPanel);
-
-		// Prepare general label
-		JLabel titleLabel = new JLabel(Msg.getString("TabPanelSponsor.label"), JLabel.CENTER); //$NON-NLS-1$
-		titleLabel.setFont(new Font("Serif", Font.BOLD, 14));
-		labelPanel.add(titleLabel);
+	@Override
+	protected void buildUI(JPanel content) {
 
 		// Prepare spring layout info panel.
-		JPanel infoPanel = new JPanel(new SpringLayout());//GridLayout(2, 2, 0, 0));
-//		infoPanel.setBorder(new MarsPanelBorder());
-		centerContentPanel.add(infoPanel, BorderLayout.NORTH);
+		JPanel infoPanel = new JPanel(new SpringLayout());
+		content.add(infoPanel, BorderLayout.NORTH);
 
 		// Prepare sponsor name label
 		JLabel sponsorNameLabel = new JLabel(Msg.getString("TabPanelSponsor.sponsor"), JLabel.RIGHT); //$NON-NLS-1$
-		//sponsorNameLabel.setSize(2, 2);
 		infoPanel.add(sponsorNameLabel);
 
 		// Prepare sponsor label
 		JTextField sponsorTF = new JTextField();
-		ReportingAuthorityType sponsor = null;
-		if (person.getReportingAuthority() != null) {
-		    sponsor = person.getReportingAuthority().getOrg();
-		    sponsorTF.setText(sponsor + ""); 
+		ReportingAuthority sponsor = person.getReportingAuthority();
+		if (sponsor != null) {
+		    sponsorTF.setText(sponsor.getName()); 
+			TooltipManager.setTooltip (sponsorTF, 
+					sponsor.getDescription(),
+					TooltipWay.down);
 		}
 		sponsorTF.setEditable(false);
 		sponsorTF.setColumns(8);
 		sponsorTF.setCaretPosition(0);
-		if (person.getReportingAuthority() != null) {
-			TooltipManager.setTooltip (sponsorTF, person.getReportingAuthority().getToolTipStr() 
-					+ " (" + sponsor + ")", TooltipWay.down);
-		}
 		infoPanel.add(sponsorTF);
 
 		// Prepare birth location name label
@@ -110,11 +89,11 @@ extends TabPanel {
 		JTextField objectiveTF = new JTextField();
 		if (person.getReportingAuthority() != null) {
 			objective = person.getReportingAuthority().getMissionAgenda().getObjectiveName();
-			TooltipManager.setTooltip (objectiveTF, Conversion.capitalize(objective), TooltipWay.down);
+			TooltipManager.setTooltip (objectiveTF, objective, TooltipWay.down);
 
 		}
 		//JLabel objectiveLabel = new JLabel(objective, JLabel.RIGHT);
-		objectiveTF.setText(Conversion.capitalize(objective));
+		objectiveTF.setText(objective);
 		objectiveTF.setEditable(false);
 		objectiveTF.setColumns(16);
 		objectiveTF.setCaretPosition(0);
@@ -125,16 +104,5 @@ extends TabPanel {
 		                                2, 2, //rows, cols
 		                                20, 10,        //initX, initY
 		                                10, 4);       //xPad, yPad
-	}
-
-	/**
-	 * Updates the info on this panel.
-	 */
-	@Override
-	public void update() {
-		if (!uiDone)
-			initializeUI();
-
-		// Fill in as we have more to update on this panel.
 	}
 }

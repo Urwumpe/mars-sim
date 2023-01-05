@@ -1,14 +1,13 @@
 /**
  * Mars Simulation Project
  * DeathInfo.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Barry Evans
  */
 
 package org.mars_sim.msp.core.person.health;
 
 import java.io.Serializable;
-import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -16,22 +15,15 @@ import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.malfunction.Malfunction;
-import org.mars_sim.msp.core.malfunction.MalfunctionFactory;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
-import org.mars_sim.msp.core.malfunction.Malfunctionable;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.GenderType;
 import org.mars_sim.msp.core.person.ai.Mind;
-import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.role.RoleType;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskManager;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.TaskManager;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.RobotType;
-import org.mars_sim.msp.core.robot.ai.BotMind;
-import org.mars_sim.msp.core.robot.ai.job.RobotJob;
-import org.mars_sim.msp.core.robot.ai.task.BotTaskManager;
 import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
@@ -47,7 +39,7 @@ public class DeathInfo implements Serializable {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	private static Logger logger = Logger.getLogger(DeathInfo.class.getName());
+	private static final Logger logger = Logger.getLogger(DeathInfo.class.getName());
 
 	// Data members
 	/** Has the body been retrieved for exam */	
@@ -57,9 +49,9 @@ public class DeathInfo implements Serializable {
 	/** Mission sol */	
 	private int missionSol;
 	/** Amount of time performed so far in postmortem exam [in Millisols]. */	
-	private double timeExam;
+	private double timeSpentExam;
 	/** Estimated time the postmortem exam should take [in Millisols]. */	
-	private double estTimeExam;
+	private double estTotExamTime;
 	/** Percent of illness*/	
 	private double healthCondition;	
 	/** Cause of death. */	
@@ -93,18 +85,14 @@ public class DeathInfo implements Serializable {
 	/** The person's last word before departing. */
 	private String lastWord = "None";
 
-	/** the robot's job at time of being decomissioned. */
-	private RobotJob robotJob;
 	/** Medical problem contributing to the death. */
 	private HealthProblem problem;
 	/** Container unit at time of death. */
 	private Unit containerUnit;
-	/** Container id at time of death. */	
-	private int containerID;
 	/** Coordinate at time of death. */
 	private Coordinates locationOfDeath;
 	/** The person's job at time of death. */
-	private Job job;
+	private JobType job;
 	/** The person. */
 	private Person person;
 	/** The robot. */
@@ -112,13 +100,8 @@ public class DeathInfo implements Serializable {
 	
 	/** Medical cause of death. */
 	private ComplaintType illness;
-	/** Person's Gender. */
-	private GenderType gender;
-	/** Bot's RoboType. */
-	private RobotType robotType;
 	/** Person's role type. */
 	private RoleType roleType;
-	
 
 	/**
 	 * The construct creates an instance of a DeathInfo class.
@@ -129,8 +112,6 @@ public class DeathInfo implements Serializable {
 		this.person = person;
 		this.problem = problem;
 		this.causeOfDeath = cause;
-//		this.lastWord = lastWord;
-		this.gender = person.getGender();
 
 		// Initialize data members
 		if (lastWord.equals("")) {
@@ -156,13 +137,10 @@ public class DeathInfo implements Serializable {
 		}
 		
 		MasterClock masterClock = Simulation.instance().getMasterClock();
-		
-		timeOfDeath = masterClock.getMarsClock().getDateTimeStamp();
-				
+		timeOfDeath = masterClock.getMarsClock().getDateTimeStamp();	
 		missionSol = masterClock.getMarsClock().getMissionSol();
-		
 		earthTimeOfDeath = masterClock.getEarthClock().getTimeStampF1();
-				
+
 		if (problem == null) {
 			Complaint serious = person.getPhysicalCondition().getMostSerious();
 			if (serious != null) {
@@ -228,52 +206,9 @@ public class DeathInfo implements Serializable {
 
 		Mission mm = mind.getMission();
 		if (mm != null) {
-			mission = mm.getDescription();
+			mission = mm.getName();
 			missionPhase = mm.getPhaseDescription();
 		}
-
-		Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(person).iterator();
-		Malfunction mostSerious = null;
-		int severity = 0;
-		while (i.hasNext()) {
-			Malfunctionable entity = i.next();
-			MalfunctionManager malfunctionMgr = entity.getMalfunctionManager();
-			if (malfunctionMgr.hasEmergencyMalfunction()) {
-				Malfunction m = malfunctionMgr.getMostSeriousEmergencyMalfunction();
-				if (m != null && m.getSeverity() > severity) {
-					mostSerious = m;
-					severity = m.getSeverity();
-				}
-			}
-
-			else if (malfunctionMgr.hasEVAMalfunction()) {
-				Malfunction m = malfunctionMgr.getMostSeriousEVAMalfunction();
-				if (m != null && m.getSeverity() > severity) {
-					mostSerious = m;
-					severity = m.getSeverity();
-				}
-			}
-
-			else if (malfunctionMgr.hasGeneralMalfunction()) {
-				Malfunction m = malfunctionMgr.getMostSeriousGeneralMalfunction();
-				if (m != null && m.getSeverity() > severity) {
-					mostSerious = m;
-					severity = m.getSeverity();
-				}
-			}
-
-			else if (malfunctionMgr.hasMalfunction()) {
-				Malfunction m = malfunctionMgr.getMostSeriousMalfunction();
-				if (m != null && m.getSeverity() > severity) { // why java.lang.NullPointerException ?
-					mostSerious = m;
-					severity = m.getSeverity();
-				}
-			}
-		}
-
-		if (mostSerious != null)
-			malfunction = mostSerious.getName();
-
 	}
 
 	public DeathInfo(Robot robot) {
@@ -282,11 +217,7 @@ public class DeathInfo implements Serializable {
 		
 		timeOfDeath = Simulation.instance().getMasterClock().getMarsClock().getDateTimeStamp();
 
-		BotMind botMind = robot.getBotMind();
-
-		robotJob = botMind.getRobotJob();
-
-		BotTaskManager taskMgr = botMind.getBotTaskManager();
+		TaskManager taskMgr = robot.getBotMind().getBotTaskManager();
 		if (taskMgr.hasTask()) {
 
 			if (task == null)
@@ -297,56 +228,14 @@ public class DeathInfo implements Serializable {
 				if (phase != null) {
 					taskPhase = phase.getName();
 				}
-				// else {
-				// taskPhase = "";
-				// }
 			}
 		}
 
-		Iterator<Malfunctionable> i = MalfunctionFactory.getMalfunctionables(robot).iterator();
-		Malfunction mostSerious = null;
-		int severity = 0;
-		while (i.hasNext()) {
-			Malfunctionable entity = i.next();
-			MalfunctionManager malfunctionMgr = entity.getMalfunctionManager();
-			if (malfunctionMgr.hasEmergencyMalfunction()) {
-				Malfunction m = malfunctionMgr.getMostSeriousEmergencyMalfunction();
-				if (m.getSeverity() > severity) {
-					mostSerious = m;
-					severity = m.getSeverity();
-				}
-			}
-
-			else if (malfunctionMgr.hasEVAMalfunction()) {
-				Malfunction m = malfunctionMgr.getMostSeriousEVAMalfunction();
-				if (m.getSeverity() > severity) {
-					mostSerious = m;
-					severity = m.getSeverity();
-				}
-			}
-
-			else if (malfunctionMgr.hasGeneralMalfunction()) {
-				Malfunction m = malfunctionMgr.getMostSeriousGeneralMalfunction();
-				if (m.getSeverity() > severity) {
-					mostSerious = m;
-					severity = m.getSeverity();
-				}
-			}
-
-			else if (malfunctionMgr.hasMalfunction()) {
-				Malfunction m = malfunctionMgr.getMostSeriousMalfunction();
-				if (m.getSeverity() > severity) {
-					mostSerious = m;
-					severity = m.getSeverity();
-				}
-			}
+		MalfunctionManager malfunctionMgr = robot.getMalfunctionManager();
+		if (malfunctionMgr.hasMalfunction()) {
+			Malfunction m = malfunctionMgr.getMostSeriousMalfunction();
+			malfunction = m.getName();
 		}
-
-		if (mostSerious != null)
-			malfunction = mostSerious.getName();
-
-		this.robotType = robot.getRobotType();
-
 	}
 
 	/**
@@ -404,12 +293,13 @@ public class DeathInfo implements Serializable {
 		return containerUnit;
 	}
 
+	/**
+	 * Backs up the container unit.
+	 * 
+	 * @param c
+	 */
 	public void backupContainerUnit(Unit c) {
 		containerUnit = c;
-	}
-	
-	public void backupContainerID(int c) {
-		containerID = c;
 	}
 	
 	/**
@@ -438,18 +328,8 @@ public class DeathInfo implements Serializable {
 	 * 
 	 * @return job
 	 */
-	public String getJob() {
-		if (job != null)
-			return job.getName(gender);
-		else
-			return "   --";
-	}
-
-	public String getRobotJob() {
-		if (robotJob != null)
-			return RobotJob.getName(robotType);
-		else
-			return "   --";
+	public JobType getJob() {
+		return job;
 	}
 
 	/**
@@ -624,19 +504,19 @@ public class DeathInfo implements Serializable {
 	}
 	
 	public double getTimeExam() {
-		return timeExam;
+		return timeSpentExam;
 	}
 
 	public void addTimeExam(double time) {
-		timeExam += time;
+		timeSpentExam += time;
 	}
 	
 	public double getEstTimeExam() {
-		return estTimeExam;
+		return estTotExamTime;
 	}
 	
 	public void setEstTimeExam(double time) {
-		estTimeExam = time;
+		estTotExamTime = time;
 	}
 	
 	public double getHealth() {

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ConstructedBuildingLogEntry.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-15
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.construction;
@@ -15,7 +15,9 @@ import java.io.Serializable;
  */
 public class ConstructedBuildingLogEntry implements Serializable {
 
-    // Data members.
+	private static final long serialVersionUID = 1L;
+	
+	// Data members.
     private String buildingName;
     private MarsClock builtTime;
     
@@ -26,7 +28,7 @@ public class ConstructedBuildingLogEntry implements Serializable {
      */
     ConstructedBuildingLogEntry(String buildingName, MarsClock builtTime) {
         this.buildingName = buildingName;
-        this.builtTime = (MarsClock) builtTime.clone();
+        this.builtTime = new MarsClock(builtTime);
     }
     
     /**
@@ -42,6 +44,6 @@ public class ConstructedBuildingLogEntry implements Serializable {
      * @return time stamp.
      */
     public MarsClock getBuiltTime() {
-        return (MarsClock) builtTime.clone();
+        return new MarsClock(builtTime);
     }
 }

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * RendezvousVehiclePanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-10-21
  * @author Scott Davis
  */
 
@@ -26,10 +26,7 @@ import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LifeSupportInterface;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
@@ -45,6 +42,7 @@ import org.mars_sim.msp.ui.swing.tool.TableStyle;
 /**
  * A wizard panel for selecting a mission rendezvous vehicle.
  */
+@SuppressWarnings("serial")
 class RendezvousVehiclePanel extends WizardPanel {
 
 	/** Wizard panel name. */
@@ -56,8 +54,7 @@ class RendezvousVehiclePanel extends WizardPanel {
 	private JLabel errorMessageLabel;
 	
 	private static MissionManager missionManager;
-	private static UnitManager unitManager = Simulation.instance().getUnitManager();
-	
+
 	/**
 	 * Constructor.
 	 * @param wizard the create mission wizard.
@@ -205,8 +202,7 @@ class RendezvousVehiclePanel extends WizardPanel {
     		
             if (row < units.size()) {
             	Rover vehicle = (Rover) getUnit(row);
-            	Inventory inv = vehicle.getInventory();
-            	
+   	
             	try {
             		if (column == 0) 
             			result = vehicle.getName();
@@ -218,20 +214,20 @@ class RendezvousVehiclePanel extends WizardPanel {
             		else if (column == 2) 
             			result = vehicle.getCrewNum();
             		else if (column == 3) {
-            			AmountResource oxygen = ResourceUtil.findAmountResource(LifeSupportInterface.OXYGEN);
-            			result = (int) inv.getAmountResourceStored(oxygen, false);
+            			AmountResource oxygen = ResourceUtil.findAmountResource(ResourceUtil.OXYGEN);
+            			result = (int) vehicle.getAmountResourceStored(oxygen.getID());
             		}
                 	else if (column == 4) {
-                		AmountResource water = ResourceUtil.findAmountResource(LifeSupportInterface.WATER);
-                		result = (int) inv.getAmountResourceStored(water, false);
+                		AmountResource water = ResourceUtil.findAmountResource(ResourceUtil.WATER);
+                		result = (int) vehicle.getAmountResourceStored(water.getID());
                 	}
                 	else if (column == 5) { 
-                		AmountResource food = ResourceUtil.findAmountResource(LifeSupportInterface.FOOD);
-                		result = (int) inv.getAmountResourceStored(food, false);
+                		AmountResource food = ResourceUtil.findAmountResource(ResourceUtil.FOOD);
+                		result = (int) vehicle.getAmountResourceStored(food.getID());
                 	}
                 	else if (column == 6) { 
                 		AmountResource dessert = ResourceUtil.findAmountResource("Soymilk");
-                		result = (int) inv.getAmountResourceStored(dessert, false);
+                		result = (int) vehicle.getAmountResourceStored(dessert.getID());
                 	}
                 	else if (column == 7) {
                 		Vehicle rescueVehicle = getRescueVehicle(vehicle);

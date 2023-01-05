@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TestLED.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -17,7 +17,7 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
-import org.mars_sim.msp.ui.steelseries.extras.Led;
+import eu.hansolo.steelseries.extras.Led;
 
 
 public class TestLED {

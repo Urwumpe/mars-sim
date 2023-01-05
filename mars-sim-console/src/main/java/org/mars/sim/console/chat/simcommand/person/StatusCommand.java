@@ -1,8 +1,17 @@
+/*
+ * Mars Simulation Project
+ * StatusCommand.java
+ * @date 2022-06-24
+ * @author Barry Evans
+ */
 package org.mars.sim.console.chat.simcommand.person;
 
 import org.mars.sim.console.chat.ChatCommand;
 import org.mars.sim.console.chat.Conversation;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PhysicalCondition;
+import org.mars_sim.msp.core.person.health.DeathInfo;
+import org.mars_sim.msp.core.structure.Settlement;
 
 /** 
  * 
@@ -11,7 +20,7 @@ public class StatusCommand extends AbstractPersonCommand {
 	public static final ChatCommand STATUS = new StatusCommand();
 	
 	private StatusCommand() {
-		super("ss", "status", "Status report");
+		super("sts", "status", "Status report");
 	}
 
 	@Override
@@ -26,19 +35,47 @@ public class StatusCommand extends AbstractPersonCommand {
 		buffer.append("Hi, My name is ");
 		buffer.append(person.getName());
 		buffer.append(" and I am a ");
-		buffer.append(person.getJobName());
-		buffer.append(" based in ");
-		buffer.append(person.getAssociatedSettlement().getName());
-		buffer.append(" where I am the ");
-		buffer.append(person.getRole().getType().getName());
-		buffer.append(System.lineSeparator());
+		buffer.append(person.getMind().getJob().getName());
 		
-		buffer.append("At the moment I am ");
-		buffer.append(person.getTaskDescription());
+		Settlement home = person.getAssociatedSettlement();
+		if (home != null) {
+			buffer.append(" based in ");
+			buffer.append(person.getAssociatedSettlement().getName());
+			buffer.append(" where I am the ");
+			buffer.append(person.getRole().getType().getName());
+		}
 		buffer.append(System.lineSeparator());
-		buffer.append("Status is ");
-		buffer.append(person.getStatus());
-		
+		PhysicalCondition condition = person.getPhysicalCondition();
+		if (person.isDeclaredDead()) {
+			DeathInfo death = condition.getDeathDetails();
+			buffer.append("I died on ");
+			buffer.append(death.getTimeOfDeath());
+			buffer.append(" doing ");
+			buffer.append(death.getTask());
+			buffer.append(". Cause was ");
+			buffer.append(death.getCause());
+		}
+		else {
+			buffer.append("At the moment, I am ");
+			buffer.append(person.getTaskDescription());
+			buffer.append(System.lineSeparator());
+			buffer.append("I am ");
+
+			double p = condition.getPerformanceFactor();
+			double h = condition.getHunger();
+			double e = condition.getHunger();
+			double t = condition.getThirst();
+			double s = condition.getStress();
+			double f = condition.getFatigue();
+
+			buffer.append(PhysicalCondition.getPerformanceStatus(p));
+			buffer.append(" in performance, ");
+			buffer.append(PhysicalCondition.getHungerStatus(h, e)).append(", ");
+			buffer.append(PhysicalCondition.getThirstyStatus(t)).append(", ");
+			buffer.append(PhysicalCondition.getStressStatus(s)).append(" and ");
+			buffer.append(PhysicalCondition.getFatigueStatus(f)).append(".");
+			buffer.append(System.lineSeparator());
+		}
 		return buffer.toString();
 	}
 

@@ -1,88 +1,68 @@
-/**
+/*
  * Mars Simulation Project
  * EVA.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-18
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import java.io.Serializable;
-import java.util.Iterator;
-
+import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.structure.Airlock;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingException;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
 import org.mars_sim.msp.core.time.ClockPulse;
 
 /**
  * This class is a building function for extra vehicular activity.
  */
-public class EVA
-extends Function
-implements Serializable {
+public class EVA extends Function {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	private static final FunctionType FUNCTION = FunctionType.EVA;
+	private static final double MAINTENANCE_FACTOR = 5D;
 
-	private static final double MAINTENANCE_FACTOR = 5D; 
+	// Nmaes of the different Positions of an Airlock; must match the buildings.xml
+	private static final String CENTER_POSITION = "center-position";
+	private static final String INTERIOR_POSITION = "interior-position";
+	private static final String EXTERIOR_POSITION = "exterior-position"; 
 	
 	private int airlockCapacity;
 	
 	private Airlock airlock;
 
 	/**
-	 * Constructor
+	 * Constructor.
 	 * 
 	 * @param building the building this function is for.
+	 * @param spec Specification of this Function
 	 */
-	public EVA(Building building) {
+	public EVA(Building building, FunctionSpec spec) {
 		// Use Function constructor.
-		super(FUNCTION, building);
+		super(FunctionType.EVA, spec, building);
 
-		String buildingType = building.getBuildingType();
 		// Add a building airlock.
-		airlockCapacity = buildingConfig.getAirlockCapacity(buildingType);
-		double airlockXLoc = buildingConfig.getAirlockXLoc(buildingType);
-		double airlockYLoc = buildingConfig.getAirlockYLoc(buildingType);
-		double interiorXLoc = buildingConfig.getAirlockInteriorXLoc(buildingType);
-		double interiorYLoc = buildingConfig.getAirlockInteriorYLoc(buildingType);
-		double exteriorXLoc = buildingConfig.getAirlockExteriorXLoc(buildingType);
-		double exteriorYLoc = buildingConfig.getAirlockExteriorYLoc(buildingType);
+		airlockCapacity = spec.getCapacity();
+		LocalPosition airlockLoc = spec.getPositionProperty(CENTER_POSITION);
+		LocalPosition airlockInteriorLoc = spec.getPositionProperty(INTERIOR_POSITION);
+		LocalPosition airlockExteriorLoc = spec.getPositionProperty(EXTERIOR_POSITION);
 
-		airlock = new BuildingAirlock(building, airlockCapacity, airlockXLoc, airlockYLoc,
-				interiorXLoc, interiorYLoc, exteriorXLoc, exteriorYLoc);
-		
-		// Load activity spots
-		loadActivitySpots(buildingConfig.getEVAActivitySpots(building.getBuildingType()));
-
-	}
-
-	/**
-	 * Constructor with airlock parameter for testing
-	 * 
-	 * @param building the building this function is for.
-	 * @param airlock the building airlock.
-	 */
-	public EVA(Building building, BuildingAirlock airlock) {
-		// Use Function constructor.
-		super(FUNCTION, building);
-
-		// Add building airlock
-		this.airlock = airlock;
+		airlock = new BuildingAirlock(building, airlockCapacity, airlockLoc, 
+											airlockInteriorLoc, airlockExteriorLoc);
 	}
 
 	/**
 	 * Gets the value of the function for a named building.
-	 * @param buildingName the building name.
+	 * 
+	 * @param type the building name.
 	 * @param newBuilding true if adding a new building.
 	 * @param settlement the settlement.
 	 * @return value (VP) of building function.
 	 * @throws Exception if error getting function value.
 	 */
-	public static double getFunctionValue(String buildingName, boolean newBuilding,
+	public static double getFunctionValue(String type, boolean newBuilding,
 			Settlement settlement) {
 
 		// Demand is one airlock capacity for every four inhabitants.
@@ -90,10 +70,8 @@ implements Serializable {
 
 		double supply = 0D;
 		boolean removedBuilding = false;
-		Iterator<Building> i = settlement.getBuildingManager().getBuildings(FUNCTION).iterator();
-		while (i.hasNext()) {
-			Building building = i.next();
-			if (!newBuilding && building.getBuildingType().equalsIgnoreCase(buildingName) && !removedBuilding) {
+		for(Building building : settlement.getBuildingManager().getBuildings(FunctionType.EVA)) {
+			if (!newBuilding && building.getBuildingType().equalsIgnoreCase(type) && !removedBuilding) {
 				removedBuilding = true;
 			}
 			else {
@@ -105,7 +83,7 @@ implements Serializable {
 		double airlockCapacityValue = demand / (supply + 1D);
 
 		// Note: building.getEVA().airlock.getCapacity() is the same as the airlockCapacity below
-		double airlockCapacity = buildingConfig.getAirlockCapacity(buildingName);
+		double airlockCapacity = buildingConfig.getFunctionSpec(type, FunctionType.EVA).getCapacity();
 
 		return airlockCapacity * airlockCapacityValue;
 	}
@@ -116,6 +94,7 @@ implements Serializable {
 	
 	/**
 	 * Gets the building's airlock.
+	 * 
 	 * @return airlock
 	 */
 	public Airlock getAirlock() {
@@ -131,11 +110,11 @@ implements Serializable {
 	}
 	
 	public int getNumEmptied() {
-		return airlockCapacity - airlock.getNumOccupants();
+		return airlockCapacity - airlock.getNumInChamber();
 	}
 	
-	public int getNumOccupied() {
-		return airlock.getNumOccupants();
+	public int getNumInChamber() {
+		return airlock.getNumInChamber();
 	}
 	
 	public String getOperatorName() {
@@ -144,30 +123,35 @@ implements Serializable {
 	
 	/**
 	 * Time passing for the building.
-	 * @param time amount of time passing (in millisols)
+	 * 
+	 * @param pulse the amount of clock pulse passing (in millisols)
 	 * @throws BuildingException if error occurs.
 	 */
 	@Override
 	public boolean timePassing(ClockPulse pulse) {
 		boolean valid = isValid(pulse);
 		if (valid) {
-			airlock.timePassing(pulse.getElapsed());
+			airlock.timePassing(pulse);
 		}
 		return valid;
 	}
 
 	/**
 	 * Gets the amount of power required when function is at full power.
+	 * 
 	 * @return power (kW)
 	 */
+	@Override
 	public double getFullPowerRequired() {
 		return 0.5;
 	}
 
 	/**
 	 * Gets the amount of power required when function is at power down level.
+	 * 
 	 * @return power (kW)
 	 */
+	@Override
 	public double getPoweredDownPowerRequired() {
 		return 0.05;
 	}

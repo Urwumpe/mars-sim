@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * SimpleEvent.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-24
  * @author Manny Kung
  */
 
@@ -15,39 +15,38 @@ import org.mars_sim.msp.core.time.ClockUtils;
 public class SimpleEvent implements Serializable {
 
 	/** default serial id. */
-	private static final long serialVersionUID = 23982863L;
+	private static final long serialVersionUID = 1L;
 
-//	private static final String ONE_ZERO = "0";
-//	private static final String TWO_ZEROS = "00";
-//	private static final String THREE_ZEROS = "000";
 	private static final String COLON = ":";
 
 	private short missionSol;
 	private float msol;
 	private byte cat;
 	private byte type;
+	private short source;
 	private short what;
 	private short whileDoing;
 	private short who;
-	private short loc0;
-	private short loc1;
-	private short settlementID;
+	private short container;
+	private short homeTown;
+	private short coordinates;
 	private String dateTime = null;
 
 	private DecimalFormat df = new DecimalFormat("000.000");
 
-	public SimpleEvent(short missionSol, float msol, byte cat, byte type, short what, short whileDoing, short who, short loc0,
-			short loc1, short settlementID) {
+	public SimpleEvent(short missionSol, float msol, byte cat, byte type, short source, short what, short whileDoing, short who, short container,
+			short homeTown, short coordinates) {
 		this.missionSol = missionSol;
 		this.msol = msol;
 		this.cat = cat;
 		this.type = type;
+		this.source = source;
 		this.what = what;
 		this.whileDoing = whileDoing;
 		this.who = who;
-		this.loc0 = loc0;
-		this.loc1 = loc1;
-		this.settlementID = settlementID;
+		this.container = container;
+		this.homeTown = homeTown;
+		this.coordinates = coordinates;
 		
 		df.setMinimumFractionDigits(3);
 		df.setMinimumIntegerDigits(3);
@@ -56,7 +55,7 @@ public class SimpleEvent implements Serializable {
 
 	public String getFullDateTimeString() {
 		if (dateTime == null) {
-			dateTime = ClockUtils.convertMissionSol2Date(missionSol) + COLON + getDecimalMillisol();//getMsol();
+			dateTime = ClockUtils.convertMissionSol2Date(missionSol) + COLON + getDecimalMillisol();
 		}
 		return dateTime;
 	}
@@ -64,47 +63,6 @@ public class SimpleEvent implements Serializable {
 	public short getSol() {
 		return missionSol;
 	}
-
-//	/**
-//	 * Returns the time string in the non-decimal format of xxx
-//	 * 
-//	 * @return the time string
-//	 */
-//	public String getMillisol() {
-//		
-//		StringBuilder s = new StringBuilder();
-//
-//		int m = (int) (Math.round(msol));
-//
-//		if (m < 10) // then 000x
-//			s.append(TWO_ZEROS).append(m);
-//		else if (m < 100) // then 00xx
-//			s.append(ONE_ZERO).append(m);
-//		else // if (m < 1000) // then 0xxx
-//			s.append(m);
-//
-//		return s.toString();
-//	}
-	
-//	/**
-//	 * Returns the time string in xxx.xxx decimal format
-//	 * 
-//	 * @return the time string
-//	 */
-//	public String getMissionSol() {
-//		StringBuilder s = new StringBuilder();
-//
-//		float m = (float) (Math.round(msol * 1000.0) / 1000.0);
-//
-//		if (m < 10) // then 000x
-//			s.append(TWO_ZEROS).append(m);
-//		else if (m < 100) // then 00xx
-//			s.append(ONE_ZERO).append(m);
-//		else // if (m < 1000) // then 0xxx
-//			s.append(m);
-//
-//		return s.toString();
-//	}
 
 	/**
 	 * Returns the time string in the decimal format of xxx.xxx
@@ -122,6 +80,10 @@ public class SimpleEvent implements Serializable {
 	public byte getType() {
 		return type;
 	}
+	
+	public short getSource() {
+		return source;
+	}
 
 	public short getWhat() {
 		return what;
@@ -135,15 +97,15 @@ public class SimpleEvent implements Serializable {
 		return who;
 	}
 
-	public short getLoc0() {
-		return loc0;
+	public short getContainer() {
+		return container;
 	}
 
-	public short getLoc1() {
-		return loc1;
+	public short getHomeTown() {
+		return homeTown;
 	}
 	
-	public short getSettlementID() {
-		return settlementID;
+	public short getCoordinates() {
+		return coordinates;
 	}
 }

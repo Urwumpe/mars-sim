@@ -1,30 +1,25 @@
-/**
+/*
  * Mars Simulation Project
  * RecordActivity.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-18
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
-import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.function.FunctionType;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
 
 /**
  * The RecordActivity class is a task for recording events/activities
  */
-public class RecordActivity extends Task implements Serializable {
+public class RecordActivity extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -46,7 +41,7 @@ public class RecordActivity extends Task implements Serializable {
 	 */
 	public RecordActivity(Person person) {
 		// Use Task constructor.
-		super(NAME, person, true, false, STRESS_MODIFIER, true, RandomUtil.getRandomDouble(10D));
+		super(NAME, person, true, false, STRESS_MODIFIER, RandomUtil.getRandomDouble(10D));
 
 		if (person.isInSettlement()) {
 			
@@ -72,11 +67,6 @@ public class RecordActivity extends Task implements Serializable {
 			endTask();
 		}
 
-	}
-
-	@Override
-	public FunctionType getLivingFunction() {
-		return FunctionType.ADMINISTRATION;
 	}
 
 	@Override
@@ -107,33 +97,11 @@ public class RecordActivity extends Task implements Serializable {
 	protected void addExperience(double time) {
 		// TODO: what experience to add
 		double newPoints = time / 20D;
-		int exp = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
-		int art = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.ARTISTRY);
+		int exp = worker.getNaturalAttributeManager().getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
+		int art = worker.getNaturalAttributeManager().getAttribute(NaturalAttributeType.ARTISTRY);
 		newPoints += newPoints * (exp + art - 100D) / 100D;
 		newPoints *= getTeachingExperienceModifier();
-		person.getSkillManager().addExperience(SkillType.REPORTING, newPoints, time);
-
+		worker.getSkillManager().addExperience(SkillType.REPORTING, newPoints, time);
 	}
 
-	@Override
-	public void endTask() {
-		super.endTask();
-	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		return 0;
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(0);
-		return results;
-	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
-
-	}
 }

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * UnitIconMapLayer.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-28
  * @author Scott Davis
  */
 

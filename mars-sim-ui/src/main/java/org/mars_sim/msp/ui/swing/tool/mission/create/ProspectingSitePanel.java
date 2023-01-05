@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ProspectingSitePanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
@@ -26,6 +26,7 @@ import javax.swing.BoxLayout;
 /**
  * A wizard panel for the ice or regolith prospecting site.
  */
+@SuppressWarnings("serial")
 class ProspectingSitePanel extends WizardPanel {
 
 	// Wizard panel name.
@@ -70,10 +71,12 @@ class ProspectingSitePanel extends WizardPanel {
 		
 		// Create the map panel.
 		mapPane = new MapPanel(wizard.getDesktop(), 200L);
+		
 		mapPane.addMapLayer(new UnitIconMapLayer(mapPane), 0);
 		mapPane.addMapLayer(new UnitLabelMapLayer(), 1);
 		mapPane.addMapLayer(ellipseLayer = new EllipseLayer(Color.GREEN), 2);
 		mapPane.addMapLayer(navLayer = new NavpointEditLayer(mapPane, false), 3);
+		
 		mapPane.addMouseListener(new NavpointMouseListener());
 		mapPane.addMouseMotionListener(new NavpointMouseMotionListener());
 		mapPane.setMaximumSize(mapPane.getPreferredSize());
@@ -250,11 +253,9 @@ class ProspectingSitePanel extends WizardPanel {
 		 * @return true if within boundaries.
 		 */
 		private boolean withinBounds(IntPoint position) {
-			boolean result = true;
-			
-			if (!navLayer.withinDisplayEdges(position)) result = false;
-			
-			int radius = (int) Math.round(Math.sqrt(Math.pow(150D - position.getX(), 2D) + 
+			boolean result = navLayer.withinDisplayEdges(position);
+
+            int radius = (int) Math.round(Math.sqrt(Math.pow(150D - position.getX(), 2D) +
 			        Math.pow(150D - position.getY(), 2D)));
 			if (radius > pixelRange) result = false;
 			

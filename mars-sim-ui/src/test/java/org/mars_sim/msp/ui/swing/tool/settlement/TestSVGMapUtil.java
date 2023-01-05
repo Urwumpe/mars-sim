@@ -7,9 +7,9 @@ import java.util.List;
 import org.apache.batik.gvt.GraphicsNode;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.resource.Part;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.construction.ConstructionConfig;
 import org.mars_sim.msp.core.structure.construction.ConstructionStageInfo;
+import org.mars_sim.msp.core.vehicle.VehicleSpec;
 import org.mars_sim.msp.ui.swing.tool.svg.SVGMapUtil;
 
 import junit.framework.TestCase;
@@ -21,7 +21,7 @@ public class TestSVGMapUtil extends TestCase {
 
     @Override
     public void setUp() throws Exception {
-        SimulationConfig.instance().loadConfig();
+    	SimulationConfig.instance().loadConfig();
     }
 
     /**
@@ -30,7 +30,7 @@ public class TestSVGMapUtil extends TestCase {
     public void testGetBuildingSVG() {
         
         // Check that all configured building names are mapped to a SVG image.
-        Iterator<String> i = BuildingConfig.getBuildingTypes().iterator();
+        Iterator<String> i = SimulationConfig.instance().getBuildingConfiguration().getBuildingTypes().iterator();
         while (i.hasNext()) {
             String buildingName = i.next();
             GraphicsNode svg = SVGMapUtil.getBuildingSVG(buildingName);
@@ -65,10 +65,8 @@ public class TestSVGMapUtil extends TestCase {
     public void testGetVehicleSVG() {
         
         // Check that all vehicle types are mapped to a SVG image.
-        Iterator<String> i = SimulationConfig.instance().getVehicleConfiguration().
-                getVehicleTypes().iterator();
-        while (i.hasNext()) {
-            String vehicleType = i.next();
+        for(VehicleSpec vs :  SimulationConfig.instance().getVehicleConfiguration().getVehicleSpecs()) {
+            String vehicleType = vs.getName();
             GraphicsNode svg = SVGMapUtil.getVehicleSVG(vehicleType);
             assertNotNull(vehicleType + " is not mapped to a SVG image.", svg);
         }
@@ -80,10 +78,8 @@ public class TestSVGMapUtil extends TestCase {
     public void testGetMaintenanceOverlaySVG() {
         
         // Check that all vehicle types have a maintenance overlay mapped to a SVG image.
-        Iterator<String> i = SimulationConfig.instance().getVehicleConfiguration().
-                getVehicleTypes().iterator();
-        while (i.hasNext()) {
-            String vehicleType = i.next();
+        for(VehicleSpec vs :  SimulationConfig.instance().getVehicleConfiguration().getVehicleSpecs()) {
+            String vehicleType = vs.getName();
             GraphicsNode svg = SVGMapUtil.getMaintenanceOverlaySVG(vehicleType);
             assertNotNull(vehicleType + " does not have a maintenance overlay mapped to a SVG image.", svg);
         }
@@ -95,10 +91,8 @@ public class TestSVGMapUtil extends TestCase {
     public void testGetLoadingOverlaySVG() {
         
         // Check that all vehicle types have a loading overlay mapped to a SVG image.
-        Iterator<String> i = SimulationConfig.instance().getVehicleConfiguration().
-                getVehicleTypes().iterator();
-        while (i.hasNext()) {
-            String vehicleType = i.next();
+        for(VehicleSpec vs :  SimulationConfig.instance().getVehicleConfiguration().getVehicleSpecs()) {
+            String vehicleType = vs.getName();
             if (!vehicleType.equalsIgnoreCase("Light Utility Vehicle")) {
                 GraphicsNode svg = SVGMapUtil.getLoadingOverlaySVG(vehicleType);
                 assertNotNull(vehicleType + " does not have a loading overlay mapped to a SVG image.", svg);
@@ -113,7 +107,7 @@ public class TestSVGMapUtil extends TestCase {
         
         // Check that all vehicle attachment parts are mapped to a SVG image.
         Iterator<Part> i = SimulationConfig.instance().getVehicleConfiguration().
-                getAttachableParts("Light Utility Vehicle").iterator();
+                getVehicleSpec("Light Utility Vehicle").getAttachableParts().iterator();
         while (i.hasNext()) {
             Part attachmentPart = i.next();
             GraphicsNode svg = SVGMapUtil.getAttachmentPartSVG(attachmentPart.getName());

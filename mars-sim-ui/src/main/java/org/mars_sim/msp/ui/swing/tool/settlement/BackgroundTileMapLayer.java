@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * BackgroundTileMapLayer.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-15
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.settlement;
@@ -49,7 +49,7 @@ implements SettlementMapLayer {
 	 */
 	public BackgroundTileMapLayer(SettlementMapPanel mapPanel) {
 		this.mapPanel = mapPanel;
-		settlementBackgroundMap = new HashMap<Settlement, String>(MAX_BACKGROUND_IMAGE_NUM);
+		settlementBackgroundMap = new HashMap<>(MAX_BACKGROUND_IMAGE_NUM);
 	}
 
 	@Override
@@ -78,6 +78,10 @@ implements SettlementMapLayer {
 
 		if (backgroundTileImage == null) {
 		    ImageIcon backgroundTileIcon = getBackgroundImage(settlement);
+		    if (backgroundTileIcon == null) {
+		    	return;
+		    }
+		    
 		    double imageScale = scale / SettlementMapPanel.DEFAULT_SCALE;
 		    int imageWidth = (int) (backgroundTileIcon.getIconWidth() * imageScale);
 		    int imageHeight = (int) (backgroundTileIcon.getIconHeight() * imageScale);
@@ -98,10 +102,10 @@ implements SettlementMapLayer {
 
 			// Calculate starting X position for drawing tile.
 			int startX = tileCenterOffsetX;
-			while ((startX + offsetX) > (0 - bufferX)) {
+			while ((startX + offsetX) > (-bufferX)) {
 				startX -= tileWidth;
 			}
-			while ((startX + offsetX) < (0 - tileWidth - bufferX)) {
+			while ((startX + offsetX) < (-tileWidth - bufferX)) {
 				startX += tileWidth;
 			}
 
@@ -123,10 +127,10 @@ implements SettlementMapLayer {
 
 				// Calculate starting Y position for drawing tile.
 				int startY = tileCenterOffsetY;
-				while ((startY + offsetY) > (0 - bufferY)) {
+				while ((startY + offsetY) > (-bufferY)) {
 					startY -= tileHeight;
 				}
-				while ((startY + offsetY) < (0 - tileHeight - bufferY)) {
+				while ((startY + offsetY) < (-tileHeight - bufferY)) {
 					startY += tileHeight;
 				}
 
@@ -152,6 +156,7 @@ implements SettlementMapLayer {
 
 	/**
 	 * Creates a resized instance of a background image.
+	 * 
 	 * @param image the original background image.
 	 * @param width the resized image width.
 	 * @param height the resized image height.
@@ -187,10 +192,7 @@ implements SettlementMapLayer {
 			if ((w > MAX_BACKGROUND_DIMENSION) || (h > MAX_BACKGROUND_DIMENSION)) {
 				float reductionW = (float) MAX_BACKGROUND_DIMENSION / (float) w;
 				float reductionH = (float) MAX_BACKGROUND_DIMENSION / (float) h;
-				float reduction = reductionW;
-				if (reductionH < reductionW) {
-					reduction = reductionH;
-				}
+				float reduction = Math.min(reductionH, reductionW);
 
 				bufferWidth = (int) (w * reduction);
 				bufferHeight = (int) (h * reduction);
@@ -215,6 +217,7 @@ implements SettlementMapLayer {
 
 	/**
 	 * Gets the background tile image icon for a settlement.
+	 * 
 	 * @param settlement the settlement to display.
 	 * @return the background tile image icon or null if none found.
 	 */

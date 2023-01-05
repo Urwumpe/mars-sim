@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ResupplyUtil.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-25
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.interplanetary.transport.resupply;
@@ -20,12 +20,10 @@ import org.mars_sim.msp.core.time.MarsClock;
 
 /**
  * Utility class for resupply missions.
+ * Future: may reference the calculation of transit time at http://www.jpl.nasa.gov/edu/teach/activity/lets-go-to-mars-calculating-launch-windows/
  */
 public final class ResupplyUtil {
 
-    // Average transit time for resupply missions from Earth to Mars [in sols]
-    private static int averageTransitTime;
-    // TODO: implement calculation of transit time at http://www.jpl.nasa.gov/edu/teach/activity/lets-go-to-mars-calculating-launch-windows/
 
     public static int MAX_NUM_SOLS_PLANNED = 2007; // 669 * 3 = 2007
 
@@ -34,15 +32,21 @@ public final class ResupplyUtil {
     private static SimulationConfig simulationConfig = SimulationConfig.instance();
 	private static SettlementConfig settlementConfig = simulationConfig.getSettlementConfiguration();
 	private static ResupplyConfig resupplyConfig = simulationConfig.getResupplyConfiguration();
-	private static MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
-	private static UnitManager unitManager = Simulation.instance().getUnitManager();
+	
+    // Average transit time for resupply missions from Earth to Mars [in sols]
+    private static int averageTransitTime = simulationConfig.getAverageTransitTime();
+    // TODO: implement calculation of transit time at http://www.jpl.nasa.gov/edu/teach/activity/lets-go-to-mars-calculating-launch-windows/
+
+    
+    private static Simulation sim = Simulation.instance();
+	private static MarsClock currentTime = sim.getMasterClock().getMarsClock();
+	private static UnitManager unitManager = sim.getUnitManager();
     
 	/**
 	 * Private constructor for utility class.
 	 */
-	public ResupplyUtil() {
-		// Do nothing
-		averageTransitTime = simulationConfig.getAverageTransitTime();
+	private ResupplyUtil() {
+		// nothing
 	}
 
 	public static int getAverageTransitTime() {
@@ -63,31 +67,33 @@ public final class ResupplyUtil {
 	}
 	        
 	/**
-	 * Create the initial resupply missions from the configuration XML files.
+	 * Creates the initial resupply missions from the configuration XML files.
 	 */
 	public static List<Resupply> loadInitialResupplyMissions() {
-
+		
 		if (resupplies == null)  {
-			resupplies = new CopyOnWriteArrayList<Resupply>();
-
+			resupplies = new CopyOnWriteArrayList<>();
+			
 	        Iterator<Settlement> i = unitManager.getSettlements().iterator();
 	        while (i.hasNext()) {
 	            Settlement settlement = i.next();
 	            String templateName = settlement.getTemplate();
-
+ 
 	            Iterator<ResupplyMissionTemplate> j =
-	                settlementConfig.getSettlementTemplate(templateName).getResupplyMissionTemplates().iterator();
+	                settlementConfig.getItem(templateName).getResupplyMissionTemplates().iterator();
 	            while (j.hasNext()) {
 	                ResupplyMissionTemplate template = j.next();
-	                MarsClock arrivalDate = (MarsClock) currentTime.clone();
+	                // Determine arrival date.
+	                MarsClock arrivalDate = new MarsClock(currentTime);
 	                arrivalDate.addTime(template.getArrivalTime() * 1000D);
-	                Resupply resupply = new Resupply(arrivalDate, settlement);
-
+	               
+	                Resupply resupply = new Resupply(template, arrivalDate, settlement);
+	                
 	                // Determine launch date.
-	                MarsClock launchDate = (MarsClock) arrivalDate.clone();
+	                MarsClock launchDate = new MarsClock(arrivalDate);
 	                launchDate.addTime(-1D * averageTransitTime * 1000D);
 	                resupply.setLaunchDate(launchDate);
-
+	                    
 	                // Set resupply state based on launch and arrival time.
 	                TransitState state = TransitState.PLANNED;
 	                if (MarsClock.getTimeDiff(currentTime, launchDate) >= 0D) {
@@ -99,22 +105,16 @@ public final class ResupplyUtil {
 	                resupply.setTransitState(state);
 
 	                String resupplyName = template.getName();
-
 	                // Get new building types.
 	                resupply.setNewBuildings(resupplyConfig.getResupplyBuildings(resupplyName));
-
 	                // Get new vehicle types.
 	                resupply.setNewVehicles(resupplyConfig.getResupplyVehicleTypes(resupplyName));
-
 	                // Get new equipment types.
 	                resupply.setNewEquipment(resupplyConfig.getResupplyEquipment(resupplyName));
-
 	                // Get number of new immigrants.
 	                resupply.setNewImmigrantNum(resupplyConfig.getNumberOfResupplyImmigrants(resupplyName));
-
 	                // Get new resources map.
 	                resupply.setNewResources(resupplyConfig.getResupplyResources(resupplyName));
-
 	                // Get new parts map.
 	                resupply.setNewParts(resupplyConfig.getResupplyParts(resupplyName));
 

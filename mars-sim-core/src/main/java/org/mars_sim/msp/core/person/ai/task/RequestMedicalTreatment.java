@@ -1,22 +1,19 @@
 /**
  * Mars Simulation Project
  * RequestMedicalTreatment.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -26,22 +23,27 @@ import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.SickBay;
 import org.mars_sim.msp.core.vehicle.Vehicle;
+import org.mars_sim.msp.core.vehicle.VehicleType;
 
 /**
  * A task for requesting and awaiting medical treatment at a medical station.
  */
-public class RequestMedicalTreatment extends Task implements Serializable {
+public class RequestMedicalTreatment extends Task {
 
     /** default serial id. */
     private static final long serialVersionUID = 1L;
 
     // Static members
+    
     /** The stress modified per millisol. */
     private static final double STRESS_MODIFIER = .3D;
 
     /** default logger. */
-    private static Logger logger = Logger.getLogger(RequestMedicalTreatment.class.getName());
+    // For Future Use: private static final Logger logger = Logger.getLogger(RequestMedicalTreatment.class.getName())
 
+	/** Simple Task name */
+	public static final String SIMPLE_NAME = RequestMedicalTreatment.class.getSimpleName();
+	
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.requestMedicalTreatment"); //$NON-NLS-1$
@@ -56,8 +58,9 @@ public class RequestMedicalTreatment extends Task implements Serializable {
     private static final double MAX_WAITING_DURATION = 200D;
 
     // Data members.
-    private MedicalAid medicalAid;
     private double waitingDuration;
+    
+    private MedicalAid medicalAid;
 
     /**
      * Constructor.
@@ -65,9 +68,9 @@ public class RequestMedicalTreatment extends Task implements Serializable {
      * @param person the person to perform the task
      */
     public RequestMedicalTreatment(Person person) {
-        super(NAME, person, false, false, STRESS_MODIFIER, false, 10D);
+        super(NAME, person, false, false, STRESS_MODIFIER, 10D);
 	     
-        if (person.getPhysicalCondition().getProblems().size() == 0)
+        if (person.getPhysicalCondition().getProblems().isEmpty())
         	endTask();
         		
         // Choose available medical aid for treatment.
@@ -78,20 +81,15 @@ public class RequestMedicalTreatment extends Task implements Serializable {
             if (medicalAid instanceof MedicalCare) {
                 // Walk to medical care building.
                 MedicalCare medicalCare = (MedicalCare) medicalAid;
-
                 // Walk to medical care building.
-                //walkToActivitySpotInBuilding(medicalCare.getBuilding(), false);
                 Building b = medicalCare.getBuilding();
                 if (b != null)
                 	walkToActivitySpotInBuilding(b, FunctionType.MEDICAL_CARE, false);
-                //else
-                //	endTask();
             }
             else if (medicalAid instanceof SickBay) {
                 // Walk to medical activity spot in rover.
                 Vehicle vehicle = ((SickBay) medicalAid).getVehicle();
-                if (vehicle instanceof Rover) {
-
+                if (VehicleType.isRover(vehicle.getVehicleType())) {
                     // Walk to rover sick bay activity spot.
                     walkToSickBayActivitySpotInRover((Rover) vehicle, false);
                 }
@@ -151,7 +149,7 @@ public class RequestMedicalTreatment extends Task implements Serializable {
 
         MedicalAid result = null;
 
-        List<MedicalAid> goodMedicalAids = new ArrayList<MedicalAid>();
+        List<MedicalAid> goodMedicalAids = new ArrayList<>();
 
         // Check all medical care buildings.
         Iterator<Building> i = person.getSettlement().getBuildingManager().getBuildings(
@@ -184,7 +182,7 @@ public class RequestMedicalTreatment extends Task implements Serializable {
         }
 
         // Randomly select an valid medical care building.
-        if (goodMedicalAids.size() > 0) {
+        if (!goodMedicalAids.isEmpty()) {
             int index = RandomUtil.getRandomInt(goodMedicalAids.size() - 1);
             result = goodMedicalAids.get(index);
         }
@@ -212,7 +210,7 @@ public class RequestMedicalTreatment extends Task implements Serializable {
 
         MedicalAid result = null;
 
-        if (person.getVehicle() instanceof Rover) {
+        if (VehicleType.isRover(person.getVehicle().getVehicleType())) {
             Rover rover = (Rover) person.getVehicle();
             if (rover.hasSickBay()) {
                 SickBay sickBay = rover.getSickBay();
@@ -340,31 +338,11 @@ public class RequestMedicalTreatment extends Task implements Serializable {
 		return medicalAid;
 	}
 	
+	/**
+	 * Stop using the associated medical aid
+	 */
     @Override
-    public FunctionType getLivingFunction() {
-        return FunctionType.MEDICAL_CARE;
-    }
-
-    @Override
-    public int getEffectiveSkillLevel() {
-        // No effective skill level.
-        return 0;
-    }
-
-    @Override
-    public List<SkillType> getAssociatedSkills() {
-        return new ArrayList<SkillType>(0);
-    }
-
-    @Override
-    protected void addExperience(double time) {
-        // Do nothing
-    }
-
-    @Override
-    public void endTask() {
-        super.endTask();
-
+    protected void clearDown() {
         // Remove person from medical aid.
         if (medicalAid != null) {
 

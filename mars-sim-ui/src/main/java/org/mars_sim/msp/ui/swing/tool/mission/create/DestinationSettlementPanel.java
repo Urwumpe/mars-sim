@@ -1,14 +1,14 @@
-/**
+/*
  * Mars Simulation Project
  * DestinationSettlementPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
@@ -19,12 +19,14 @@ import javax.swing.event.ListSelectionListener;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 
 /**
  * This is a wizard panel for selecting the mission destination settlement.
  */
+@SuppressWarnings("serial")
 class DestinationSettlementPanel extends WizardPanel {
 
 	/** Wizard panel name. */
@@ -217,7 +219,7 @@ class DestinationSettlementPanel extends WizardPanel {
     	public void updateTable() {
     		units.clear();
     		Settlement startingSettlement = getWizard().getMissionData().getStartingSettlement();    		
-    		Collection<Settlement> settlements = unitManager.getSettlements();
+    		Collection<Settlement> settlements = new ArrayList<>(unitManager.getSettlements());
     		settlements.remove(startingSettlement);
     		
     		// Add all settlements sorted by distance from mission starting point.
@@ -252,10 +254,15 @@ class DestinationSettlementPanel extends WizardPanel {
     		
     		if (column == 1) {
     			try {
-    				Settlement startingSettlement = getWizard().getMissionData().getStartingSettlement();
+    				MissionDataBean data = getWizard().getMissionData();
+    				Settlement startingSettlement = data.getStartingSettlement();
     				double distance = startingSettlement.getCoordinates().getDistance(settlement.getCoordinates());
-    				double roverRange = getWizard().getMissionData().getRover().getRange(wizard.getMissionBean().getMissionType());
-    				if (roverRange < distance) result = true;
+    				Vehicle v = data.getRover();
+    				if (v == null) {
+    					v = data.getDrone();
+    				}
+    				double vRange = v.getRange(wizard.getMissionBean().getMissionType());
+    				if (vRange < distance) result = true;
     			}
     			catch (Exception e) {}
     		}

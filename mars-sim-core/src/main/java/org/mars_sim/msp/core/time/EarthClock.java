@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * EarthClock.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-21
  * @author Scott Davis
  */
 
@@ -22,6 +22,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.SimpleTimeZone;
 import java.util.TimeZone;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -34,10 +35,13 @@ public class EarthClock implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** Initialized logger. */
-	private static Logger logger = Logger.getLogger(EarthClock.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
-	
+	private static final Logger logger = Logger.getLogger(EarthClock.class.getName());
+
+	private static final String FULL_TIME_FORMAT = "%02d:%02d:%02d";
+	private static final String DATE_FORMAT = "%04d-%s-%02d";
+	private static final String WEEK_DATE_FORMAT = " %s ";
+	private static final String FULL_DATE_TIME_FORMAT = DATE_FORMAT + WEEK_DATE_FORMAT + FULL_TIME_FORMAT;
+
 	/**
 	 * Tracks the number of milliseconds since 1 January 1970 00:00:00 at the start of the sim
 	 */
@@ -47,6 +51,7 @@ public class EarthClock implements Serializable {
 	private SimpleDateFormat f1;
 	private SimpleDateFormat f2;
 	private SimpleDateFormat f3;
+	private SimpleDateFormat f4;
 
 	private SimpleTimeZone zone;
 
@@ -56,21 +61,21 @@ public class EarthClock implements Serializable {
 
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param fullDateTimeString the UT date string
 	 * @throws Exception if date string is invalid.
 	 */
 	public EarthClock(String fullDateTimeString) {
 		// Java 8's Date/Time API in java.time package, see
 		// https://docs.oracle.com/javase/tutorial/datetime/TOC.html
-		
-		// dtFormatter_millis = DateTimeFormatter.ofPattern("yyyy-MMM-dd HH:mm:ss");//.AAAA");//AAAA");
+
+		// Alternatively, dtFormatter_millis = DateTimeFormatter.ofPattern("yyyy-MMM-dd HH:mm:ss");//.AAAA");//AAAA");
 
 		// see http://stackoverflow.com/questions/26142864/how-to-get-utc0-date-in-java-8
 
 		// Use ZonedDate
 		zonedDateTime = ZonedDateTime.now(ZoneOffset.UTC);
-		
+
 		// Set Greenwich Mean Time (GMT) timezone for calendar
 		zone = new SimpleTimeZone(0, "GMT");
 		// see http://www.diffen.com/difference/GMT_vs_UTC
@@ -86,11 +91,11 @@ public class EarthClock implements Serializable {
 		f1 = new SimpleDateFormat("yyyy-MM-dd HH:mm '(UT)'", Locale.US);
 		f1.setTimeZone(zone);
 
-		// Note: By default, java set locale to user's machine system locale via
-		// Locale.getDefault(Locale.Category.FORMAT));
+		// Note: By default, java set locale to user's machine system locale
+		// by using Locale.getDefault(Locale.Category.FORMAT));
 		// i.e. f2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss",
-		// Locale.getDefault(Locale.Category.FORMAT));
-		// 2017-03-27 set it to Locale.US
+		// Use Locale.getDefault(Locale.Category.FORMAT));
+		// or Set it to Locale.US
 
 		f2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
 		f2.setTimeZone(zone);
@@ -107,7 +112,7 @@ public class EarthClock implements Serializable {
 			zonedDateTime = dateOfFirstLanding;
 			computeMillisAtStart();
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			logger.log(Level.SEVERE, "Can't obtain the ogg music file.", ex);
 		}
 
 		// Initialize a second formatter
@@ -117,6 +122,8 @@ public class EarthClock implements Serializable {
 		f3.setTimeZone(gmt);
 		f3.setLenient(false);
 
+		f4 = new SimpleDateFormat("yyyy-MMM-dd EEE HH:mm:ss.SSS", Locale.US);
+		f4.setTimeZone(zone);
 	}
 
 	public static String getMonthForInt(int m) {
@@ -136,10 +143,10 @@ public class EarthClock implements Serializable {
 	public Instant getInstant() {
 		return zonedDateTime.toInstant();
 	}
-	
+
 	/**
 	 * Returns the current date/time
-	 * 
+	 *
 	 * @return date
 	 */
 	public Date getCurrentDateTime() {
@@ -152,7 +159,7 @@ public class EarthClock implements Serializable {
 
 	/**
 	 * Returns the number of milliseconds since 1 January 1970 00:00:00
-	 * 
+	 *
 	 * @return long
 	 */
 	public static long getMillisAtStart() {
@@ -161,7 +168,7 @@ public class EarthClock implements Serializable {
 
 	/**
 	 * Returns the number of milliseconds since 1 January 1970 00:00:00
-	 * 
+	 *
 	 * @return long
 	 */
 	public void computeMillisAtStart() {
@@ -170,7 +177,7 @@ public class EarthClock implements Serializable {
 
 	/**
 	 * Returns the number of milliseconds since 1 January 1970 00:00:00
-	 * 
+	 *
 	 * @return long
 	 */
 	public static long getMillis(EarthClock clock) {
@@ -179,7 +186,7 @@ public class EarthClock implements Serializable {
 
 	/**
 	 * Returns the date/time formatted in a string
-	 * 
+	 *
 	 * @return date/time formatted in a string. eg "2055-May-06 03:37:22"
 	 */
 	public String getCurrentDateTimeString(EarthClock clock) {
@@ -188,16 +195,16 @@ public class EarthClock implements Serializable {
 
 	/**
 	 * Returns the date/time formatted in a string
-	 * 
+	 *
 	 * @return date/time formatted in a string. ex "2055-05-06 03:37:22 (UT)"
 	 */
-	public String getTimeStampF0() {		
+	public String getTimeStampF0() {
 		return f0.format(Timestamp.from(zonedDateTime.toInstant()));
 	}
 
 	/**
 	 * Returns the date/time formatted in a string
-	 * 
+	 *
 	 * @return date/time formatted in a string. ex "2055-05-06 03:37 (UT)"
 	 */
 	public String getTimeStampF1() {
@@ -206,16 +213,25 @@ public class EarthClock implements Serializable {
 
 	/**
 	 * Returns the date/time formatted in a string
-	 * 
-	 * @return date/time formatted in a string. ex "2055-May-06 03:37:22"
+	 *
+	 * @return date/time formatted in a string. ex "2055-05-06 03:37:22"
 	 */
 	public String getTimeStampF3() {
 		return f3.format(Timestamp.from(zonedDateTime.toInstant()));
 	}
 
 	/**
+	 * Returns the date/time formatted in a string
+	 *
+	 * @return date/time formatted in a string. ex "2055-May-06 Sun 03:37:22"
+	 */
+	public String getTimeStampF4() {
+		return f4.format(Timestamp.from(zonedDateTime.toInstant()));
+	}
+
+	/**
 	 * Returns the date formatted in a string
-	 * 
+	 *
 	 * @return date formatted in a string. ex "2055-05-06"
 	 */
 	public String getDateStringF0() {
@@ -225,8 +241,8 @@ public class EarthClock implements Serializable {
 
 	/**
 	 * Returns the date formatted in a string
-	 * 
-	 * @return date formatted in a string. ex "2055-May-06"
+	 *
+	 * @return date formatted in a string. ex "2055-05-06"
 	 */
 	public String getDateStringF3() {
 		String d = getTimeStampF3();
@@ -234,8 +250,19 @@ public class EarthClock implements Serializable {
 	}
 
 	/**
+	 * Returns the date formatted in a string
+	 *
+	 * @return date formatted in a string. ex "2055-May-06"
+	 */
+	public String getDateStringF4() {
+		String d = getTimeStampF4();
+		return d.substring(0, d.indexOf(" "));
+	}
+
+
+	/**
 	 * Returns the time formatted in a string
-	 * 
+	 *
 	 * @return date formatted in a string. ex "03:37:22"
 	 */
 	public String getTimeStringF0() {
@@ -245,7 +272,7 @@ public class EarthClock implements Serializable {
 
 	/**
 	 * Adds time to the calendar
-	 * 
+	 *
 	 * @param milliseconds the time to be added to the calendar
 	 */
 	public void addTime(long milliseconds) {
@@ -255,7 +282,7 @@ public class EarthClock implements Serializable {
 
 	/**
 	 * Displays the string version of the clock.
-	 * 
+	 *
 	 * @return time stamp string.
 	 */
 	public String toString() {
@@ -349,25 +376,6 @@ public class EarthClock implements Serializable {
 
 	public String getDayOfWeekString() {
 		return zonedDateTime.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);//gregCal.get(Calendar.DAY_OF_WEEK);
-		
-//		StringBuilder s = new StringBuilder();
-//		if (w == Calendar.SUNDAY)
-//			s.append("Sunday");
-//		else if (w == Calendar.MONDAY)
-//			s.append("Monday");
-//		else if (w == Calendar.TUESDAY)
-//			s.append("Tuesday");
-//		else if (w == Calendar.WEDNESDAY)
-//			s.append("Wednesday");
-//		else if (w == Calendar.THURSDAY)
-//			s.append("Thursday");
-//		else if (w == Calendar.FRIDAY)
-//			s.append("Friday");
-//		else if (w == Calendar.SATURDAY)
-//			s.append("Saturaday");
-//		// else
-//		// s = "";
-//		return s.toString();
 	}
 
 	public ZonedDateTime getZonedDateTime() {
@@ -382,12 +390,18 @@ public class EarthClock implements Serializable {
 		return zonedDateTime.toLocalTime();
 	}
 
-//	public Date getDT() {
-//		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-//		LocalDate localDate = zonedDateTime //LocalDate.parse(dateString, formatter);
-//		Date.from(java.time.ZonedDateTime.now().toInstant());
-//	}
-    
+	/**
+	 * Returns formatted time stamp string in the format of "03-Adir-05:056.434"
+	 *
+	 * @param time {@link MarsClock} instance
+	 * @return formatted String
+	 */
+	public static String getDateTimeStamp(EarthClock time) {
+		return String.format(FULL_DATE_TIME_FORMAT, time.getYear(), time.getMonthString(),
+										            time.getDayOfMonth(), time.getDayOfWeekString(),
+										            time.getHour(), time.getMinute(), time.getSecond());
+	}
+
 	public void destroy() {
 		f0 = null;
 		f2 = null;

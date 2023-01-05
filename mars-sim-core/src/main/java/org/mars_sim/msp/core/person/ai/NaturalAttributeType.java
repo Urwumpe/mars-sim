@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * NaturalAttributeType.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author stpa
  */
 
@@ -22,6 +22,8 @@ public enum NaturalAttributeType {
 	COURAGE (Msg.getString("NaturalAttributeType.courage")), //$NON-NLS-1$
 	
 	CONVERSATION (Msg.getString("NaturalAttributeType.conversation")), //$NON-NLS-1$
+	CREATIVITY (Msg.getString("NaturalAttributeType.creativity")), //$NON-NLS-1$
+
 	EMOTIONAL_STABILITY (Msg.getString("NaturalAttributeType.emotionalStability")), //$NON-NLS-1$
 	ENDURANCE (Msg.getString("NaturalAttributeType.endurance")), //$NON-NLS-1$
 	EXPERIENCE_APTITUDE (Msg.getString("NaturalAttributeType.experienceAptitude")), //$NON-NLS-1$

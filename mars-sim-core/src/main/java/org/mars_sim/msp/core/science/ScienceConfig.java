@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ScienceConfig.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-28
  * @author Manny Kung
  */
 
@@ -10,16 +10,18 @@ package org.mars_sim.msp.core.science;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Level;
 
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
 
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.tool.Conversion;
 import org.mars_sim.msp.core.tool.RandomUtil;
  
@@ -28,6 +30,9 @@ public class ScienceConfig implements Serializable {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
  
+	/** default logger. */
+	private static SimLogger logger = SimLogger.getLogger(ScienceConfig.class.getName());
+
 	private static final String SCIENTIFIC_STUDY = "scientific_study";
 	private static final String JSON = "json";
 	private static final String DIR = "/";
@@ -45,17 +50,13 @@ public class ScienceConfig implements Serializable {
 	
 	private static String[] jsonFiles = new String[ScienceType.valuesList().size()]; 
     
-    private static List<Integer> averageTime = new CopyOnWriteArrayList<>(); 
+    private static List<Integer> averageTime = new ArrayList<>(); 
     
     private static int aveNumCollaborators;
-    
-    private Subject s;
-    
-    private Map<ScienceType, List<Topic>> scienceTopics = new ConcurrentHashMap<>();
-    
-    public static void main(String[] args) {
-			new ScienceConfig();
-    }
+
+	private static int maxStudiesPerPerson = 2;
+        
+    private Map<ScienceType, List<Topic>> scienceTopics = new EnumMap<>(ScienceType.class);
     
     public void createJsonFiles() {
     	int size = ScienceType.valuesList().size();
@@ -82,10 +83,12 @@ public class ScienceConfig implements Serializable {
         try {
 			fis.close();
 		} catch (IOException e1) {
-			e1.printStackTrace();
+          	logger.log(Level.SEVERE, "Cannot close json file: "+ e1.getMessage());
 		}
          
         aveNumCollaborators = jsonObject.getInt("average_num_collaborators");
+        maxStudiesPerPerson = jsonObject.getInt("max_studies_per_person");
+
         averageTime.add(jsonObject.getInt("base_proposal_time"));
         averageTime.add(jsonObject.getInt("base_primary_research_study_time"));
         averageTime.add(jsonObject.getInt("base_collaborative_research_study_time"));
@@ -104,17 +107,23 @@ public class ScienceConfig implements Serializable {
 	        jsonReader = Json.createReader(fis);
 	         
 	        // Get JsonObject from JsonReader
-	        jsonObject = jsonReader.readObject();
-	         
+	        try {
+	        	jsonObject = jsonReader.readObject();
+	        }  
+	        catch (RuntimeException rte) {
+	        	logger.severe("Problem parsing JSON " + fileName);
+	        	throw rte;
+	        }
+	        
 	        // Close IO resource and JsonReader
 	        jsonReader.close();
 	        try {
 				fis.close();
 			} catch (IOException e1) {
-				e1.printStackTrace();
+	          	logger.log(Level.SEVERE, "Cannot close json file: "+ e1.getMessage());
 			}
 	         
-	        s = new Subject();
+	        Subject s = new Subject();
 	        // Retrieve a subject from JsonObject
 	        s.setSubject(jsonObject.getString(SUBJECT));
 	     
@@ -135,17 +144,13 @@ public class ScienceConfig implements Serializable {
 		        	s.createTopic(t);
 		        }
 	        } catch (Exception e1) {
-				e1.printStackTrace();
+	          	logger.log(Level.SEVERE, "Cannot get json object: "+ e1.getMessage());
 			}
      
 	        scienceTopics.put(ScienceType.getType(s.getName()), s.getTopics());
     	}
     }
  
-    public Subject getSubject() {
-    	return s;
-    }
-	
     public String getATopic(ScienceType type) {
     	if (scienceTopics.containsKey(type)) {
     		List<Topic> topics = scienceTopics.get(type);
@@ -158,11 +163,6 @@ public class ScienceConfig implements Serializable {
     	return GENERAL;	
     }
     
-    
-    public static List<Integer> getAverageTime() {
-    	return averageTime; 
-    }
-
     public static int getAverageTime(int index) {
     	return averageTime.get(index); 
     }
@@ -171,6 +171,9 @@ public class ScienceConfig implements Serializable {
     	return aveNumCollaborators;
     }
 
+	public static int getMaxStudies() {
+		return maxStudiesPerPerson ;
+	}
 
     /**
      * Class Subject is a scientific subject holding a list of topics
@@ -182,7 +185,7 @@ public class ScienceConfig implements Serializable {
 		
 		String name;
 
-		List<Topic> topics = new CopyOnWriteArrayList<>();
+		List<Topic> topics = new ArrayList<>();
 		
 		Subject() {}
 
@@ -239,7 +242,6 @@ public class ScienceConfig implements Serializable {
         jsonFiles = null;
         averageTime.clear();
         averageTime = null; 
-        s = null; 
         scienceTopics.clear();
         scienceTopics = null;   
     }

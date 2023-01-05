@@ -1,29 +1,26 @@
 /**
  * Mars Simulation Project
  * StudyFieldSamplesMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-10-21
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.mars.MarsSurface;
-import org.mars_sim.msp.core.person.FavoriteType;
+import org.mars_sim.msp.core.equipment.ResourceHolder;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.fav.FavoriteType;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.task.StudyFieldSamples;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.resource.ResourceUtil;
-import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.core.structure.Lab;
@@ -32,23 +29,24 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
 /**
  * Meta task for the StudyFieldSamples task.
  */
-public class StudyFieldSamplesMeta implements MetaTask, Serializable {
+public class StudyFieldSamplesMeta extends FactoryMetaTask {
 
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
-    
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.studyFieldSamples"); //$NON-NLS-1$
 
     /** default logger. */
-    private static Logger logger = Logger.getLogger(StudyFieldSamplesMeta.class.getName());
-
-    @Override
-    public String getName() {
-        return NAME;
-    }
-
+    private static final Logger logger = Logger.getLogger(StudyFieldSamplesMeta.class.getName());
+    
+    public StudyFieldSamplesMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.WORK_HOUR);
+		
+		setFavorite(FavoriteType.FIELD_WORK);
+		setTrait(TaskTrait.ACADEMIC);
+		setPreferredJob(JobType.AREOLOGIST, JobType.BIOLOGIST,
+						JobType.BOTANIST, JobType.CHEMIST);
+	}
+    
     @Override
     public Task constructInstance(Person person) {
         return new StudyFieldSamples(person);
@@ -60,25 +58,29 @@ public class StudyFieldSamplesMeta implements MetaTask, Serializable {
         double result = 0D;
 
         // Probability affected by the person's stress and fatigue.
-        PhysicalCondition condition = person.getPhysicalCondition();
-        double fatigue = condition.getFatigue();
-        double stress = condition.getStress();
-        double hunger = condition.getHunger();
-        
-        if (fatigue > 1000 || stress > 50 || hunger > 500)
+        if (!person.getPhysicalCondition().isFitByLevel(1000, 70, 1000))
         	return 0;
         
         if (person.isInside()) {
 	
 	        // Check that there are available field samples to study.
 	        try {
+	        	double mostStored = 0D;
 	            Unit container = person.getContainerUnit();
-				if (!(container instanceof MarsSurface)) {
-	                Inventory inv = container.getInventory();
-	                //AmountResource rockSamples = AmountResource.findAmountResource("rock samples");
-	                if (inv.getAmountResourceStored(ResourceUtil.rockSamplesID, false) < StudyFieldSamples.SAMPLE_MASS) {
+	            int bestID = 0;
+	            if (container instanceof ResourceHolder) {
+	            	for (int i: ResourceUtil.rockIDs) {
+		            	double stored = ((ResourceHolder)container).getAmountResourceStored(i);
+		            	if (mostStored < stored) {
+		            		mostStored = stored;
+		            		bestID = i;
+		            	}
+		            }
+		            if (mostStored < StudyFieldSamples.SAMPLE_MASS) {
 	                    return 0;
 	                }
+		            else
+		            	result = mostStored/10.0;
 	            }
 	        }
 	        catch (Exception e) {
@@ -102,7 +104,7 @@ public class StudyFieldSamplesMeta implements MetaTask, Serializable {
 	                            primaryResult *= StudyFieldSamples.getLabCrowdingModifier(person, lab);
 	
 	                            // If researcher's current job isn't related to study science, divide by two.
-	                            Job job = person.getMind().getJob();
+	                            JobType job = person.getMind().getJob();
 	                            if (job != null) {
 	                                ScienceType jobScience = ScienceType.getJobScience(job);
 	                                if (!primaryStudy.getScience().equals(jobScience)) {
@@ -121,7 +123,7 @@ public class StudyFieldSamplesMeta implements MetaTask, Serializable {
 	        }
 	
 	        // Add probability for each study researcher is collaborating on.
-	        Iterator<ScientificStudy> i = scientificStudyManager.getOngoingCollaborativeStudies(person).iterator();
+	        Iterator<ScientificStudy> i = person.getCollabStudies().iterator();
 	        while (i.hasNext()) {
 	            ScientificStudy collabStudy = i.next();
 	            if (ScientificStudy.RESEARCH_PHASE.equals(collabStudy.getPhase())) {
@@ -137,7 +139,7 @@ public class StudyFieldSamplesMeta implements MetaTask, Serializable {
 	                                collabResult *= StudyFieldSamples.getLabCrowdingModifier(person, lab);
 	
 	                                // If researcher's current job isn't related to study science, divide by two.
-	                                Job job = person.getMind().getJob();
+	                                JobType job = person.getMind().getJob();
 	                                if (job != null) {
 	                                    ScienceType jobScience = ScienceType.getJobScience(job);
 	                                    if (!collabScience.equals(jobScience)) {
@@ -156,55 +158,28 @@ public class StudyFieldSamplesMeta implements MetaTask, Serializable {
 	            }
 	        }
 	
-	
-	        // Effort-driven task modifier.
-	        result *= person.getPerformanceRating();
-	
-	        // Job modifier.
-	        Job job = person.getMind().getJob();
-	        if (job != null) {
-	            result *= job.getStartTaskProbabilityModifier(StudyFieldSamples.class)
-	            		* person.getAssociatedSettlement().getGoodsManager().getResearchFactor();
-	        }
-	
-	        // Modify if research is the person's favorite activity.
-	        if (person.getFavorite().getFavoriteActivity() == FavoriteType.FIELD_WORK) {
-	            result *= 2D;
-	        }
-	
-	        // 2015-06-07 Added Preference modifier
-	        if (result > 0)
-	         	result = result + result * person.getPreference().getPreferenceScore(this)/2D;
-	
+	        result *= getPersonModifier(person);
 	    }
         
         if (result <= 0) 
         	result = 0;
-        else  if (person.isInVehicle()) {	
+        
+        else if (person.isInSettlement()) {
+        	result *= 1.5;
+        }
+        
+        else if (person.isInVehicle()) {	
 	        // Check if person is in a moving rover.
-	        if (Vehicle.inMovingRover(person)) {
-		        // the bonus inside a vehicle, 
+	        if (!Vehicle.inMovingRover(person)) {
+		        // Easier to examine if not moving
 	        	// rather than having nothing to do if a person is not driving
-	        	result += 30;
+	        	result /= 1.5;
 	        } 	       
 	        else
-		        // the bonus inside a vehicle, 
-	        	// rather than having nothing to do if a person is not driving
-	        	result += 10;
+	        	// harder to examine if moving
+	        	result /= 3D;
         }
         
         return result;
     }
-
-	@Override
-	public Task constructInstance(Robot robot) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 }

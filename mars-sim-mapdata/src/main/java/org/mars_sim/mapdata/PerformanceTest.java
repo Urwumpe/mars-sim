@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * PerformanceTest.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-28
  * @author Manny Kung
  */
 
@@ -363,6 +363,8 @@ public class PerformanceTest {
 			grabber.grabPixels();
 		} catch (InterruptedException e) {
 			System.out.println("grabber error");
+		    // Restore interrupted state...
+		    Thread.currentThread().interrupt();
 		}
 		if ((grabber.status() & ImageObserver.ABORT) != 0)
 			System.out.println("grabber error");
@@ -402,8 +404,7 @@ public class PerformanceTest {
 		try {
 			ImageIO.write(newImg, imgFormat,location);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			 System.out.println("Problems in reproduceImage's ImageIO.write: " + e.getMessage());
 		}
 	}
 	

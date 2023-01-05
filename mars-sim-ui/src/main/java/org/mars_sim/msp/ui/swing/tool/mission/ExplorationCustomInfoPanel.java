@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ExplorationCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -31,6 +31,7 @@ import com.alee.laf.scroll.WebScrollPane;
 /**
  * A panel for displaying exploration mission information.
  */
+@SuppressWarnings("serial")
 public class ExplorationCustomInfoPanel
 extends MissionCustomInfoPanel {
 

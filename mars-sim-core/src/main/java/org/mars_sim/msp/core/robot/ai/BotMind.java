@@ -1,21 +1,18 @@
-/**
+/*
  * Mars Simulation Project
  * BotMind.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-19
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.robot.ai;
 
 import java.io.Serializable;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.UnitEventType;
-import org.mars_sim.msp.core.person.ai.SkillManager;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.ai.job.RobotJob;
 import org.mars_sim.msp.core.robot.ai.task.BotTaskManager;
@@ -31,11 +28,11 @@ public class BotMind implements Serializable, Temporal {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
-
+	
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(BotMind.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	private static SimLogger logger = SimLogger.getLogger(BotMind.class.getName());
+	
+	private static final double SMALL_AMOUNT_OF_TIME = 0.001;
 	
 	// Data members
 	/** Is the job locked so another can't be chosen? */
@@ -45,19 +42,11 @@ public class BotMind implements Serializable, Temporal {
 	private Robot robot = null;
 	/** The robot's task manager. */
 	private BotTaskManager botTaskManager;
-	/** The robot's current mission (if any). */
-//	private Mission mission;
 	/** The robot's job. */
 	private RobotJob robotJob;
-	/** The robot's skill manager. */
-	private SkillManager skillManager;
-//	/** The robot's core mind. */
-//	private CoreMind coreMind;
+	/** The robot's current mission (if any). */
+	private Mission mission;
 	
-
-//	private static MissionManager missionManager;
-
-
 	/**
 	 * Constructor 1.
 	 * 
@@ -68,30 +57,27 @@ public class BotMind implements Serializable, Temporal {
 
 		// Initialize data members
 		this.robot = robot;
-//		mission = null;
+		mission = null;
 		robotJob = null;
 		jobLock = false;
 
-		// Define the boundary in Sense-Act-Plan (Robot control methodology
-		// 1. Sense - gather information using the sensors
-		// 2. Plan - create a world model using all the information, and plan the next
-		// move
-		// 3. Act
-		// SPA is used in iterations: After the acting phase, the sensing phase, and the
-		// entire cycle, is repeated.
-		// https://en.wikipedia.org/wiki/Sense_Plan_Act
+		// Define the boundary in Sense-Act-Plan, a Robot control methodology as follows :
+		//
+		// 1. Sense - 	Gather information using the sensors.
+		// 2.  Plan - 	Create a world model using all the information, 
+		//				and plan the next move.
+		// 3.   Act -		
+		//
+		// Note: SPA is used in iterations. After the acting phase, the sensing phase, 
+		// 		 and the entire cycle, is repeated.
+		//
+		// Reference : https://en.wikipedia.org/wiki/Sense_Plan_Act
 
 //		// Create CoreMind
 //		coreMind = new CoreMind();
-		// Construct a skill manager.
-//		skillManager = new SkillManager(robot, coreMind);
-//		skillManager = new SkillManager(robot);
 		
 		// Construct a task manager
 		botTaskManager = new BotTaskManager(this);
-
-//		missionManager = sim.getMissionManager();
-
 	}
 
 	/**
@@ -102,54 +88,127 @@ public class BotMind implements Serializable, Temporal {
 	 */
 	@Override
 	public boolean timePassing(ClockPulse pulse) {
-
 		if (botTaskManager != null) {
-			// Take action as necessary.
-			takeAction(pulse.getElapsed());
+			botTaskManager.timePassing(pulse);
+			// Decides what tasks to inject time
+			if (pulse.getElapsed() > 0)
+				decideTask(pulse.getElapsed());
 		}
-		
-//	    if (missionManager != null)
-//	    	missionManager.recordMission(robot);
 
-//		int msolInt = marsClock.getMillisolInt();
-
-//		if (msolCache != msolInt) {
-//			msolCache = msolInt;
-			// I don't think robots should be changing jobs on their own. - Scott
-			// Check if this robot needs to get a new job or change jobs.
-//		        if (!jobLock) {
-//		        	setRobotJob(JobManager.getNewRobotJob(robot), false);
-//		        }
-//		}
 		return true;
 	}
 
 	/**
-	 * Take appropriate action for a given amount of time.
+	 * Decides what tasks to take for a given amount of time.
+	 * 
+	 * @param time time in millisols
+	 * @throws Exception if error during action.
+	 */
+	private void decideTask(double time) {
+		double remainingTime = time;
+		double pulseTime = Task.getStandardPulseTime();
+		while (remainingTime > 0 && pulseTime > 0) {
+			// Vary the amount of time to be injected
+			double rand = RandomUtil.getRandomDouble(.8, 1);
+			double deltaTime = pulseTime * rand;
+			if (remainingTime > deltaTime) {
+				// Call takeAction to perform a task and consume the pulse time.
+				takeAction(deltaTime);
+				// Reduce the total time by the pulse time
+				remainingTime -= deltaTime;
+			}
+			else {
+				// Call takeAction to perform a task and consume the pulse time.
+				takeAction(remainingTime);
+				// Reduce the total time by the pulse time
+				remainingTime = 0;
+			}
+		}
+	}
+	
+	/**
+	 * Takes appropriate action for a given amount of time.
 	 * 
 	 * @param time time in millisols
 	 * @throws Exception if error during action.
 	 */
 	private void takeAction(double time) {
-		boolean hasActiveTask = botTaskManager.hasActiveTask();
+		double pulseTime = time;
 		// Perform a task if the robot has one, or determine a new task/mission.
-		if (hasActiveTask) {
-			double remainingTime = botTaskManager.executeTask(time, robot.getPerformanceRating());
-			if (remainingTime > 0D) {
+		if (robot.getSystemCondition().getBatteryState() <= 5D) {
+			String task = botTaskManager.getTaskName();
+			if (task.equalsIgnoreCase(""))
+				task = "None";
+			logger.log(robot, Level.WARNING, 30_000L, "Battery almost depleted and must be recharged."
+					+ " Current task: " + task + ".");
+			// Add sleep task
+			botTaskManager.endCurrentTask();
+			return;
+		}
+			
+		if (botTaskManager.hasActiveTask()) {			
+			// Call executeTask
+			double remainingTime = botTaskManager.executeTask(pulseTime, robot.getPerformanceRating());
+			
+			if (remainingTime == pulseTime) {
+				// Reduce the time by standardPulseTime
+				remainingTime = pulseTime - Task.standardPulseTime;
+				
+				// Do not call takeAction
+				return;
+			}
+			
+			if (remainingTime > SMALL_AMOUNT_OF_TIME) {
 				takeAction(remainingTime);
 			}
-		} 
+		}
 		
 		else {
-			if (!botTaskManager.hasActiveTask()) {
-				try {
-					getNewAction(true);
-				} catch (Exception e) {
-					logger.log(Level.WARNING, robot + " could not get new action", e);
-					e.printStackTrace(System.err);
-				}
+			lookForATask();
+		}
+	}
+
+	/**
+	 * Looks for a new task.
+	 */
+	public void lookForATask() {
+
+		boolean hasActiveMission = false;
+		boolean hasTask = false;
+		
+		if (mission != null) {
+			if (mission.isDone()) {
+				// Set the mission to null since it is done
+				mission = null;
+			}
+			else {
+				hasActiveMission = true;
 			}
 		}
+		
+		if (hasActiveMission && mission.getPhase() != null) {
+			hasTask = resumeMission();
+
+		}
+		
+		if (!hasTask) { 
+			// Note: may use if (robot.getRobotType() == RobotType.DELIVERYBOT) for testing
+			// don't have an active mission
+			botTaskManager.startNewTask();
+		}
+	}
+	
+	/**
+	 * Resumes a mission.
+	 * 
+	 * @param modifier
+	 */
+	private boolean resumeMission() {
+		if (robot.isFit() && !robot.getSystemCondition().isLowPower()) {
+			return mission.performMission(robot);
+		}
+
+		return false;
 	}
 
 	public Robot getRobot() {
@@ -157,7 +216,7 @@ public class BotMind implements Serializable, Temporal {
 	}
 
 	/**
-	 * Returns the robot's task manager
+	 * Returns the robot's task manager.
 	 * 
 	 * @return botTaskManager
 	 */
@@ -172,11 +231,11 @@ public class BotMind implements Serializable, Temporal {
 	 * @return current mission
 	 */
 	public Mission getMission() {
-		return null;//mission;
+		return mission;
 	}
 
 	/**
-	 * Gets the robot's job
+	 * Gets the robot's job.
 	 * 
 	 * @return job or null if none.
 	 */
@@ -210,123 +269,81 @@ public class BotMind implements Serializable, Temporal {
 		}
 	}
 
-//	/**
-//	 * Returns true if robot has an active mission.
-//	 * 
-//	 * @return true for active mission
-//	 */
-//	public boolean hasActiveMission() {
-//		return (mission != null) && !mission.isDone();
-//	}
+	/**
+	 * Returns true if person has an active mission.
+	 * 
+	 * @return true for active mission
+	 */
+	public boolean hasActiveMission() {
+        return (mission != null) && !mission.isDone();
+	}
 
 	/**
-	 * Set this mind as inactive. Needs move work on this; has to abort the Task can
+	 * Returns true if person has a mission.
+	 * 
+	 * @return true for active mission
+	 */
+	public boolean hasAMission() {
+        //			// has a mission but need to determine if this mission is active or not
+        //			if (mission.isApproved()
+        //				|| (mission.getPlan() != null
+        //					&& mission.getPlan().getStatus() != PlanType.NOT_APPROVED))
+        return mission != null;
+    }
+	
+	/**
+	 * Sets this bot mind as inactive. 
+	 * Note: Needs to work on this. Has to abort the Task. Can 
 	 * not just close it. This abort action would then allow the Mission to be also
 	 * aborted.
 	 */
 	public void setInactive() {
-		botTaskManager.clearTask();
-//		if (hasActiveMission()) {
-//			if (robot != null)
-//				mission.removeMember(robot);
-//			mission = null;
-//		}
+		botTaskManager.clearAllTasks("Inactive");
+		if (hasActiveMission()) {
+			mission.removeMember(robot);
+			mission = null;
+		}
 	}
 
 	/**
-	 * Sets the robot's current mission.
+	 * Sets the person's current mission.
 	 * 
 	 * @param newMission the new mission
 	 */
 	public void setMission(Mission newMission) {
-//		if (newMission != mission) {
-//
-//			if (robot != null) {
-//				if (mission != null) {
-//					mission.removeMember(robot);
-//				}
-//
-//				mission = newMission;
-//
-//				if (newMission != null) {
-//					newMission.addMember(robot);
-//				}
-//
-//				robot.fireUnitUpdate(UnitEventType.MISSION_EVENT, newMission);
-//			}
-//		}
+		if (newMission != mission) {
+			if (mission != null) {
+				mission.removeMember(robot);
+			}
+			mission = newMission;
+
+			if (newMission != null) {
+				newMission.addMember(robot);
+			}
+
+			robot.fireUnitUpdate(UnitEventType.MISSION_EVENT, newMission);
+		}
 	}
 
 	/**
-	 * Determines a new action for the robot based on available tasks, missions and
-	 * active missions.
+	 * Stops the person's current mission.
 	 * 
-	 * @param tasks    can actions be tasks?
 	 */
-	public void getNewAction(boolean tasks) {
-		// Get probability weights from tasks, missions and active missions.
-		double taskWeights = 0D;
-//		double missionWeights = 0D;
-
-		// Determine sum of weights based on given parameters
-		double weightSum = 0D;
-
-		if (tasks) {
-			taskWeights = botTaskManager.getTotalTaskProbability(false);
-			weightSum += taskWeights;
-		}
-
-		if ((weightSum <= 0D) || (Double.isNaN(weightSum)) || (Double.isInfinite(weightSum))) {
-			try {
-				TimeUnit.MILLISECONDS.sleep(100L);
-			} catch (InterruptedException e) {
-//				logger.severe("BotMind.getNewAction() " + robot.getName() + " has weight sum of " + weightSum);
-				e.printStackTrace();
-			}
-		}
-
-		// Select randomly across the total weight sum.
-		double rand = RandomUtil.getRandomDouble(weightSum);
-
-		// Determine which type of action was selected and set new action accordingly.
-		if (tasks) {
-			if (rand < taskWeights) {
-				Task newTask = botTaskManager.getNewTask();
-
-				if (newTask != null)
-					botTaskManager.addTask(newTask);
-//				else
-//					logger.severe(robot + "'s newTask is null.");
-
-				return;
-				
-			} else {
-				rand -= taskWeights;
-			}
-		}
-
-		// If reached this point, no task or mission has been found.
-//		LogConsolidated.log(logger, Level.SEVERE, 20_000, sourceName,
-//				robot.getName() + " could not determine a new task (taskWeights: " 
-//					+ taskWeights + ").");
+	public void stopMission() {
+		mission = null;
 	}
-	
+
 	public void reinit() {
 		botTaskManager.reinit();
 	}
 	
 	/**
-	 * Prepare object for garbage collection.
+	 * Prepares object for garbage collection.
 	 */
 	public void destroy() {
 		robot = null;
 		botTaskManager.destroy();
 		botTaskManager = null;
-//		if (mission != null)
-//			mission.destroy();
-//		mission = null;
 		robotJob = null;
-		// skillManager.destroy(); // not working for maven test
-		 skillManager = null;
 	}
 }

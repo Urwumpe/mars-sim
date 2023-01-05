@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * HeatSource.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-31
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.structure.building.function;
@@ -9,10 +9,7 @@ package org.mars_sim.msp.core.structure.building.function;
 import java.io.Serializable;
 
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.Mars;
-import org.mars_sim.msp.core.mars.OrbitInfo;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
-import org.mars_sim.msp.core.mars.Weather;
+import org.mars_sim.msp.core.environment.SurfaceFeatures;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 
@@ -25,18 +22,18 @@ public abstract class HeatSource implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	// private static Logger logger = Logger.getLogger(HeatSource.class.getName());
+	// private static final Logger logger = Logger.getLogger(HeatSource.class.getName());
 
 	// Data members
 	private double maxHeat;
 
+	private double percent;
+	
 	private HeatSourceType type;
 
 	protected static SurfaceFeatures surface;
-	protected static Mars mars;
-	protected static OrbitInfo orbitInfo;
-	protected static Weather weather;
-
+	
+	
 	/**
 	 * Constructor.
 	 * 
@@ -46,16 +43,10 @@ public abstract class HeatSource implements Serializable {
 	public HeatSource(HeatSourceType type, double maxHeat) {
 		this.type = type;
 		this.maxHeat = maxHeat;
-
-		if (mars == null)
-			mars = Simulation.instance().getMars();
+		this.percent = 0;
+		
 		if (surface == null)
-			surface = mars.getSurfaceFeatures();
-		if (orbitInfo == null)
-			orbitInfo = mars.getOrbitInfo();
-		if (weather == null)
-			weather = mars.getWeather();
-
+			surface = Simulation.instance().getSurfaceFeatures();
 	}
 
 	/**
@@ -74,6 +65,24 @@ public abstract class HeatSource implements Serializable {
 	 */
 	public double getMaxHeat() {
 		return maxHeat;
+	}
+
+	/**
+	 * Return the percentage of full power for this heat source.
+	 * 
+	 * @return
+	 */
+	public double getPercentagePower() {
+		return percent ;
+	}
+
+	/**
+	 * Sets the percentage of the power for this heat source.
+	 * 
+	 * @param percentage
+	 */
+	public void setPercentagePower(double percentage) {
+		this.percent = percentage;
 	}
 
 	/**
@@ -97,8 +106,18 @@ public abstract class HeatSource implements Serializable {
 	 * 
 	 * @return efficiency (max is 1)
 	 */
-	public abstract double getEfficiency();
+	public double getEfficiency() {
+		// To be overridden
+		return 1;
+	}
 
+	/**
+	 * Sets the thermal efficiency of the heat source.
+	 */
+	public void setEfficiency(double value) {
+		// To be overridden
+	}
+	
 	/**
 	 * Gets the maintenance time for this heat source.
 	 * 
@@ -119,41 +138,7 @@ public abstract class HeatSource implements Serializable {
 	 * 
 	 * @param time
 	 */
-	public abstract void setTime(double time);
-
-	/**
-	 * Switch to producing the full output
-	 */
-	public abstract void switch2Full();
-
-	/**
-	 * Switch to producing only half of the output
-	 */
-	public abstract void switch2Half();
-
-	/**
-	 * Switch to producing only a quarter of the output
-	 */
-	public abstract void switch2OneQuarter();
-
-	/**
-	 * Switch to producing only three quarters of the output
-	 */
-	public abstract void switch2ThreeQuarters();
-	
-	/**
-	 * Reloads instances after loading from a saved sim
-	 * 
-	 * @param {@link Mars}
-	 * @param {@link SurfaceFeatures}
-	 * @param {@link OrbitInfo}
-	 * @param {@link Weather}
-	 */
-	public static void initializeInstances(Mars m, SurfaceFeatures s, OrbitInfo o, Weather w) {
-		mars = m;
-		surface = s;
-		orbitInfo = o;
-		weather = w;
+	public void setTime(double time) {
 	}
 
 	/**
@@ -162,5 +147,4 @@ public abstract class HeatSource implements Serializable {
 	public void destroy() {
 		type = null;
 	}
-
 }

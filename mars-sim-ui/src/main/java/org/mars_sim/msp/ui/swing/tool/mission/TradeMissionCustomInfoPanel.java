@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TradeMissionCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -9,19 +9,14 @@ package org.mars_sim.msp.ui.swing.tool.mission;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridLayout;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-import javax.swing.table.AbstractTableModel;
-
+import org.mars_sim.msp.core.goods.CommerceMission;
+import org.mars_sim.msp.core.goods.Good;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
 import org.mars_sim.msp.core.person.ai.mission.MissionEventType;
 import org.mars_sim.msp.core.person.ai.mission.Trade;
-import org.mars_sim.msp.core.structure.goods.Good;
 
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
@@ -34,13 +29,15 @@ import com.alee.laf.table.WebTable;
 @SuppressWarnings("serial")
 public class TradeMissionCustomInfoPanel extends MissionCustomInfoPanel {
 
+	private final static int HEIGHT = 120;
+	
 	// Data members.
 	private Trade mission;
-	private SellingGoodsTableModel sellingGoodsTableModel;
+	private GoodsTableModel sellingGoodsTableModel;
 	private WebLabel desiredGoodsProfitLabel;
-	private DesiredGoodsTableModel desiredGoodsTableModel;
+	private GoodsTableModel desiredGoodsTableModel;
 	private WebLabel boughtGoodsProfitLabel;
-	private BoughtGoodsTableModel boughtGoodsTableModel;
+	private GoodsTableModel boughtGoodsTableModel;
 
 	/**
 	 * Constructor.
@@ -62,11 +59,16 @@ public class TradeMissionCustomInfoPanel extends MissionCustomInfoPanel {
 
 		// Create a scroll pane for the selling goods table.
 		WebScrollPane sellingGoodsScrollPane = new WebScrollPane();
-		sellingGoodsScrollPane.setPreferredSize(new Dimension(-1, -1));
+		sellingGoodsScrollPane.setPreferredSize(new Dimension(-1, HEIGHT));
 		sellingGoodsPane.add(sellingGoodsScrollPane, BorderLayout.CENTER);
 
 		// Create the selling goods table and model.
-		sellingGoodsTableModel = new SellingGoodsTableModel();
+		sellingGoodsTableModel = new GoodsTableModel() {
+			@Override
+			protected Map<Good, Integer> getLoad(CommerceMission commerce) {
+				return commerce.getSellLoad();
+			}
+		};
 		WebTable sellingGoodsTable = new WebTable(sellingGoodsTableModel);
 		sellingGoodsScrollPane.setViewportView(sellingGoodsTable);
 
@@ -88,11 +90,16 @@ public class TradeMissionCustomInfoPanel extends MissionCustomInfoPanel {
 
 		// Create a scroll pane for the desired goods table.
 		WebScrollPane desiredGoodsScrollPane = new WebScrollPane();
-		desiredGoodsScrollPane.setPreferredSize(new Dimension(-1, -1));
+		desiredGoodsScrollPane.setPreferredSize(new Dimension(-1, HEIGHT));
 		desiredGoodsPane.add(desiredGoodsScrollPane, BorderLayout.CENTER);
 
 		// Create the desired goods table and model.
-		desiredGoodsTableModel = new DesiredGoodsTableModel();
+		desiredGoodsTableModel = new GoodsTableModel() {
+			@Override
+			protected Map<Good, Integer> getLoad(CommerceMission commerce) {
+				return commerce.getDesiredBuyLoad();
+			}
+		};
 		WebTable desiredGoodsTable = new WebTable(desiredGoodsTableModel);
 		desiredGoodsScrollPane.setViewportView(desiredGoodsTable);
 
@@ -114,11 +121,16 @@ public class TradeMissionCustomInfoPanel extends MissionCustomInfoPanel {
 
 		// Create a scroll pane for the bought goods table.
 		WebScrollPane boughtGoodsScrollPane = new WebScrollPane();
-		boughtGoodsScrollPane.setPreferredSize(new Dimension(-1, -1));
+		boughtGoodsScrollPane.setPreferredSize(new Dimension(-1, HEIGHT));
 		boughtGoodsPane.add(boughtGoodsScrollPane, BorderLayout.CENTER);
 
 		// Create the bought goods table and model.
-		boughtGoodsTableModel = new BoughtGoodsTableModel();
+		boughtGoodsTableModel = new GoodsTableModel() {
+			@Override
+			protected Map<Good, Integer> getLoad(CommerceMission commerce) {
+				return commerce.getBuyLoad();
+			}
+		};
 		WebTable boughtGoodsTable = new WebTable(boughtGoodsTableModel);
 		boughtGoodsScrollPane.setViewportView(boughtGoodsTable);
 	}
@@ -126,18 +138,18 @@ public class TradeMissionCustomInfoPanel extends MissionCustomInfoPanel {
 	@Override
 	public void updateMissionEvent(MissionEvent e) {
 		if (e.getType() == MissionEventType.BUY_LOAD_EVENT) {
-			boughtGoodsTableModel.updateTable();
+			boughtGoodsTableModel.updateTable(mission);
 			updateBoughtGoodsProfit();
 		}
 	}
 
 	@Override
-	public void updateMission(Mission mission) {
-		if (mission instanceof Trade) {
-			this.mission = (Trade) mission;
-			sellingGoodsTableModel.updateTable();
-			desiredGoodsTableModel.updateTable();
-			boughtGoodsTableModel.updateTable();
+	public void updateMission(Mission newMission) {
+		if (newMission instanceof Trade) {
+			this.mission = (Trade) newMission;
+			sellingGoodsTableModel.updateTable(mission);
+			desiredGoodsTableModel.updateTable(mission);
+			boughtGoodsTableModel.updateTable(mission);
 			updateDesiredGoodsProfit();
 			updateBoughtGoodsProfit();
 		}
@@ -157,176 +169,5 @@ public class TradeMissionCustomInfoPanel extends MissionCustomInfoPanel {
 	private void updateBoughtGoodsProfit() {
 		int profit = (int) mission.getProfit();
 		boughtGoodsProfitLabel.setText("Profit: " + profit + " VP");
-	}
-
-	/**
-	 * Abstract model for a goods table.
-	 */
-	private abstract static class GoodsTableModel
-	extends AbstractTableModel {
-
-		/** default serial id. */
-		private static final long serialVersionUID = 1L;
-
-		// Data members.
-		protected Map<Good, Integer> goodsMap;
-		protected List<Good> goodsList;
-
-		/**
-		 * Constructor.
-		 */
-		private GoodsTableModel() {
-			// Use AbstractTableModel constructor.
-			super();
-
-			// Initialize goods map and list.
-			goodsList = new ArrayList<Good>();
-			goodsMap = new HashMap<Good, Integer>();
-		}
-
-		/**
-		 * Returns the number of rows in the model.
-		 * @return number of rows.
-		 */
-		public int getRowCount() {
-			return goodsList.size();
-		}
-
-		/**
-		 * Returns the number of columns in the model.
-		 * @return number of columns.
-		 */
-		public int getColumnCount() {
-			return 2;
-		}
-
-		/**
-		 * Returns the name of the column at columnIndex.
-		 * @param columnIndex the column index.
-		 * @return column name.
-		 */
-		public String getColumnName(int columnIndex) {
-			if (columnIndex == 0) return "Good";
-			else return "Amount";
-		}
-
-		/**
-		 * Returns the value for the cell at columnIndex and rowIndex.
-		 * @param row the row whose value is to be queried.
-		 * @param column the column whose value is to be queried.
-		 * @return the value Object at the specified cell.
-		 */
-		public Object getValueAt(int row, int column) {
-			Object result = "unknown";
-
-			if (row < goodsList.size()) {
-				Good good = goodsList.get(row); 
-				if (column == 0) result = good.getName();
-				else result = goodsMap.get(good);
-			}
-
-			return result;
-		}
-
-		/**
-		 * Updates the table data.
-		 */
-		protected abstract void updateTable();
-	}
-
-	/**
-	 * Model for the selling goods table.
-	 */
-	private class SellingGoodsTableModel
-	extends GoodsTableModel {
-
-		/** default serial id. */
-		private static final long serialVersionUID = 1L;
-
-		/**
-		 * hidden Constructor.
-		 */
-		private SellingGoodsTableModel() {
-			// Use GoodsTableModel constructor.
-			super();
-		}
-
-		@Override
-		protected void updateTable() {
-			if (mission.getSellLoad() != null) {
-				goodsMap = mission.getSellLoad();
-				goodsList = new ArrayList<Good>(goodsMap.keySet());
-				Collections.sort(goodsList);
-			}
-			else {
-				goodsMap.clear();
-				goodsList.clear();
-			}
-			fireTableDataChanged();
-		}
-	}
-
-	/**
-	 * Model for the desired goods table.
-	 */
-	private class DesiredGoodsTableModel
-	extends GoodsTableModel {
-
-		/** default serial id. */
-		private static final long serialVersionUID = 1L;
-
-		/**
-		 * hidden Constructor.
-		 */
-		private DesiredGoodsTableModel() {
-			// Use GoodsTableModel constructor.
-			super();
-		}
-
-		@Override
-		protected void updateTable() {
-			if (mission.getDesiredBuyLoad() != null) {
-				goodsMap = mission.getDesiredBuyLoad();
-				goodsList = new ArrayList<Good>(goodsMap.keySet());
-				Collections.sort(goodsList);
-			}
-			else {
-				goodsMap.clear();
-				goodsList.clear();
-			}
-			fireTableDataChanged();
-		}
-	}
-
-	/**
-	 * Model for the bought goods table.
-	 */
-	private class BoughtGoodsTableModel
-	extends GoodsTableModel {
-
-		/** default serial id. */
-		private static final long serialVersionUID = 1L;
-
-		/**
-		 * hidden Constructor.
-		 */
-		private BoughtGoodsTableModel() {
-			// Use GoodsTableModel constructor.
-			super();
-		}
-
-		@Override
-		protected void updateTable() {
-			if (mission.getBuyLoad() != null) {
-				goodsMap = mission.getBuyLoad();
-				goodsList = new ArrayList<Good>(goodsMap.keySet());
-				Collections.sort(goodsList);
-			}
-			else {
-				goodsMap.clear();
-				goodsList.clear();
-			}
-			fireTableDataChanged();
-		}
 	}
 }

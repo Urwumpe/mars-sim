@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SFMT19937j.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.tool;
@@ -101,13 +101,7 @@ public class SFMT19937j {
         final int lag = 11;
         final int mid = 306;
         Arrays.fill(psfmt32, 0x8b8b8b8b);
-        int count;
-        if (init_key.length + 1 > N32) {
-            count = init_key.length + 1;
-        }
-        else {
-            count = N32;
-        }
+        int count = Math.max(init_key.length + 1, N32);
         int r = func1(psfmt32[0] ^ psfmt32[mid] ^ psfmt32[N32 - 1]);
         psfmt32[mid] += r;
         r += init_key.length;

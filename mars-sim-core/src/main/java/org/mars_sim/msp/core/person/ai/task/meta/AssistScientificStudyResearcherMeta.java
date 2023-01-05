@@ -1,23 +1,21 @@
 /**
  * Mars Simulation Project
  * AssistScientificStudyResearcherMeta.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
 import java.util.Collection;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.fav.FavoriteType;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.task.AssistScientificStudyResearcher;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.tool.RandomUtil;
@@ -26,21 +24,21 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
 /**
  * Meta task for the AssistScientificStudyResearcher task.
  */
-public class AssistScientificStudyResearcherMeta implements MetaTask, Serializable {
+public class AssistScientificStudyResearcherMeta extends FactoryMetaTask {
 
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
-    
-    /** Task name */
+	/** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.assistScientificStudyResearcher"); //$NON-NLS-1$
+    
+    public AssistScientificStudyResearcherMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.WORK_HOUR);
+		setFavorite(FavoriteType.RESEARCH);
+		setTrait(TaskTrait.ACADEMIC);
+		
+		setPreferredJob(JobType.ACADEMICS);
+	}
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
-
-    @Override
+	@Override
     public Task constructInstance(Person person) {
         return new AssistScientificStudyResearcher(person);
     }
@@ -51,13 +49,9 @@ public class AssistScientificStudyResearcherMeta implements MetaTask, Serializab
         double result = 0D;
         
         // Probability affected by the person's stress and fatigue.
-        PhysicalCondition condition = person.getPhysicalCondition();
-        double fatigue = condition.getFatigue();
-        double stress = condition.getStress();
-        double hunger = condition.getHunger();
-        
-        if (fatigue > 1000 || stress > 50 || hunger > 500)
+        if (!person.getPhysicalCondition().isFitByLevel(1000, 70, 1000)) {
         	return 0;
+        }
         
         if (person.isInside()) {
 	        // Find potential researchers.
@@ -82,27 +76,10 @@ public class AssistScientificStudyResearcherMeta implements MetaTask, Serializab
 
 	            // If assistant is in a settlement, use crowding modifier.
                 Building building = BuildingManager.getBuilding(researcher);
-                if (building != null) {
-                    result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(person, building);
-                    result *= TaskProbabilityUtil.getRelationshipModifier(person, building);
-                }
-
-	            // Job modifier.
-	            Job job = person.getMind().getJob();
-	            if (job != null) {
-	                result *= job.getStartTaskProbabilityModifier(AssistScientificStudyResearcher.class)
-	                		* person.getAssociatedSettlement().getGoodsManager().getResearchFactor();
-	            }
-
-	            // Modify if research is the person's favorite activity.
-	            if (person.getFavorite().getFavoriteActivity() == FavoriteType.RESEARCH) {
-		        	result *= RandomUtil.getRandomDouble(3.0);
-	            }
-
-                // Add Preference modifier
-	            if (result > 0)
-	            	result = result + result * person.getPreference().getPreferenceScore(this)/2D;
-
+                result *= getBuildingModifier(building, person);
+                result *= person.getAssociatedSettlement().getGoodsManager().getResearchFactor();
+                
+	            result *= getPersonModifier(person);
 	        }
         }
 
@@ -110,17 +87,4 @@ public class AssistScientificStudyResearcherMeta implements MetaTask, Serializab
         
         return result;
     }
-
-    
-	@Override
-	public Task constructInstance(Robot robot) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 }

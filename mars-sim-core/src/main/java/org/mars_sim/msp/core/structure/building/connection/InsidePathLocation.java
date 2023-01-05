@@ -1,10 +1,12 @@
 /**
  * Mars Simulation Project
  * InsidePathLocation.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.connection;
+
+import org.mars_sim.msp.core.LocalPosition;
 
 /**
  * A location point object on an inside building path.
@@ -12,14 +14,8 @@ package org.mars_sim.msp.core.structure.building.connection;
 public interface InsidePathLocation {
 
     /**
-     * Gets the X location in the settlement locale.
-     * @return X location (meters).
+     * Gets the position in the settlement locale.
+     * @return Position in (meters).
      */
-    public double getXLocation();
-    
-    /**
-     * Gets the Y location in the settlement locale.
-     * @return Y location (meters).
-     */
-    public double getYLocation();
+    public LocalPosition getPosition();
 }

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * RescueMissionCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -29,6 +29,7 @@ import com.alee.laf.panel.WebPanel;
 /**
  * A panel for displaying rescue/salvage vehicle mission information.
  */
+@SuppressWarnings("serial")
 public class RescueMissionCustomInfoPanel extends MissionCustomInfoPanel {
 
     // Data members
@@ -144,7 +145,7 @@ public class RescueMissionCustomInfoPanel extends MissionCustomInfoPanel {
             List<Malfunction> malfunctions = vehicle.getMalfunctionManager().getMalfunctions();
             if (malfunctions.size() > 0) {
             	String first = malfunctions.get(0).getName();
-            	if (!serious.equals(first))
+            	if (serious != null && !serious.equals(first))
             		malfunctionBuff.append(first);
                 for (int x = 1; x < malfunctions.size(); x++) {
                 	String next = malfunctions.get(x).getName();

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * LeadResearcherPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission.create;
@@ -11,7 +11,6 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
-import java.util.Iterator;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -33,6 +32,7 @@ import org.mars_sim.msp.ui.swing.tool.TableStyle;
 /**
  * A wizard panel to select a lead researcher the science mission.
  */
+@SuppressWarnings("serial")
 public class LeadResearcherPanel
 extends WizardPanel {
 

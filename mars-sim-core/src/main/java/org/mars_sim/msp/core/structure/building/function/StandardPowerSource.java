@@ -1,12 +1,10 @@
 /**
  * Mars Simulation Project
  * StandardPowerSource.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
-
-import java.io.Serializable;
 
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -14,9 +12,7 @@ import org.mars_sim.msp.core.structure.building.Building;
 /**
  * A power source that gives a constant supply of power.
  */
-public class StandardPowerSource
-extends PowerSource
-implements Serializable {
+public class StandardPowerSource extends PowerSource {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;

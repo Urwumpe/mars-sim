@@ -1,18 +1,18 @@
-/**
+/*
  * Mars Simulation Project
  * AmountResource.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-05
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.resource;
 
-import java.io.Serializable;
+import org.mars_sim.msp.core.goods.GoodType;
 
 /**
  * The AmountResource class represents a type of resource measured in mass kg.
  */
-public final class AmountResource extends ResourceAbstract implements Serializable {
+public final class AmountResource extends ResourceAbstract {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 12L;
@@ -35,97 +35,50 @@ public final class AmountResource extends ResourceAbstract implements Serializab
 	public static final int NAPKIN = 150;
 
 	// Data members
-	private int id;
-
-	private int hashcode = -1;
-
 	private boolean edible;
 
 	private boolean lifeSupport;
+	
+	/** By default, demandMultiplier is zero. */
+	private double demandMultiplier = 0;
 
-	private String name;
-
-	private String type;
-
-	private String description;
+	private GoodType goodType;
 
 	private PhaseType phase;
 
-	public AmountResource() {
-	}
-
 	/**
-	 * Constructor
-	 * 
-	 * @param name        the resource's name
+	 * Constructor.
+	 *
+	 * @param name			the resource's name
+	 * @param goodType		the good type
 	 * @param description {@link String}
-	 * @param phase       the material phase of the resource.
-	 * @param lifeSupport true if life support resource.
+	 * @param phase			the material phase of the resource
+	 * @param demand		the demand multiplier of this good
+	 * @param lifeSupport	true if life support resource
+	 * @param edible		true if edible.
 	 */
-	public AmountResource(int id, String name, String type, String description, PhaseType phase, boolean lifeSupport,
-			boolean edible) {
-		this.id = id;
-		this.name = name.toLowerCase();
-		this.type = type;
-		this.description = description;
+	public AmountResource(int id, String name, GoodType goodType, String description, 
+			PhaseType phase, double demand, boolean lifeSupport, boolean edible) {
+		super(name, id, description);
+		this.goodType = goodType;
 		this.phase = phase;
+		this.demandMultiplier = demand;
 		this.lifeSupport = lifeSupport;
 		this.edible = edible;
-		this.hashcode = getName().toLowerCase().hashCode() * phase.hashCode();
 	}
-
+	
 	/**
-	 * Gets a empty instance of the amount resource
-	 * 
-	 * @return {@link AmountResource}
+	 * Gets the resource's good type.
+	 *
+	 * @return the good type.
 	 */
-	public static AmountResource newInstance() {
-		return new AmountResource();
-	}
-
-	/**
-	 * Gets the resource's id.
-	 * 
-	 * @return resource id.
-	 */
-	@Override
-	public int getID() {
-		return id;
-	}
-
-	/**
-	 * Gets the resource's name.
-	 * 
-	 * @return name of resource.
-	 */
-	@Override
-	public String getName() {
-		return name;
-	}
-
-	/**
-	 * Gets the resource's type.
-	 * 
-	 * @return type of resource.
-	 */
-	// @Override
-	public String getType() {
-		return type;
-	}
-
-	/**
-	 * Gets the resource's description.
-	 * 
-	 * @return description of resource.
-	 */
-	@Override
-	public String getDescription() {
-		return description;
+	public GoodType getGoodType() {
+		return goodType;
 	}
 
 	/**
 	 * Gets the resources material phase.
-	 * 
+	 *
 	 * @return phase value
 	 */
 	public PhaseType getPhase() {
@@ -133,8 +86,17 @@ public final class AmountResource extends ResourceAbstract implements Serializab
 	}
 
 	/**
-	 * Checks if life support resource.
+	 * Gets the demand multiplier.
 	 * 
+	 * @return
+	 */
+	public double getDemand() {
+		return demandMultiplier;
+	}
+	
+	/**
+	 * Checks if life support resource.
+	 *
 	 * @return true if life support resource.
 	 */
 	public boolean isLifeSupport() {
@@ -143,7 +105,7 @@ public final class AmountResource extends ResourceAbstract implements Serializab
 
 	/**
 	 * Checks if edible resource.
-	 * 
+	 *
 	 * @return true if edible resource.
 	 */
 	public boolean isEdible() {
@@ -153,25 +115,17 @@ public final class AmountResource extends ResourceAbstract implements Serializab
 	/**
 	 * Gets the hash code value.
 	 */
+	@Override
 	public int hashCode() {
-		return hashcode;
+		return getID() % 128;
 	}
 
-	public void destroy() {
-
-//		amountResourceConfig = null;
-//		phase = null;
-//		foodAR = null;
-//		oxygenAR = null;
-//		waterAR = null;
-//		carbonDioxideAR = null;
-//	    tableSaltAR = null;
-//	    NaClOAR = null;
-//	    greyWaterAR = null;
-//	    foodWasteAR = null;
-//	    solidWasteAR = null;
-//	    napkinAR = null;
-
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj) return true;
+		if (obj == null) return false;
+		if (this.getClass() != obj.getClass()) return false;
+		AmountResource ar = (AmountResource) obj;
+		return this.getID() == ar.getID();
 	}
-
 }

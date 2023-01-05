@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * IncomingListPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-25
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.resupply;
@@ -36,6 +36,7 @@ import com.alee.laf.scroll.WebScrollPane;
 /**
  * A panel showing a list of all incoming transport items.
  */
+@SuppressWarnings("serial")
 public class IncomingListPanel
 extends WebPanel
 implements ListSelectionListener {
@@ -58,7 +59,7 @@ implements ListSelectionListener {
 
 		// Create incoming list.
 		listModel = new IncomingListModel();
-		incomingList = new JList<Object>(listModel);
+		incomingList = new JList<>(listModel);
 		incomingList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		WebScrollPane scrollPane = new WebScrollPane(incomingList);
 		scrollPane.setHorizontalScrollBarPolicy(WebScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -67,6 +68,7 @@ implements ListSelectionListener {
 
 	/**
 	 * Gets the incoming resupply list.
+	 * 
 	 * @return the incoming resupply list.
 	 */
 	JList<?> getIncomingList() {
@@ -107,8 +109,12 @@ implements ListSelectionListener {
 
 			 TransportManager manager = Simulation.instance().getTransportManager();
 			 transportList = manager.getIncomingTransportItems();
-			 Collections.sort(transportList);
-
+			 if (!transportList.isEmpty()) {
+				 Collections.sort(transportList);
+			 }
+			 
+			 System.out.println(transportList);
+			 
 			 // Register as historical event listener.
 			 Simulation.instance().getEventManager().addListener(this);
 		 }
@@ -145,8 +151,10 @@ implements ListSelectionListener {
 				 else if (EventType.TRANSPORT_ITEM_ARRIVED.equals(he.getType()) ||
 						 EventType.TRANSPORT_ITEM_CANCELLED.equals(he.getType())) {
 					 int transportIndex = transportList.indexOf(transportItem);
-					 transportList.remove(transportItem);
-					 fireIntervalRemoved(this, transportIndex, transportIndex);
+					 if (transportIndex >= 0) {
+						transportList.remove(transportItem);
+						fireIntervalRemoved(this, transportIndex, transportIndex);
+					 }
 				 }
 				 else if (EventType.TRANSPORT_ITEM_MODIFIED.equals(he.getType())) {
 					 if (transportList.contains(transportItem)) {
@@ -170,6 +178,5 @@ implements ListSelectionListener {
 			  transportList = null;
 			  Simulation.instance().getEventManager().removeListener(this);
 		  }
-
 	 }
 }

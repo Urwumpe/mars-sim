@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ManufacturePanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -26,13 +26,13 @@ import org.mars_sim.msp.core.resource.ItemType;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 
 import com.alee.laf.panel.WebPanel;
 
 /**
  * A panel showing information about a manufacturing process.
  */
+@SuppressWarnings("serial")
 public class ManufacturePanel extends WebPanel {
 
 	// Data members
@@ -86,7 +86,7 @@ public class ManufacturePanel extends WebPanel {
         }
         if (name.length() > processStringWidth) name = name.substring(0, processStringWidth) + "...";
 		// Capitalize process names
-        JLabel nameLabel = new JLabel(Conversion.capitalize(name), JLabel.CENTER);
+        JLabel nameLabel = new JLabel(name, JLabel.CENTER);
         namePane.add(nameLabel);
 
         if (showBuilding) {
@@ -166,35 +166,34 @@ public class ManufacturePanel extends WebPanel {
     public static String getToolTipString(ManufactureProcessInfo info, Building building) {
         StringBuilder result = new StringBuilder("<html>");
 
-        result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&nbsp;Process : ").append(Conversion.capitalize(info.getName())).append("<br>");
-    	//if (building != null) result.append("Building : ").append(building.getNickName()).append("<br>");
-        result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;Labor Req : ").append(info.getWorkTimeRequired()).append(" millisols<br>");
-        result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;&nbsp;Time Req : ").append(info.getProcessTimeRequired()).append(" millisols<br>");
-        result.append("&emsp;&emsp;&emsp;&emsp;Power Req : ").append(info.getPowerRequired()).append(" kW<br>");
-        result.append("&emsp;&emsp;&nbsp;Bldg Tech Req : Level ").append(info.getTechLevelRequired()).append("<br>");
-        result.append("Mat Sci Skill Req : Level ").append(info.getSkillLevelRequired()).append("<br>");
+        result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;Process : ").append(info.getName()).append("<br>");
+        result.append("&emsp;&emsp;&emsp;&nbsp;Labor Req : ").append(info.getWorkTimeRequired()).append(" millisols<br>");
+        result.append("&emsp;&emsp;&emsp;&nbsp;&nbsp;Time Req : ").append(info.getProcessTimeRequired()).append(" millisols<br>");
+        result.append("&emsp;&emsp;&emsp;Power Req : ").append(info.getPowerRequired()).append(" kW<br>");
+        result.append("&emsp;&nbsp;Bldg Tech Req : Level ").append(info.getTechLevelRequired()).append("<br>");
+        result.append("&nbsp;Mat Sci Skill Req : Level ").append(info.getSkillLevelRequired()).append("<br>");
 
     	// Add process inputs.
-    	result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&nbsp;Inputs : ");
+    	result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;&nbsp;Inputs : ");
     	Iterator<ManufactureProcessItem> i = info.getInputList().iterator();
     	int ii = 0;
     	while (i.hasNext()) {
     		ManufactureProcessItem item = i.next();
     		// Capitalize process names
-            if (ii ==0) result.append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName())).append("<br>");
-            else result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;").append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName())).append("<br>");
+            if (ii == 0) result.append(getItemAmountString(item)).append(" ").append(item.getName()).append("<br>");
+            else result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;").append(getItemAmountString(item)).append(" ").append(item.getName()).append("<br>");
             ii++;
     	}
 
     	// Add process outputs.
-    	result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&nbsp;&nbsp;Outputs : ");
+    	result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;Outputs : ");
     	Iterator<ManufactureProcessItem> j = info.getOutputList().iterator();
     	int jj = 0;
     	while (j.hasNext()) {
     		ManufactureProcessItem item = j.next();
     		//  Capitalize process names
-            if (jj==0) result.append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName())).append("<br>");
-            else result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;").append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName())).append("<br>");
+            if (jj == 0) result.append(getItemAmountString(item)).append(" ").append(item.getName()).append("<br>");
+            else result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;").append(getItemAmountString(item)).append(" ").append(item.getName()).append("<br>");
             jj++;
     	}
 

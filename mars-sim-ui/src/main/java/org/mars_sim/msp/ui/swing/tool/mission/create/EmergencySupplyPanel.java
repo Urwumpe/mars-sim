@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * EmergencySupplyPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-10-21
  * @author Scott Davis
  */
 
@@ -34,27 +34,23 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.text.NumberFormatter;
 
-import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.equipment.Bag;
-import org.mars_sim.msp.core.equipment.Barrel;
 import org.mars_sim.msp.core.equipment.ContainerUtil;
-import org.mars_sim.msp.core.equipment.EquipmentFactory;
-import org.mars_sim.msp.core.equipment.GasCanister;
-import org.mars_sim.msp.core.person.ai.mission.TradeUtil;
+import org.mars_sim.msp.core.equipment.EquipmentType;
+import org.mars_sim.msp.core.goods.CommerceUtil;
+import org.mars_sim.msp.core.goods.Good;
+import org.mars_sim.msp.core.goods.GoodCategory;
+import org.mars_sim.msp.core.goods.GoodsUtil;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.PhaseType;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.structure.goods.Good;
-import org.mars_sim.msp.core.structure.goods.GoodType;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 /**
  * A wizard panel for getting emergency supplies information.
  */
+@SuppressWarnings("serial")
 public class EmergencySupplyPanel extends WizardPanel {
 
 	// Data members.
@@ -176,7 +172,7 @@ public class EmergencySupplyPanel extends WizardPanel {
 						Good good = supplyTableModel.goodsList.get(selectedGoodIndex);
 						int currentAmount = supplyTableModel.goodsMap.get(good);
 						if (amount <= currentAmount) {
-							if (good.getCategory() == GoodType.VEHICLE
+							if (good.getCategory() == GoodCategory.VEHICLE
 									&& ((amount > 1) || cargoTableModel.hasCargoVehicle())) {
 								errorMessageLabel.setText("Only one vehicle can be traded.");
 							} else {
@@ -237,11 +233,11 @@ public class EmergencySupplyPanel extends WizardPanel {
 	boolean commitChanges() {
 		boolean result = false;
 		try {
+			MissionDataBean missionData = getWizard().getMissionData();
+			
 			// Check if enough containers in cargo goods.
-			if (hasEnoughContainers()) {
-
+			if (hasEnoughContainers(missionData.getStartingSettlement())) {
 				// Set emergency cargo goods.
-				MissionDataBean missionData = getWizard().getMissionData();
 				missionData.setEmergencyGoods(cargoTableModel.getCargoGoods());
 
 				result = true;
@@ -283,33 +279,31 @@ public class EmergencySupplyPanel extends WizardPanel {
 	 * @return true if enough containers
 	 * @throws Exception if error checking containers.
 	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private boolean hasEnoughContainers() {
+	private boolean hasEnoughContainers(Settlement settlement) {
 		boolean result = true;
 
-		Map<Class, Integer> containerMap = new HashMap<Class, Integer>(3);
-		containerMap.put(Bag.class, getNumberOfCargoContainers(Bag.class));
-		containerMap.put(Barrel.class, getNumberOfCargoContainers(Barrel.class));
-		containerMap.put(GasCanister.class, getNumberOfCargoContainers(GasCanister.class));
+		Map<EquipmentType, Integer> containerMap = new HashMap<>(3);
+		containerMap.put(EquipmentType.BAG, getNumberOfCargoContainers(EquipmentType.BAG));
+		containerMap.put(EquipmentType.BARREL, getNumberOfCargoContainers(EquipmentType.BARREL));
+		containerMap.put(EquipmentType.GAS_CANISTER, getNumberOfCargoContainers(EquipmentType.GAS_CANISTER));
 
 		Map<Good, Integer> cargoGoods = cargoTableModel.getCargoGoods();
 
 		Iterator<Good> i = cargoGoods.keySet().iterator();
 		while (i.hasNext()) {
 			Good good = i.next();
-			if (good.getCategory() == GoodType.AMOUNT_RESOURCE) {
+			if (good.getCategory() == GoodCategory.AMOUNT_RESOURCE) {
 				AmountResource resource = ResourceUtil.findAmountResource(good.getID());
 				PhaseType phase = resource.getPhase();
-				Class containerType = ContainerUtil.getContainerTypeNeeded(phase);
+				EquipmentType containerType = ContainerUtil.getContainerTypeNeeded(phase);
 				int containerNum = containerMap.get(containerType);
-				Unit container = EquipmentFactory.createEquipment(containerType, new Coordinates(0, 0), true);
-				double capacity = container.getInventory().getAmountResourceCapacity(resource, false);
+				double capacity = ContainerUtil.getContainerCapacity(containerType);
 				double totalCapacity = containerNum * capacity;
 				double resourceAmount = cargoGoods.get(good);
 				if (resourceAmount > totalCapacity) {
 					double neededCapacity = resourceAmount - totalCapacity;
 					int neededContainerNum = (int) Math.ceil(neededCapacity / capacity);
-					String containerName = container.getName().toLowerCase();
+					String containerName = containerType.getName();
 					if (neededContainerNum > 1)
 						containerName = containerName + "s";
 					errorMessageLabel.setText(
@@ -333,7 +327,7 @@ public class EmergencySupplyPanel extends WizardPanel {
 	 * @param containerType the container class.
 	 * @return number of containers.
 	 */
-	private int getNumberOfCargoContainers(Class containerType) {
+	private int getNumberOfCargoContainers(EquipmentType containerType) {
 		int result = 0;
 		Good containerGood = GoodsUtil.getEquipmentGood(containerType);
 		Map<Good, Integer> cargoGoods = cargoTableModel.getCargoGoods();
@@ -428,7 +422,7 @@ public class EmergencySupplyPanel extends WizardPanel {
 			while (i.hasNext()) {
 				Good good = i.next();
 				try {
-					int amount = (int) TradeUtil.getNumInInventory(good, settlement.getInventory());
+					int amount = (int) CommerceUtil.getNumInInventory(good, settlement);
 					if (checkForVehicle(good))
 						amount--;
 					goodsMap.put(good, amount);
@@ -448,7 +442,7 @@ public class EmergencySupplyPanel extends WizardPanel {
 		private boolean checkForVehicle(Good good) {
 			boolean result = false;
 
-			if (good.getCategory() == GoodType.VEHICLE) {
+			if (good.getCategory() == GoodCategory.VEHICLE) {
 				String missionRoverName = getWizard().getMissionData().getRover().getDescription();
 				if (good.getName().equalsIgnoreCase(missionRoverName))
 					result = true;
@@ -633,7 +627,7 @@ public class EmergencySupplyPanel extends WizardPanel {
 			boolean result = false;
 			Iterator<Good> i = cargoList.iterator();
 			while (i.hasNext()) {
-				if (i.next().getCategory() == GoodType.VEHICLE)
+				if (i.next().getCategory() == GoodCategory.VEHICLE)
 					result = true;
 			}
 			return result;

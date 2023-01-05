@@ -1,27 +1,24 @@
-/**
+/*
  * Mars Simulation Project
  * ReviewJobReassignmentMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-27
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.job.JobAssignment;
-import org.mars_sim.msp.core.person.ai.job.JobAssignmentType;
+import org.mars_sim.msp.core.person.ai.job.util.JobAssignment;
+import org.mars_sim.msp.core.person.ai.job.util.JobAssignmentType;
 import org.mars_sim.msp.core.person.ai.role.RoleType;
 import org.mars_sim.msp.core.person.ai.task.ReviewJobReassignment;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.Administration;
 import org.mars_sim.msp.core.time.MarsClock;
@@ -30,22 +27,19 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
 /**
  * The Meta task for the ReviewJobReassignment task.
  */
-public class ReviewJobReassignmentMeta implements MetaTask, Serializable {
-
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
+public class ReviewJobReassignmentMeta extends FactoryMetaTask {
 
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.reviewJobReassignment"); //$NON-NLS-1$
 
     public static MarsClock marsClock;
+    
+    public ReviewJobReassignmentMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.WORK_HOUR);
+		setTrait(TaskTrait.LEADERSHIP);
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
-
+	}
     @Override
     public Task constructInstance(Person person) {
         return new ReviewJobReassignment(person);
@@ -56,38 +50,25 @@ public class ReviewJobReassignmentMeta implements MetaTask, Serializable {
 
         double result = 0D;
     
-        if (person.isInside()) {
+        if (person.isInSettlement()) {
 
             // Probability affected by the person's stress and fatigue.
-            PhysicalCondition condition = person.getPhysicalCondition();
-            double fatigue = condition.getFatigue();
-            double stress = condition.getStress();
-            double hunger = condition.getHunger();
-            
-            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            if (!person.getPhysicalCondition().isFitByLevel(1000, 70, 1000))
             	return 0;
             
         	//if (roleType == null)
         	//NOTE: sometimes enum is null. sometimes it is NOT. why?
         	RoleType roleType = person.getRole().getType();
 
-            if (roleType != null && roleType == RoleType.PRESIDENT
-                	|| roleType == RoleType.MAYOR
-            		|| roleType == RoleType.COMMANDER
-        			|| roleType == RoleType.SUB_COMMANDER
-        			|| roleType == RoleType.CHIEF_OF_AGRICULTURE
-           			|| roleType == RoleType.CHIEF_OF_ENGINEERING
-           			|| roleType == RoleType.CHIEF_OF_LOGISTICS_N_OPERATIONS
-           			|| roleType == RoleType.CHIEF_OF_MISSION_PLANNING
-           			|| roleType == RoleType.CHIEF_OF_SAFETY_N_HEALTH
-           			|| roleType == RoleType.CHIEF_OF_SCIENCE
-           			|| roleType == RoleType.CHIEF_OF_SUPPLY_N_RESOURCES        			
-        			|| (roleType == RoleType.MISSION_SPECIALIST && person.getAssociatedSettlement().getNumCitizens() <= 4)) {
+            if (roleType != null && (roleType.isCouncil()
+        	        || roleType.isChief()     			
+        			|| (roleType == RoleType.MISSION_SPECIALIST && person.getAssociatedSettlement().getNumCitizens() <= 4))) {
 
 	        	    Iterator<Person> i = person.getAssociatedSettlement().getAllAssociatedPeople().iterator();
 	                while (i.hasNext()) {
+	                	// Get the job history of the candidate not the caller
 	                    Person p = i.next();
-	                    List<JobAssignment> list = person.getJobHistory().getJobAssignmentList();
+	                    List<JobAssignment> list = p.getJobHistory().getJobAssignmentList();
 	                    JobAssignment ja = list.get(list.size()-1);
 	                    
 	                    JobAssignmentType status = ja.getStatus();
@@ -148,23 +129,10 @@ public class ReviewJobReassignmentMeta implements MetaTask, Serializable {
 	                if (result > 0D) {
 	                    // Get an available office space.
 	                    Building building = Administration.getAvailableOffice(person);
-	                    if (building != null) {
-	                        result += 100D;
-	                        result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(person, building);
-	                        result *= TaskProbabilityUtil.getRelationshipModifier(person, building);
-	                    }
+						result += 100D;
+						result *= getBuildingModifier(building, person);
 
-	                    // Modify if operation is the person's favorite activity.
-	                    if (person.getFavorite().getFavoriteActivity() == FavoriteType.OPERATION) {
-	                        result *= 1.5D;
-	                    }
-
-	                    if (result > 0)
-	                        //result += result / 8D * person.getPreference().getPreferenceScore(this);
-	                    	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
-
-	                    // Effort-driven task modifier.
-	                    result *= person.getPerformanceRating();
+	                    result *= getPersonModifier(person);
 	                }
                     
                     if (result < 0) {
@@ -175,16 +143,4 @@ public class ReviewJobReassignmentMeta implements MetaTask, Serializable {
 
         return result;
     }
-
-	@Override
-	public Task constructInstance(Robot robot) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 }

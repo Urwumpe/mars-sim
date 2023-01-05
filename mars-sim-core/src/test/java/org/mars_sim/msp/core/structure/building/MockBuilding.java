@@ -1,9 +1,9 @@
 package org.mars_sim.msp.core.structure.building;
 
 import java.util.ArrayList;
-import java.util.logging.Logger;
+import java.util.Map;
 
-import org.mars_sim.msp.core.Inventory;
+import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.structure.BuildingTemplate;
 import org.mars_sim.msp.core.structure.building.function.Function;
@@ -13,85 +13,47 @@ import org.mars_sim.msp.core.structure.building.function.LifeSupport;
 public class MockBuilding extends Building {
 
 	/* default logger. */
-	private static Logger logger = Logger.getLogger(Building.class.getName());
+//	private static final Logger logger = Logger.getLogger(Building.class.getName());
+	private static FunctionSpec lifeSupportSpec = null;
 	
-	/** The unit count for this building. */
-//	private static int uniqueCount = Unit.FIRST_BUILDING_UNIT_ID;
-	/** Unique identifier for this settlement. */
-//	private int identifier;
-	
-//	private BuildingManager manager;
-	
-//	/**
-//	 * Must be synchronised to prevent duplicate ids being assigned via different
-//	 * threads.
-//	 * 
-//	 * @return
-//	 */
-//	private static synchronized int getNextIdentifier() {
-//		return uniqueCount++;
-//	}
-	
-//	/**
-//	 * Get the unique identifier for this settlement
-//	 * 
-//	 * @return Identifier
-//	 */
-//	public int getIdentifier() {
-//		return identifier;
-//	}
-//	
-//	public void incrementID() {
-//		// Gets the identifier
-//		this.identifier = getNextIdentifier();
-//	}
-	
+	private static FunctionSpec getLifeSupportSpec() {
+		if (lifeSupportSpec == null) {
+			
+			lifeSupportSpec = new FunctionSpec(Map.of(BuildingConfig.POWER_REQUIRED, 1D,
+													  FunctionSpec.CAPACITY, 10),
+														null);
+		}
+		return lifeSupportSpec;
+	}
+
     public MockBuilding() {
     	super();
     }
     
     public MockBuilding(BuildingManager manager, String name)  {
 		super(manager, name);
-		buildingType = "Mock Type";
-		setNickName(name);
-		changeName(name);
-		
-// SettlementID is done by the superclass		
-//		if (manager == null)
-//			logger.severe("manager = null");
-//		settlementID = (Integer) manager.getSettlement().getIdentifier();
-		
-		unitManager.addBuildingID(this);
-//		sim.getUnitManager().addUnit(this);
-		
+		buildingType = "EVA Airlock";
 
 		if (manager == null) {
 			throw new IllegalArgumentException("Bulding manager can not be null");
 		}
 		manager.addMockBuilding(this);
-		 
-//		this.manager = manager;
+
 		malfunctionManager = new MalfunctionManager(this, 0D, 0D);
-		functions = new ArrayList<Function>();
-		//functions = new HashSet<Function>();
-		functions.add(new LifeSupport(this, 10, 1));
+		functions = new ArrayList<>();
+		functions.add(new LifeSupport(this, getLifeSupportSpec()));
 	}
     
 	public MockBuilding(BuildingTemplate template, BuildingManager manager)  {
 		super(template, manager);
 		buildingType = "Mock Type";
-		super.changeName("Mock Building");
+		changeName("Mock Building");
 		
-		settlementID = (Integer) manager.getSettlement().getIdentifier();
-		
-//		sim.getUnitManager().addBuildingID(this);
 		unitManager.addUnit(this);
 
-//		this.manager = manager;
 		malfunctionManager = new MalfunctionManager(this, 0D, 0D);
-		functions = new ArrayList<Function>();
-		//functions = new HashSet<Function>();
-		functions.add(new LifeSupport(this, 10, 1));
+		functions = new ArrayList<>();
+		functions.add(new LifeSupport(this, getLifeSupportSpec()));
 	}
 
 	public void setTemplateID(int id) {
@@ -102,14 +64,10 @@ public class MockBuilding extends Building {
 	    this.buildingType = type;
 	}
 
-	public void setXLocation(double xLoc) {
-	    this.xLoc = xLoc;
+	public void setLocation(LocalPosition loc) {
+		this.loc = loc;
 	}
-
-	public void setYLocation(double yLoc) {
-	    this.yLoc = yLoc;
-	}
-
+	
 	public void setZLocation(double zLoc) {
 	    this.zLoc = zLoc;
 	}
@@ -129,14 +87,8 @@ public class MockBuilding extends Building {
 	public void addFunction(Function function) {
 	    functions.add(function);
 	}
-
-	@Override
-	public Inventory getInventory() {
-		return null;
-	}
 	
-	@Override
-	public String toString() {
-		return super.getNickName();
+	public void setLocation(double x, double y) {
+		loc = new LocalPosition(x, y);	
 	}
 }

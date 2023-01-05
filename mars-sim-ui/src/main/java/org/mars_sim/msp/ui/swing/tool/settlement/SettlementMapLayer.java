@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SettlementMapLayer.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.settlement;
@@ -10,7 +10,7 @@ import java.awt.Graphics2D;
 
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.UnitManager;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
+import org.mars_sim.msp.core.environment.SurfaceFeatures;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -23,7 +23,7 @@ public interface SettlementMapLayer {
 	static Simulation sim = Simulation.instance();
 	static UnitManager unitManager = sim.getUnitManager();
 	static MissionManager missionManager = sim.getMissionManager();
-	static SurfaceFeatures surfaceFeatures = sim.getMars().getSurfaceFeatures();
+	static SurfaceFeatures surfaceFeatures = sim.getSurfaceFeatures();
 
 	/**
 	 * Displays the settlement map layer.

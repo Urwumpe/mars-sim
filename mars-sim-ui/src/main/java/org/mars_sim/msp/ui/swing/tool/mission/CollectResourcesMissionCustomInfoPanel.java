@@ -1,25 +1,33 @@
-/**
+/*
  * Mars Simulation Project
  * CollectResourcesMissionCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-11-29
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
 
 import java.awt.BorderLayout;
-import java.awt.GridLayout;
+import java.awt.Component;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
-import org.mars_sim.msp.core.Msg;
+import javax.swing.BorderFactory;
+import javax.swing.JLabel;
+import javax.swing.SpringLayout;
+
 import org.mars_sim.msp.core.UnitEvent;
 import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.UnitListener;
 import org.mars_sim.msp.core.person.ai.mission.CollectResourcesMission;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
+import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.tool.Conversion;
 import org.mars_sim.msp.core.vehicle.Rover;
+import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
 
 import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
@@ -32,65 +40,57 @@ public class CollectResourcesMissionCustomInfoPanel
 extends MissionCustomInfoPanel
 implements UnitListener {
 
+	private static final String KG_FORMAT = "%.2f kg";
 	// Data members.
-	private double resourceAmountCache;
-	
 	private CollectResourcesMission mission;
-	private AmountResource resource;
-	private AmountResource[] REGOLITH_TYPES;
-	
-	
-	private Rover missionRover;
-	private WebLabel collectionValueLabel;
 
+	private Rover missionRover;
+	private WebLabel[] amountLabels = null;
+	private List<AmountResource> resourcesCollected = new ArrayList<>();
 
 	/**
 	 * Constructor.
 	 */
-	public CollectResourcesMissionCustomInfoPanel(AmountResource resource) {
+	public CollectResourcesMissionCustomInfoPanel(int [] resourceIds) {
 		// Use MissionCustomInfoPanel constructor.
 		super();
-
-		// Initialize data members.
-		this.resource = resource;
-		
-		if (resource == ResourceUtil.regolithAR) {
-			REGOLITH_TYPES = new AmountResource[] {
-					ResourceUtil.regolithBAR,
-					ResourceUtil.regolithCAR,
-					ResourceUtil.regolithDAR
-			};
-		}
 
 		// Set layout.
 		setLayout(new BorderLayout());
 
 		// Create content panel.
-		WebPanel contentPanel = new WebPanel(new GridLayout(1, 2));
-		add(contentPanel, BorderLayout.NORTH);
+		WebPanel collectionPanel = new WebPanel(new SpringLayout());
+		collectionPanel.setBorder(BorderFactory.createTitledBorder("Resource Collected - Aboard Vehicle"));
+		add(collectionPanel, BorderLayout.CENTER);
+				
+		amountLabels = new WebLabel[resourceIds.length];
+		
+		for (int i=0; i<resourceIds.length; i++) {
+			AmountResource ar = ResourceUtil.findAmountResource(resourceIds[i]);
+			resourcesCollected.add(ar);
+			
+			WebLabel label = new WebLabel(String.format("%12s :   ", Conversion.capitalize(ar.getName())),
+					                                    JLabel.LEFT); //$NON-NLS-1$
+			label.setAlignmentX(Component.LEFT_ALIGNMENT);
+			collectionPanel.add(label);
 
-		// Create collection title label.
-		String resourceString = resource.getName().substring(0, 1).toUpperCase() + 
-				resource.getName().substring(1);
-		WebLabel collectionTitleLabel = new WebLabel(
-				Msg.getString("CollectResourcesMissionCustomInfoPanel.totalCollected", 
-						Conversion.capitalize(resourceString))); //$NON-NLS-1$
-		contentPanel.add(collectionTitleLabel);
+			WebLabel l = new WebLabel(String.format(KG_FORMAT, 0D), JLabel.LEFT);
+			amountLabels[i] = l;
+			collectionPanel.add(l);
+		}
 
-		// Create collection value label.
-		collectionValueLabel = new WebLabel(
-			Msg.getString(
-				"CollectResourcesMissionCustomInfoPanel.kilograms", //$NON-NLS-1$
-				Integer.toString(0)
-			),
-			WebLabel.LEFT
-		);
-		contentPanel.add(collectionValueLabel);
+		// Prepare SpringLayout.
+		SpringUtilities.makeCompactGrid(collectionPanel,
+				resourceIds.length, 2, // rows, cols
+				100, 5, // initX, initY
+				20, 4); // xPad, yPad
 	}
+
 
 	@Override
 	public void updateMission(Mission mission) {
-		if (mission instanceof CollectResourcesMission) {
+		if (mission.getMissionType() == MissionType.COLLECT_ICE
+				|| mission.getMissionType() == MissionType.COLLECT_REGOLITH) {
 			// Remove as unit listener to any existing rovers.
 			if (missionRover != null) {
 				missionRover.removeUnitListener(this);
@@ -103,8 +103,6 @@ implements UnitListener {
 				// Register as unit listener for mission rover.
 				missionRover.addUnitListener(this);
 			}
-
-//			resourceAmountCache = this.mission.getTotalCollectedResources();
 
 			// Update the collection value label.
 			updateCollectionValueLabel();
@@ -121,23 +119,10 @@ implements UnitListener {
 		if (UnitEventType.INVENTORY_RESOURCE_EVENT == event.getType()) {
 			Object source = event.getTarget();
 			if (source instanceof AmountResource) {
-				if (resource.equals(event.getTarget())){
-					updateCollectionValueLabel(); 
-				}
-				for (AmountResource ar : REGOLITH_TYPES) {
-					if (ar.equals(event.getTarget())) {
-						updateCollectionValueLabel(); 
-					}
+				if (resourcesCollected.contains(source)){
+					updateCollectionValueLabel();
 				}
 			}
-				
-//			else if (source instanceof Integer) {
-//				if ((Integer)source < ResourceUtil.FIRST_ITEM_RESOURCE_ID)
-//					updateCollectionValueLabel();
-//			}
-//			if (resource.equals(event.getTarget())) {
-//				updateCollectionValueLabel();   
-//			}
 		}
 	}
 
@@ -145,25 +130,13 @@ implements UnitListener {
 	 * Updates the collection value label.
 	 */
 	private void updateCollectionValueLabel() {
-		double resourceAmount = mission.getTotalCollectedResources();
-		if (missionRover != null) {
-//			resourceAmount = missionRover.getInventory().getAmountResourceStored(resource, true);
-			if (resourceAmountCache < resourceAmount) {
-				resourceAmountCache = resourceAmount;
-			}
-			else {
-				resourceAmount = resourceAmountCache;
-			}
-		}
-		else {
-			resourceAmount = resourceAmountCache;
-		}
 
-		// Update collection value label.
-		collectionValueLabel.setText(
-			Msg.getString("CollectResourcesMissionCustomInfoPanel.kilograms", //$NON-NLS-1$
-				Integer.toString((int) resourceAmount)
-			)
-		);
+		Map<Integer, Double> collected = mission.getResourcesCollected();
+
+		int i = 0;
+		for (AmountResource resourceId : resourcesCollected) {
+			double amount = collected.getOrDefault(resourceId.getID(), 0D);
+			amountLabels[i++].setText(String.format(KG_FORMAT, amount));
+		}
 	}
 }

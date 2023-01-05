@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * UnitToolbar.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
@@ -178,7 +178,7 @@ public class UnitToolBar extends JToolBar implements ActionListener {
 	    g2.setPaint(new GradientPaint(0, 0, almond, 0, getHeight(), antiqueBronze, true));
 	    g2.fillRect(0, 0, getWidth(), getHeight());
 
-	    // Dipose of copy
+	    // Dispose of copy
 	    g2.dispose();
 	}
 	

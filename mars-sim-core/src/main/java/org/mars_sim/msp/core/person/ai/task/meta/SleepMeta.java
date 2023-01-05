@@ -1,84 +1,74 @@
-/**
+/*
  * Mars Simulation Project
  * SleepMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-19
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
-
-import java.io.Serializable;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.CircadianClock;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ShiftType;
-import org.mars_sim.msp.core.person.ai.job.Astronomer;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.task.Sleep;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.structure.ShiftSlot.WorkStatus;
 import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.structure.building.BuildingCategory;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * Meta task for the Sleep task.
  */
-public class SleepMeta implements MetaTask, Serializable {
+public class SleepMeta extends FactoryMetaTask {
 
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
-
-    /** default logger. */
-//    private static Logger logger = Logger.getLogger(SleepMeta.class.getName());
-//	private static String loggerName = logger.getName();
-//	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+//	private static SimLogger logger = SimLogger.getLogger(SleepMeta.class.getName());
 
     /** Task name */
     private static final String NAME = Msg.getString("Task.description.sleep"); //$NON-NLS-1$
-
-    private CircadianClock circadian;
-    
-    private PhysicalCondition pc;
 		
-//    public SleepMeta() {
-//    	System.out.println("SleepMeta created.");
-//    }
+	private static final int CAP = 6_000;
     
-    @Override
-    public String getName() {
-        return NAME;
-    }
-
+    public SleepMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.ANY_HOUR);
+	}
+    
     @Override
     public Task constructInstance(Person person) {
-//		logger.info(person + "  Calling Sleep");
     	return new Sleep(person);
     }
 
     @Override
     public double getProbability(Person person) {
-    	
+  		
+        double result = 0;
+	
         // No sleeping outside.
+    	// Should allow a person to walk back in to find a place to sleep
     	if (person.isOutside())
     		return 0;
     	
-   		circadian = person.getCircadianClock();
-   		pc = person.getPhysicalCondition();
-   		
-        double result = 0;
-	
+    	if (person.isInSettlement()) {
+	        Building b = person.getBuildingLocation();
+	        if ((b != null) && (b.getCategory() == BuildingCategory.EVA_AIRLOCK)) {
+	        	return 0;
+	        }
+    	}
+    	
+   		CircadianClock circadian = person.getCircadianClock();
+   		PhysicalCondition pc = person.getPhysicalCondition();
+ 
        	boolean proceed = false;
 
     	// Note : each millisol generates 1 fatigue point
     	// 500 millisols is ~12 hours
 
-       // boolean isOnCall = ts.getShiftType() == ShiftType.ON_CALL;
-        
         double fatigue = pc.getFatigue();
     	double stress = pc.getStress();
-    	double ghrelin = circadian.getSurplusGhrelin();
-    	double leptin = circadian.getSurplusLeptin();
+    	double ghrelinS = circadian.getSurplusGhrelin();
+    	double leptinS = circadian.getSurplusLeptin();
     	double hunger = pc.getHunger();
     	double energy = pc.getEnergy();
     	
@@ -91,27 +81,35 @@ public class SleepMeta implements MetaTask, Serializable {
     	
     	// 1000 millisols is 24 hours, if a person hasn't slept for 24 hours,
         // he is supposed to want to sleep right away.
-    	if (fatigue > 400 || stress > 75 || ghrelin-leptin > 700) {
+    	// Note: sleep deprivation increases ghrelin levels, while at the same time 
+    	// lowers leptin levels in the blood.
+    	// Take a break from sleep if it's too hungry and too low energy
+    	if (fatigue > PhysicalCondition.FATIGUE_MIN || energy < PhysicalCondition.ENERGY_THRESHOLD
+    			&& (stress > 50 || ghrelinS > 0 || leptinS == 0)) {
     		
         	int rand = RandomUtil.getRandomInt(1);
-        	// Take a break from sleep if it's too hungry
-        	if (rand == 1 && (hunger > 667 || energy < 1000))
-        		proceed = false;
-        	else
-        		proceed = true;
-//    		logger.info(person + "  ghrelin: " + ghrelin + "  leptin:" + leptin);
+            proceed = rand != 1 ;
     	}
     	
         if (proceed) {
-        	// the desire to go to bed increase linearly after 12 hours of wake time
-            result = (fatigue - 333) * 10 + stress * 10 
-            		+ (ghrelin-leptin - 600)/2.5D
-            		// high hunger makes it harder to fall asleep
-            		- hunger/20;
+			double ghrelin = person.getCircadianClock().getGhrelin();
+			double leptin = person.getCircadianClock().getLeptin();
+		    double sleepMillisols = person.getCircadianClock().getTodaySleepTime();
+            double[] muscle = person.getPhysicalCondition().getMusculoskeletal();
             
+        	// the desire to go to bed increase linearly after 6 hours of wake time
+            result += Math.max((fatigue - 250), 0) * 10 + stress * 10 
+            		+ (ghrelin - leptin)
+            		// High hunger makes it harder to fall asleep
+            		// Therefore, limit the hunger contribution to a max of 300
+            		+ Math.min(hunger, 300)
+            		// Note: muscle condition affects the desire to exercise
+            		- muscle[2]/2.5 
+            		- sleepMillisols / 2;
+                   
             double pref = person.getPreference().getPreferenceScore(this);
             
-         	result = result + result * pref/12D;                            	
+         	result += result * pref/12D;                            	
         	
     	    if (result <= 0) {
     	    	// Reduce the probability if it's not the right time to sleep
@@ -120,10 +118,10 @@ public class SleepMeta implements MetaTask, Serializable {
     	    }
     	    	
             // Check if person is an astronomer.
-            boolean isAstronomer = (person.getMind().getJob() instanceof Astronomer);
+            boolean isAstronomer = (person.getMind().getJob() == JobType.ASTRONOMER);
 
             // Dark outside modifier.
-            boolean isDark = (surface.getSolarIrradiance(person.getCoordinates()) < 5);
+            boolean isDark = (surfaceFeatures.getSolarIrradiance(person.getCoordinates()) < 5);
             
             if (isDark && !isAstronomer) {
                 // Non-astronomers more likely to sleep when it's dark out.
@@ -134,107 +132,19 @@ public class SleepMeta implements MetaTask, Serializable {
                 result *= 2D;
             }
 
-            if (person.getShiftType() == ShiftType.ON_CALL)
-            	result = result * 2;
-            
-            else if (person.getTaskSchedule().isShiftHour(marsClock.getMillisolInt())) {
-         	   // Reduce the probability if it's not the right time to sleep
-//         	   Sleep.refreshSleepHabit(person);
-         	   // probability of sleep reduces to one fifth of its value
-               result = result / 50D;
+			int maxNumSleep = 4;
+			WorkStatus workStatus = person.getShiftSlot().getStatus();
+            if (workStatus == WorkStatus.ON_CALL) {
+            	// Note: For on-call personnel, there is no longer a definite sleep 
+            	// pattern, recommend resting as much as possible to get ready 
+            	// when duties call.
+            	result = result * 100;
+				maxNumSleep = 8;
+			}
+            else if (workStatus == WorkStatus.ON_DUTY) {
+         	   // Reduce the probability of sleep
+               result = result / 100D;
             }
-            
-//        	Building quarters = null;
-//        	Settlement s1 = person.getSettlement();
-//        	Settlement s0 = person.getAssociatedSettlement();
-//
-//        	// Note: !s1.equals(s2) is troublesome if s1 or s2 is null
-//
-//			// check to see if a person is a trader or on a trading mission
-//			if (s1 != null && !s1.equals(s0)) {
-//        	//if (person.getMind().getJob() instanceof Trader) {
-//        		// yes he is a trader/guest 
-//				LogConsolidated.log(logger, Level.INFO, 4_000, sourceName, 
-//						"[" + person.getLocationTag().getLocale() + "] " + person.getName()
-//						+ " at "
-//						+ person.getLocationTag().getImmediateLocation()
-//						+ person + " is a trader of a Trade mission (or a tourist guest) and "
-//            			+ "may need to use an unoccupied bed randomly.");
-//            	// Get a quarters that has an "unoccupied bed" (even if that bed has been designated to someone else)
-//            	quarters = Sleep.getBestAvailableQuarters(person, false);
-//
-//                if (quarters != null) {
-//            		result = modifyProbability(result, person, quarters);
-//                }
-////	                else {
-//                   	//logger.fine("SleepMeta : " + person + " couldn't find an empty bed at all. Falling asleep at any spot if being too tired.");
-//                	// TODO: should allow him/her to go sleep in gym or medical station.
-////		            }
-//			}
-//
-//			else {
-//		        // Add checking if a person has a designated bed
-//                quarters = person.getQuarters();
-//                
-//                if (quarters != null) {
-//	            	// if this person has already been assigned a quarter and a bed, not a shared/guest bed
-//                	// he should be "more" inclined to fall asleep this way
-//                	result = 2D * modifyProbability(result, person, quarters);
-//                }
-//                else {
-//	            	// if this person has never been assigned a quarter and a bed so far
-//                	LogConsolidated.log(logger, Level.FINE, 4_000, sourceName, 
-//    						"[" + person.getLocationTag().getLocale() + "] " + person.getName()
-//    						+ " at "
-//    						+ person.getLocationTag().getImmediateLocation()
-//    						+ " has never been designated a bed");
-//
-//       				quarters = Sleep.getBestAvailableQuarters(person, true);
-//
-//		            if (quarters != null) {
-//	                	LogConsolidated.log(logger, Level.FINE, 4_000, sourceName, 
-//	    						"[" + person.getLocationTag().getLocale() + "] " + person.getName()
-//	    						+ " at "
-//	    						+ person.getLocationTag().getImmediateLocation()
-//	    						+ " will be designated a bed in " 
-//	            				+ quarters.getNickName());
-//	                    // set it as his quarters
-//                		result = modifyProbability(result, person, quarters);
-//		            }
-//		            else {
-//	              		// There are no undesignated beds left in any quarters
-//	                	LogConsolidated.log(logger, Level.FINE, 4_000, sourceName, 
-//	    						"[" + person.getLocationTag().getLocale() + "] " + person.getName()
-//	    						+ " at "
-//	    						+ person.getLocationTag().getImmediateLocation()
-//	    						+ " cannot find any empty, undesignated beds in any "
-//	                			+ "quarters. Will use an unoccupied bed randomly.");
-//	                	// Get a quarters that has an "unoccupied bed" (even if that bed has been designated to someone else)
-//	                	quarters = Sleep.getBestAvailableQuarters(person, false);
-//	                	if (quarters != null) {
-//	                		result = modifyProbability(result, person, quarters);
-//	                	}
-//	                    else {
-//	                    	LogConsolidated.log(logger, Level.FINE, 4_000, sourceName, 
-//	        						"[" + person.getLocationTag().getLocale() + "] " + person.getName()
-//	        						+ " at "
-//	        						+ person.getLocationTag().getImmediateLocation()
-//	        						+ " couldn't find an empty bed. Falling asleep at "
-//	                    			+ "right where he/she is.");
-//	                    	// TODO: should allow him/her to sleep in gym or anywhere.
-//    	                	// he should be "less" inclined to fall asleep this way
-//	                    	result /= 2D;
-//	                    }
-//	                }
-//                }
-//			}
-
-        	int maxNumSleep = 0;
-
-        	if (person.getTaskSchedule().getShiftType() == ShiftType.ON_CALL)
-            	maxNumSleep = 8;
-            else
-            	maxNumSleep = 4;
 
         	int sol = marsClock.getMissionSol();
         	
@@ -245,66 +155,15 @@ public class SleepMeta implements MetaTask, Serializable {
             
     	    if (result < 0)
     	    	result = 0;
-
         }
-        
-        else {
-        	// if process is false
-        	
-	        // Reduce the probability if it's not the right time to sleep
-//	    	refreshSleepHabit(person);  
-       }
+ 
+        if (result > CAP)
+        	result = CAP;
 
-       
-//        if (result > 0)
-//        	LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-//        		person + " " + Math.round(result*100.0)/100.0, null);
-        
-//		logger.info(person + "  End of SleepMeta");
-		
         return result;
     }
-    
-    public double modifyProbability(double value, Person person, Building quarters) {
-    	return value * TaskProbabilityUtil.getCrowdingProbabilityModifier(person, quarters) 
-    			* TaskProbabilityUtil.getRelationshipModifier(person, quarters);
-    }
-    
-    
-	@Override
-	public Task constructInstance(Robot robot) {
-		return new Sleep(robot); 	  	
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-
-        double result = 1D;
-
-        // No sleeping outside.
-        if (robot.isOutside())
-            return 0;
-
-        else if (robot.isInVehicle())
-            return result;
-        
-        // Crowding modifier.
-        else if (robot.isInSettlement()) {
-        	result += 1D;
-        	// TODO: stay at the work location
-        	// TODO: go to that building to recharge if battery is low
-            Building building = Sleep.getAvailableRoboticStationBuilding(robot);
-            if (building != null) {
-            	result += 1D;
-
-            }
-        }
-
-
-        return result;
-	}
 	
-	public double modifiedBySleepHabit(Person person, double result) {
+	private double modifiedBySleepHabit(Person person, double result) {
         	// Checks the current time against the sleep habit heat map
 	    	int bestSleepTime[] = person.getPreferredSleepHours();
 	    	// is now falling two of the best sleep time ?
@@ -323,9 +182,4 @@ public class SleepMeta implements MetaTask, Serializable {
 	    	}
 	    	return result;
 	}
-	
-
-    
-    public void destroy() {
-    }
 }

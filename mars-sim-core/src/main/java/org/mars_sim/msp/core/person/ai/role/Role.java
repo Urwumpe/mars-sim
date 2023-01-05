@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Role.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.role;
@@ -10,7 +10,6 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.Person;
@@ -22,9 +21,7 @@ public class Role implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(Role.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+//	private static SimLogger logger = SimLogger.getLogger(Role.class.getName());
 	
 	private Person person;
 
@@ -81,7 +78,7 @@ public class Role implements Serializable {
 		if (newType != oldType) {
 			// Note : if this is a leadership role, only one person should occupy this position 
 			List<Person> predecessors = null;
-			if (RoleUtil.isLeadershipRole(newType)) {
+			if (newType.isChief() || newType.isCouncil()) {
 				// Find a list of predecessors who are occupying this role
 				predecessors = person.getAssociatedSettlement().getChainOfCommand().findPeopleWithRole(newType);
 				if (!predecessors.isEmpty()) {

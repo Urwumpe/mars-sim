@@ -1,9 +1,19 @@
+/**
+ * Mars Simulation Project
+ * DateCommand.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand;
 
 import org.mars.sim.console.chat.ChatCommand;
 import org.mars.sim.console.chat.Conversation;
+import org.mars.sim.console.chat.ConversationRole;
 import org.mars_sim.msp.core.time.EarthClock;
+import org.mars_sim.msp.core.time.MarsClockFormat;
 import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.MasterClock;
 
 /**
  * Command to stop speaking with an entity.
@@ -17,74 +27,34 @@ public class DateCommand extends ChatCommand {
 		super(TopLevel.SIMULATION_GROUP, "d", "date", "What is the date?");
 	}
 
-	/** 
+	/**
 	 * Output the current simulation date time.
 	 */
 	@Override
 	public boolean execute(Conversation context, String input) {
 
-		StringBuilder responseText = new StringBuilder();
-		
-		// Mars/Earth Date and Time
-		EarthClock earthClock = context.getSim().getMasterClock().getEarthClock();
-		String earthDate = earthClock.getDateStringF3();
-		String earthTime = earthClock.getTimeStringF0();
-		
-		MarsClock marsClock = context.getSim().getMasterClock().getMarsClock();
-		int missionSol = marsClock.getMissionSol();
-		String marsDate = marsClock.getDateString();
-		String marsTime = marsClock.getDecimalTimeString();
-		
-		responseText.append(System.lineSeparator());
-		String s0 = "Mission Sol : ";
-		int num = 20 - s0.length();
-		for (int i = 0; i < num; i++) {
-			responseText.append(" ");
-		}
-		responseText.append(s0);
-		responseText.append(missionSol);
-		responseText.append(System.lineSeparator());
-		responseText.append(System.lineSeparator());
+		StructuredResponse responseText = new StructuredResponse();
+		MasterClock clock = context.getSim().getMasterClock();
+		EarthClock earthClock = clock.getEarthClock();
+		MarsClock marsClock = clock.getMarsClock();
 
-		String s1 = "Mars Date : ";
-		num = 20 - s1.length();
-		for (int i = 0; i < num; i++) {
-			responseText.append(" ");
-		}
-		responseText.append(s1);
-		responseText.append(marsDate);
-		responseText.append(System.lineSeparator());
+		responseText.appendLabelledDigit("Mission Sol", marsClock.getMissionSol());
+		responseText.appendLabeledString("Mars Date", MarsClockFormat.getDateString(marsClock));
+		responseText.appendLabeledString("Mars Time", MarsClockFormat.getDecimalTimeString(marsClock));
+		responseText.appendLabeledString("Earth Date", earthClock.getDateStringF4());
+		responseText.appendLabeledString("Earth Time", earthClock.getTimeStringF0());
+		responseText.appendLabeledString("Uptime", clock.getUpTimer().getUptime());
 
-		String s2 = "Mars Time : ";
-		num = 20 - s2.length();
-		for (int i = 0; i < num; i++) {
-			responseText.append(" ");
+		if (context.getRoles().contains(ConversationRole.ADMIN)) {
+			// For Admin user display details about the simulation engine
+			responseText.appendBlankLine();
+			responseText.appendLabelledDigit("Last Pulse execution (msec)", (int) clock.getExecutionTime());
+			responseText.appendLabelledDigit("Last sleep time (msec)", (int) clock.getSleepTime());
+			responseText.appendLabelledDigit("Pulse count", (int) clock.getTotalPulses());
 		}
-		responseText.append(s2);
-		responseText.append(marsTime);
-		responseText.append(System.lineSeparator());
-		responseText.append(System.lineSeparator());
 
-		String s3 = "Earth Date : ";
-		num = 20 - s3.length();
-		for (int i = 0; i < num; i++) {
-			responseText.append(" ");
-		}
-		responseText.append(s3);
-		responseText.append(earthDate);
-		responseText.append(System.lineSeparator());
+		context.println(responseText.getOutput());
 
-		String s4 = "Earth Time : ";
-		num = 20 - s4.length();
-		for (int i = 0; i < num; i++) {
-			responseText.append(" ");
-		}
-		responseText.append(s4);
-		responseText.append(earthTime);
-		responseText.append(System.lineSeparator());
-		
-		context.println(responseText.toString());
-		
 		return true;
 	}
 

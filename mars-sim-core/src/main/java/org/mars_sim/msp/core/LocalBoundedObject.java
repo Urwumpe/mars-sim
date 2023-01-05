@@ -1,16 +1,18 @@
 /**
  * Mars Simulation Project
  * LocalBoundedObject.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-06-09
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core;
 
+import java.io.Serializable;
+
 /**
  * Interface for a rectangle-bounded object in the local area.
  */
-public interface LocalBoundedObject {
+public interface LocalBoundedObject extends Serializable {
 
 	/**
 	 * Gets the X location of the object from the local area's center point.
@@ -18,7 +20,9 @@ public interface LocalBoundedObject {
 	 * @return X location (meters from local center point - West: positive, East:
 	 *         negative).
 	 */
-	public double getXLocation();
+	default double getXLocation() {
+		return getPosition().getX();
+	}
 
 	/**
 	 * Gets the Y location of the object from the local area's center point.
@@ -26,8 +30,15 @@ public interface LocalBoundedObject {
 	 * @return Y location (meters from local center point - North: positive, South:
 	 *         negative).
 	 */
-	public double getYLocation();
+	default double getYLocation() {
+		return getPosition().getY();
+	}
 
+	/**
+	 * Get the position of this object relative to the local area's center point
+	 */
+	public LocalPosition getPosition();
+	
 	/**
 	 * Gets the object's width.
 	 * 

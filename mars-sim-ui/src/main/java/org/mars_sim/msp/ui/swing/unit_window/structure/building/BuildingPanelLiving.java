@@ -1,92 +1,94 @@
-/**
+/*
  * Mars Simulation Project
  * BuildingPanelLiving.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-10
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Font;
 import java.awt.GridLayout;
+
+import javax.swing.JPanel;
+import javax.swing.JTextField;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.structure.building.function.LivingAccommodations;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 
-import com.alee.laf.label.WebLabel;
 import com.alee.laf.panel.WebPanel;
 
 
 /**
  * The BuildingPanelLiving class is a building function panel representing
- * the living accommodation info of a settlement building.
+ * the living accommodation details of a settlement building.
  */
 @SuppressWarnings("serial")
 public class BuildingPanelLiving extends BuildingFunctionPanel {
-	
+
+	private static final String BED_ICON = Msg.getString("icon.bed"); //$NON-NLS-1$
+
 	private int bedCapCache;
 	private int bedAssignedCache;
 	private int bedOccupiedCache;
 	private int bedEmptyCache;
-	
-	private WebLabel bedCapLabel;
-	private WebLabel bedAssignsLabel;
-	private WebLabel bedOccupiedLabel;
-	private WebLabel bedEmptyLabel;
-	
-	private LivingAccommodations living; 
+
+	private JTextField bedCapLabel;
+	private JTextField bedAssignsLabel;
+	private JTextField bedOccupiedLabel;
+	private JTextField bedEmptyLabel;
+
+	private LivingAccommodations living;
 
 	/**
 	 * Constructor.
-	 * @param medical the medical care building this panel is for.
+	 * 
+	 * @param living the building this panel is for.
 	 * @param desktop The main desktop.
 	 */
 	public BuildingPanelLiving(LivingAccommodations living, MainDesktopPane desktop) {
 
 		// Use BuildingFunctionPanel constructor
-		super(living.getBuilding(), desktop);
+		super(
+			Msg.getString("BuildingPanelLiving.title"), 
+			ImageLoader.getNewIcon(BED_ICON),
+			living.getBuilding(), 
+			desktop
+		);
 
 		// Initialize data members
 		this.living = living;
-
-		// Set panel layout
-		setLayout(new BorderLayout());
+	}
+	
+	/**
+	 * Builds the UI elements.
+	 * 
+	 * @param center the panel to be built
+	 */
+	@Override
+	protected void buildUI(JPanel center) {
 
 		// Create label panel
-		WebPanel labelPanel = new WebPanel(new GridLayout(5, 1, 0, 0));
-		add(labelPanel, BorderLayout.NORTH);
-		labelPanel.setOpaque(false);
-		labelPanel.setBackground(new Color(0,0,0,128));
-
-		// Create medical care label
-		WebLabel titleLabel = new WebLabel(Msg.getString("BuildingPanelLiving.title"), WebLabel.CENTER);
-		titleLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		//medicalCareLabel.setForeground(new Color(102, 51, 0)); // dark brown
-		labelPanel.add(titleLabel);
+		WebPanel labelPanel = new WebPanel(new GridLayout(5, 2, 0, 0));
+		center.add(labelPanel, BorderLayout.NORTH);
 
 		// Create bed capacity label
-		bedCapLabel = new WebLabel(Msg.getString("BuildingPanelLiving.beds.capacity",
-				living.getBedCap()), WebLabel.CENTER);
-		labelPanel.add(bedCapLabel);
+		bedCapLabel = addTextField(labelPanel, Msg.getString("BuildingPanelLiving.beds.capacity"),
+								   living.getBedCap(), 5, "Max number of beds available");
 
 		// Create # of assigned bed label
-		bedAssignsLabel = new WebLabel(Msg.getString("BuildingPanelLiving.beds.assigned",
-				living.getNumAssignedBeds()), WebLabel.CENTER);
-		labelPanel.add(bedAssignsLabel);
+		bedAssignsLabel = addTextField(labelPanel, Msg.getString("BuildingPanelLiving.beds.assigned"),
+									   living.getNumAssignedBeds(), 5, "Number of beds already assigned");
 
 		// Create bedOccupiedLabel
-		bedOccupiedLabel = new WebLabel(Msg.getString("BuildingPanelLiving.beds.occupied",
-				living.getNumOccupiedActivitySpots()), WebLabel.CENTER);
-		labelPanel.add(bedOccupiedLabel);
-		
+		bedOccupiedLabel = addTextField(labelPanel, Msg.getString("BuildingPanelLiving.beds.occupied"),
+										living.getNumOccupiedActivitySpots(), 5, "Number of beds already occupied");
+
 		// Create bedEmptyLabel
-		bedEmptyLabel = new WebLabel(Msg.getString("BuildingPanelLiving.beds.empty",
-				living.getNumEmptyActivitySpots()), WebLabel.CENTER);
-		labelPanel.add(bedEmptyLabel);
-		
+		bedEmptyLabel = addTextField(labelPanel, Msg.getString("BuildingPanelLiving.beds.empty"),
+									 living.getNumEmptyActivitySpots(), 5, "Number of empty beds available");
 	}
 
 	@Override
@@ -94,26 +96,26 @@ public class BuildingPanelLiving extends BuildingFunctionPanel {
 		// Update bedCapLabel
 		if (bedCapCache != living.getBedCap()) {
 			bedCapCache = living.getBedCap();
-			bedCapLabel.setText(Msg.getString("BuildingPanelLiving.beds.capacity", bedCapCache));
+			bedCapLabel.setText(Integer.toString(bedCapCache));
 		}
 
 		// Update bedAssignsLabel
 		if (bedAssignedCache != living.getNumAssignedBeds()) {
 			bedAssignedCache = living.getNumAssignedBeds();
-			bedAssignsLabel.setText(Msg.getString("BuildingPanelLiving.beds.assigned", bedAssignedCache));
+			bedAssignsLabel.setText(Integer.toString(bedAssignedCache));
 		}
-		
+
 		// Update bedOccupiedLabel
 		if (bedOccupiedCache != living.getNumOccupiedActivitySpots()) {
 			bedOccupiedCache = living.getNumOccupiedActivitySpots();
-			bedOccupiedLabel.setText(Msg.getString("BuildingPanelLiving.beds.occupied", bedOccupiedCache));
-		}	
-		
+			bedOccupiedLabel.setText(Integer.toString(bedOccupiedCache));
+		}
+
 		// Update bedEmptyLabel
 		if (bedEmptyCache != living.getNumEmptyActivitySpots()) {
 			bedEmptyCache = living.getNumEmptyActivitySpots();
-			bedEmptyLabel.setText(Msg.getString("BuildingPanelLiving.beds.empty", bedEmptyCache));
-		}	
+			bedEmptyLabel.setText(Integer.toString(bedEmptyCache));
+		}
 	}
 }
-	
+

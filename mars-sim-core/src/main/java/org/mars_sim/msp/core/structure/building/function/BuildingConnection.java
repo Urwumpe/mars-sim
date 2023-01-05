@@ -1,27 +1,28 @@
 /**
  * Mars Simulation Project
  * BuildingConnection.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import java.io.Serializable;
 import java.util.Iterator;
 
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.structure.building.BuildingSpec;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
 
-public class BuildingConnection extends Function implements Serializable {
+public class BuildingConnection extends Function {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 
 	/** constructor. */
-	public BuildingConnection(Building building) {
+	public BuildingConnection(Building building, FunctionSpec spec) {
 		// User Function constructor.
-		super(FunctionType.BUILDING_CONNECTION, building);
+		super(FunctionType.BUILDING_CONNECTION, spec, building);
 	}
 
 	/**
@@ -36,7 +37,8 @@ public class BuildingConnection extends Function implements Serializable {
 
 		// Determine building base level.
 		// Should only determine supply and demand of connectors with same base level.
-		int baseLevel = buildingConfig.getBaseLevel(buildingName);
+		BuildingSpec spec = buildingConfig.getBuildingSpec(buildingName);
+		int baseLevel = spec.getBaseLevel();
 
 		// Determine demand.
 		double demand = 0D;

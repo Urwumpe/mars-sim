@@ -1,39 +1,35 @@
-/**
+/*
  * Mars Simulation Project
  * PreparingDessert.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-30
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.structure.building.function.cooking;
 
-import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.SimulationConfig;
-import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.task.CookMeal;
 import org.mars_sim.msp.core.person.ai.task.PrepareDessert;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ResourceUtil;
-import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.WaterUseType;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingException;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
 import org.mars_sim.msp.core.structure.building.function.Function;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.LifeSupport;
-import org.mars_sim.msp.core.structure.building.function.Storage;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.Conversion;
@@ -42,32 +38,32 @@ import org.mars_sim.msp.core.tool.RandomUtil;
 /**
  * The PreparingDessert class is a building function for making dessert.
  */
-public class PreparingDessert extends Function implements Serializable {
+public class PreparingDessert extends Function {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(PreparingDessert.class.getName());
+	private static SimLogger logger = SimLogger.getLogger(PreparingDessert.class.getName());
 	/** The minimal amount of resource to be retrieved. */
 	private static final double MIN = 0.00001;
 
-	private static String sourceName = logger.getName();
+	public static final String REFRIGERATE = "A dessert has expired. Refrigerating ";
 
-	public static final String REFRIGERATE = "A dessert has expired. Refigerating ";
-
-	public static final String DISCARDED = " is expired and discarded at ";
+	public static final String DISCARDED = " has expired and discarded.";
 
 	public static final String GREY_WATER = "grey water";
 	public static final String FOOD_WASTE = "food waste";
 	public static final String WATER = "water";
 	public static final String SODIUM_HYPOCHLORITE = "sodium hypochlorite";
+	public static final String JUICE = "juice";
+	public static final String MILK = "milk";
+	
 	/**
 	 * The base amount of work time in milliSols (for cooking skill 0) to prepare
 	 * fresh dessert .
 	 */
 	public static final double PREPARE_DESSERT_WORK_REQUIRED = 3D;
 
-	// public double dessertsReplenishmentRate;
 	public static double UP = 0.01;
 	public static double DOWN = 0.007;
 
@@ -80,17 +76,32 @@ public class PreparingDessert extends Function implements Serializable {
 
 	private static double dessertMassPerServing;
 
-	private static String[] availableDesserts = { "sesame milk", 
-			"soymilk", "sugarcane juice", "cranberry juice",
-			"strawberry", "granola bar", "blueberry muffin"};
+	private static String[] availableDesserts = { 
+			"sesame milk", 
+			"soymilk", 
+			"sugarcane juice", 
+			"cranberry juice",
+			"strawberry", 
+			"granola bar", 
+			"blueberry muffin"};
 
 	private static int NUM_DESSERTS = availableDesserts.length;
 
 	private static int waterID = ResourceUtil.waterID;
-	private static int greyWaterID = ResourceUtil.greyWaterID;
 	private static int foodWasteID = ResourceUtil.foodWasteID;
 	public static int NaClOID = ResourceUtil.NaClOID;
 
+	public static int[] availableDessertsID = {
+			ResourceUtil.findIDbyAmountResourceName(availableDesserts[0]),
+			ResourceUtil.findIDbyAmountResourceName(availableDesserts[1]),
+			ResourceUtil.findIDbyAmountResourceName(availableDesserts[2]),
+			ResourceUtil.findIDbyAmountResourceName(availableDesserts[3]),
+			ResourceUtil.findIDbyAmountResourceName(availableDesserts[4]),
+			ResourceUtil.findIDbyAmountResourceName(availableDesserts[5]),
+			ResourceUtil.findIDbyAmountResourceName(availableDesserts[6])
+	};
+	
+	
 	public static AmountResource[] availableDessertsAR = { 
 			ResourceUtil.findAmountResource(availableDesserts[0]),
 			ResourceUtil.findAmountResource(availableDesserts[1]),
@@ -98,7 +109,8 @@ public class PreparingDessert extends Function implements Serializable {
 			ResourceUtil.findAmountResource(availableDesserts[3]),
 			ResourceUtil.findAmountResource(availableDesserts[4]),
 			ResourceUtil.findAmountResource(availableDesserts[5]),
-			ResourceUtil.findAmountResource(availableDesserts[6]) };
+			ResourceUtil.findAmountResource(availableDesserts[6])
+	};
 
 	// Arbitrary percent of dry mass of the corresponding dessert/beverage.
 	public static double[] dryMass = { 0.10, 0.05, 0.02, 0.02, 0.20, 0.4, 0.3, };
@@ -117,11 +129,6 @@ public class PreparingDessert extends Function implements Serializable {
 
 	private double cleaningAgentPerSol;
 
-	private String producerName;
-
-	private Person person;
-	private Robot robot;
-
 	private List<PreparedDessert> servingsOfDessert;
 
 	/**
@@ -130,29 +137,21 @@ public class PreparingDessert extends Function implements Serializable {
 	 * @param building the building this function is for.
 	 * @throws BuildingException if error in constructing function.
 	 */
-	public PreparingDessert(Building building) {
-		// Use Function constructor.
-		super(FunctionType.PREPARING_DESSERT, building);
+	public PreparingDessert(Building building, FunctionSpec spec) {
+		// Use Function constructor but uses COOKING as the configuration type
+		super(FunctionType.PREPARING_DESSERT, spec, building);
 
 		dessertMassPerServing = personConfig.getDessertConsumptionRate() / (double) NUM_OF_DESSERT_PER_SOL
-				* DESSERT_SERVING_FRACTION;
+				/ DESSERT_SERVING_FRACTION;
 
 		MealConfig mealConfig = SimulationConfig.instance().getMealConfiguration(); // need this to pass maven test
 		// Add loading the two parameters from meals.xml
 		cleaningAgentPerSol = mealConfig.getCleaningAgentPerSol();
-		// waterUsagePerMeal = mealConfig.getWaterConsumptionRate();
 
 		preparingWorkTime = 0D;
 		servingsOfDessert = new CopyOnWriteArrayList<>();
 
-		this.cookCapacity = buildingConfig.getCookCapacity(building.getBuildingType());
-
-		// Load activity spots
-		loadActivitySpots(buildingConfig.getCookingActivitySpots(building.getBuildingType()));
-	}
-
-	public Inventory getInventory() {
-		return building.getInventory();
+		this.cookCapacity = spec.getCapacity();
 	}
 
 	public static String[] getArrayOfDesserts() {
@@ -214,8 +213,6 @@ public class PreparingDessert extends Function implements Serializable {
 			if (!newBuilding && building.getBuildingType().equalsIgnoreCase(buildingType) && !removedBuilding) {
 				removedBuilding = true;
 			} else {
-				// PreparingDessert preparingDessertFunction = (PreparingDessert)
-				// building.getFunction(FUNCTION);
 				double wearModifier = (building.getMalfunctionManager().getWearCondition() / 100D) * .25D + .25D;
 				supply += building.getPreparingDessert().cookCapacity * wearModifier;
 			}
@@ -223,7 +220,7 @@ public class PreparingDessert extends Function implements Serializable {
 
 		double preparingDessertCapacityValue = demand / (supply + 1D);
 
-		double preparingDessertCapacity = buildingConfig.getCookCapacity(buildingType);
+		double preparingDessertCapacity = buildingConfig.getFunctionSpec(buildingType, FunctionType.PREPARING_DESSERT).getCapacity();
 
 		return preparingDessertCapacity * preparingDessertCapacityValue;
 	}
@@ -246,53 +243,18 @@ public class PreparingDessert extends Function implements Serializable {
 		int result = 0;
 
 		if (getBuilding().hasFunction(FunctionType.LIFE_SUPPORT)) {
-			try {
-				LifeSupport lifeSupport = building.getLifeSupport();
-				Iterator<Person> i = lifeSupport.getOccupants().iterator();
-				while (i.hasNext()) {
-					Task task = i.next().getMind().getTaskManager().getTask();
-					if (task instanceof PrepareDessert) {
-						result++;
-					}
+			LifeSupport lifeSupport = building.getLifeSupport();
+			Iterator<Person> i = lifeSupport.getOccupants().iterator();
+			while (i.hasNext()) {
+				Task task = i.next().getMind().getTaskManager().getTask();
+				if (task instanceof PrepareDessert) {
+					result++;
 				}
-			} catch (Exception e) {
-				e.printStackTrace();
 			}
 		}
 
 		return result;
 	}
-
-//    /**
-//     * Gets the skill level of the best cook using this facility.
-//     * @return skill level.
-//
-//    public int getBestDessertSkill() {
-//        int result = 0;
-//
-//        if (getBuilding().hasFunction(BuildingFunction.LIFE_SUPPORT)) {
-//            try {
-//                LifeSupport lifeSupport = (LifeSupport) getBuilding().getFunction(BuildingFunction.LIFE_SUPPORT);
-//                Iterator<Person> i = lifeSupport.getOccupants().iterator();
-//                while (i.hasNext()) {
-//                    Person person = i.next();
-//                    Task task = person.getMind().getTaskManager().getTask();
-//                    if (task instanceof CookMeal) {
-//                        int preparingDessertSkill = person.getMind().getSkillManager().getEffectiveSkillLevel(SkillType.COOKING);
-//                        if (preparingDessertSkill > result) {
-//                            result = preparingDessertSkill;
-//                        }
-//                    }
-//                }
-//            }
-//            catch (Exception e) {
-//            	e.printStackTrace();
-//            }
-//        }
-//
-//        return result;
-//    }
-//     */
 
 	/**
 	 * Checks if there are any FreshDessertList in this facility.
@@ -318,7 +280,7 @@ public class PreparingDessert extends Function implements Serializable {
 	 * @return PreparedDessert
 	 */
 	public PreparedDessert chooseADessert(Person person) {
-		List<PreparedDessert> menu = new CopyOnWriteArrayList<>();// servingsOfDessert);
+		List<PreparedDessert> menu = new CopyOnWriteArrayList<>();
 		PreparedDessert bestDessert = null;
 		PreparedDessert bestFavDessert = null;
 		double bestQuality = -1;
@@ -328,7 +290,7 @@ public class PreparingDessert extends Function implements Serializable {
 
 		if (thirst > 100) {
 			for (PreparedDessert d : servingsOfDessert) {
-				if (d.getName().contains("juice") || d.getName().contains("milk"))
+				if (d.getName().contains(JUICE) || d.getName().contains(MILK))
 					menu.add(d);
 			}
 		} else
@@ -341,10 +303,6 @@ public class PreparingDessert extends Function implements Serializable {
 			if (d.getName().equals(favoriteDessert)) {
 				// person will choose his/her favorite dessert right away
 				if (q > bestQuality) {
-					// if (q > currentBestQuality) {
-					// currentBestQuality = q;
-					// bestQuality = q;
-					// }
 					bestQuality = q;
 					bestFavDessert = d;
 					menu.remove(bestFavDessert);
@@ -392,9 +350,6 @@ public class PreparingDessert extends Function implements Serializable {
 		// quality among the current servings ?
 		Iterator<PreparedDessert> i = servingsOfDessert.iterator();
 		while (i.hasNext()) {
-			// PreparedDessert freshDessert = i.next();
-			// if (freshDessert.getQuality() > bestQuality)
-			// bestQuality = freshDessert.getQuality();
 			double q = i.next().getQuality();
 			if (q > bestQuality)
 				bestQuality = q;
@@ -425,24 +380,27 @@ public class PreparingDessert extends Function implements Serializable {
 
 	/**
 	 * Cleans up the kitchen with cleaning agent and water.
+	 * NOTE: turn this into a task that a person should do
 	 */
 	private void cleanUpKitchen() {
-		boolean cleaning0 = false;
-		if (cleaningAgentPerSol * .1 > MIN)
-			cleaning0 = retrieve(cleaningAgentPerSol * .1, NaClOID, true);
-		boolean cleaning1 = false;
-		if (cleaningAgentPerSol > MIN) {
-			cleaning1 = retrieve(cleaningAgentPerSol * 5, waterID, true);
-			building.getSettlement().addWaterConsumption(WaterUseType.CLEAN_DESSERT, cleaningAgentPerSol * 5);
-		}
+		
+		double amountAgent = cleaningAgentPerSol;		 
+		double lackingAgent = building.getSettlement().retrieveAmountResource(ResourceUtil.NaClOID, amountAgent);
 
-		if (cleaning0)
-			cleanliness = cleanliness + .05;
+		double amountWater = 10 * amountAgent;
+		double lackingWater = building.getSettlement().retrieveAmountResource(ResourceUtil.waterID, amountWater);
+		
+		// Track water consumption
+		building.getSettlement().addWaterConsumption(WaterUseType.CLEAN_DESSERT, amountWater - lackingWater);
+		
+		// Modify cleanliness
+		if (lackingAgent <= 0)
+			cleanliness = cleanliness + .1;
 		else
-			cleanliness = cleanliness - .025;
+			cleanliness = cleanliness - .1;
 
-		if (cleaning1)
-			cleanliness = cleanliness + .075;
+		if (lackingWater <= 0)
+			cleanliness = cleanliness + .05;
 		else
 			cleanliness = cleanliness - .05;
 
@@ -450,7 +408,6 @@ public class PreparingDessert extends Function implements Serializable {
 			cleanliness = 1;
 		else if (cleanliness < -1)
 			cleanliness = -1;
-
 	}
 
 	/**
@@ -463,19 +420,18 @@ public class PreparingDessert extends Function implements Serializable {
 	}
 
 	/**
-	 * Gets a list of all desserts available at the settlement.
+	 * Gets a list of all desserts that can be made at the settlement.
 	 * 
 	 * @return list of dessert names.
 	 */
-	public List<String> getAListOfDesserts() {
-		// TODO : turn this list into an array to speed up the operation
-		List<String> dessertList = new CopyOnWriteArrayList<>(); // ArrayList<String>();
+	public List<String> getListDessertsToMake() {
+		// Note : turn this list into an array to speed up the operation
+		List<String> dessertList = new ArrayList<>();
 
 		// Put together a list of available dessert
-		// for(String n : availableDesserts) {
 		for (int i = 0; i < NUM_DESSERTS; i++) {
 			double amount = dryMass[i];
-			/// System.out.println("PreparingDessert : it's " + availableDesserts[i]);
+
 			boolean isAvailable = false;
 			if (amount > MIN)
 				isAvailable = retrieve(amount, availableDessertsAR[i].getID(), false);
@@ -484,7 +440,6 @@ public class PreparingDessert extends Function implements Serializable {
 				isWater_av = retrieve(dessertMassPerServing - amount, waterID, false);
 
 			if (isAvailable && isWater_av) {
-				// System.out.println("n is available");
 				dessertList.add(availableDesserts[i]);
 			}
 		}
@@ -514,19 +469,20 @@ public class PreparingDessert extends Function implements Serializable {
 	 * skill.
 	 * 
 	 * @param workTime work time (millisols)
+	 * @param worker
+	 * @return
 	 */
-	public String addWork(double workTime, Unit theCook) {
-		if (theCook instanceof Person)
-			this.person = (Person) theCook;
-		else if (theCook instanceof Robot)
-			this.robot = (Robot) theCook;
-
+	public String addWork(double workTime, Worker worker) {
 		String selectedDessert = null;
-
+		// Note: chould first choose the dessert to prepare and not wait until 
+		// preparingWorkTime has reached PREPARE_DESSERT_WORK_REQUIRED
+		
 		preparingWorkTime += workTime;
 
 		if ((preparingWorkTime >= PREPARE_DESSERT_WORK_REQUIRED) && !makeNoMoreDessert) {
 
+			preparingWorkTime = 0;
+			
 			// max allowable # of dessert servings per meal time.
 			double population = building.getSettlement().getIndoorPeopleCount();
 			double maxServings = population * building.getSettlement().getDessertsReplenishmentRate();
@@ -535,14 +491,17 @@ public class PreparingDessert extends Function implements Serializable {
 
 			if (numServings >= maxServings) {
 				makeNoMoreDessert = true;
-			} else {
+			} 
+			
+			else {
 				// List<String> dessertList = getAListOfDesserts();
 				// selectedDessert = makeADessert(getADessert(dessertList));
-				selectedDessert = makeADessert(getADessert(getAListOfDesserts()));
+				selectedDessert = makeADessert(getADessert(getListDessertsToMake()), worker);
+				return Conversion.capitalize(selectedDessert);
 			}
 		}
 
-		return Conversion.capitalize(selectedDessert);
+		return selectedDessert;
 	}
 
 	/**
@@ -552,7 +511,6 @@ public class PreparingDessert extends Function implements Serializable {
 	 * @return number of prepared desserts.
 	 */
 	private int getTotalAvailablePreparedDessertsAtSettlement(Settlement settlement) {
-
 		int result = 0;
 
 		Iterator<Building> i = settlement.getBuildingManager().getBuildings(FunctionType.PREPARING_DESSERT).iterator();
@@ -579,14 +537,12 @@ public class PreparingDessert extends Function implements Serializable {
 		return result;
 	}
 
-	public String makeADessert(String selectedDessert) {
+	private String makeADessert(String selectedDessert, Worker worker) {
 
 		// Take out one serving of the selected dessert from storage.
 		double dryMass = getDryMass(selectedDessert);
 
 		if (selectedDessert == null) {
-			// System.out.println("PreparingDessert : selectedDessert is " +
-			// selectedDessert);
 			return null;
 		}
 
@@ -604,63 +560,27 @@ public class PreparingDessert extends Function implements Serializable {
 			// TODO: quality also dependent upon the hygiene of a person
 			double culinarySkillPerf = 0;
 			// Add influence of a person/robot's performance on meal quality
-			if (person != null)
-				culinarySkillPerf = .25 * person.getPerformanceRating()
-						* person.getSkillManager().getEffectiveSkillLevel(SkillType.COOKING);
-			else if (robot != null)
-				culinarySkillPerf = .1 * robot.getPerformanceRating()
-						* robot.getSkillManager().getEffectiveSkillLevel(SkillType.COOKING);
+			culinarySkillPerf = .25 * worker.getPerformanceRating()
+						* worker.getSkillManager().getEffectiveSkillLevel(SkillType.COOKING);
 
 			dessertQuality = Math.round((dessertQuality + culinarySkillPerf + cleanliness) * 10D) / 10D;
-			;
-
-			if (person != null)
-				producerName = person.getName();
-			else if (robot != null)
-				producerName = robot.getName();
 
 			// Create a serving of dessert and add it into the list
 			servingsOfDessert.add(new PreparedDessert(selectedDessert, dessertQuality, dessertMassPerServing,
-					(MarsClock) marsClock.clone(), producerName, this));
+					new MarsClock(marsClock)));
 
-			// consumeWater();
 			dessertCounterPerSol++;
-
-			// logger.info(producerName + " prepared a serving of " + selectedDessert
-			// + " in " + getBuilding().getBuildingManager().getSettlement().getName()
-			// + " (dessert quality : " + dessertQuality + ")");
 
 			preparingWorkTime -= PREPARE_DESSERT_WORK_REQUIRED;
 
 			// Reduce a tiny bit of kitchen's cleanliness upon every meal made
-			cleanliness = cleanliness - .0075;
+			cleanliness -= .0075;
 
 			return selectedDessert;
 		}
 
 	}
 
-//    /**
-//     * Consumes a certain amount of water for each dessert
-//     */
-//    public void consumeWater() {
-//    	int sign = RandomUtil.getRandomInt(0, 1);
-//    	double rand = RandomUtil.getRandomDouble(0.2);
-//    	double usage = WATER_USAGE_PER_DESSERT;
-//    	//TODO: need to move the hardcoded amount to a xml file
-//    	if (sign == 0)
-//    		usage = 1 + rand;
-//    	else
-//    		usage = 1 - rand;
-//    	if (usage > MIN) {
-//    		Storage.retrieveAnResource(usage, waterID, inv, true);
-//        	settlement.addWaterConsumption(1, usage);	
-//    	}
-//    	
-//		double wasteWaterAmount = usage * .5;
-//		if (wasteWaterAmount > MIN)
-//			Storage.storeAnResource(wasteWaterAmount, greyWaterID, inv, sourceName + "::consumeWater");
-//    }
 
 	/**
 	 * Time passing for the building.
@@ -693,28 +613,21 @@ public class PreparingDessert extends Function implements Serializable {
 							// Throw out bad dessert as food waste.
 							double m = getDryMass(dessert.getName());
 							if (m > MIN)
-								store(m, foodWasteID, sourceName + "::timePassing");
+								store(m, foodWasteID, "PreparingDessert::timePassing");
 	
-							log.append("[").append(building.getSettlement().getName()).append("] ")
-									.append(getDryMass(dessert.getName())).append(" kg ")
-									.append(dessert.getName().toLowerCase()).append(DISCARDED)
-									.append(getBuilding().getNickName()).append(".");
+							log.append(getDryMass(dessert.getName())).append(" kg ")
+									.append(dessert.getName()).append(DISCARDED);
 	
-							LogConsolidated.flog(Level.INFO, 10000, sourceName, log.toString());
+							logger.log(building, Level.INFO, 30_000, log.toString());
 	
 						} else {
 							// Refrigerate prepared dessert.
 							refrigerateFood(dessert);
 	
-							log.append("[").append(building.getSettlement().getName()).append("] ")
-									.append(REFRIGERATE).append(getDryMass(dessert.getName())).append(" kg ")
-									.append(dessert.getName().toLowerCase()).append(" at ")
-									.append(getBuilding().getNickName()).append(".");
+							log.append(REFRIGERATE).append(getDryMass(dessert.getName())).append(" kg ")
+									.append(dessert.getName() + ".");
 	
-							LogConsolidated.flog(Level.INFO, 10000, sourceName, log.toString());
-	
-							// logger.finest("The dessert has lost its freshness at " +
-							// getBuilding().getBuildingManager().getSettlement().getName());
+							logger.log(building, Level.INFO, 30_000, log.toString());
 						}
 	
 						// Adjust the rate to go down for each dessert that wasn't eaten.
@@ -727,8 +640,7 @@ public class PreparingDessert extends Function implements Serializable {
 			}
 	
 			// Check if not meal time, clean up.
-			Coordinates location = building.getSettlement().getCoordinates();
-			if (!CookMeal.isLocalMealTime(location, 10)) {
+			if (!CookMeal.isLocalMealTime(building.getSettlement().getCoordinates(), 0)) {
 				finishUp();
 			}
 	
@@ -759,13 +671,13 @@ public class PreparingDessert extends Function implements Serializable {
 	 * @param dessert the dessert to refrigerate.
 	 */
 	public void refrigerateFood(PreparedDessert dessert) {
+		String dessertName = dessert.getName();
 		try {
-			String dessertName = dessert.getName();
 			double mass = getDryMass(dessertName);
-			store(mass, ResourceUtil.findIDbyAmountResourceName(dessertName), sourceName + "::refrigerateFood");
+			store(mass, ResourceUtil.findIDbyAmountResourceName(dessertName), "PreparingDessert::refrigerateFood");
 
 		} catch (Exception e) {
-			e.printStackTrace();
+          	logger.log(Level.SEVERE, "Cannot store " + dessertName + ": "+ e.getMessage());
 		}
 	}
 
@@ -773,57 +685,41 @@ public class PreparingDessert extends Function implements Serializable {
 		return dessertCounterPerSol;
 	}
 
-//    /**
-//     * Gets the amount resource of the fresh food from a specified food group.
-//     *
-//     * @param String food group
-//     * @return AmountResource of the specified fresh food
-//
-//    public AmountResource getFreshFoodAR(String foodGroup) {
-//        AmountResource freshFoodAR = AmountResource.findAmountResource(foodGroup);
-//        return freshFoodAR;
-//    }
 
-//    /**
-//     * Computes amount of fresh food from a particular fresh food amount resource.
-//     *
-//     * @param AmountResource of a particular fresh food
-//     * @return Amount of a particular fresh food in kg, rounded to the 4th decimal places
-//
-//    public double getFreshFood(AmountResource ar) {
-//        double freshFoodAvailable = inv.getAmountResourceStored(ar, false);
-//    	//inv.addDemandTotalRequest(ar);
-//        return freshFoodAvailable;
-//    }
 
 	/**
 	 * Gets the amount of power required when function is at full power.
 	 * 
 	 * @return power (kW)
 	 */
+	@Override
 	public double getFullPowerRequired() {
 		return getNumCooks() * 10D;
 	}
 
+	/**
+	 * Checks if this resource id is a dessert id
+	 * 
+	 * @param id
+	 * @return
+	 */
+	public static boolean isADessert(int id) {
+		for (int i: availableDessertsID) {
+			if (id == i)
+				return true;
+		}
+		return false;
+	}
+	
 	@Override
 	public double getMaintenanceTime() {
 		return cookCapacity * 10D;
-	}
-
-	private boolean retrieve(double amount, int resource, boolean value) {
-		return Storage.retrieveAnResource(amount, resource, building.getInventory(), value);
-	}
-
-	private void store(double amount, int resource, String source) {
-		Storage.storeAnResource(amount, resource, building.getInventory(), source);
 	}
 
 	@Override
 	public void destroy() {
 		super.destroy();
 
-		person = null;
-		robot = null;
 		servingsOfDessert = null;
 		availableDessertsAR = null;
 	}

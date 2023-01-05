@@ -1,13 +1,11 @@
-/**
+/*
  * Mars Simulation Project
  * Relax.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-10
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -15,10 +13,9 @@ import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
-import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.person.PhysicalCondition;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
@@ -30,14 +27,13 @@ import org.mars_sim.msp.core.vehicle.Rover;
  * The duration of the task is by default chosen randomly, up to 100 millisols.
  */
 public class Relax
-extends Task
-implements Serializable {
+extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(Relax.class.getName());
+	private static final Logger logger = Logger.getLogger(Relax.class.getName());
 
 	/** Task name */
     private static final String NAME = Msg.getString(
@@ -56,11 +52,11 @@ implements Serializable {
 	 * @param person the person to perform the task
 	 */
 	public Relax(Person person) {
-		super(NAME, person, false, false, STRESS_MODIFIER, true, 10D);
+		super(NAME, person, false, false, STRESS_MODIFIER, 10D);
 		
 		// If during person's work shift, only relax for short period.
 		int msols = marsClock.getMillisolInt();
-        boolean isShiftHour = person.getTaskSchedule().isShiftHour(msols);
+        boolean isShiftHour = person.isOnDuty();
 		if (isShiftHour) {
 		    setDuration(10D);
 		}
@@ -72,7 +68,7 @@ implements Serializable {
 				Building rec = getAvailableRecreationBuilding(person);
 				if (rec != null) {
 					// Walk to recreation building.
-				    walkToTaskSpecificActivitySpotInBuilding(rec, true);
+				    walkToTaskSpecificActivitySpotInBuilding(rec, FunctionType.RECREATION, true);
 				    walkSite = true;
 				}
 				else {
@@ -107,55 +103,6 @@ implements Serializable {
 		setPhase(RELAXING);
 	}
 
-	public Relax(Robot robot) {
-		super(NAME, robot, false, false, STRESS_MODIFIER, true, 10D);// + RandomUtil.getRandomDouble(10D));
-		
-		// If robot is in a settlement, try to find a place to relax.
-//		boolean walkSite = false;
-//
-//		if (robot.isInSettlement()) {
-//			try {
-//				Building recBuilding = Sleep.getAvailableRoboticStationBuilding(robot);
-//				if (recBuilding != null) {
-//					// Walk to recreation building.
-//				    walkToActivitySpotInBuilding(recBuilding, true);
-//				    walkSite = true;
-//				}
-//			}
-//			catch (Exception e) {
-//				logger.log(Level.SEVERE,"Relax.constructor(): " + e.getMessage());
-//				endTask();
-//			}
-//		}
-//		
-//		if (!walkSite) {
-//		    if (robot.isInVehicle()) {
-//                // If robot is in rover, walk to passenger activity spot.
-//                if (robot.getVehicle() instanceof Rover) {
-//                    walkToPassengerActivitySpotInRover((Rover) robot.getVehicle(), true);
-//                }
-//            }
-//		    else {
-//                // Walk to random location.
-//                walkToRandomLocation(true);
-//            }
-//		}
-//
-//		// Initialize phase
-//		addPhase(RELAXING);
-//		setPhase(RELAXING);
-
-	}
-
-    @Override
-    public FunctionType getLivingFunction() {
-        return FunctionType.RECREATION;
-    }
-
-    public FunctionType getRoboticFunction() {
-        return FunctionType.ROBOTIC_STATION;
-    }
-
 	@Override
 	protected double performMappedPhase(double time) {
 		if (getPhase() == null) {
@@ -175,31 +122,26 @@ implements Serializable {
 	 * @return the amount of time (millisol) left after performing the phase.
 	 */
 	private double relaxingPhase(double time) {
+	
+		double remainingTime = 0;
 		
 		if (person != null) {
 			
 	        // Obtain the fractionOfRest to restore fatigue faster in high fatigue case.	   
 			double fractionOfRest = time/1000;
 		
-			double f = person.getFatigue();
+			PhysicalCondition pc = person.getPhysicalCondition();
+			double f =  pc.getFatigue();
 					
 	        // Reduce person's fatigue
-	        double newFatigue = f - f * fractionOfRest;
-
-	        if (newFatigue < 0D) {
-	            newFatigue = 0D;
-	        }
-	        person.getPhysicalCondition().setFatigue(newFatigue);
-
+	        pc.reduceFatigue(f * fractionOfRest);
+	        
+	        pc.relaxMuscle(time);
 		}
 		
-		return 0D;
+		return remainingTime;
 	}
 
-	@Override
-	protected void addExperience(double time) {
-		// This task adds no experience.
-	}
 
 	/**
 	 * Gets an available recreation building that the person can use.
@@ -226,16 +168,4 @@ implements Serializable {
 
 		return result;
 	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		return 0;
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(0);
-		return results;
-	}
-	
 }

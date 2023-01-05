@@ -1,40 +1,39 @@
-/**
+/*
  * Mars Simulation Project
  * MeetTogetherMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-02
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
-
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.role.RoleType;
 import org.mars_sim.msp.core.person.ai.task.MeetTogether;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
 
 
 /**
  * Meta task for MeetTogether task.
  */
-public class MeetTogetherMeta implements MetaTask, Serializable {
+public class MeetTogetherMeta extends FactoryMetaTask {
 
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
-
+    /** default logger. */
+//    private static final SimLogger logger = SimLogger.getLogger(MeetTogetherMeta.class.getName());
+	
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.meetTogether"); //$NON-NLS-1$
-     
-    @Override
-    public String getName() {
-        return NAME;
-    }
+    
+	private static final int CAP = 1_000;
+	
+    public MeetTogetherMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.WORK_HOUR);
+		
+		setPreferredJob(JobType.POLITICIAN, JobType.REPORTER);
+	}
 
     @Override
     public Task constructInstance(Person person) {
@@ -48,61 +47,44 @@ public class MeetTogetherMeta implements MetaTask, Serializable {
         
         RoleType roleType = person.getRole().getType();
         
-        // Probability affected by the person's stress and fatigue.
-        PhysicalCondition condition = person.getPhysicalCondition();
-        double fatigue = condition.getFatigue();
-        
-        if (fatigue > 1000)
-        	return 0;
-        
         if (person.isInSettlement() && roleType != null) {
 	
-	        if (roleType == RoleType.PRESIDENT
-	                	|| roleType == RoleType.MAYOR
-	            		|| roleType == RoleType.COMMANDER)
+	        if (roleType.isCouncil())
 	        	result += 50D;
 	
-	        else if (roleType == RoleType.CHIEF_OF_AGRICULTURE
-	            	|| roleType == RoleType.CHIEF_OF_ENGINEERING
-	            	|| roleType == RoleType.CHIEF_OF_LOGISTICS_N_OPERATIONS
-	            	|| roleType == RoleType.CHIEF_OF_MISSION_PLANNING
-	            	|| roleType == RoleType.CHIEF_OF_SAFETY_N_HEALTH
-	            	|| roleType == RoleType.CHIEF_OF_SCIENCE
-	            	|| roleType == RoleType.CHIEF_OF_SUPPLY_N_RESOURCES)
+	        else if (roleType.isChief())
 	        	result += 30D;
 	 
-	
 	        // TODO: Probability affected by the person's stress and fatigue.
 	
-	        // Effort-driven task modifier.
-	        result *= person.getPerformanceRating();
-	
-	    	int now = Simulation.instance().getMasterClock().getMarsClock().getMillisolInt();
-	        boolean isOnShiftNow = person.getTaskSchedule().isShiftHour(now);
+	    	int now = marsClock.getMillisolInt();
+	        boolean isOnShiftNow = person.isOnDuty();
+	        
+	        int size = person.getAssociatedSettlement().getIndoorPeopleCount();
+	        result /= 2 * Math.sqrt(size/8.0);
 	        
 	        if (isOnShiftNow)
-	        	result = result*1.5D;
+	        	result = result * 10;
 	        
 	        if (result > 0)
 	        	result = result + result * person.getPreference().getPreferenceScore(this)/5D;
 	
+	        // Probability affected by the person's stress and fatigue.
+	        double fatigue = person.getPhysicalCondition().getFatigue();
+	        
+	        result -= fatigue/50;
+	         
 	        if (result < 0) 
 	        	result = 0;
+	        
+	        // Effort-driven task modifier.
+	        result *= person.getPerformanceRating();
+	       
         }
+        
+        if (result > CAP)
+        	result = CAP;
         
         return result;
     }
-
-
-	@Override
-	public Task constructInstance(Robot robot) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 }

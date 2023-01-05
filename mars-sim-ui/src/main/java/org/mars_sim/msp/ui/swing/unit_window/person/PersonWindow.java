@@ -1,19 +1,37 @@
-/**
+/*
  * Mars Simulation Project
  * PersonWindow.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-10-24
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.person;
 
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridLayout;
+
+import javax.swing.SwingConstants;
 import javax.swing.event.ChangeEvent;
 
+import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.structure.ShiftSlot;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.MainWindow;
+import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfo;
+import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfoFactory;
 import org.mars_sim.msp.ui.swing.unit_window.InventoryTabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.LocationTabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.NotesTabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.UnitWindow;
+
+import com.alee.laf.label.WebLabel;
+import com.alee.laf.panel.WebPanel;
+import com.alee.managers.tooltip.TooltipManager;
+import com.alee.managers.tooltip.TooltipWay;
 
 /**
  * The PersonWindow is the window for displaying a person.
@@ -21,24 +39,29 @@ import org.mars_sim.msp.ui.swing.unit_window.UnitWindow;
 @SuppressWarnings("serial")
 public class PersonWindow extends UnitWindow {
 
+	private static final String TOWN = Msg.getString("icon.colony");
+	private static final String JOB = Msg.getString("icon.career");
+	private static final String ROLE = Msg.getString("icon.role");
+	private static final String SHIFT = Msg.getString("icon.shift");
+	
+	private static final String TWO_SPACES = "  ";
+	private static final String SIX_SPACES = "      ";
+	
 	/** Is person dead? */
 	private boolean deadCache = false;
-
-	private Person person;
 	
-//	private TabPanelActivity tabPanelActivity;
-//	private TabPanelAttribute tabPanelAttribute;
-//	private TabPanelCareer tabPanelCareer;
-//	private TabPanelFavorite tabPanelFavorite;
-//	private TabPanelGeneral tabPanelGeneral;
-//	private TabPanelHealth tabPanelHealth;
-//	private InventoryTabPanel inventoryTabPanel;
-//	private LocationTabPanel locationTabPanel;
-//	private TabPanelSchedule tabPanelSchedule;
-//	private TabPanelScience tabPanelScience;
-//	private TabPanelSkill tabPanelSkill;
-//	private TabPanelSocial tabPanelSocial;
-//	private TabPanelSponsorship tabPanelSponsorship;
+	private String oldRoleString = "";
+	private String oldJobString = "";
+	private String oldTownString = "";
+	
+	private WebLabel townLabel;
+	private WebLabel jobLabel;
+	private WebLabel roleLabel;
+	private WebLabel shiftLabel;
+
+	private WebPanel statusPanel;
+	
+	private Person person;
 
 	/**
 	 * Constructor.
@@ -48,17 +71,113 @@ public class PersonWindow extends UnitWindow {
 	 */
 	public PersonWindow(MainDesktopPane desktop, Person person) {
 		// Use UnitWindow constructor
-		super(desktop, person, true);
+		super(desktop, person, person.getNickName(), true);
 		this.person = person;
 	
-		// Add tab panels
+		// Create status panel
+		statusPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+
+		getContentPane().add(statusPanel, BorderLayout.NORTH);	
 		
-//		tabPanelActivity = new TabPanelActivity(person, desktop);
-//		addTabPanel(tabPanelActivity);
-//
-//		tabPanelAttribute = new TabPanelAttribute(person, desktop);
-//		addTabPanel(tabPanelAttribute);
+		initTopPanel(person);
 		
+		initTabPanel(person);
+		
+		statusUpdate();
+	}
+	
+	
+	public void initTopPanel(Person person) {
+		statusPanel.setPreferredSize(new Dimension(WIDTH / 8, UnitWindow.STATUS_HEIGHT));
+
+		// Create name label
+		UnitDisplayInfo displayInfo = UnitDisplayInfoFactory.getUnitDisplayInfo(unit);
+		String name = SIX_SPACES + unit.getShortenedName() + SIX_SPACES;
+
+		statusPanel.setPreferredSize(new Dimension(WIDTH / 8, UnitWindow.STATUS_HEIGHT));
+
+		WebLabel nameLabel = new WebLabel(name, displayInfo.getButtonIcon(unit), SwingConstants.CENTER);
+		nameLabel.setMinimumSize(new Dimension(120, UnitWindow.STATUS_HEIGHT));
+		
+		WebPanel namePane = new WebPanel(new BorderLayout(50, 0));
+		namePane.add(nameLabel, BorderLayout.CENTER);
+	
+		Font font = null;
+
+		if (MainWindow.OS.contains("linux")) {
+			font = new Font("DIALOG", Font.BOLD, 8);
+		} else {
+			font = new Font("DIALOG", Font.BOLD, 10);
+		}
+		nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		nameLabel.setAlignmentY(Component.TOP_ALIGNMENT);
+		nameLabel.setFont(font);
+		nameLabel.setVerticalTextPosition(WebLabel.BOTTOM);
+		nameLabel.setHorizontalTextPosition(WebLabel.CENTER);
+
+		statusPanel.add(namePane);
+
+		WebLabel townIconLabel = new WebLabel();
+		TooltipManager.setTooltip(townIconLabel, "Hometown", TooltipWay.down);
+		setImage(TOWN, townIconLabel);
+
+		WebLabel jobIconLabel = new WebLabel();
+		TooltipManager.setTooltip(jobIconLabel, "Job", TooltipWay.down);
+		setImage(JOB, jobIconLabel);
+
+		WebLabel roleIconLabel = new WebLabel();
+		TooltipManager.setTooltip(roleIconLabel, "Role", TooltipWay.down);
+		setImage(ROLE, roleIconLabel);
+
+		WebLabel shiftIconLabel = new WebLabel();
+		TooltipManager.setTooltip(shiftIconLabel, "Work Shift", TooltipWay.down);
+		setImage(SHIFT, shiftIconLabel);
+
+		WebPanel townPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		WebPanel jobPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		WebPanel rolePanel = new WebPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		WebPanel shiftPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+
+		townLabel = new WebLabel();
+		townLabel.setFont(font);
+
+		jobLabel = new WebLabel();
+		jobLabel.setFont(font);
+
+		roleLabel = new WebLabel();
+		roleLabel.setFont(font);
+
+		shiftLabel = new WebLabel();
+		shiftLabel.setFont(font);
+
+		townPanel.add(townIconLabel);
+		townPanel.add(townLabel);
+		townPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		jobPanel.add(jobIconLabel);
+		jobPanel.add(jobLabel);
+		jobPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		rolePanel.add(roleIconLabel);
+		rolePanel.add(roleLabel);
+		rolePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		shiftPanel.add(shiftIconLabel);
+		shiftPanel.add(shiftLabel);
+		shiftPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		WebPanel rowPanel = new WebPanel(new GridLayout(2, 2, 0, 0));
+		rowPanel.add(townPanel);
+		rowPanel.add(rolePanel);
+		rowPanel.add(shiftPanel);
+		rowPanel.add(jobPanel);
+
+		statusPanel.add(rowPanel);
+		rowPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+	}
+	
+	public void initTabPanel(Person person) {
+		// Add tab panels	
 		addTabPanel(new TabPanelActivity(person, desktop));
 		
 		addTabPanel(new TabPanelAttribute(person, desktop));
@@ -66,43 +185,39 @@ public class PersonWindow extends UnitWindow {
 		addTabPanel(new TabPanelCareer(person, desktop));
 
 		// Add death tab panel if person is dead.
-		if (person.getPhysicalCondition().isDead()) {
+		if (person.isDeclaredDead()
+				|| person.getPhysicalCondition().isDead()) {
 			deadCache = true;
-			addTabPanel(new TabPanelDeath(person, desktop));
-		} else
-			deadCache = false;
+			addDeathPanel(new TabPanelDeath(person, desktop));
+		}
 
 		addTabPanel(new TabPanelFavorite(person, desktop));
 
-		addTabPanel(new TabPanelGeneral(person, desktop));
-
 		addTabPanel(new TabPanelHealth(person, desktop));
+
+		addTabPanel(new InventoryTabPanel(person, desktop));
+
+		addTabPanel(new LocationTabPanel(person, desktop));
 
 		addTabPanel(new NotesTabPanel(person, desktop));
 		
-		addTabPanel(new InventoryTabPanel(person, desktop));
-
-		addTopPanel(new LocationTabPanel(person, desktop));
-
-//		addTabPanel(new TabPanelPersonality(person, desktop));
-
+		addTabPanel(new TabPanelPersonality(person, desktop));
+		
 		addTabPanel(new TabPanelSchedule(person, desktop));
 
-		addTabPanel(new TabPanelScience(person, desktop));
+		addTabPanel(new TabPanelScienceStudy(person, desktop));
 
 		addTabPanel(new TabPanelSkill(person, desktop));
 
 		addTabPanel(new TabPanelSocial(person, desktop));
 
 		addTabPanel(new TabPanelSponsor(person, desktop));
-
-		// Add tab sorting
-		sortTabPanels();
+		
+		addFirstPanel(new TabPanelGeneral(person, desktop));
+		
+		// Add to tab panels. 
+		addTabIconPanels();
 	}
-
-//	public void initializeUI(TabPanel tabPanel) {
-//		tabPanel.initializeUI();
-//	}
 
 	/**
 	 * Updates this window.
@@ -111,32 +226,77 @@ public class PersonWindow extends UnitWindow {
 	public void update() {
 		super.update();
 
-		if (!deadCache) {
-			if (person.isDeclaredDead()) {
-				deadCache = true;
-				addTabPanel(new TabPanelDeath(person, desktop));
-			}
+		if (!deadCache 
+			&& (person.isDeclaredDead()
+			|| person.getPhysicalCondition().isDead())) {
+			deadCache = true;
+			addDeathPanel(new TabPanelDeath(person, desktop));
 		}
+		
+		statusUpdate();
 	}
 
+	/*
+	 * Updates the status of the person.
+	 */
+	public void statusUpdate() {
+
+		String townString = null;
+
+		if (person.getPhysicalCondition().isDead()) {
+			if (person.getAssociatedSettlement() != null)
+				townString = person.getAssociatedSettlement().getName();
+			else if (person.getBuriedSettlement() != null)
+				townString = person.getBuriedSettlement().getName();
+			else if (person.getPhysicalCondition().getDeathDetails().getPlaceOfDeath() != null)
+				townString = person.getPhysicalCondition().getDeathDetails().getPlaceOfDeath();
+		}
+
+		else if (person.getAssociatedSettlement() != null)
+			townString = person.getAssociatedSettlement().getName();
+
+		if (townString != null && !oldTownString.equals(townString)) {
+			oldJobString = townString;
+			if (townString.length() > 40)
+				townString = townString.substring(0, 40);
+			townLabel.setText(TWO_SPACES + townString);
+		}
+
+		String jobString = person.getMind().getJob().getName();
+		if (!oldJobString.equals(jobString)) {
+			oldJobString = jobString;
+			jobLabel.setText(TWO_SPACES + jobString);
+		}
+
+		String roleString = person.getRole().getType().getName();
+		if (!oldRoleString.equals(roleString)) {
+			oldRoleString = roleString;
+			roleLabel.setText(TWO_SPACES + roleString);
+		}
+
+		ShiftSlot newShiftType = person.getShiftSlot();
+		String shiftDesc = TabPanelSchedule.getShiftDescription(newShiftType);
+		shiftLabel.setText(TWO_SPACES + newShiftType.getShift().getName());
+		TooltipManager.setTooltip(shiftLabel, shiftDesc, TooltipWay.down);
+	}
+	
 	@Override
 	public void stateChanged(ChangeEvent e) {
-
-//		TabPanel newTab = (TabPanel)e.getSource();//getSelected();
-//		System.out.println("oldTab : " + oldTab + "    newTab : " + newTab);
-//		
-//		if (oldTab == null || newTab != oldTab) {
-//			oldTab = newTab;
-//			
-//			if (!newTab.isUIDone());
-//				newTab.initializeUI();
-//				
-////			if (newTab instanceof TabPanelActivity) {
-////				if (tabPanelActivity.isUIDone());
-////				 	tabPanelActivity.initializeUI();
-////			} else if (newTab instanceof TabPanelAttribute) {
-////				
-////			}
-//		}
+		// nothing
 	}
+	
+	/**
+	 * Prepares unit window for deletion.
+	 */
+	public void destroy() {		
+		person = null;
+		
+		statusPanel = null;
+		
+		townLabel = null;
+		jobLabel = null;
+		roleLabel = null;
+		shiftLabel = null;
+	}
+
 }

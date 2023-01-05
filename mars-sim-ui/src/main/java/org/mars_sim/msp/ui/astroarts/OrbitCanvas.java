@@ -1,6 +1,7 @@
-/* Mars Simulation Project
- * DateDialog.java
- * @version 3.1.2 2020-09-02
+/* 
+ * Mars Simulation Project
+ * OrbitCanvas.java
+ * @date 2022-07-10
  * @author Manny Kung
  * Original work by Osamu Ajiki and Ron Baalke (NASA/JPL)
  * http://www.astroarts.com/products/orbitviewer/
@@ -59,8 +60,9 @@ class OrbitCanvas extends Canvas {
 	 */
 	private Xyz objectPos;
 	private Xyz planetPos[];
-        private int CenterObjectSelected;
-        private boolean OrbitDisplay[];	
+	private int centerObjectSelected;
+	private int timeStep;
+	private boolean orbitDisplay[];	
 	/**
 	 * Projection Parameters
 	 */
@@ -122,7 +124,7 @@ class OrbitCanvas extends Canvas {
 	 */
 	public OrbitCanvas(Comet object, ATime atime) {
 		planetPos = new Xyz[9];
-                OrbitDisplay = new boolean[11];
+        orbitDisplay = new boolean[11];
 		this.object = object;
 		this.objectOrbit = new CometOrbit(object, 120);
 		this.planetOrbit = new PlanetOrbit[9];
@@ -202,22 +204,28 @@ class OrbitCanvas extends Canvas {
 	}
 
 
-        /**
-         * Select Orbits
-         */
-        public void SelectOrbits(boolean OrbitDisplay[], int OrbitCount) {
-           for (int i=0; i< OrbitCount; i++)
-           {
-                this.OrbitDisplay[i] = OrbitDisplay[i];
-           }
-        }
-
-        /**
-         * Select Center Object
-         */
-        public void SelectCenterObject(int CenterObjectSelected) {
-                this.CenterObjectSelected = CenterObjectSelected;
-        }
+	/**
+	 * Select Orbits
+	 */
+	public void selectOrbits(boolean orbitDisplay[], int OrbitCount) {
+	   for (int i=0; i< OrbitCount; i++) {
+	        this.orbitDisplay[i] = orbitDisplay[i];
+	   }
+	}
+	
+	/**
+	 * Select Center Object
+	 */
+	public void selectCenterObject(int index) {
+		this.centerObjectSelected = index;
+	}
+	
+	/**
+	 * Select time step
+	 */
+	public void selectTimeStep(int index) {
+		this.timeStep = index;
+	}
 	
 	/**
 	 * Switch Object Name ON/OFF
@@ -275,24 +283,24 @@ class OrbitCanvas extends Canvas {
 		}
 	}
 
-        /**
-         * Draw Earth's Orbit
-         */
-        private void drawEarthOrbit(Graphics g, PlanetOrbit planetOrbit,
-                                                 Color colorUpper, Color colorLower) {
-                Point point1, point2;
-                Xyz xyz = planetOrbit.getAt(0).Rotate(this.mtxToEcl)
-                                                          .Rotate(this.mtxRotate);
-                point1 = getDrawPoint(xyz);
-                for (int i = 1; i <= planetOrbit.getDivision(); i++) {
-                        xyz = planetOrbit.getAt(i).Rotate(this.mtxToEcl);
-                        g.setColor(colorUpper);
-                        xyz = xyz.Rotate(this.mtxRotate);
-                        point2 = getDrawPoint(xyz);
-                        g.drawLine(point1.x, point1.y, point2.x, point2.y);
-                        point1 = point2;
-                }
-        }
+	/**
+	 * Draw Earth's Orbit
+	 */
+	private void drawEarthOrbit(Graphics g, PlanetOrbit planetOrbit,
+	                                         Color colorUpper, Color colorLower) {
+		Point point1, point2;
+		Xyz xyz = planetOrbit.getAt(0).Rotate(this.mtxToEcl)
+		                                          .Rotate(this.mtxRotate);
+		point1 = getDrawPoint(xyz);
+		for (int i = 1; i <= planetOrbit.getDivision(); i++) {
+		        xyz = planetOrbit.getAt(i).Rotate(this.mtxToEcl);
+		        g.setColor(colorUpper);
+		        xyz = xyz.Rotate(this.mtxRotate);
+		        point2 = getDrawPoint(xyz);
+		        g.drawLine(point1.x, point1.y, point2.x, point2.y);
+		        point1 = point2;
+		}
+	}
 	
 	/**
 	 * Draw Planets' Body
@@ -352,36 +360,36 @@ class OrbitCanvas extends Canvas {
 		this.nX0 = this.sizeCanvas.width  / 2;
 		this.nY0 = this.sizeCanvas.height / 2;
 
-                if (Math.abs(epochToEcl - atime.getJd()) > 365.2422 * 5) {
-                        updateRotationMatrix(atime);
-                }
+        if (Math.abs(epochToEcl - atime.getJd()) > 365.2422 * 5) {
+                updateRotationMatrix(atime);
+        }
 
-                // If center object is comet/asteroid  
-                if (CenterObjectSelected == 1 )   {
-                   xyz = this.objectOrbit.getAt(0).Rotate(this.mtxToEcl).Rotate(this.mtxRotate);
-                   xyz = this.objectPos.Rotate(this.mtxToEcl).Rotate(this.mtxRotate);	
-                   point3 = getDrawPoint(xyz);
+        // If center object is comet/asteroid  
+        if (centerObjectSelected == 1 )   {
+           xyz = this.objectOrbit.getAt(0).Rotate(this.mtxToEcl).Rotate(this.mtxRotate);
+           xyz = this.objectPos.Rotate(this.mtxToEcl).Rotate(this.mtxRotate);	
+           point3 = getDrawPoint(xyz);
 
-                   this.nX0 = this.sizeCanvas.width - point3.x;
-                   this.nY0 = this.sizeCanvas.height - point3.y;
+           this.nX0 = this.sizeCanvas.width - point3.x;
+           this.nY0 = this.sizeCanvas.height - point3.y;
 
-                   if (Math.abs(epochToEcl - atime.getJd()) > 365.2422 * 5) {
-                        updateRotationMatrix(atime);
-                   } 
-                }
-                // If center object is one of the planets
-                else if (CenterObjectSelected > 1 )   {
-                   xyz = planetPos[CenterObjectSelected -2].Rotate(this.mtxRotate);
+           if (Math.abs(epochToEcl - atime.getJd()) > 365.2422 * 5) {
+                updateRotationMatrix(atime);
+           } 
+        }
+        // If center object is one of the planets
+        else if (centerObjectSelected > 1 )   {
+           xyz = planetPos[centerObjectSelected -2].Rotate(this.mtxRotate);
 
-                   point3 = getDrawPoint(xyz);
+           point3 = getDrawPoint(xyz);
 
-                   this.nX0 = this.sizeCanvas.width - point3.x;
-                   this.nY0 = this.sizeCanvas.height - point3.y;
+           this.nX0 = this.sizeCanvas.width - point3.x;
+           this.nY0 = this.sizeCanvas.height - point3.y;
 
-                   if (Math.abs(epochToEcl - atime.getJd()) > 365.2422 * 5) {
-                        updateRotationMatrix(atime);
-                   }
-                }
+           if (Math.abs(epochToEcl - atime.getJd()) > 365.2422 * 5) {
+                updateRotationMatrix(atime);
+           }
+        }
 
 		// Get Off-Screen Image Graphics Context
 		Graphics gg = offscreen.getGraphics();
@@ -411,7 +419,7 @@ class OrbitCanvas extends Canvas {
 		
 		point1 = getDrawPoint(xyz);
 		
-		if (OrbitDisplay[0] || OrbitDisplay[1]) {
+		if (orbitDisplay[0] || orbitDisplay[1]) {
 
 			for (int i = 1; i <= this.objectOrbit.getDivision(); i++) {
 				xyz = this.objectOrbit.getAt(i).Rotate(this.mtxToEcl);
@@ -444,47 +452,47 @@ class OrbitCanvas extends Canvas {
 		}
 		g2d.setFont(fontPlanetName);
 		
-		if (OrbitDisplay[0] || OrbitDisplay[10]) {
+		if (orbitDisplay[0] || orbitDisplay[10]) {
 			drawPlanetOrbit(g2d, planetOrbit[Planet.PLUTO-Planet.MERCURY],
 							colorPlanetOrbitUpper, colorPlanetOrbitLower);
 		}
 		drawPlanetBody(g2d, planetPos[8], "Pluto");
 		
-		if (OrbitDisplay[0] || OrbitDisplay[9]) {
+		if (orbitDisplay[0] || orbitDisplay[9]) {
 			
 			drawPlanetOrbit(g2d, planetOrbit[Planet.NEPTUNE-Planet.MERCURY],
 							colorPlanetOrbitUpper, colorPlanetOrbitLower);
 		}
 		drawPlanetBody(g2d, planetPos[7], "Neptune");
 		
-		if (OrbitDisplay[0] || OrbitDisplay[8]) {
+		if (orbitDisplay[0] || orbitDisplay[8]) {
 			drawPlanetOrbit(g2d, planetOrbit[Planet.URANUS-Planet.MERCURY],
 							colorPlanetOrbitUpper, colorPlanetOrbitLower);
 		}
 		drawPlanetBody(g2d, planetPos[6], "Uranus");
 		
-		if (OrbitDisplay[0] || OrbitDisplay[7]) {
+		if (orbitDisplay[0] || orbitDisplay[7]) {
 			drawPlanetOrbit(g2d, planetOrbit[Planet.SATURN-Planet.MERCURY],
 							colorPlanetOrbitUpper, colorPlanetOrbitLower);
 		}
 		drawPlanetBody(g2d, planetPos[5], "Saturn");
 		
-		if (OrbitDisplay[0] || OrbitDisplay[6]) {
+		if (orbitDisplay[0] || orbitDisplay[6]) {
 			drawPlanetOrbit(g2d, planetOrbit[Planet.JUPITER-Planet.MERCURY],
 							colorPlanetOrbitUpper, colorPlanetOrbitLower);
 		}
 		drawPlanetBody(g2d, planetPos[4], "Jupiter");
 		
 		if (fZoom * 1.524 >= 7.5) {
-			if (OrbitDisplay[0] || OrbitDisplay[5]) {
+			if (orbitDisplay[0] || orbitDisplay[5]) {
 				
 				drawPlanetOrbit(g2d, planetOrbit[Planet.MARS-Planet.MERCURY],
 								colorPlanetOrbitUpper, colorPlanetOrbitLower);
 			}
 			drawPlanetBody(g2d, planetPos[3], "Mars");
 		}
-		if (fZoom * 1.000 >= 7.5) {
-                        if (OrbitDisplay[0] || OrbitDisplay[4]) {
+		if (fZoom >= 7.5) {
+                        if (orbitDisplay[0] || orbitDisplay[4]) {
 
 			   drawEarthOrbit(g2d, planetOrbit[Planet.EARTH-Planet.MERCURY],
 						colorPlanetOrbitUpper, colorPlanetOrbitUpper);
@@ -493,15 +501,15 @@ class OrbitCanvas extends Canvas {
                         
 		}
 		if (fZoom * 0.723 >= 7.5) {
-                        if (OrbitDisplay[0] || OrbitDisplay[3]) {
+                        if (orbitDisplay[0] || orbitDisplay[3]) {
 			   drawPlanetOrbit(g2d, planetOrbit[Planet.VENUS-Planet.MERCURY],
 						colorPlanetOrbitUpper, colorPlanetOrbitLower);
                         }
 			drawPlanetBody(g2d, planetPos[1], "Venus");
 		}
 		if (fZoom * 0.387 >= 7.5) {
-                        if (OrbitDisplay[0] || OrbitDisplay[2]) {
-			   drawPlanetOrbit(g2d, planetOrbit[Planet.MERCURY-Planet.MERCURY],
+                        if (orbitDisplay[0] || orbitDisplay[2]) {
+			   drawPlanetOrbit(g2d, planetOrbit[0],
 						colorPlanetOrbitUpper, colorPlanetOrbitLower);
                         }
 			drawPlanetBody(g2d, planetPos[0], "Mercury");
@@ -605,7 +613,7 @@ class OrbitCanvas extends Canvas {
 	 */
 	public void paint(Graphics g) {
 		if (offscreen == null) {
-			this.sizeCanvas = size();
+			this.sizeCanvas = getSize();
 			offscreen = createImage(this.sizeCanvas.width,
 									this.sizeCanvas.height);
 			update(g);

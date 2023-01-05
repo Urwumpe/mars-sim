@@ -1,28 +1,26 @@
 /**
  * Mars Simulation Project
  * MBTIPersonality.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-15
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.core.person.ai;
 
-//import java.util.Optional;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PersonConfig;
-import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 /*
@@ -81,7 +79,7 @@ public class MBTIPersonality implements Serializable {
 	/** The person's MBTI */
 	public MBTIType mbtiType;
 
-	private static Map<MBTIType, String> descriptor;
+	private static EnumMap<MBTIType, String> descriptor;
 	
 	// Add four MBTI scores
 	public static final int INTROVERSION_EXTRAVERSION = 0;
@@ -94,6 +92,10 @@ public class MBTIPersonality implements Serializable {
 	// The company stress modifier per millisol.
 	private static final double BASE_COMPANY_STRESS_MODIFIER = .1D;
 
+	private static final String FUNCTION_LENS = "Function Lens";
+	private static final String CULTURE_LENS = "Culture Lens";
+	private static final String TEMP_LENS = "Temperament Lens";
+	
 	// Domain members
 	/** The percent Breakdown of MBTI type of a general population, loading from people.xml. */
 	private static Map<String, Double> personalityDistribution = null;
@@ -115,7 +117,7 @@ public class MBTIPersonality implements Serializable {
 	}
 	
 	static {
-		descriptor = new ConcurrentHashMap<>();
+		descriptor = new EnumMap<>(MBTIType.class);
 		descriptor.put(MBTIType.ISTP, "Analyzer");
 		descriptor.put(MBTIType.ISTJ, "Inspector");
 		descriptor.put(MBTIType.ISFP, "Supporter");
@@ -151,7 +153,7 @@ public class MBTIPersonality implements Serializable {
 		// Determine personality type.
 		double randValue = RandomUtil.getRandomDouble(100D);
 		
-		List<String> distribution = new CopyOnWriteArrayList<>(personalityDistribution.keySet());
+		List<String> distribution = new ArrayList<>(personalityDistribution.keySet());
 		Collections.shuffle(distribution);
 		
 		Iterator<String> i = distribution.iterator();
@@ -178,7 +180,7 @@ public class MBTIPersonality implements Serializable {
 	public void setScorePairs() {
 
 		// Add computing the scores
-		scores = new ConcurrentHashMap<Integer, Integer>(4);
+		scores = new HashMap<>(4);
 
 		for (int j = 0; j < 4; j++) {
 
@@ -380,18 +382,18 @@ public class MBTIPersonality implements Serializable {
 		if (p == null) return; // TODO: why getting NPE when loading from a sim ?
 		
 		Collection<Person> localGroup = p.getLocalGroup();
-		PhysicalCondition condition = p.getPhysicalCondition();
+		int groupSize = localGroup.size();
 
-		// Introverts reduce stress when alone.
-		if (isIntrovert() && (localGroup.size() == 0)) {
+		// Introverts reduce stress when alone (just me in group).
+		if (isIntrovert() && (groupSize == 1)) {
 			double solitudeStressModifier = BASE_SOLITUDE_STRESS_MODIFIER * time;
-			condition.setStress(condition.getStress() - solitudeStressModifier);
+			p.getPhysicalCondition().reduceStress(solitudeStressModifier);
 		}
 
-		// Extroverts reduce stress when with company.
-		if (isExtrovert() && (localGroup.size() > 0)) {
+		// Extroverts reduce stress when with company, i.e. mor ethan me
+		if (isExtrovert() && (groupSize > 1)) {
 			double companyStressModifier = BASE_COMPANY_STRESS_MODIFIER * time;
-			condition.setStress(condition.getStress() - companyStressModifier);
+			p.getPhysicalCondition().reduceStress(companyStressModifier);
 		}
 
 	}
@@ -407,55 +409,55 @@ public class MBTIPersonality implements Serializable {
 		
 		// Trait 2 & 3
 		if (value.contains("ST")) {
-			sb.append("Function Lens").append(System.lineSeparator())
+			sb.append(FUNCTION_LENS).append(System.lineSeparator())
 			.append(" ST : Prefer to use proven methods of communication.").append(System.lineSeparator());
 		}
 		else if (value.contains("SF")) {
-			sb.append("Function Lens").append(System.lineSeparator())
+			sb.append(FUNCTION_LENS).append(System.lineSeparator())
 			.append(" SF : Love to share their experience to help others.").append(System.lineSeparator());
 		}
 		else if (value.contains("NF")) {
-			sb.append("Function Lens").append(System.lineSeparator())
+			sb.append(FUNCTION_LENS).append(System.lineSeparator())
 			.append(" NF : Prefer to communicate in creative ways.").append(System.lineSeparator());
 		}
 		else if (value.contains("NT")) {
-			sb.append("Function Lens").append(System.lineSeparator())
+			sb.append(FUNCTION_LENS).append(System.lineSeparator())
 			.append(" NT : Love to debate challenging questions.").append(System.lineSeparator());
 		}
 		
 		// Trait 1 & 2
 		if (value.contains("IS")) {
-			sb.append("Culture Lens").append(System.lineSeparator())
+			sb.append(CULTURE_LENS).append(System.lineSeparator())
 			.append(" IS : Be careful and mindful of details when involved in change.").append(System.lineSeparator());
 		}
 		else if (value.contains("ES")) {
-			sb.append("Culture Lens").append(System.lineSeparator())
+			sb.append(CULTURE_LENS).append(System.lineSeparator())
 			.append(" ES : Love to see and discuss the practical results of change.").append(System.lineSeparator());
 		}
 		else if (value.contains("IN")) {
-			sb.append("Culture Lens").append(System.lineSeparator())
+			sb.append(CULTURE_LENS).append(System.lineSeparator())
 			.append(" IN : Reflect and digest ideas and concepts around the change.").append(System.lineSeparator());
 		}
 		else if (value.contains("EN")) {
-			sb.append("Culture Lens").append(System.lineSeparator())
+			sb.append(CULTURE_LENS).append(System.lineSeparator())
 			.append(" EN : Maximize variety, discuss avenues and implications of change long-term.").append(System.lineSeparator());
 		}
 		
 		// Trait 2 & 4
 		if (value.contains("S") && value.contains("J")) {
-			sb.append("Temperament Lens").append(System.lineSeparator())
+			sb.append(TEMP_LENS).append(System.lineSeparator())
 			.append(" SJ : Value responsibility and loyalty.").append(System.lineSeparator());
 		}
 		else if (value.contains("S") && value.contains("P")) {
-			sb.append("Temperament Lens").append(System.lineSeparator())
+			sb.append(TEMP_LENS).append(System.lineSeparator())
 			.append(" SP : Value cleverness and timeliness.").append(System.lineSeparator());
 		}
 		else if (value.contains("N") && value.contains("P")) {
-			sb.append("Temperament Lens").append(System.lineSeparator())
+			sb.append(TEMP_LENS).append(System.lineSeparator())
 			.append(" NP : Value inspiration and a personal approach.").append(System.lineSeparator());
 		}
 		else if (value.contains("N") && value.contains("J")) {
-			sb.append("Temperament Lens").append(System.lineSeparator())
+			sb.append(TEMP_LENS).append(System.lineSeparator())
 			.append(" NJ : Value ingenuity and logic.").append(System.lineSeparator());
 		}
 		

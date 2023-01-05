@@ -1,23 +1,29 @@
-/**
+/*
  * Mars Simulation Project
  * MartianSolComboBoxModel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-04
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.resupply;
 
 import javax.swing.DefaultComboBoxModel;
 
-import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.MarsClockFormat;
 
 /**
  * A combo box model for Martian sols.
  */
+@SuppressWarnings("serial")
 public class MartianSolComboBoxModel
 extends DefaultComboBoxModel<Integer> {
 
 	/** Data members. */
 	private int maxSolNum;
+
+	// A standard month has 28 sols.
+	// If the month number is divisible by 6, that month has 27 sols.
+	// If that year is leap orbit and the month number is 24, that month has 28 sols.
+	// An orbit has 24 months that can have either 27 or 28 Sols.
 
 	/**
 	 * Constructor.
@@ -25,20 +31,20 @@ extends DefaultComboBoxModel<Integer> {
 	 * @param orbit {@link Integer} the Martian orbit number.
 	 */
 	public MartianSolComboBoxModel(int month, int orbit) {
-		maxSolNum = MarsClock.getSolsInMonth(month, orbit);
-
+		maxSolNum = MarsClockFormat.getSolsInMonth(month, orbit);
 		for (int x = 1; x <= maxSolNum; x++) {
 			addElement(x);
 		}
 	}
 
 	/**
-	 * Update the items based on the number of sols in the month.
+	 * Updates the items based on the number of sols in the month.
+	 * 
 	 * @param month the Martian month number.
 	 * @param orbit the Martian orbit number.
 	 */
 	public void updateSolNumber(int month, int orbit) {
-		int newMaxSolNum = MarsClock.getSolsInMonth(month, orbit);
+		int newMaxSolNum = MarsClockFormat.getSolsInMonth(month, orbit);
 		if (newMaxSolNum != maxSolNum) {
 			int oldSelectedSol = (Integer) getSelectedItem();
 

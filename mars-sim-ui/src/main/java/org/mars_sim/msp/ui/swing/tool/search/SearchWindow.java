@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * SearchWindow.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-28
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.search;
@@ -18,6 +18,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.logging.Logger;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JList;
@@ -28,8 +29,7 @@ import javax.swing.event.DocumentListener;
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.UnitManagerEvent;
-import org.mars_sim.msp.core.UnitManagerListener;
+import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -40,7 +40,7 @@ import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.navigator.NavigatorWindow;
 import org.mars_sim.msp.ui.swing.tool.settlement.SettlementMapPanel;
 import org.mars_sim.msp.ui.swing.tool.settlement.SettlementWindow;
-import org.mars_sim.msp.ui.swing.toolWindow.ToolWindow;
+import org.mars_sim.msp.ui.swing.toolwindow.ToolWindow;
 
 import com.alee.laf.button.WebButton;
 import com.alee.laf.checkbox.WebCheckBox;
@@ -56,7 +56,9 @@ import com.alee.laf.text.WebTextField;
 @SuppressWarnings("serial")
 public class SearchWindow
 extends ToolWindow {
-
+	
+	private static final Logger logger = Logger.getLogger(SearchWindow.class.getName());
+	
 	/** Tool name. */
 	public static final String NAME = Msg.getString("SearchWindow.title"); //$NON-NLS-1$
 
@@ -115,6 +117,8 @@ extends ToolWindow {
 	/** Button to execute the search of the selected unit. */
 	private WebButton searchButton;
 
+	private UnitManager unitManager;
+
 	/**
 	 * Constructor.
 	 * @param desktop {@link MainDesktopPane} the desktop pane
@@ -123,9 +127,8 @@ extends ToolWindow {
 
 		// Use ToolWindow constructor
 		super(NAME, desktop);
-
-//		mapPanel = desktop.getSettlementWindow().getMapPanel();
-		
+		unitManager = desktop.getSimulation().getUnitManager();
+	
 		// Initialize locks
 		lockUnitList = false;
 		lockSearchText = false;
@@ -174,7 +177,9 @@ extends ToolWindow {
 		// Create select text field
 		selectTextField = new WebTextField();
 		selectTextField.getDocument().addDocumentListener(new DocumentListener() {
-			public void changedUpdate(DocumentEvent event) {}
+			public void changedUpdate(DocumentEvent event) {
+				// Not needed
+			}
 			public void insertUpdate(DocumentEvent event) {
 				searchTextChange();
 				searchButton.setEnabled(true);
@@ -188,9 +193,10 @@ extends ToolWindow {
 
 		// Create unit list
 		unitListModel = new UnitListModel(UnitCategory.PEOPLE);
-		unitList = new JList<Unit>(unitListModel);
+		unitList = new JList<>(unitListModel);
 		unitList.setSelectedIndex(0);
 		unitList.addMouseListener(new MouseAdapter() {
+			@Override
 			public void mouseReleased(MouseEvent event) {
 				if (event.getClickCount() == 2) search();
 				else if (!lockUnitList) {
@@ -257,7 +263,6 @@ extends ToolWindow {
 	private void search() {
 		Collection<? extends Unit> units = null;
 		String category = (String) searchForSelect.getSelectedItem();
-//		UnitManager unitManager = Simulation.instance().getUnitManager();
 		if (category.equals(UnitCategory.PEOPLE.getName())) {
 			Collection<Person> people = unitManager.getPeople();
 			units = CollectionUtils.sortByName(people);
@@ -354,8 +359,6 @@ extends ToolWindow {
 	}
 	
 	public void showPersonRobot(Unit u) {
-//		Settlement s = u.findSettlementVicinity();
-
 		// person just happens to step outside the settlement at its
 		// vicinity temporarily
 
@@ -364,8 +367,8 @@ extends ToolWindow {
 		if (u instanceof Person) {
 			Person p = (Person) u;
 			
-			double xLoc = p.getXLocation();
-			double yLoc = p.getYLocation();
+			double xLoc = p.getPosition().getX();
+			double yLoc = p.getPosition().getY();
 			double scale = mapPanel.getScale();
 			mapPanel.reCenter();
 			mapPanel.moveCenter(xLoc * scale, yLoc * scale);
@@ -374,11 +377,11 @@ extends ToolWindow {
 				mapPanel.displayPerson(p);
 		} 
 		
-		else if (u instanceof Robot) {
+		else { 
 			Robot r = (Robot) u;
 			
-			double xLoc = r.getXLocation();
-			double yLoc = r.getYLocation();
+			double xLoc = r.getPosition().getX();
+			double yLoc = r.getPosition().getY();
 			double scale = mapPanel.getScale();
 			mapPanel.reCenter();
 			mapPanel.moveCenter(xLoc * scale, yLoc * scale);
@@ -415,7 +418,7 @@ extends ToolWindow {
 			int fitIndex = 0;
 			boolean goodFit = false;
 			for (int x = unitListModel.size() - 1; x > -1; x--) {
-				Unit unit = (Unit) unitListModel.elementAt(x);
+				Unit unit = unitListModel.elementAt(x);
 				String unitString = unit.getName().toLowerCase();
 				if (unitString.startsWith(searchText)) {
 					fitIndex = x;
@@ -435,11 +438,10 @@ extends ToolWindow {
 	}
 
 	@Override
-	public void destroy() {} {
-
+	public void destroy() {
+		super.destroy();
+		
 		if (unitListModel != null) {
-//			UnitManager manager = Simulation.instance().getUnitManager();
-			unitManager.removeUnitManagerListener(unitListModel);
 			unitListModel.clear();
 			unitListModel = null;
 		}
@@ -449,12 +451,8 @@ extends ToolWindow {
 	 * Inner class list model for categorized units.
 	 */
 	private class UnitListModel
-	extends DefaultListModel<Unit>
-	implements UnitManagerListener {
+	extends DefaultListModel<Unit> {
 
-		/**
-		 *
-		 */
 		private static final long serialVersionUID = 1L;
 		// Data members.
 		private UnitCategory category;
@@ -472,9 +470,6 @@ extends ToolWindow {
 			this.category = initialCategory;
 
 			updateList();
-
-			// Add model as unit manager listener.
-			unitManager.addUnitManagerListener(this);
 		}
 
 		/**
@@ -497,22 +492,10 @@ extends ToolWindow {
 			clear();
 
 			Collection<? extends Unit> units = null;
-//			UnitManager unitManager = unitManager;
-			if (category.equals(UnitCategory.PEOPLE)) {
 
-				if (unitManager.getTotalNumPeople() == 0) {
-					Thread.yield();
-					try {
-						Thread.sleep(2L);
-					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-				}
-				else {
-					Collection<Person> people = unitManager.getPeople();
-					units = CollectionUtils.sortByName(people);
-				}
+			if (category.equals(UnitCategory.PEOPLE)) {
+				Collection<Person> people = unitManager.getPeople();
+				units = CollectionUtils.sortByName(people);
 			}
 			else if (category.equals(UnitCategory.SETTLEMENTS)) {
 				Collection<Settlement> settlement = unitManager.getSettlements();
@@ -534,25 +517,6 @@ extends ToolWindow {
 					addElement(unitI.next());
 				}
 			}
-		}
-
-		@Override
-		public void unitManagerUpdate(UnitManagerEvent event) {
-
-			Unit selectedUnit = (Unit) unitList.getSelectedValue();
-			lockUnitList = true;
-
-			updateList();
-
-			if (selectedUnit != null) {
-				int index = indexOf(selectedUnit);
-				if (index >= 0) {
-					unitList.setSelectedIndex(index);
-					unitList.ensureIndexIsVisible(index);
-				}
-			}
-
-			lockUnitList = false;
 		}
 	}
 }

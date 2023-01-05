@@ -1,12 +1,10 @@
 /**
  * Mars Simulation Project
  * WindPowerSource.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
-
-import java.io.Serializable;
 
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -16,9 +14,7 @@ import org.mars_sim.msp.core.structure.building.Building;
  * Assume each Vertical Axis Wind Turbine (VAWT) is capable of provides 
  * up to 2 kW of power if the wind speed is as much as 20 m/s.	
  */
-public class WindPowerSource
-extends PowerSource
-implements Serializable {
+public class WindPowerSource extends PowerSource {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;

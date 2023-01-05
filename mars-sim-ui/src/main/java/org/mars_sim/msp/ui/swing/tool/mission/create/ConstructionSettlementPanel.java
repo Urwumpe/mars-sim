@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ConstructionSettlementPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-10-21
  * @author Scott Davis
  */
 
@@ -28,16 +28,16 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.mars_sim.msp.core.CollectionUtils;
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.equipment.EVASuit;
+import org.mars_sim.msp.core.equipment.EquipmentType;
 import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
+import org.mars_sim.msp.core.vehicle.VehicleType;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 /**
  * A wizard panel for selecting the mission's construction settlement.
  */
+@SuppressWarnings("serial")
 class ConstructionSettlementPanel extends WizardPanel {
 
 	/** The wizard panel name. */
@@ -202,7 +202,6 @@ class ConstructionSettlementPanel extends WizardPanel {
             if (row < units.size()) {
                 try {
                     Settlement settlement = (Settlement) getUnit(row);
-                    Inventory inv = settlement.getInventory();
                     if (column == 0) 
                         result = settlement.getName();
                     else if (column == 1) 
@@ -212,9 +211,9 @@ class ConstructionSettlementPanel extends WizardPanel {
                         result = numSites;
                     }
                     else if (column == 3) 
-                        result = inv.findNumUnitsOfClass(LightUtilityVehicle.class);
+                        result = settlement.findNumVehiclesOfType(VehicleType.LUV);
                     else if (column == 4) 
-                        result = inv.findNumUnitsOfClass(EVASuit.class);
+                        result = settlement.findNumContainersOfType(EquipmentType.EVA_SUIT);
                 }
                 catch (Exception e) {}
             }

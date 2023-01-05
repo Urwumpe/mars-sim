@@ -1,12 +1,11 @@
-/**
+/*
  * Mars Simulation Project
  * MedicalCare.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import java.io.Serializable;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -14,7 +13,7 @@ import java.util.List;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.task.RequestMedicalTreatment;
 import org.mars_sim.msp.core.person.ai.task.TreatMedicalPatient;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.MedicalAid;
 import org.mars_sim.msp.core.person.health.MedicalStation;
@@ -22,64 +21,59 @@ import org.mars_sim.msp.core.person.health.Treatment;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingException;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
 
 /**
  * The MedicalCare class represents a building function for providing medical
  * care.
  */
-public class MedicalCare extends Function implements MedicalAid, Serializable {
+public class MedicalCare extends Function implements MedicalAid {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	private MedicalStation medicalStation;
 
-
 	/**
 	 * Constructor.
 	 * 
 	 * @param building the building this function is for.
+	 * @param spec Specification of Function
 	 * @throws BuildingException if function could not be constructed.
 	 */
-	public MedicalCare(Building building) {
+	public MedicalCare(Building building, FunctionSpec spec) {
 		// Use Function constructor.
-		super(FunctionType.MEDICAL_CARE, building);
+		super(FunctionType.MEDICAL_CARE, spec, building);
 
-		int techLevel = buildingConfig.getMedicalCareTechLevel(building.getBuildingType());
-		int beds = buildingConfig.getMedicalCareBeds(building.getBuildingType());
-		medicalStation = new MedicalStation(techLevel, beds);
-		medicalStation.setBuilding(building);
+		int techLevel = spec.getTechLevel();
+		int beds = spec.getCapacity();
+		medicalStation = new MedicalStation(building.getName(), techLevel, beds);
 
-		// Load activity spots
-		loadActivitySpots(buildingConfig.getMedicalCareActivitySpots(building.getBuildingType()));
-		// TODO: need to distinguish between activity spots and bed locations
-		// Load bed locations
-		loadBedLocations(buildingConfig.getMedicalCareBedLocations(building.getBuildingType()));
+		// NOTE: will need to distinguish between activity spots and bed locations
+		// Load bed locations by loadBedLocations(buildingConfig.getMedicalCareBedLocations(building.getBuildingType()))
 	}
 
 	/**
-	 * Gets the value of the function for a named building.
+	 * Gets the value of the function for a named building type.
 	 * 
-	 * @param buildingName the building name.
+	 * @param type the building type.
 	 * @param newBuilding  true if adding a new building.
 	 * @param settlement   the settlement.
 	 * @return value (VP) of building function.
 	 * @throws Exception if error getting function value.
 	 */
-	public static double getFunctionValue(String buildingName, boolean newBuilding, Settlement settlement) {
+	public static double getFunctionValue(String type, boolean newBuilding, Settlement settlement) {
 
 		// Demand is 5 medical points per inhabitant.
 		double demand = settlement.getNumCitizens() * 5D;
 
 		double supply = 0D;
 		boolean removedBuilding = false;
-		Iterator<Building> i = settlement.getBuildingManager().getBuildings(FunctionType.MEDICAL_CARE).iterator();
-		while (i.hasNext()) {
-			Building building = i.next();
-			if (!newBuilding && building.getBuildingType().equalsIgnoreCase(buildingName) && !removedBuilding) {
+		for(Building building : settlement.getBuildingManager().getBuildings(FunctionType.MEDICAL_CARE)) {
+			if (!newBuilding && building.getBuildingType().equalsIgnoreCase(type) && !removedBuilding) {
 				removedBuilding = true;
 			} else {
-				MedicalCare medFunction = building.getMedical();// (MedicalCare) building.getFunction(FUNCTION);
+				MedicalCare medFunction = building.getMedical();
 				double tech = medFunction.getTechLevel();
 				double beds = medFunction.getSickBedNum();
 				double wearModifier = (building.getMalfunctionManager().getWearCondition() / 100D) * .75D + .25D;
@@ -89,10 +83,9 @@ public class MedicalCare extends Function implements MedicalAid, Serializable {
 
 		double medicalPointValue = demand / (supply + 1D) / 10D;
 
-		// BuildingConfig config =
-		// SimulationConfig.instance().getBuildingConfiguration();
-		double tech = buildingConfig.getMedicalCareTechLevel(buildingName);
-		double beds = buildingConfig.getMedicalCareBeds(buildingName);
+		FunctionSpec fSpec = buildingConfig.getFunctionSpec(type, FunctionType.MEDICAL_CARE);
+		double tech = fSpec.getTechLevel();
+		double beds = fSpec.getCapacity();
 		double medicalPoints = (tech * tech) * beds;
 
 		return medicalPoints * medicalPointValue;
@@ -122,10 +115,7 @@ public class MedicalCare extends Function implements MedicalAid, Serializable {
 	 * @return true or false
 	 */
 	public boolean hasEmptyBeds() {
-		if (getPatientNum() < getSickBedNum())
-			return true;
-		else
-			return false;
+        return getPatientNum() < getSickBedNum();
 	}
 	
 	/**
@@ -150,8 +140,6 @@ public class MedicalCare extends Function implements MedicalAid, Serializable {
 			Iterator<Person> i = lifeSupport.getOccupants().iterator();
 			while (i.hasNext()) {
 				Task task = i.next().getMind().getTaskManager().getTask();
-//					if (task instanceof MedicalAssistance) {
-//						MedicalAid aid = ((MedicalAssistance) task).getMedicalAid();
 				if (task instanceof TreatMedicalPatient) {
 					MedicalAid aid = ((TreatMedicalPatient) task).getMedicalAid();						
 					if ((aid != null) && (aid == this))
@@ -234,12 +222,9 @@ public class MedicalCare extends Function implements MedicalAid, Serializable {
 
 	@Override
 	public double getMaintenanceTime() {
-
 		double result = 0D;
-
 		// Add maintenance for treatment level.
 		result += medicalStation.getTreatmentLevel() * 10D;
-
 		// Add maintenance for number of sick beds.
 		result += medicalStation.getSickBedNum() * 10D;
 

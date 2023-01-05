@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * UIConfig.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-28
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing;
@@ -11,7 +11,7 @@ import java.awt.Point;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -19,19 +19,20 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.swing.JFrame;
 import javax.swing.JInternalFrame;
 
-import org.apache.commons.io.IOUtils;
-import org.jdom2.DocType;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.input.SAXBuilder;
 import org.jdom2.output.Format;
 import org.jdom2.output.XMLOutputter;
-import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.SimulationFiles;
 import org.mars_sim.msp.ui.swing.sound.AudioPlayer;
-import org.mars_sim.msp.ui.swing.toolWindow.ToolWindow;
+import org.mars_sim.msp.ui.swing.toolwindow.ToolWindow;
 import org.mars_sim.msp.ui.swing.unit_window.UnitWindow;
+
+import com.google.common.base.Charsets;
 
 /**
  * Static class for saving/loading user interface configuration data.
@@ -39,23 +40,15 @@ import org.mars_sim.msp.ui.swing.unit_window.UnitWindow;
 public class UIConfig {
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(UIConfig.class.getName());
+	private static final Logger logger = Logger.getLogger(UIConfig.class.getName());
 
 	/** Singleton instance. */
 	public static final UIConfig INSTANCE = new UIConfig();
 
 	/** Internal window types. */
 	public static final String TOOL = "tool";
-
 	public static final String UNIT = "unit";
-
-	/** Config filename. */
-//	private static final String DIRECTORY = System.getProperty("user.home") + File.separator + ".mars-sim"
-//			+ File.separator + "saved";
-
 	private static final String FILE_NAME = "ui_settings.xml";
-
-	private static final String FILE_NAME_DTD = "ui_settings.dtd";
 
 	// UI config elements and attributes.
 	private static final String UI = "ui";
@@ -77,7 +70,7 @@ public class UIConfig {
 	private static final String DISPLAY = "display";
 	private static final String Z_ORDER = "z-order";
 
-	private Document configDoc;
+	private Element root;
 
 	private MainDesktopPane desktop;
 
@@ -91,137 +84,133 @@ public class UIConfig {
 	 * Loads and parses the XML save file.
 	 */
 	public void parseFile() {
-		File configFile = new File(Simulation.SAVE_DIR, FILE_NAME);
+		File configFile = new File(SimulationFiles.getSaveDir(), FILE_NAME);
 		if (configFile.exists()) {
 
 		    SAXBuilder builder = new SAXBuilder();
-	
+		    // In order to get rid of the XMLConstants.ACCESS_EXTERNAL_DTD as well
+		    // Need to switch to using internal DTD first
+		    // Gets rid of ACCESS_EXTERNAL_SCHEMA
+		    builder.setProperty(javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD, "");
+		    // Gets rid of ACCESS_EXTERNAL_SCHEMA
+		    builder.setProperty(javax.xml.XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
 		    try  {
-		    	configDoc = builder.build(new File(Simulation.SAVE_DIR, FILE_NAME));
+		    	Document configDoc = builder.build(new File(SimulationFiles.getSaveDir(), FILE_NAME));
+		    	root = configDoc.getRootElement();
 		    }
 		    catch (Exception e) {
-		        e.printStackTrace();
+				logger.log(Level.SEVERE, "Cannot parse " + FILE_NAME + " : " + e.getMessage());
 		    }
 		}
 	}
-	
+
 	/**
 	 * Creates an XML document for the UI configuration and saves it to a file.
-	 * 
+	 *
 	 * @param mainWindow the main window.
 	 */
 	public void saveFile(MainWindow mainWindow) {
 		desktop = mainWindow.getDesktop();
-		
-		File configFile = new File(Simulation.SAVE_DIR, FILE_NAME);
+
+		File configFile = new File(SimulationFiles.getSaveDir(), FILE_NAME);
 
 		// Create save directory if it doesn't exist.
 		if (!configFile.getParentFile().exists()) {
 			configFile.getParentFile().mkdirs();
-			logger.config(Simulation.SAVE_DIR + " created successfully"); 
+			logger.config(SimulationFiles.getSaveDir() + " created successfully");
 		}
-		
+
 		else {
 
 			try {
 				if (Files.deleteIfExists(configFile.toPath())) {
-				    logger.config("previous ui_settings.xml deleted."); 
-				} 
-				else { 
-					logger.config("Can't delete ui_settings.xml since it's not found."); 
+				    logger.config("Previous ui_settings.xml deleted.");
+				}
+				else {
+					logger.config("Can't delete ui_settings.xml since it's not found.");
 				}
 			} catch (IOException e) {
-				e.printStackTrace();
+				logger.config("Can't delete ui_settings.xml: " + e.getMessage());
 			}
 
 		}
-		
-		if (!configFile.exists()) {
-			
-			FileOutputStream stream = null;
 
-			try {
-				Document outputDoc = new Document();
-				DocType dtd = new DocType(UI, Simulation.SAVE_DIR + File.separator + FILE_NAME_DTD);
-				outputDoc.setDocType(dtd);
+		Document outputDoc = new Document();
 
-				Element uiElement = new Element(UI);
-//				outputDoc.removeContent();
-//				outputDoc.addContent(uiElement);
-				outputDoc.setRootElement(uiElement);
+		Element uiElement = new Element(UI);
+		outputDoc.setRootElement(uiElement);
 
-				uiElement.setAttribute(USE_DEFAULT, "false"); 
-				// FIXME lechimp 10/9/13: why is this always set to false upon save?
-				uiElement.setAttribute(SHOW_TOOL_BAR, Boolean.toString(mainWindow.getToolToolBar().isVisible()));
-				uiElement.setAttribute(SHOW_UNIT_BAR, Boolean.toString(mainWindow.getUnitToolBar().isVisible()));
+		uiElement.setAttribute(USE_DEFAULT, "false");
+		uiElement.setAttribute(SHOW_TOOL_BAR, Boolean.toString(mainWindow.getToolToolBar().isVisible()));
+		uiElement.setAttribute(SHOW_UNIT_BAR, Boolean.toString(mainWindow.getUnitToolBar().isVisible()));
 
-				Element mainWindowElement = new Element(MAIN_WINDOW);
-				uiElement.addContent(mainWindowElement);
+		Element mainWindowElement = new Element(MAIN_WINDOW);
+		uiElement.addContent(mainWindowElement);
 
-				mainWindowElement.setAttribute(LOCATION_X, Integer.toString(mainWindow.getFrame().getX()));
-				mainWindowElement.setAttribute(LOCATION_Y, Integer.toString(mainWindow.getFrame().getY()));
-				mainWindowElement.setAttribute(WIDTH, Integer.toString(mainWindow.getFrame().getWidth()));
-				mainWindowElement.setAttribute(HEIGHT, Integer.toString(mainWindow.getFrame().getHeight()));
+		JFrame realWindow = mainWindow.getFrame();
+		mainWindowElement.setAttribute(LOCATION_X, Integer.toString(realWindow.getX()));
+		mainWindowElement.setAttribute(LOCATION_Y, Integer.toString(realWindow.getY()));
 
-				Element volumeElement = new Element(VOLUME);
-				uiElement.addContent(volumeElement);
+		// Get the real display size
+		mainWindowElement.setAttribute(WIDTH, Integer.toString(realWindow.getWidth()));
+		mainWindowElement.setAttribute(HEIGHT, Integer.toString(realWindow.getHeight()));
 
-				AudioPlayer player = desktop.getSoundPlayer();
-				volumeElement.setAttribute(SOUND, Double.toString(player.getMusicVolume()));
-				volumeElement.setAttribute(SOUND, Double.toString(player.getEffectVolume()));
-				volumeElement.setAttribute(MUTE, Boolean.toString(player.isMusicMute()));
-				volumeElement.setAttribute(MUTE, Boolean.toString(player.isSoundMute()));
+		Element volumeElement = new Element(VOLUME);
+		uiElement.addContent(volumeElement);
 
-				Element internalWindowsElement = new Element(INTERNAL_WINDOWS);
-				uiElement.addContent(internalWindowsElement);
+		AudioPlayer player = desktop.getSoundPlayer();
+		volumeElement.setAttribute(SOUND, Double.toString(player.getMusicVolume()));
+		volumeElement.setAttribute(SOUND, Double.toString(player.getEffectVolume()));
+		volumeElement.setAttribute(MUTE, Boolean.toString(AudioPlayer.isMusicMute()));
+		volumeElement.setAttribute(MUTE, Boolean.toString(AudioPlayer.isEffectMute()));
 
-				// Add all internal windows.
-				JInternalFrame[] windows = desktop.getAllFrames();
-				for (JInternalFrame window1 : windows) {
-					if (window1.isVisible() || window1.isIcon()) {
-						Element windowElement = new Element(WINDOW);
-						internalWindowsElement.addContent(windowElement);
+		Element internalWindowsElement = new Element(INTERNAL_WINDOWS);
+		uiElement.addContent(internalWindowsElement);
 
-						windowElement.setAttribute(Z_ORDER, Integer.toString(desktop.getComponentZOrder(window1)));
-						windowElement.setAttribute(LOCATION_X, Integer.toString(window1.getX()));
-						windowElement.setAttribute(LOCATION_Y, Integer.toString(window1.getY()));
-						windowElement.setAttribute(WIDTH, Integer.toString(window1.getWidth()));
-						windowElement.setAttribute(HEIGHT, Integer.toString(window1.getHeight()));
-						windowElement.setAttribute(DISPLAY, Boolean.toString(!window1.isIcon()));
+		// Add all internal windows.
+		JInternalFrame[] windows = desktop.getAllFrames();
+		for (JInternalFrame window1 : windows) {
+			if (window1.isVisible() || window1.isIcon()) {
+				Element windowElement = new Element(WINDOW);
+				internalWindowsElement.addContent(windowElement);
 
-						if (window1 instanceof ToolWindow) {
-							windowElement.setAttribute(TYPE, TOOL);
-							windowElement.setAttribute(NAME, ((ToolWindow) window1).getToolName());
-						} else if (window1 instanceof UnitWindow) {
-							windowElement.setAttribute(TYPE, UNIT);
-							windowElement.setAttribute(NAME, ((UnitWindow) window1).getUnit().getName());
-						} else {
-							windowElement.setAttribute(TYPE, "other");
-							windowElement.setAttribute(NAME, "other");
-						}
-					}
+				windowElement.setAttribute(Z_ORDER, Integer.toString(desktop.getComponentZOrder(window1)));
+				windowElement.setAttribute(LOCATION_X, Integer.toString(window1.getX()));
+				windowElement.setAttribute(LOCATION_Y, Integer.toString(window1.getY()));
+				windowElement.setAttribute(WIDTH, Integer.toString(window1.getWidth()));
+				windowElement.setAttribute(HEIGHT, Integer.toString(window1.getHeight()));
+				windowElement.setAttribute(DISPLAY, Boolean.toString(!window1.isIcon()));
+
+				if (window1 instanceof ToolWindow) {
+					windowElement.setAttribute(TYPE, TOOL);
+					windowElement.setAttribute(NAME, ((ToolWindow) window1).getToolName());
+				} else if (window1 instanceof UnitWindow) {
+					windowElement.setAttribute(TYPE, UNIT);
+					windowElement.setAttribute(NAME, ((UnitWindow) window1).getUnit().getName());
+				} else {
+					windowElement.setAttribute(TYPE, "other");
+					windowElement.setAttribute(NAME, "other");
 				}
-
-				// Copy /dtd/ui_settings.dtd resource to save directory.
-				// Always do this as we don't know when the local saved dtd file is out of date.
-				InputStream in = getClass().getResourceAsStream("/dtd/" + FILE_NAME_DTD);
-				IOUtils.copy(in, new FileOutputStream(new File(Simulation.SAVE_DIR, FILE_NAME_DTD)));
-
-				XMLOutputter fmt = new XMLOutputter();
-				fmt.setFormat(Format.getPrettyFormat());
-				stream = new FileOutputStream(configFile);
-				
-//					 bug 2909888: read the inputstream with a specific encoding instead of the
-//					 system default.
-				 
-				OutputStreamWriter writer = new OutputStreamWriter(stream, "UTF-8");
-				fmt.output(outputDoc, writer);
-			    logger.config("Saving new ui_settings.xml."); 
-			} catch (Exception e) {
-				logger.log(Level.SEVERE, e.getMessage());
-			} finally {
-				IOUtils.closeQuietly(stream);
 			}
+		}
+
+		// Load the DTD scheme from the ui_settings.dtd file
+		try (
+
+			OutputStream out = new FileOutputStream(new File(SimulationFiles.getSaveDir(), FILE_NAME));
+			OutputStream stream = new FileOutputStream(configFile)) {
+
+			XMLOutputter fmt = new XMLOutputter();
+			fmt.setFormat(Format.getPrettyFormat());
+
+			OutputStreamWriter writer = new OutputStreamWriter(stream, Charsets.UTF_8);
+
+			fmt.output(outputDoc, writer);
+
+		    logger.config("Current window settings saved.");
+
+		} catch (Exception e) {
+			logger.log(Level.SEVERE, e.getMessage());
 		}
 	}
 
@@ -233,10 +222,9 @@ public class UIConfig {
 	 */
 	public boolean useUIDefault() {
 		try {
-			if (configDoc == null) {
+			if (root == null) {
 				return true;
 			}
-			Element root = configDoc.getRootElement();
 			return Boolean.parseBoolean(root.getAttributeValue(USE_DEFAULT));
 		} catch (Exception e) {
 			return true;
@@ -250,10 +238,9 @@ public class UIConfig {
 	 */
 	public boolean showToolBar() {
 		try {
-			if (configDoc == null) {
+			if (root == null) {
 				return true;
 			}
-			Element root = configDoc.getRootElement();
 			return Boolean.parseBoolean(root.getAttributeValue(SHOW_TOOL_BAR));
 		} catch (Exception e) {
 			return true;
@@ -267,10 +254,9 @@ public class UIConfig {
 	 */
 	public boolean showUnitBar() {
 		try {
-			if (configDoc == null) {
+			if (root == null) {
 				return true;
 			}
-			Element root = configDoc.getRootElement();
 			return Boolean.parseBoolean(root.getAttributeValue(SHOW_UNIT_BAR));
 		} catch (Exception e) {
 			return true;
@@ -283,8 +269,11 @@ public class UIConfig {
 	 * @return location.
 	 */
 	public Point getMainWindowLocation() {
+		if (root == null) {
+			return new Point(0, 0);
+		}
+
 		try {
-			Element root = configDoc.getRootElement();
 			Element mainWindow = root.getChild(MAIN_WINDOW);
 			int x = Integer.parseInt(mainWindow.getAttributeValue(LOCATION_X));
 			int y = Integer.parseInt(mainWindow.getAttributeValue(LOCATION_Y));
@@ -301,7 +290,6 @@ public class UIConfig {
 	 */
 	public Dimension getMainWindowDimension() {
 		try {
-			Element root = configDoc.getRootElement();
 			Element mainWindow = root.getChild(MAIN_WINDOW);
 			int width = Integer.parseInt(mainWindow.getAttributeValue(WIDTH));
 			int height = Integer.parseInt(mainWindow.getAttributeValue(HEIGHT));
@@ -318,7 +306,6 @@ public class UIConfig {
 	 */
 	public double getVolume() {
 		try {
-			Element root = configDoc.getRootElement();
 			Element volume = root.getChild(VOLUME);
 			return Double.parseDouble(volume.getAttributeValue(SOUND));
 		} catch (Exception e) {
@@ -333,7 +320,6 @@ public class UIConfig {
 	 */
 	public boolean isMute() {
 		try {
-			Element root = configDoc.getRootElement();
 			Element volume = root.getChild(VOLUME);
 			return Boolean.parseBoolean(volume.getAttributeValue(MUTE));
 		} catch (Exception e) {
@@ -349,18 +335,14 @@ public class UIConfig {
 	 */
 	public boolean isInternalWindowDisplayed(String windowName) {
 		try {
-			Element root = configDoc.getRootElement();
 			Element internalWindows = root.getChild(INTERNAL_WINDOWS);
 			List<Element> internalWindowNodes = internalWindows.getChildren();
 			boolean result = false;
-			for (Object element : internalWindowNodes) {
-				if (element instanceof Element) {
-					Element internalWindow = (Element) element;
-					String name = internalWindow.getAttributeValue(NAME);
-					if (name.equals(windowName)) {
-						result = Boolean.parseBoolean(internalWindow.getAttributeValue(DISPLAY));
-						break;
-					}
+			for (Element internalWindow : internalWindowNodes) {
+				String name = internalWindow.getAttributeValue(NAME);
+				if (name.equals(windowName)) {
+					result = Boolean.parseBoolean(internalWindow.getAttributeValue(DISPLAY));
+					break;
 				}
 			}
 			return result;
@@ -377,19 +359,15 @@ public class UIConfig {
 	 */
 	public Point getInternalWindowLocation(String windowName) {
 		try {
-			Element root = configDoc.getRootElement();
 			Element internalWindows = root.getChild(INTERNAL_WINDOWS);
 			List<Element> internalWindowNodes = internalWindows.getChildren();
 			Point result = new Point(0, 0);
-			for (Object element : internalWindowNodes) {
-				if (element instanceof Element) {
-					Element internalWindow = (Element) element;
-					String name = internalWindow.getAttributeValue(NAME);
-					if (name.equals(windowName)) {
-						int locationX = Integer.parseInt(internalWindow.getAttributeValue(LOCATION_X));
-						int locationY = Integer.parseInt(internalWindow.getAttributeValue(LOCATION_Y));
-						result.setLocation(locationX, locationY);
-					}
+			for (Element internalWindow : internalWindowNodes) {
+				String name = internalWindow.getAttributeValue(NAME);
+				if (name.equals(windowName)) {
+					int locationX = Integer.parseInt(internalWindow.getAttributeValue(LOCATION_X));
+					int locationY = Integer.parseInt(internalWindow.getAttributeValue(LOCATION_Y));
+					result.setLocation(locationX, locationY);
 				}
 			}
 			return result;
@@ -406,17 +384,13 @@ public class UIConfig {
 	 */
 	public int getInternalWindowZOrder(String windowName) {
 		try {
-			Element root = configDoc.getRootElement();
 			Element internalWindows = root.getChild(INTERNAL_WINDOWS);
 			List<Element> internalWindowNodes = internalWindows.getChildren();
 			int result = -1;
-			for (Object element : internalWindowNodes) {
-				if (element instanceof Element) {
-					Element internalWindow = (Element) element;
-					String name = internalWindow.getAttributeValue(NAME);
-					if (name.equals(windowName))
-						result = Integer.parseInt(internalWindow.getAttributeValue(Z_ORDER));
-				}
+			for (Element internalWindow : internalWindowNodes) {
+				String name = internalWindow.getAttributeValue(NAME);
+				if (name.equals(windowName))
+					result = Integer.parseInt(internalWindow.getAttributeValue(Z_ORDER));
 			}
 			return result;
 		} catch (Exception e) {
@@ -432,19 +406,15 @@ public class UIConfig {
 	 */
 	public Dimension getInternalWindowDimension(String windowName) {
 		try {
-			Element root = configDoc.getRootElement();
 			Element internalWindows = root.getChild(INTERNAL_WINDOWS);
 			List<Element> internalWindowNodes = internalWindows.getChildren();
 			Dimension result = new Dimension(0, 0);
-			for (Object element : internalWindowNodes) {
-				if (element instanceof Element) {
-					Element internalWindow = (Element) element;
-					String name = internalWindow.getAttributeValue(NAME);
-					if (name.equals(windowName)) {
-						int width = Integer.parseInt(internalWindow.getAttributeValue(WIDTH));
-						int height = Integer.parseInt(internalWindow.getAttributeValue(HEIGHT));
-						result = new Dimension(width, height);
-					}
+			for (Element internalWindow : internalWindowNodes) {
+				String name = internalWindow.getAttributeValue(NAME);
+				if (name.equals(windowName)) {
+					int width = Integer.parseInt(internalWindow.getAttributeValue(WIDTH));
+					int height = Integer.parseInt(internalWindow.getAttributeValue(HEIGHT));
+					result = new Dimension(width, height);
 				}
 			}
 			return result;
@@ -461,17 +431,13 @@ public class UIConfig {
 	 */
 	public String getInternalWindowType(String windowName) {
 		try {
-			Element root = configDoc.getRootElement();
 			Element internalWindows = root.getChild(INTERNAL_WINDOWS);
 			List<Element> internalWindowNodes = internalWindows.getChildren();
 			String result = "";
-			for (Object element : internalWindowNodes) {
-				if (element instanceof Element) {
-					Element internalWindow = (Element) element;
-					String name = internalWindow.getAttributeValue(NAME);
-					if (name.equals(windowName))
-						result = internalWindow.getAttributeValue(TYPE);
-				}
+			for (Element internalWindow : internalWindowNodes) {
+				String name = internalWindow.getAttributeValue(NAME);
+				if (name.equals(windowName))
+					result = internalWindow.getAttributeValue(TYPE);
 			}
 			return result;
 		} catch (Exception e) {
@@ -487,17 +453,16 @@ public class UIConfig {
 	 */
 	public boolean isInternalWindowConfigured(String windowName) {
 		try {
-			Element root = configDoc.getRootElement();
+			if (root == null) {
+				return false;
+			}
 			Element internalWindows = root.getChild(INTERNAL_WINDOWS);
 			List<Element> internalWindowNodes = internalWindows.getChildren();
 			boolean result = false;
-			for (Object element : internalWindowNodes) {
-				if (element instanceof Element) {
-					Element internalWindow = (Element) element;
-					String name = internalWindow.getAttributeValue(NAME);
-					if (name.equals(windowName))
-						result = true;
-				}
+			for (Element internalWindow : internalWindowNodes) {
+				String name = internalWindow.getAttributeValue(NAME);
+				if (name.equals(windowName))
+					result = true;
 			}
 			return result;
 		} catch (Exception e) {
@@ -513,14 +478,10 @@ public class UIConfig {
 	public List<String> getInternalWindowNames() {
 		List<String> result = new ArrayList<String>();
 		try {
-			Element root = configDoc.getRootElement();
 			Element internalWindows = root.getChild(INTERNAL_WINDOWS);
 			List<Element> internalWindowNodes = internalWindows.getChildren();
-			for (Object element : internalWindowNodes) {
-				if (element instanceof Element) {
-					Element internalWindow = (Element) element;
-					result.add(internalWindow.getAttributeValue(NAME));
-				}
+			for (Element internalWindow : internalWindowNodes) {
+				result.add(internalWindow.getAttributeValue(NAME));
 			}
 			return result;
 		} catch (Exception e) {

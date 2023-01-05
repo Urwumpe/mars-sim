@@ -1,47 +1,54 @@
 /**
  * Mars Simulation Project
  * Management.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import java.io.Serializable;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Level;
 
+import org.mars_sim.msp.core.logging.SimLogger;
+import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.structure.building.BuildingException;
+import org.mars_sim.msp.core.structure.building.BuildingManager;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
+import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * A management building function.  The building facilitates management
  * of a settlement population.
  */
-public class Management
-extends Function
-implements Serializable {
+public class Management extends Function {
 
     /** default serial id. */
     private static final long serialVersionUID = 1L;
 
+	private static SimLogger logger = SimLogger.getLogger(Management.class.getName());
+
     // Data members
-    private int populationSupport;
+	private int staff;
+	private int staffCapacity;
 
     /**
      * Constructor.
      * @param building the building this function is for.
      */
-    public Management(Building building) {
+    public Management(Building building, FunctionSpec spec) {
         // Use Function constructor.
-        super(FunctionType.MANAGEMENT, building);
-        // Populate data members.
-        populationSupport = buildingConfig.getManagementPopulationSupport(building.getBuildingType());
-        // Load activity spots
-        loadActivitySpots(buildingConfig.getManagementActivitySpots(building.getBuildingType()));
+        super(FunctionType.MANAGEMENT, spec, building);
+
+		staffCapacity = spec.getCapacity();
     }
 
     /**
      * Gets the value of the function for a named building.
-     * 
+     *
      * @param buildingName the building name.
      * @param newBuilding true if adding a new building.
      * @param settlement the settlement.
@@ -59,30 +66,98 @@ implements Serializable {
         while (i.hasNext()) {
             Building managementBuilding = i.next();
             Management management = managementBuilding.getManagement();
-            double populationSupport = management.getPopulationSupport();
+            double capacity = management.getStaffCapacity();
             double wearFactor = ((managementBuilding.getMalfunctionManager().getWearCondition() / 100D) * .75D) + .25D;
-            supply += populationSupport * wearFactor;
+            supply += capacity * wearFactor;
         }
 
         if (!newBuilding) {
-//            BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
-            supply -= buildingConfig.getManagementPopulationSupport(buildingName);
+            supply -= buildingConfig.getFunctionSpec(buildingName, FunctionType.MANAGEMENT).getCapacity();
             if (supply < 0D) supply = 0D;
         }
 
         return demand / (supply + 1D);
     }
 
-    /**
-     * Gets the number of people this management facility can support.
-     * @return population that can be supported.
-     */
-    public int getPopulationSupport() {
-        return populationSupport;
-    }
+	/**
+	 * Gets an available building with the management function.
+	 *
+	 * @param person the person looking for the command and control station.
+	 * @return an available office space or null if none found.
+	 */
+	public static Building getAvailableStation(Person person) {
+		Building result = null;
+
+		// If person is in a settlement, try to find a building with )an office.
+		if (person.isInSettlement()) {
+			List<Building> stations = person.getSettlement().getBuildingManager().getBuildings(FunctionType.MANAGEMENT);
+			stations = BuildingManager.getNonMalfunctioningBuildings(stations);
+
+			List<Building> comfortOffices = BuildingManager.getLeastCrowdedBuildings(stations);
+
+			if (!comfortOffices.isEmpty()) {
+				stations = comfortOffices;
+			}
+
+			// skip filtering the crowded stations
+			Map<Building, Double> selected = BuildingManager.getBestRelationshipBuildings(person, stations);
+			result = RandomUtil.getWeightedRandomObject(selected);
+		}
+
+		return result;
+	}
+
+	/**
+	 * Gets the number of people this administration facility can be used all at a
+	 * time.
+	 *
+	 * @return population that can be supported.
+	 */
+	public int getStaffCapacity() {
+		return staffCapacity;
+	}
+
+	/**
+	 * Gets the current number of people using the office space.
+	 *
+	 * @return number of people.
+	 */
+	public int getNumStaff() {
+		return staff;
+	}
+
+	public boolean isFull() {
+        return staff >= staffCapacity;
+	}
+
+	/**
+	 * Adds a person to the office space.
+	 *
+	 * @throws BuildingException if person would exceed office space capacity.
+	 */
+	public void addStaff() {
+		if (staff >= staffCapacity) {
+			logger.log(building, Level.INFO, 10_000, "The office space is full.");
+		}
+		else
+			staff++;
+	}
+
+	/**
+	 * Removes a person from the office space.
+	 *
+	 * @throws BuildingException if nobody is using the office space.
+	 */
+	public void removeStaff() {
+		staff--;
+		if (staff < 0) {
+			staff = 0;
+			logger.log(building, Level.SEVERE, 10_000, "Miscalculating the office space occupancy");
+		}
+	}
 
     @Override
     public double getMaintenanceTime() {
-        return populationSupport * 1D;
+        return staffCapacity * 1D;
     }
 }

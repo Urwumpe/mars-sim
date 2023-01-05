@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * DirectionDisplayPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
@@ -116,7 +116,7 @@ public class DirectionDisplayPanel extends JPanel {
 		g.drawString("E", centerX + letterRadius - (eWidth / 2), centerY + (fontHeight / 2));
 
 		// Draw direction line if necessary
-		if (vehicle.haveStatusType(StatusType.MOVING) || (vehicle.haveStatusType(StatusType.STUCK) && vehicle.getSpeed() > 0D)) {
+		if (vehicle.getPrimaryStatus() == StatusType.MOVING) {
 			Direction direction = vehicle.getDirection();
 			double hyp = (double) (CIRCLE_RADIUS);
 			int newX = (int) Math.round(hyp * direction.getSinDirection());

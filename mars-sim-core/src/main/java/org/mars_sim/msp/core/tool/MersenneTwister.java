@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * MersenneTwister.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -12,13 +12,12 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.Serializable;
 
 /** 
  * <h3>MersenneTwister and MersenneTwisterFast</h3>
  * <p><b>Version 22</b>, based on version MT199937(99/10/29)
  * of the Mersenne Twister algorithm found at 
- * <a href="http://www.math.keio.ac.jp/matumoto/emt.html">
+ * <a href="https://en.wikipedia.org/wiki/Mersenne_Twister">
  * The Mersenne Twister Home Page</a>, with the initialization
  * improved using the new 2002/1/26 initialization algorithm
  * By Sean Luke, October 2004.
@@ -188,7 +187,7 @@ import java.io.Serializable;
  @version 22
 */
 
-public strictfp class MersenneTwister extends java.util.Random implements Serializable, Cloneable
+public strictfp class MersenneTwister extends java.util.Random implements Cloneable
     {
     // Serialization
     private static final long serialVersionUID = -4035832775130174188L;  // locked as of Version 15
@@ -238,8 +237,8 @@ public strictfp class MersenneTwister extends java.util.Random implements Serial
         for both.  You can guarantee that the internal gaussian storage is the same (and so the
         nextGaussian() methods will return the same values) by calling clearGaussian() on both
         objects. */
-    public synchronized boolean stateEquals(MersenneTwister other)
-        {
+    public synchronized boolean stateEquals(MersenneTwister mer)  {
+    	MersenneTwister other = mer;
         if (other == this) return true;
         if (other == null)return false;
         synchronized(other)
@@ -334,7 +333,7 @@ public strictfp class MersenneTwister extends java.util.Random implements Serial
         mag01[1] = MATRIX_A;
 
         mt[0]= (int)(seed & 0xffffffff);
-        mt[0] = (int) seed;
+//        mt[0] = (int) seed;
         for (mti=1; mti<N; mti++) 
             {
             mt[mti] = 
@@ -363,7 +362,7 @@ public strictfp class MersenneTwister extends java.util.Random implements Serial
         int i, j, k;
         setSeed(19650218);
         i=1; j=0;
-        k = (N>array.length ? N : array.length);
+        k = (Math.max(N, array.length));
         for (; k!=0; k--) 
             {
             mt[i] = (mt[i] ^ ((mt[i-1] ^ (mt[i-1] >>> 30)) * 1664525)) + array[j] + j; /* non linear */

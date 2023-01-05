@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MarsMapType.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-02
  * @author stpa
  */
 package org.mars_sim.msp.ui.swing.tool.navigator;

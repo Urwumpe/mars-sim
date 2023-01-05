@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TravelToSettlementMeta.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission.meta;
@@ -9,53 +9,40 @@ package org.mars_sim.msp.core.person.ai.mission.meta;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.job.Job;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
+import org.mars_sim.msp.core.person.ai.mission.MissionType;
+import org.mars_sim.msp.core.person.ai.mission.MissionUtil;
 import org.mars_sim.msp.core.person.ai.mission.RoverMission;
 import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
-import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
-import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * A meta mission for the TravelToSettlement mission.
  */
-public class TravelToSettlementMeta implements MetaMission {
-
-	/** default logger. */
-//	private static Logger logger = Logger.getLogger(TravelToSettlementMeta.class.getName());
-
-    private static final double LIMIT = 1D;
+public class TravelToSettlementMeta extends AbstractMetaMission {
     
-    /** Mission name */
-    private static final String DEFAULT_DESCRIPTION = Msg.getString(
-            "Mission.description.travelToSettlement"); //$NON-NLS-1$
+    private static final int EARLIEST_SOL_TRAVEL = 28;
+	private static final double LIMIT = 0;
+
+	public TravelToSettlementMeta() {
+		// Anyone can start ??
+    	super(MissionType.TRAVEL_TO_SETTLEMENT, null);
+    }
     
     @Override
-    public String getName() {
-        return DEFAULT_DESCRIPTION;
-    }
-
-    @Override
-    public Mission constructInstance(Person person) {
-        return new TravelToSettlement(person);
-    }
-
-    @Override
-    public Mission constructInstance(Robot robot) {
-        return null;//new TravelToSettlement(robot);
+    public Mission constructInstance(Person person, boolean needsReview) {
+        return new TravelToSettlement(person, needsReview);
     }
 
     @Override
     public double getProbability(Person person) {
 
-    	if (marsClock.getMissionSol() < 28)
+    	if (marsClock.getMissionSol() < EARLIEST_SOL_TRAVEL) {
     		return 0;
+    	}
     	
         double missionProbability = 0D;
 
@@ -66,14 +53,13 @@ public class TravelToSettlementMeta implements MetaMission {
 
             missionProbability = getMissionProbability(settlement, person);
 
-    		if (missionProbability <= 0)
+    		if (missionProbability <= 0) {
     			return 0;
+    		}
     		
 	        // Job modifier.
-	        Job job = person.getMind().getJob();
-	        if (job != null)
-	        	missionProbability *= job.getStartMissionProbabilityModifier(
-	                    TravelToSettlement.class)* settlement.getGoodsManager().getTourismFactor();
+    		missionProbability *= getLeaderSuitability(person)
+    				* settlement.getGoodsManager().getTourismFactor();
 			
 			if (missionProbability > LIMIT)
 				missionProbability = LIMIT;
@@ -82,52 +68,26 @@ public class TravelToSettlementMeta implements MetaMission {
 			// if extrovert, score 50 to 100 -->  0 to 2
 			// Reduce probability if introvert
 			int extrovert = person.getExtrovertmodifier();
-			missionProbability += extrovert;
+			missionProbability = missionProbability * (1 + extrovert/2.0);
 			
 			if (missionProbability < 0)
 				missionProbability = 0;
         }
-
-//        if (missionProbability > 0)
-//        	logger.info("TravelToSettlementMeta's probability : " +
-//				 Math.round(missionProbability*100D)/100D);
 		 
         return missionProbability;
     }
 
-    @Override
-    public double getProbability(Robot robot) {
-        return 0;
-    }
-
-    public double getMissionProbability(Settlement settlement, Unit unit) {
-    	Person person = null;
-    	Robot robot = null;
-
-        double missionProbability = settlement.getMissionBaseProbability(DEFAULT_DESCRIPTION);
-		if (missionProbability == 0)
-			return 0;
-		
-		missionProbability = 0;
-		
+    private double getMissionProbability(Settlement settlement, Worker member) {
+        double missionProbability = 0;
+        
         // Check if there are any desirable settlements within range.
         double topSettlementDesirability = 0D;
-        Vehicle vehicle = RoverMission.getVehicleWithGreatestRange(TravelToSettlement.missionType, settlement, false);
+        Vehicle vehicle = RoverMission.getVehicleWithGreatestRange(MissionType.TRAVEL_TO_SETTLEMENT, settlement, false);
         if (vehicle != null) {
-        	Map<Settlement, Double> desirableSettlements = null;
-			if (unit instanceof Person) {
-				person = (Person) unit;
-	            desirableSettlements = TravelToSettlement.getDestinationSettlements(
-	                    person, settlement, vehicle.getRange(TravelToSettlement.missionType));
+        	Map<Settlement, Double> desirableSettlements = TravelToSettlement.getDestinationSettlements(
+                    member, settlement, vehicle.getRange(MissionType.TRAVEL_TO_SETTLEMENT));
 
-			}
-			else if (unit instanceof Robot) {
-				robot = (Robot) unit;
-	            desirableSettlements = TravelToSettlement.getDestinationSettlements(
-	                    robot, settlement, vehicle.getRange(TravelToSettlement.missionType));
-			}
-
-            if (desirableSettlements.size() == 0) {
+            if ((desirableSettlements == null) || desirableSettlements.isEmpty()) {
             	return 0;
             }
 
@@ -143,12 +103,11 @@ public class TravelToSettlementMeta implements MetaMission {
 
 
         // Determine mission probability.
-
         missionProbability = TravelToSettlement.BASE_MISSION_WEIGHT
                 + (topSettlementDesirability / 100D);
 
-		int numEmbarked = VehicleMission.numEmbarkingMissions(settlement);
-		int numThisMission = Simulation.instance().getMissionManager().numParticularMissions(DEFAULT_DESCRIPTION, settlement);
+		int numEmbarked = MissionUtil.numEmbarkingMissions(settlement);
+		int numThisMission = missionManager.numParticularMissions(MissionType.TRAVEL_TO_SETTLEMENT, settlement);
 
    		// Check for # of embarking missions.
 		if (Math.max(1, settlement.getNumCitizens() / 8.0) < numEmbarked + numThisMission) {
@@ -162,7 +121,7 @@ public class TravelToSettlementMeta implements MetaMission {
 		int f1 = 2*numEmbarked + 1;
 		int f2 = 2*numThisMission + 1;
 		
-		missionProbability *= settlement.getNumCitizens() / f1 / f2 / 2D * ( 1 + settlement.getMissionDirectiveModifier(8));
+		missionProbability *= settlement.getNumCitizens() / f1 / f2 / 2D;
 		
         // Crowding modifier.
         int crowding = settlement.getIndoorPeopleCount()

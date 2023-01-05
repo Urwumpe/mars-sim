@@ -1,48 +1,50 @@
-/**
+/*
  * Mars Simulation Project
  * ProduceFoodMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-26
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
-
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.fav.FavoriteType;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.task.ProduceFood;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.ai.job.Chefbot;
-import org.mars_sim.msp.core.robot.ai.job.Makerbot;
+import org.mars_sim.msp.core.robot.RobotType;
+import org.mars_sim.msp.core.structure.OverrideType;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * Meta task for the ProduceFood task.
  */
-public class ProduceFoodMeta implements MetaTask, Serializable {
+public class ProduceFoodMeta extends FactoryMetaTask {
 
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
-    
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.produceFood"); //$NON-NLS-1$
 
-    private static final double CAP = 3000D;
+    private static final double CAP = 3_000D;
     
-    @Override
-    public String getName() {
-        return NAME;
-    }
+    public ProduceFoodMeta() {
+		super(NAME, WorkerType.BOTH, TaskScope.WORK_HOUR);
+		setFavorite(FavoriteType.COOKING);
+		setTrait(TaskTrait.ARTISTIC);
+		
+		setPreferredJob(JobType.BIOLOGIST, JobType.CHEF,
+						JobType.CHEMIST, JobType.BOTANIST);
 
+        addPreferredRobot(RobotType.CHEFBOT);
+        addPreferredRobot(RobotType.MAKERBOT);
+	}
+    
     @Override
     public Task constructInstance(Person person) {
         return new ProduceFood(person);
@@ -56,16 +58,15 @@ public class ProduceFoodMeta implements MetaTask, Serializable {
     	
         double result = 0D;
 
-        if (person.isInSettlement() && !person.getSettlement().getFoodProductionOverride()) {
+        if (person.isInSettlement() && !person.getSettlement().getProcessOverride(OverrideType.FOOD_PRODUCTION)) {
 	        // If settlement has foodProduction override, no new foodProduction processes can be created.
         	
             // Probability affected by the person's stress and fatigue.
             PhysicalCondition condition = person.getPhysicalCondition();
             double fatigue = condition.getFatigue();
             double stress = condition.getStress();
-            double hunger = condition.getHunger();
             
-            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            if (fatigue > 1000 || stress > 50)
             	return 0;
             
             // See if there is an available foodProduction building.
@@ -89,29 +90,14 @@ public class ProduceFoodMeta implements MetaTask, Serializable {
                 result = result - (fatigue - 100) / 2.5D;
 
                 // Crowding modifier.
-                result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(person, foodProductionBuilding);
-                result *= TaskProbabilityUtil.getRelationshipModifier(person, foodProductionBuilding);
+                result *= getBuildingModifier(foodProductionBuilding, person);
+
 
                 // FoodProduction good value modifier.
                 result *= ProduceFood.getHighestFoodProductionProcessValue(person, foodProductionBuilding);
+        		result *= person.getSettlement().getGoodsManager().getCropFarmFactor();
 
-    	        // Effort-driven task modifier.
-    	        result *= person.getPerformanceRating();
-
-    	        // Job modifier.
-    	        Job job = person.getMind().getJob();
-    	        if (job != null) {
-    	            result *= job.getStartTaskProbabilityModifier(ProduceFood.class)
-                    		* person.getSettlement().getGoodsManager().getCropFarmFactor();
-    	        }
-
-                // Modify if cooking is the person's favorite activity.
-                if (person.getFavorite().getFavoriteActivity() == FavoriteType.COOKING) {
-                    result *= RandomUtil.getRandomDouble(2D);
-                }
-
-    	        // Add Preference modifier
-                result = result + result * person.getPreference().getPreferenceScore(this)/6D;
+    	        result *= getPersonModifier(person);
        
                 // Capping the probability at 100 as manufacturing process values can be very large numbers.
                 if (result > CAP) {
@@ -135,38 +121,35 @@ public class ProduceFoodMeta implements MetaTask, Serializable {
 
         double result = 0D;
 
-        if (robot.getBotMind().getRobotJob() instanceof Chefbot || robot.getBotMind().getRobotJob() instanceof Makerbot){
+        if (robot.isInSettlement()) {
 
-			if (robot.isInSettlement()) {
+            // If settlement has foodProduction override, no new
+            // foodProduction processes can be created.
+            if (!robot.getSettlement().getProcessOverride(OverrideType.FOOD_PRODUCTION)) {
 
-		        // If settlement has foodProduction override, no new
-		        // foodProduction processes can be created.
-		        if (!robot.getSettlement().getFoodProductionOverride()) {
+                // See if there is an available foodProduction building.
+                Building foodProductionBuilding = ProduceFood.getAvailableFoodProductionBuilding(robot);
+                if (foodProductionBuilding != null) {
+                    result += 100D;
 
-		            // See if there is an available foodProduction building.
-		            Building foodProductionBuilding = ProduceFood.getAvailableFoodProductionBuilding(robot);
-		            if (foodProductionBuilding != null) {
-		                result += 100D;
+                    // FoodProduction good value modifier.
+                    result *= ProduceFood.getHighestFoodProductionProcessValue(robot, foodProductionBuilding);
 
-		                // FoodProduction good value modifier.
-		                result *= ProduceFood.getHighestFoodProductionProcessValue(robot, foodProductionBuilding);
+                    // If foodProduction building has process requiring work, add modifier.
+                    SkillManager skillManager = robot.getSkillManager();
+                    int skill = skillManager.getEffectiveSkillLevel(SkillType.COOKING) * 5;
+                    skill += skillManager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE) * 2;
+                    skill = (int) Math.round(skill / 7D);
 
-		                // If foodProduction building has process requiring work, add modifier.
-		                SkillManager skillManager = robot.getSkillManager();
-		                int skill = skillManager.getEffectiveSkillLevel(SkillType.COOKING) * 5;
-		                skill += skillManager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE) * 2;
-		                skill = (int) Math.round(skill / 7D);
+                    if (ProduceFood.hasProcessRequiringWork(foodProductionBuilding, skill)) {
+                        result += 100D;
+                    }
 
-		                if (ProduceFood.hasProcessRequiringWork(foodProductionBuilding, skill)) {
-		                    result += 100D;
-		                }
+                    // Effort-driven task modifier.
+                    result *= robot.getPerformanceRating();
 
-			            // Effort-driven task modifier.
-			            result *= robot.getPerformanceRating();
-
-		            }
-		        }
-			}
+                }
+            }
         }
 
         return result;

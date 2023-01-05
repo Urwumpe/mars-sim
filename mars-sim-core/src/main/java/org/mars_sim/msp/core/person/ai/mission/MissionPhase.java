@@ -1,31 +1,62 @@
 /**
  * Mars Simulation Project
  * MissionPhase.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission;
 
 import java.io.Serializable;
 
+import org.mars_sim.msp.core.Msg;
+
 /**
  * A phase of a mission.
  */
 public final class MissionPhase implements Serializable {
+	// Classificatino of the phase interms of Stage
+	public enum Stage {
+		PREPARATION,
+		ACTIVE,
+		CLOSEDOWN
+	};
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
+	private static final String MSG_KEY_PREFIX = "Mission.phase.";
+
 	// The phase name.
 	private String name;
+	
+	private String descriptionTemplate = null;
+
+	private Stage stage = Stage.ACTIVE;
 
 	/**
-	 * Constructor
+	 * Constructor for an ACTIVE phase
 	 * 
 	 * @param the phase name.
 	 */
 	public MissionPhase(String name) {
-		this.name = name;
+		this(name, Stage.ACTIVE);
+	}
+
+	/**
+	 * Constructor
+	 * 
+	 * @param key The key for the phase name.
+	 */
+	public MissionPhase(String key, Stage stage) {
+		// Hack for the transition phase
+		if (!key.startsWith(MSG_KEY_PREFIX)) {
+			key = MSG_KEY_PREFIX + key;
+		}
+
+		this.name = Msg.getString(key);
+		this.descriptionTemplate = Msg.getString(key + ".description");
+
+		this.stage = stage;
 	}
 
 	/**
@@ -37,6 +68,21 @@ public final class MissionPhase implements Serializable {
 		return name;
 	}
 
+	/**
+	 * Get the template for any description
+	 * @return
+	 */
+	public String getDescriptionTemplate() {
+		return descriptionTemplate;
+	}
+	
+	/**
+	 * Get teh Stage associated wth this phase.
+	 */
+	public Stage getStage() {
+		return stage;
+	}
+
 	@Override
 	public String toString() {
 		return getName();
@@ -44,10 +90,14 @@ public final class MissionPhase implements Serializable {
 
 	@Override
 	public boolean equals(Object obj) {
-		boolean result = false;
-		if ((obj != null) && (obj instanceof MissionPhase) && obj.toString().equals(toString())) {
-			result = true;
-		}
-		return result;
+		return (obj != null) && (obj instanceof MissionPhase)
+				&& ((MissionPhase)obj).name.equals(name);
 	}
+	
+
+	@Override
+	public int hashCode() {
+		return name.hashCode() % 32;
+	}
+
 }

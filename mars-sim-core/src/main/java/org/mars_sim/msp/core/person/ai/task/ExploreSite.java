@@ -1,37 +1,26 @@
-/**
+/*
  * Mars Simulation Project
  * ExploreSite.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-18
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.awt.geom.Point2D;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LocalAreaUtil;
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.equipment.SpecimenBox;
-import org.mars_sim.msp.core.mars.ExploredLocation;
-import org.mars_sim.msp.core.mars.MineralMap;
+import org.mars_sim.msp.core.environment.ExploredLocation;
+import org.mars_sim.msp.core.environment.MineralMap;
+import org.mars_sim.msp.core.equipment.Container;
+import org.mars_sim.msp.core.equipment.ContainerUtil;
+import org.mars_sim.msp.core.equipment.EquipmentType;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
-import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
-import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.mission.Exploration;
-import org.mars_sim.msp.core.person.ai.mission.MissionMember;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
@@ -39,15 +28,14 @@ import org.mars_sim.msp.core.vehicle.Rover;
 /**
  * A task for the EVA operation of exploring a site.
  */
-public class ExploreSite extends EVAOperation implements Serializable {
+public class ExploreSite extends EVAOperation {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	private static Logger logger = Logger.getLogger(ExploreSite.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
-	
+	/** default logger. */
+	private static SimLogger logger = SimLogger.getLogger(ExploreSite.class.getName());
+
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.exploreSite"); //$NON-NLS-1$
 
@@ -55,44 +43,55 @@ public class ExploreSite extends EVAOperation implements Serializable {
 	private static final TaskPhase EXPLORING = new TaskPhase(Msg.getString("Task.phase.exploring")); //$NON-NLS-1$
 
 	// Static members
-	private static final double AVERAGE_ROCK_SAMPLES_COLLECTED_SITE = 10D;
-	public static final double AVERAGE_ROCK_SAMPLE_MASS = .5D;
-	private static final double ESTIMATE_IMPROVEMENT_FACTOR = 5D;
+	/** The average labor time it takes to find the resource. */
+	public static final double LABOR_TIME = 50D;
+
+	private static final double AVERAGE_ROCK_SAMPLES_COLLECTED_SITE = 40 + RandomUtil.getRandomDouble(20);
+	public static final double AVERAGE_ROCK_SAMPLE_MASS = 5 + RandomUtil.getRandomDouble(5);
+	private static final double ESTIMATE_IMPROVEMENT_FACTOR = 5 + RandomUtil.getRandomDouble(5);
+
+	private static final int ROCK_SAMPLES_ID = ResourceUtil.rockSamplesID;
 
 	// Data members
+	private double totalCollected = 0;
+	private double numSamplesCollected = AVERAGE_ROCK_SAMPLES_COLLECTED_SITE / AVERAGE_ROCK_SAMPLE_MASS;
+	
+	// Future: should keep track of the actual total exploring site time and use it below.
+	// The longer it stays, the more samples are collected and better the mining estimation
+	private double chance = numSamplesCollected * Exploration.EXPLORING_SITE_TIME / 8000.0;
+
 	private ExploredLocation site;
 	private Rover rover;
 
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param person the person performing the task.
 	 * @param site   the site to explore.
 	 * @param rover  the mission rover.
 	 * @throws exception if error creating task.
 	 */
 	public ExploreSite(Person person, ExploredLocation site, Rover rover) {
-
 		// Use EVAOperation parent constructor.
-		super(NAME, person, true, RandomUtil.getRandomDouble(50D) + 10D);
+		super(NAME, person, true, LABOR_TIME + RandomUtil.getRandomDouble(-5D, 5D), SkillType.AREOLOGY);
 
+		addAdditionSkill(SkillType.PROSPECTING);
+		
 		// Initialize data members.
 		this.site = site;
 		this.rover = rover;
 
 		// Determine location for field work.
-		Point2D exploreLoc = determineExploreLocation();
-		setOutsideSiteLocation(exploreLoc.getX(), exploreLoc.getY());
+		setRandomOutsideLocation(rover);
 
 		// Take specimen containers for rock samples.
 		if (!hasSpecimenContainer()) {
 			takeSpecimenContainer();
-
-			// If specimen containers are not available, end task.
-			if (!hasSpecimenContainer()) {
-				logger.fine(person.getName() + " was unable to find any specimen containers to collect rock samples.");
-				endTask();
-			}
+		}
+		// If specimen containers are not available, end task.
+		else {
+			logger.warning(person, "No more specimen box for collecting rock samples.");
+			endTask();
 		}
 
 		// Add task phase
@@ -100,41 +99,13 @@ public class ExploreSite extends EVAOperation implements Serializable {
 	}
 
 	/**
-	 * Determine location to explore.
-	 * 
-	 * @return field work X and Y location outside rover.
-	 */
-	private Point2D determineExploreLocation() {
-
-		Point2D newLocation = null;
-		boolean goodLocation = false;
-		for (int x = 0; (x < 5) && !goodLocation; x++) {
-			for (int y = 0; (y < 10) && !goodLocation; y++) {
-
-				double distance = RandomUtil.getRandomDouble(100D) + (x * 100D) + 50D;
-				double radianDirection = RandomUtil.getRandomDouble(Math.PI * 2D);
-				double newXLoc = rover.getXLocation() - (distance * Math.sin(radianDirection));
-				double newYLoc = rover.getYLocation() + (distance * Math.cos(radianDirection));
-				Point2D boundedLocalPoint = new Point2D.Double(newXLoc, newYLoc);
-
-				newLocation = LocalAreaUtil.getLocalRelativeLocation(boundedLocalPoint.getX(), boundedLocalPoint.getY(),
-						rover);
-				goodLocation = LocalAreaUtil.isLocationCollisionFree(newLocation.getX(), newLocation.getY(),
-						person.getCoordinates());
-			}
-		}
-
-		return newLocation;
-	}
-
-	/**
 	 * Checks if a person can explore a site.
-	 * 
+	 *
 	 * @param member the member
 	 * @param rover  the rover
 	 * @return true if person can explore a site.
 	 */
-	public static boolean canExploreSite(MissionMember member, Rover rover) {
+	public static boolean canExploreSite(Worker member, Rover rover) {
 
 		if (member instanceof Person) {
 			Person person = (Person) member;
@@ -144,24 +115,25 @@ public class ExploreSite extends EVAOperation implements Serializable {
 				return false;
 
 			if (EVAOperation.isGettingDark(person)) {
-				logger.fine(person.getName() + " ended exploring site due to getting dark.");
+				logger.fine(person, "Ended exploring site due to getting dark.");
 				return false;
 			}
 
 			if (EVAOperation.isHungryAtMealTime(person)) {
-				logger.fine(person.getName() + " ended exploring site due to being hungry at meal time.");
+				logger.fine(person, "Ended exploring site due to being hungry at meal time.");
 				return false;
 			}
-			
+
 			if (EVAOperation.isExhausted(person)) {
-				logger.fine(person.getName() + " ended exploring site due to being exhausted.");
+				logger.fine(person, "Ended exploring site due to being exhausted.");
 				return false;
 			}
-			
+
+			if (person.getPhysicalCondition().computeFitnessLevel() < 3)
+				return false;
 
 			// Check if person's medical condition will not allow task.
-			if (person.getPerformanceRating() < .2D)
-				return false;
+            return !(person.getPerformanceRating() < .2D);
 		}
 
 		return true;
@@ -176,223 +148,188 @@ public class ExploreSite extends EVAOperation implements Serializable {
 	protected double performMappedPhase(double time) {
 
 		time = super.performMappedPhase(time);
-
-		if (getPhase() == null) {
-			throw new IllegalArgumentException("Task phase is null");
-		} else if (EXPLORING.equals(getPhase())) {
-			return exploringPhase(time);
-		} else {
-			return time;
+		if (!isDone()) {
+			if (getPhase() == null) {
+				throw new IllegalArgumentException("Task phase is null");
+			} else if (EXPLORING.equals(getPhase())) {
+				time = exploringPhase(time);
+			}
 		}
+		return time;
 	}
 
 	/**
-	 * Perform the exploring phase of the task.
-	 * 
+	 * Performs the exploring phase of the task.
+	 *
 	 * @param time the time available (millisols).
 	 * @return remaining time after performing phase (millisols).
 	 * @throws Exception if error performing phase.
 	 */
 	private double exploringPhase(double time) {
+		double remainingTime = 0;
+		
+		if (checkReadiness(time, false) > 0)
+			return time;
 
-		// Check for an accident during the EVA operation.
-		checkForAccident(time);
-
-		// Check for radiation exposure during the EVA operation.
-		if (isRadiationDetected(time)) {
-			setPhase(WALK_BACK_INSIDE);
+		if (totalCollected >= AVERAGE_ROCK_SAMPLES_COLLECTED_SITE) {
+			checkLocation();
 			return time;
 		}
 
-		// Check if site duration has ended or there is reason to cut the exploring
-		// phase short and return to the rover.
-		if (shouldEndEVAOperation() || addTimeOnSite(time)) {
-			setPhase(WALK_BACK_INSIDE);
-			return time;
+		int rand = RandomUtil.getRandomInt(1);
+
+		if (rand == 0) {
+			// Improve mineral concentration estimates.
+			improveMineralConcentrationEstimates(time);
 		}
-
-		// Collect rock samples.
-		collectRockSamples(time);
-
-		// Improve mineral concentration estimates.
-		improveMineralConcentrationEstimates(time);
-
-		// TODO: Add other site exploration activities later.
+		else {
+			// Collect rocks.
+			collectRocks(time);
+		}
+		
+		// FUTURE: Add other site exploration activities later.
 
 		// Add experience points
 		addExperience(time);
 
-		return 0D;
+		// Check for an accident during the EVA operation.
+		checkForAccident(time);
+
+		// Check if site duration has ended or there is reason to cut the exploring
+		// phase short and return to the rover.
+		if (addTimeOnSite(time)) {
+			checkLocation();
+			return remainingTime;
+		}
+
+		return remainingTime;
 	}
 
 	/**
-	 * Collect rock samples if chosen.
-	 * 
+	 * Collects rock samples if chosen.
+	 *
 	 * @param time the amount of time available (millisols).
 	 * @throws Exception if error collecting rock samples.
 	 */
-	private void collectRockSamples(double time) {
+	private void collectRocks(double time) {
 		if (hasSpecimenContainer()) {
-			double numSamplesCollected = AVERAGE_ROCK_SAMPLES_COLLECTED_SITE / AVERAGE_ROCK_SAMPLE_MASS;
-			double probability = (time / Exploration.EXPLORING_SITE_TIME) * (numSamplesCollected);
+			double probability = (1 + site.getNumEstimationImprovement()) * chance * time 
+					* (getEffectiveSkillLevel() + person.getSkillManager().getSkillLevel(SkillType.PROSPECTING)) / 2D;
+			if (probability > .9)
+				probability = .9;
+
 			if (RandomUtil.getRandomDouble(1.0D) <= probability) {
-				Inventory inv = person.getInventory();
-				double rockSampleMass = RandomUtil.getRandomDouble(AVERAGE_ROCK_SAMPLE_MASS * 2D);
-				double rockSampleCapacity = inv.getAmountResourceRemainingCapacity(ResourceUtil.rockSamplesID, true,
-						false);
-				if (rockSampleMass < rockSampleCapacity)
-					inv.storeAmountResource(ResourceUtil.rockSamplesID, rockSampleMass, true);
-				inv.addAmountSupply(ResourceUtil.rockSamplesID, rockSampleMass);
+				
+				Container box = person.findContainer(EquipmentType.SPECIMEN_BOX, false, -1);
+				int rockId = box.getResource();
+				if (rockId == -1) {
+					// Box is empty so choose at random
+					int randomNum = RandomUtil.getRandomInt(((ResourceUtil.rockIDs).length) - 1);
+					rockId = ResourceUtil.rockIDs[randomNum];
+					logger.info(person, 10_000, "Type of rocks collected: " + ResourceUtil.ROCKS[randomNum] + ".");
+				}
+
+				double mass = RandomUtil.getRandomDouble(AVERAGE_ROCK_SAMPLE_MASS / 2D, AVERAGE_ROCK_SAMPLE_MASS * 2D);
+				double cap = box.getAmountResourceRemainingCapacity(rockId);
+				if (mass <= cap) {
+					double excess = box.storeAmountResource(rockId, mass);
+					totalCollected += mass - excess;
+				}
 			}
 		}
 	}
 
 	/**
-	 * Improve the mineral concentration estimates of an explored site.
-	 * 
+	 * Improves the mineral concentration estimates of an explored site.
+	 *
 	 * @param time the amount of time available (millisols).
 	 */
 	private void improveMineralConcentrationEstimates(double time) {
-		double probability = (time / Exploration.EXPLORING_SITE_TIME) * getEffectiveSkillLevel()
+		double probability = (time * Exploration.EXPLORING_SITE_TIME / 1000.0) 
+				* (getEffectiveSkillLevel() + person.getSkillManager().getSkillLevel(SkillType.PROSPECTING)) / 2D
 				* ESTIMATE_IMPROVEMENT_FACTOR;
-		if (RandomUtil.getRandomDouble(1.0D) <= probability) {
-			MineralMap mineralMap = Simulation.instance().getMars().getSurfaceFeatures().getMineralMap();
-			Map<String, Double> estimatedMineralConcentrations = site.getEstimatedMineralConcentrations();
-			Iterator<String> i = estimatedMineralConcentrations.keySet().iterator();
-			while (i.hasNext()) {
-				String mineralType = i.next();
-				double actualConcentration = mineralMap.getMineralConcentration(mineralType, site.getLocation());
-				double estimatedConcentration = estimatedMineralConcentrations.get(mineralType);
-				double estimationDiff = Math.abs(actualConcentration - estimatedConcentration);
-				double estimationImprovement = RandomUtil.getRandomDouble(1D * getEffectiveSkillLevel());
-				if (estimationImprovement > estimationDiff)
-					estimationImprovement = estimationDiff;
-				if (estimatedConcentration < actualConcentration)
-					estimatedConcentration += estimationImprovement;
-				else
-					estimatedConcentration -= estimationImprovement;
-				estimatedMineralConcentrations.put(mineralType, estimatedConcentration);
-			}
-
-			// Add to site mineral concentration estimation improvement number.
-			site.addEstimationImprovement();
-			LogConsolidated.log(logger, Level.FINE, 5000, sourceName, "[" + person.getLocationTag().getLocale() + "] "
-					+ person.getName() + " was exploring the site at " + site.getLocation().getFormattedString() 
-					+ ". Estimation Improvement: "
+		if (probability > .9)
+			probability = .9;
+		if ((site.getNumEstimationImprovement() == 0) || (RandomUtil.getRandomDouble(1.0D) <= probability)) {
+			improveSiteEstimates(site, getEffectiveSkillLevel());
+			
+			logger.log(person, Level.INFO, 5_000,
+					"Exploring site at " + site.getLocation().getFormattedString()				
+					+ ". # of estimation made: "
 					+ site.getNumEstimationImprovement() + ".");
 		}
 	}
 
 	/**
-	 * Checks if the person is carrying a specimen container.
+	 * Improves the mineral estimates for a particular site. Reviewer has a certain
+	 * skill rating.
 	 * 
+	 * @param site
+	 * @param skill
+	 */
+	public static void improveSiteEstimates(ExploredLocation site, int skill) {
+
+		int certainty = Math.max(100, site.getNumEstimationImprovement());
+		MineralMap mineralMap = surfaceFeatures.getMineralMap();
+		Map<String, Double> estimatedMineralConcentrations = site.getEstimatedMineralConcentrations();
+
+		for (String mineralType : estimatedMineralConcentrations.keySet()) {
+			double actual = mineralMap.getMineralConcentration(mineralType, site.getLocation());			
+			double estimated = estimatedMineralConcentrations.get(mineralType);
+			double diff = Math.abs(actual - estimated);
+			// Note that rand can 'overshoot' the target
+			double rand = RandomUtil.getRandomDouble(1D * skill * certainty / 50);
+			if (rand > diff * 1.25)
+				rand = diff * 1.25;
+			if (estimated < actual)
+				estimated += rand;
+			else
+				estimated -= rand;
+			
+//			System.out.println("improveSiteEstimates  " + mineralType 
+//					+ "   estimated: " + Math.round(estimated * 100.0)/100.0
+//					+ "   actual: " + Math.round(actual * 100.0)/100.0);
+			
+			estimatedMineralConcentrations.put(mineralType, estimated);
+		}
+
+		// Add to site mineral concentration estimation improvement number.
+		site.addEstimationImprovement();
+	}
+
+	/**
+	 * Checks if the person is carrying a specimen container.
+	 *
 	 * @return true if carrying container.
 	 */
 	private boolean hasSpecimenContainer() {
-		return person.getInventory().containsUnitClass(SpecimenBox.class);
+		return person.containsEquipment(EquipmentType.SPECIMEN_BOX);
 	}
 
 	/**
 	 * Takes the least full specimen container from the rover, if any are available.
-	 * 
-	 * @throws Exception if error taking container.
+	 *
+	 * @return true if the person receives a specimen container.
 	 */
-	private void takeSpecimenContainer() {
-		Unit container = findLeastFullContainer(rover);
+	private boolean takeSpecimenContainer() {
+		Container container = ContainerUtil.findLeastFullContainer(
+											rover, EquipmentType.SPECIMEN_BOX,
+											ROCK_SAMPLES_ID);
+
 		if (container != null) {
-			if (person.getInventory().canStoreUnit(container, false)) {
-				container.transfer(rover, person);
-			}
+			return container.transfer(person);
 		}
+		return false;
 	}
 
 	/**
-	 * Gets the least full specimen container in the rover.
-	 * 
-	 * @param rover the rover with the inventory to look in.
-	 * @return specimen container or null if none.
+	 * Transfers the Specimen box to the Vehicle.
 	 */
-	private static SpecimenBox findLeastFullContainer(Rover rover) {
-		SpecimenBox result = null;
-		double mostCapacity = 0D;
-
-		Iterator<SpecimenBox> i = rover.getInventory().findAllSpecimenBoxes().iterator();
-		while (i.hasNext()) {
-			SpecimenBox container = i.next();
-			try {
-				double remainingCapacity = container.getInventory()
-						.getAmountResourceRemainingCapacity(ResourceUtil.rockSamplesID, false, false);
-
-				if (remainingCapacity > mostCapacity) {
-					result = container;
-					mostCapacity = remainingCapacity;
-				}
-			} catch (Exception e) {
-				e.printStackTrace(System.err);
-			}
+	@Override
+	protected void clearDown() {
+		if (rover != null) {
+			// Task may end early before a Rover is selected
+			returnEquipmentToVehicle(rover);
 		}
-
-		return result;
-	}
-
-	@Override
-	protected void addExperience(double time) {
-		// Add experience to "EVA Operations" skill.
-		// (1 base experience point per 100 millisols of time spent)
-		double evaExperience = time / 100D;
-
-		// Experience points adjusted by person's "Experience Aptitude" attribute.
-		NaturalAttributeManager nManager = person.getNaturalAttributeManager();
-		int experienceAptitude = nManager.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
-		double experienceAptitudeModifier = (((double) experienceAptitude) - 50D) / 100D;
-		evaExperience += evaExperience * experienceAptitudeModifier;
-		evaExperience *= getTeachingExperienceModifier();
-		person.getSkillManager().addExperience(SkillType.EVA_OPERATIONS, evaExperience, time);
-
-		// If phase is exploring, add experience to areology skill.
-		if (EXPLORING.equals(getPhase())) {
-			// 1 base experience point per 10 millisols of exploration time spent.
-			// Experience points adjusted by person's "Experience Aptitude" attribute.
-			double areologyExperience = time / 10D;
-			areologyExperience += areologyExperience * experienceAptitudeModifier;
-			person.getSkillManager().addExperience(SkillType.AREOLOGY, areologyExperience, time);
-		}
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(2);
-		results.add(SkillType.EVA_OPERATIONS);
-		results.add(SkillType.AREOLOGY);
-		return results;
-	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		SkillManager manager = person.getSkillManager();
-		int EVAOperationsSkill = manager.getEffectiveSkillLevel(SkillType.EVA_OPERATIONS);
-		int areologySkill = manager.getEffectiveSkillLevel(SkillType.AREOLOGY);
-		return (int) Math.round((double) (EVAOperationsSkill + areologySkill) / 2D);
-	}
-
-	@Override
-	public void endTask() {
-
-		// Load specimen container in rover.
-		Inventory pInv = person.getInventory();
-		if (pInv.containsUnitClass(SpecimenBox.class)) {
-			SpecimenBox box = pInv.findASpecimenBox();
-			box.transfer(pInv, rover);
-		}
-
-		super.endTask();
-	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
-
-		site = null;
-		rover = null;
 	}
 }

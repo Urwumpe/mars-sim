@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ScienceWindow.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.science;
@@ -9,12 +9,15 @@ package org.mars_sim.msp.ui.swing.tool.science;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.util.List;
 
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.science.ScientificStudy;
+import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.toolWindow.ToolWindow;
+import org.mars_sim.msp.ui.swing.toolwindow.ToolWindow;
 
 import com.alee.laf.panel.WebPanel;
 
@@ -31,8 +34,8 @@ extends ToolWindow {
 	public static final String NAME = Msg.getString("ScienceWindow.title"); //$NON-NLS-1$
 
 	// Data members
-	private OngoingStudyListPanel ongoingStudyListPane;
-	private FinishedStudyListPanel finishedStudyListPane;
+	private AbstractStudyListPanel ongoingStudyListPane;
+	private AbstractStudyListPanel finishedStudyListPane;
 	private StudyDetailPanel studyDetailPane;
 	private ScientificStudy selectedStudy;
 
@@ -40,6 +43,7 @@ extends ToolWindow {
 	 * Constructor
 	 * @param desktop the main desktop panel.
 	 */
+	@SuppressWarnings("serial")
 	public ScienceWindow(MainDesktopPane desktop) {
 
 		// Use ToolWindow constructor
@@ -53,15 +57,27 @@ extends ToolWindow {
 		setContentPane(mainPane);
 
 		// Create lists panel.
-		WebPanel listsPane = new WebPanel(new GridLayout(2, 1));
+		WebPanel listsPane = new WebPanel(new GridLayout(2, 1, 0, 0));
 		mainPane.add(listsPane, BorderLayout.WEST);
 
+		ScientificStudyManager mgr = Simulation.instance().getScientificStudyManager();
+		
 		// Create ongoing study list panel.
-		ongoingStudyListPane = new OngoingStudyListPanel(this);
+		ongoingStudyListPane = new AbstractStudyListPanel(this, "OngoingStudyListPanel") {		
+			@Override
+			protected List<ScientificStudy> getStudies() {
+				return mgr.getOngoingStudies();
+			}
+		};
 		listsPane.add(ongoingStudyListPane);
 
 		// Create finished study list panel.
-		finishedStudyListPane = new FinishedStudyListPanel(this);
+		finishedStudyListPane = new AbstractStudyListPanel(this, "FinishedStudyListPanel") {		
+			@Override
+			protected List<ScientificStudy> getStudies() {
+				return mgr.getCompletedStudies();
+			}
+		};
 		listsPane.add(finishedStudyListPane);
 
 		// Create study detail panel.
@@ -86,9 +102,10 @@ extends ToolWindow {
 	 */
 	public void setScientificStudy(ScientificStudy study) {
 		selectedStudy = study;
-		studyDetailPane.displayScientificStudy(study);
-		ongoingStudyListPane.selectScientificStudy(study, true);
-		finishedStudyListPane.selectScientificStudy(study, true);
+		if (studyDetailPane.displayScientificStudy(study)) {
+			ongoingStudyListPane.selectScientificStudy(study, true);
+			finishedStudyListPane.selectScientificStudy(study, true);
+		}
 	}
 
 	/**
