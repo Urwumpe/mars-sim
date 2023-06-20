@@ -1,21 +1,23 @@
-/**
+/*
  * Mars Simulation Project
  * ManufactureConfig.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-06-12
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.manufacture;
 
-import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Logger;
 
 import org.jdom2.Document;
 import org.jdom2.Element;
+import org.mars_sim.msp.core.configuration.ConfigHelper;
 import org.mars_sim.msp.core.equipment.EquipmentType;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
@@ -23,16 +25,13 @@ import org.mars_sim.msp.core.resource.ItemType;
 import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 
-public class ManufactureConfig implements Serializable {
+public class ManufactureConfig {
 
-	/** default serial id. */
-	private static final long serialVersionUID = 1L;
-
-	private static Logger logger = Logger.getLogger(ManufactureConfig.class.getName());
+	private static final Logger logger = Logger.getLogger(ManufactureConfig.class.getName());
 
 	// Element names
 	private static final String PROCESS = "process";
-	private static final String NAME = "name";
+	private static final String NAME = "name";	
 	private static final String TECH = "tech";
 	private static final String SKILL = "skill";
 	private static final String WORK_TIME = "work-time";
@@ -52,7 +51,6 @@ public class ManufactureConfig implements Serializable {
 	private static final String TYPE = "type";
 	private static final String PART_SALVAGE = "part-salvage";
 
-	private static Document manufactureDoc;
 	private static List<ManufactureProcessInfo> manufactureProcessList;
 	private static List<SalvageProcessInfo> salvageList;
 
@@ -63,7 +61,8 @@ public class ManufactureConfig implements Serializable {
 	 *                       configuration.
 	 */
 	public ManufactureConfig(Document manufactureDoc) {
-		this.manufactureDoc = manufactureDoc;
+		loadManufactureProcessList(manufactureDoc);
+		loadSalvageList(manufactureDoc);
 	}
 
 	/**
@@ -72,92 +71,231 @@ public class ManufactureConfig implements Serializable {
 	 * @return list of manufacturing process information.
 	 * @throws Exception if error getting info.
 	 */
-	public static List<ManufactureProcessInfo> getManufactureProcessList() {
+	public List<ManufactureProcessInfo> getManufactureProcessList() {
+		return manufactureProcessList;
+	}
+	
+	/**
+	 * Gets a list of manufacturing process information.
+	 * 
+	 * @return list of manufacturing process information.
+	 * @throws Exception if error getting info.
+	 */
+	private synchronized void loadManufactureProcessList(Document manufactureDoc) {
+		if (manufactureProcessList != null) {
+			// just in case if another thread is being created
+			return;
+		}
+		
+		// Build the global list in a temp to avoid access before it is built
+		List<ManufactureProcessInfo> newList = new ArrayList<>();
+		
+		Element root = manufactureDoc.getRootElement();
+		List<Element> processNodes = root.getChildren(PROCESS);
 
-		if (manufactureProcessList == null) {
+		for (Element processElement : processNodes) {
 
-			Element root = manufactureDoc.getRootElement();
-			List<Element> processNodes = root.getChildren(PROCESS);
-			manufactureProcessList = new CopyOnWriteArrayList<ManufactureProcessInfo>();
+			// Create a map that stores the resource to be swapped out with an alternate resource
+			Map<String, String> alternateResourceMap = new HashMap<>();
+			
+			ManufactureProcessInfo process = new ManufactureProcessInfo();
 
-			for (Element processElement : processNodes) {
+			String name = "";
+			String description = "";
 
-				ManufactureProcessInfo process = new ManufactureProcessInfo();
-				manufactureProcessList.add(process);
-				String name = "";
-				String description = "";
+			name = processElement.getAttributeValue(NAME);
+			
+			process.setName(name);
+			process.setTechLevelRequired(Integer.parseInt(processElement.getAttributeValue(TECH)));
+			process.setSkillLevelRequired(Integer.parseInt(processElement.getAttributeValue(SKILL)));
+			process.setWorkTimeRequired(Double.parseDouble(processElement.getAttributeValue(WORK_TIME)));
+			process.setProcessTimeRequired(Double.parseDouble(processElement.getAttributeValue(PROCESS_TIME)));
+			process.setPowerRequired(Double.parseDouble(processElement.getAttributeValue(POWER_REQUIRED)));
 
-				name = processElement.getAttributeValue(NAME).toLowerCase();
-				process.setName(name);
+			Element descriptElem = processElement.getChild(DESCRIPTION);
+			if (descriptElem != null) {
+				description = descriptElem.getText();
+			}
+			process.setDescription(description);
 
-				process.setTechLevelRequired(Integer.parseInt(processElement.getAttributeValue(TECH)));
+			Element inputs = processElement.getChild(INPUTS);
+			
+			List<ManufactureProcessItem> inputList = new ArrayList<>();
+			
+			process.setInputList(inputList);
 
-				process.setSkillLevelRequired(Integer.parseInt(processElement.getAttributeValue(SKILL)));
+			parseInputResources(inputList, inputs.getChildren(RESOURCE), alternateResourceMap);
+			parseParts(inputList, inputs.getChildren(PART));
+			parseEquipment(inputList, inputs.getChildren(EQUIPMENT));
+			parseVehicles(inputList, inputs.getChildren(VEHICLE));
 
-				process.setWorkTimeRequired(Double.parseDouble(processElement.getAttributeValue(WORK_TIME)));
+			Element outputs = processElement.getChild(OUTPUTS);
+			
+			List<ManufactureProcessItem> outputList = new ArrayList<>();
+			
+			process.setOutputList(outputList);
 
-				process.setProcessTimeRequired(Double.parseDouble(processElement.getAttributeValue(PROCESS_TIME)));
+			parseOutputResources(outputList, outputs.getChildren(RESOURCE));
+			parseParts(outputList, outputs.getChildren(PART));
+			parseEquipment(outputList, outputs.getChildren(EQUIPMENT));
+			parseVehicles(outputList, outputs.getChildren(VEHICLE));
 
-				process.setPowerRequired(Double.parseDouble(processElement.getAttributeValue(POWER_REQUIRED)));
+			// Add process to newList.
+			newList.add(process);
+		
+			if (!alternateResourceMap.isEmpty()) {
+				// Create a list for the original resources from alternateResourceMap
+				List<String> originalResourceList = new ArrayList<>(alternateResourceMap.values());
+				// Create a list for the alternate resources from alternateResourceMap
+				List<String> altResourceList = new ArrayList<>(alternateResourceMap.keySet());
+				
+				String processName = process.getName();
+		
+//				System.out.println("processName: " + processName);
+				
+//				System.out.println("alternateResourceMap: " + alternateResourceMap);
+				
+				int size = altResourceList.size();
+				
+				for (int i = 0; i < size; i++) {
+					
+					// Use copy constructor to create a new instance
+					ManufactureProcessInfo altProcess = new ManufactureProcessInfo(process);
 
-				Element descriptElem = processElement.getChild(DESCRIPTION);
-				if (descriptElem != null) {
-					description = descriptElem.getText();
+					String altProcessName = processName + " " + (i + 1);
+							
+					String originalResource = originalResourceList.get(i);
+					String altResource = altResourceList.get(i);
+
+					// Rename the original process name by appending it with a numeral
+					altProcess.setName(altProcessName);
+
+					// Create a brand new list
+					List<ManufactureProcessItem> newInputItems = new ArrayList<>();
+					
+					for (ManufactureProcessItem item: inputList) {
+						
+						String resName = item.getName();								
+						double amount = item.getAmount();				
+						ItemType type = item.getType();
+					
+						ManufactureProcessItem newItem = new ManufactureProcessItem();
+						
+						if (resName.equalsIgnoreCase(originalResource)) {
+							AmountResource resource = ResourceUtil.findAmountResource(resName);
+							if (resource != null) {
+								// Replace with the alternate resource name
+								newItem.setName(altResource);
+							}
+							else {
+//								System.out.println("resName: " + resName + "  originalResource: " + originalResource + "  inputList: " + inputList);
+								newItem.setName(resName);
+							}
+						}
+						else {
+							newItem.setName(resName);
+						}
+						
+						newItem.setAmount(amount);						
+						newItem.setType(type);
+		
+						newInputItems.add(newItem);					
+					}
+					
+					// Write the modified input resource list onto the new list
+					altProcess.setInputList(newInputItems);
+					
+					// Add process to newList.
+					newList.add(altProcess);
 				}
-				process.setDescription(description);
-
-				Element inputs = processElement.getChild(INPUTS);
-				List<ManufactureProcessItem> inputList = new CopyOnWriteArrayList<ManufactureProcessItem>();
-				process.setInputList(inputList);
-
-				parseResources(inputList, inputs.getChildren(RESOURCE));
-
-				parseParts(inputList, inputs.getChildren(PART));
-
-				parseEquipment(inputList, inputs.getChildren(EQUIPMENT));
-
-				parseVehicles(inputList, inputs.getChildren(VEHICLE));
-
-				Element outputs = processElement.getChild(OUTPUTS);
-				List<ManufactureProcessItem> outputList = new CopyOnWriteArrayList<ManufactureProcessItem>();
-				process.setOutputList(outputList);
-
-				parseResources(outputList, outputs.getChildren(RESOURCE));
-
-				parseParts(outputList, outputs.getChildren(PART));
-
-				parseEquipment(outputList, outputs.getChildren(EQUIPMENT));
-
-				parseVehicles(outputList, outputs.getChildren(VEHICLE));
 			}
 		}
-
-		return manufactureProcessList;
+		
+		// Assign the newList now built
+		manufactureProcessList = Collections.unmodifiableList(newList);
 	}
 
 	/**
-	 * Parses the amount resource elements in a node list.
+	 * Parses the input amount resource elements in a node list.
+	 * 
+	 * @param list          the list to store the resources in.
+	 * @param resourceNodes the node list.
+	 * @param alternateResourceMap the map that stores the resource to be swapped out with an alternate resource
+	 * @throws Exception if error parsing resources.
+	 */
+	private static void parseInputResources(List<ManufactureProcessItem> list, List<Element> resourceNodes, 
+			Map<String, String> alternateResourceMap) {
+		
+		for (Element resourceElement : resourceNodes) {
+			
+			ManufactureProcessItem resourceItem = new ManufactureProcessItem();
+			resourceItem.setType(ItemType.AMOUNT_RESOURCE);
+			String originalResourceName = "";
+			
+			for (int i = 0; i < 4; i++) {
+				String num = "";
+				if (i == 0)
+					num = "";
+				else 
+					num = i + "";
+				String resourceXMLName = resourceElement.getAttributeValue(NAME + num);
+				
+				if (resourceXMLName != null) {
+				
+					if (i == 0) {
+						originalResourceName = resourceXMLName;
+					}
+				
+					// Checks if resourceName exists at all
+					AmountResource resource = ResourceUtil.findAmountResource(resourceXMLName);
+					if (resource == null)
+						logger.severe(resourceXMLName + " shows up in manufacturing.xml but doesn't exist in resources.xml.");
+					else {
+						if (i == 0) {
+							resourceItem.setName(resourceXMLName);						
+							resourceItem.setAmount(Double.parseDouble(resourceElement.getAttributeValue(AMOUNT)));
+							list.add(resourceItem);
+						}
+						else {
+							alternateResourceMap.put(resourceXMLName, originalResourceName);
+//							System.out.println(alternateResourceMap.size() + "  originalResourceName: " + originalResourceName
+//									+ "  ->  resourceXMLName: " + resourceXMLName);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Parses the output amount resource elements in a node list.
 	 * 
 	 * @param list          the list to store the resources in.
 	 * @param resourceNodes the node list.
 	 * @throws Exception if error parsing resources.
 	 */
-	private static void parseResources(List<ManufactureProcessItem> list, List<Element> resourceNodes) {
+	private static void parseOutputResources(List<ManufactureProcessItem> list, List<Element> resourceNodes) {
+
 		for (Element resourceElement : resourceNodes) {
+			
 			ManufactureProcessItem resourceItem = new ManufactureProcessItem();
 			resourceItem.setType(ItemType.AMOUNT_RESOURCE);
-			String resourceName = resourceElement.getAttributeValue(NAME).toLowerCase();
-			AmountResource resource = ResourceUtil.findAmountResource(resourceName);
-			if (resource == null)
-				logger.severe(resourceName + " shows up in manufacturing.xml but doesn't exist in resources.xml.");
-			else {
-				resourceItem.setName(resourceName);
-				resourceItem.setAmount(Double.parseDouble(resourceElement.getAttributeValue(AMOUNT)));
-				list.add(resourceItem);
+			
+			String resourceName = resourceElement.getAttributeValue(NAME);
+			
+			if (resourceName != null) {
+				AmountResource resource = ResourceUtil.findAmountResource(resourceName);
+				if (resource == null)
+					logger.severe(resourceName + " shows up in manufacturing.xml but doesn't exist in resources.xml.");
+				else {		
+					resourceItem.setName(resourceName);
+					resourceItem.setAmount(Double.parseDouble(resourceElement.getAttributeValue(AMOUNT)));
+					list.add(resourceItem);
+				}
 			}
 		}
 	}
-
+	
 	/**
 	 * Parses the part elements in a node list.
 	 * 
@@ -196,21 +334,12 @@ public class ManufactureConfig implements Serializable {
 			equipmentItem.setType(ItemType.EQUIPMENT);
 			String equipmentName = equipmentElement.getAttributeValue(NAME);
 
-			Set<String> names = EquipmentType.getNameSet();// EquipmentFactory.getEquipmentNames();
-			boolean result = false;
-			for (String s : names) {
-				if (s.equalsIgnoreCase(equipmentName)) {
-					result = true;
-				}
-			}
-
-			if (result) {
+			EquipmentType eType = EquipmentType.valueOf(ConfigHelper.convertToEnumName(equipmentName));
+			if (eType != null) {
 				equipmentItem.setName(equipmentName);
 				equipmentItem.setAmount(Integer.parseInt(equipmentElement.getAttributeValue(NUMBER)));
 				list.add(equipmentItem);
-			} else
-				logger.severe("The equipment '" + equipmentName + "' shows up in manufacturing.xml but doesn't "
-						+ "exist in EquipmentType.");
+			}
 		}
 	}
 
@@ -237,75 +366,59 @@ public class ManufactureConfig implements Serializable {
 	 * @return list of salvage process information.
 	 * @throws Exception if error getting info.
 	 */
-	List<SalvageProcessInfo> getSalvageList() {
-
-		if (salvageList == null) {
-
-			Element root = manufactureDoc.getRootElement();
-			List<Element> salvageNodes = root.getChildren(SALVAGE);
-			salvageList = new CopyOnWriteArrayList<SalvageProcessInfo>();
-			Iterator<Element> i = salvageNodes.iterator();
-			while (i.hasNext()) {
-				Element salvageElement = i.next();
-				SalvageProcessInfo salvage = new SalvageProcessInfo();
-				salvageList.add(salvage);
-				String itemName = "";
-
-				itemName = salvageElement.getAttributeValue(ITEM_NAME);
-				salvage.setItemName(itemName);
-
-				salvage.setType(salvageElement.getAttributeValue(TYPE));
-
-				salvage.setTechLevelRequired(Integer.parseInt(salvageElement.getAttributeValue(TECH)));
-
-				salvage.setSkillLevelRequired(Integer.parseInt(salvageElement.getAttributeValue(SKILL)));
-
-				salvage.setWorkTimeRequired(Double.parseDouble(salvageElement.getAttributeValue(WORK_TIME)));
-
-				List<Element> partSalvageNodes = salvageElement.getChildren(PART_SALVAGE);
-				List<PartSalvage> partSalvageList = new CopyOnWriteArrayList<PartSalvage>();
-				salvage.setPartSalvageList(partSalvageList);
-
-				Iterator<Element> j = partSalvageNodes.iterator();
-				while (j.hasNext()) {
-					Element partSalvageElement = j.next();
-					PartSalvage part = new PartSalvage();
-					partSalvageList.add(part);
-
-					part.setName(partSalvageElement.getAttributeValue(NAME));
-
-					part.setNumber(Integer.parseInt(partSalvageElement.getAttributeValue(NUMBER)));
-				}
-			}
-		}
-
+	public List<SalvageProcessInfo> getSalvageList() {
 		return salvageList;
 	}
-
+		
 	/**
-	 * Prepare object for garbage collection.
+	 * Gets a list of salvage process information.
+	 * 
+	 * @return list of salvage process information.
+	 * @throws Exception if error getting info.
 	 */
-	public void destroy() {
-		manufactureDoc = null;
-
-		if (manufactureProcessList != null) {
-
-			Iterator<ManufactureProcessInfo> i = manufactureProcessList.iterator();
-			while (i.hasNext()) {
-				i.next().destroy();
-			}
-			manufactureProcessList.clear();
-			manufactureProcessList = null;
-		}
-
+	private synchronized void loadSalvageList(Document manufactureDoc) {
 		if (salvageList != null) {
-
-			Iterator<SalvageProcessInfo> j = salvageList.iterator();
-			while (j.hasNext()) {
-				j.next().destroy();
-			}
-			salvageList.clear();
-			salvageList = null;
+			// just in case if another thread is being created
+			return;
 		}
+		
+		Element root = manufactureDoc.getRootElement();
+		List<Element> salvageNodes = root.getChildren(SALVAGE);
+		List<SalvageProcessInfo> newList = new ArrayList<>();
+		
+		Iterator<Element> i = salvageNodes.iterator();
+		while (i.hasNext()) {
+			Element salvageElement = i.next();
+			SalvageProcessInfo salvage = new SalvageProcessInfo();
+			String itemName = "";
+			itemName = salvageElement.getAttributeValue(ITEM_NAME);
+			
+			salvage.setItemName(itemName);
+			salvage.setType(salvageElement.getAttributeValue(TYPE));
+			salvage.setTechLevelRequired(Integer.parseInt(salvageElement.getAttributeValue(TECH)));
+			salvage.setSkillLevelRequired(Integer.parseInt(salvageElement.getAttributeValue(SKILL)));
+			salvage.setWorkTimeRequired(Double.parseDouble(salvageElement.getAttributeValue(WORK_TIME)));
+
+			List<Element> partSalvageNodes = salvageElement.getChildren(PART_SALVAGE);
+			List<PartSalvage> partSalvageList = new ArrayList<>();
+			salvage.setPartSalvageList(partSalvageList);
+
+			Iterator<Element> j = partSalvageNodes.iterator();
+			while (j.hasNext()) {
+				Element partSalvageElement = j.next();
+				PartSalvage part = new PartSalvage();
+				
+				partSalvageList.add(part);
+
+				part.setName(partSalvageElement.getAttributeValue(NAME));
+				part.setNumber(Integer.parseInt(partSalvageElement.getAttributeValue(NUMBER)));
+			}
+
+			// Add salvage to newList.
+			newList.add(salvage);
+		}
+
+		// Assign the newList now built
+		salvageList = Collections.unmodifiableList(newList);
 	}
 }

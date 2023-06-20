@@ -1,14 +1,13 @@
 /**
  * Mars Simulation Project
  * PersonalityTraitManager.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
  
 package org.mars_sim.msp.core.person.ai;
 
 import java.io.Serializable;
-import java.util.Hashtable;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -123,7 +122,7 @@ public class PersonalityTraitManager implements Serializable {
 	}
 
 	/**
-	 * Creates the personality vector
+	 * Creates the personality vector.
 	 * 
 	 * @return double array
 	 */

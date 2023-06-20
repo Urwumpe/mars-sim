@@ -1,15 +1,14 @@
-/**
+/*
  * Mars Simulation Project
  * ConstructionUtil.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-15
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.core.structure.construction;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.person.Person;
@@ -21,6 +20,8 @@ import org.mars_sim.msp.core.structure.Settlement;
  */
 public class ConstructionUtil {
 
+	private static ConstructionConfig config = SimulationConfig.instance().getConstructionConfiguration();
+	
 	/**
 	 * Private constructor.
 	 */
@@ -29,17 +30,22 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets a construction stage info matching a given name.
+	 * 
 	 * @param stageName the stage info name.
 	 * @return construction stage info or null if none found.
 	 * @throws Exception if error finding construction stage info.
 	 */
+	// TODO: reduce the utilization on this method. 3.5% of total cpu
 	public static ConstructionStageInfo getConstructionStageInfo(String stageName) {
 		ConstructionStageInfo result = null;
 
 		Iterator<ConstructionStageInfo> i = getAllConstructionStageInfoList().iterator(); 
 		while (i.hasNext()) {
 			ConstructionStageInfo stageInfo = i.next();
-			if (stageInfo.getName().equalsIgnoreCase(stageName.trim())) result = stageInfo;
+			if (stageInfo.getName().equalsIgnoreCase(stageName.trim())) {
+				result = stageInfo;
+				break;
+			}
 		}
 
 		return result;
@@ -47,6 +53,7 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets a list of all construction stage info of a given type.
+	 * 
 	 * @param stageType the type of stage.
 	 * @return list of construction stage info.
 	 * @throws Exception if error getting list.
@@ -57,6 +64,7 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets a list of all construction stage info of a given type.
+	 * 
 	 * @param stageType the type of stage.
 	 * @param constructionSkill the architect's construction skill.
 	 * @return list of construction stage info.
@@ -64,9 +72,9 @@ public class ConstructionUtil {
 	 */
 	public static List<ConstructionStageInfo> getConstructionStageInfoList(String stageType,
 			int constructionSkill) {
-		ConstructionConfig config = SimulationConfig.instance().getConstructionConfiguration();
+
 		List<ConstructionStageInfo> result = 
-				new CopyOnWriteArrayList<ConstructionStageInfo>(config.getConstructionStageInfoList(stageType));
+				new ArrayList<>(config.getConstructionStageInfoList(stageType));
 		Iterator<ConstructionStageInfo> i = result.iterator();
 		while (i.hasNext()) {
 			if (i.next().getArchitectConstructionSkill() > constructionSkill) i.remove();
@@ -76,6 +84,7 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets a list of all foundation construction stage info.
+	 * 
 	 * @return list of construction stage info.
 	 * @throws Exception if error getting list.
 	 */
@@ -85,6 +94,7 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets a list of all foundation construction stage info.
+	 * 
 	 * @param constructionSkill the architect's construction skill.
 	 * @return list of construction stage info.
 	 * @throws Exception if error getting list.
@@ -96,6 +106,7 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets a list of all frame construction stage info.
+	 * 
 	 * @return list of construction stage info.
 	 * @throws Exception if error getting list.
 	 */
@@ -105,6 +116,7 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets a list of all frame construction stage info.
+	 * 
 	 * @param constructionSkill the architect's construction skill.
 	 * @return list of construction stage info.
 	 * @throws Exception if error getting list.
@@ -116,6 +128,7 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets a list of all building construction stage info.
+	 * 
 	 * @return list of construction stage info.
 	 * @throws Exception if error getting list.
 	 */
@@ -125,6 +138,7 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets a list of all building construction stage info.
+	 * 
 	 * @param constructionSkill the architect's construction skill.
 	 * @return list of construction stage info.
 	 * @throws Exception if error getting list.
@@ -136,37 +150,24 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets a list of all construction stage info available.
+	 * 
 	 * @return list of construction stage info.
 	 * @throws Exception if error getting list.
 	 */
 	public static List<ConstructionStageInfo> getAllConstructionStageInfoList() {
-
-		ConstructionConfig config = SimulationConfig.instance().getConstructionConfiguration();
-		List<ConstructionStageInfo> foundations = config.getConstructionStageInfoList(
-				ConstructionStageInfo.FOUNDATION);
-		List<ConstructionStageInfo> frames = config.getConstructionStageInfoList(
-				ConstructionStageInfo.FRAME);
-		List<ConstructionStageInfo> buildings = config.getConstructionStageInfoList(
-				ConstructionStageInfo.BUILDING);
-
-//		int resultSize = foundations.size() + frames.size() + buildings.size();
-		List<ConstructionStageInfo> result = new CopyOnWriteArrayList<ConstructionStageInfo>();
-		result.addAll(foundations);
-		result.addAll(frames);
-		result.addAll(buildings);
-
-		return result;
+		return config.getAllConstructionStageInfoList();
 	}
 
 	/**
 	 * Gets a list of names of buildings that are constructable from a given construction stage info.
+	 * 
 	 * @param stageInfo the construction stage info.
 	 * @return list of building names.
 	 * @throws Exception if error getting list.
 	 */
 	public static List<String> getConstructableBuildingNames(ConstructionStageInfo stageInfo) {
 
-		List<String> result = new CopyOnWriteArrayList<String>();
+		List<String> result = new ArrayList<String>();
 
 		if (ConstructionStageInfo.FOUNDATION.equals(stageInfo.getType())) {
 			Iterator<ConstructionStageInfo> i = getNextPossibleStages(stageInfo).iterator();
@@ -186,13 +187,14 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets a list of the next possible construction stages from a given construction stage info.
+	 * 
 	 * @param stageInfo the construction stage info.
 	 * @return list of construction stage info.
 	 * @throws Exception if error getting list.
 	 */
 	public static List<ConstructionStageInfo> getNextPossibleStages(ConstructionStageInfo stageInfo) {
 
-		List<ConstructionStageInfo> result = new CopyOnWriteArrayList<ConstructionStageInfo>();
+		List<ConstructionStageInfo> result = new ArrayList<>();
 
 		String nextStageName = null;
 		if (ConstructionStageInfo.FOUNDATION.equals(stageInfo.getType())) 
@@ -201,7 +203,7 @@ public class ConstructionUtil {
 			nextStageName = ConstructionStageInfo.BUILDING;
 
 		if (nextStageName != null) {
-			ConstructionConfig config = SimulationConfig.instance().getConstructionConfiguration();
+	
 			Iterator<ConstructionStageInfo> i = config.getConstructionStageInfoList(nextStageName).iterator();
 			while (i.hasNext()) {
 				ConstructionStageInfo buildingStage = i.next();
@@ -216,6 +218,7 @@ public class ConstructionUtil {
 
 	/**
 	 * Gets the prerequisite construction stage info for a given stage info.
+	 * 
 	 * @param stageInfo the construction stage info.
 	 * @return the prerequisite stage info or null if none.
 	 * @throws Exception if error finding prerequisite stage info.
@@ -228,7 +231,10 @@ public class ConstructionUtil {
 			Iterator<ConstructionStageInfo> i = getAllConstructionStageInfoList().iterator();
 			while (i.hasNext()) {
 				ConstructionStageInfo info = i.next();
-				if (info.getName().equals(prerequisiteStageName)) result = info;
+				if (info.getName().equals(prerequisiteStageName)) {
+					result = info;
+					break;
+				}
 			}
 		}
 
@@ -237,6 +243,7 @@ public class ConstructionUtil {
 	
 	/**
 	 * Gets the highest construction skill of all people associated with a settlement.
+	 * 
 	 * @param settlement the settlement.
 	 * @return highest effective construction skill.
 	 */

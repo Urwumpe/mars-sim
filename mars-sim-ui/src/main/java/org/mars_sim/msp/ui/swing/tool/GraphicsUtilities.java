@@ -1,10 +1,9 @@
 /**
  * Mars Simulation Project
  * GraphicsUtilities.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-20
  * @author Manny Kung
  */
-
 package org.mars_sim.msp.ui.swing.tool;
 
 /*

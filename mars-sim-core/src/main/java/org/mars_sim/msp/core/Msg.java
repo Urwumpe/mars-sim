@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * Msg.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-31
  * @author stpa
  */
 package org.mars_sim.msp.core;
@@ -11,6 +11,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -22,16 +24,17 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * used to get internationizations of strings
- * and other stuff from {@link ResourceBundle}-
+ * For getting internationizations of strings
+ * from {@link ResourceBundle}-
  * properties-files, like date or decimal formats,
- * or image-icon-paths (think of red cross vs. crescent)
+ * or image-icon-paths (think of red cross vs. crescent).
+ * 
  * @author stpa
  */
 public class Msg {
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(Msg.class.getName());
+	private static final Logger logger = Logger.getLogger(Msg.class.getName());
 
 	/** location of the properties files in the project code base. */
 	private static final String BUNDLE_NAME = "messages"; //$NON-NLS-1$
@@ -69,43 +72,10 @@ public class Msg {
 		try {
 			return RESOURCE_BUNDLE.getString(key);
 		} catch (MissingResourceException e) {
-//			Log.warn(e.getStackTrace()[1].getClassName());
 			return handle(e,key);
 		}
-		
-
-		
 	}
 
-	/*
-	 * replaces all occurrences of "{0}" with the given parameter.
-	 * @param key {@link String}
-	 * @param param1 {@link String}
-	 * @return {@link String}
-	 *
-	 */
-//	public static String getString(
-//		final String key,
-//		final String param1
-//	) {
-//		return getString(key)
-//		.replace("{0}",param1);
-//	}
-
-	/*
-	 * replaces all occurrences of "{0}" with the given parameter.
-	 * @param key {@link String}
-	 * @param param1 {@link Integer}
-	 * @return {@link String}
-	 *
-     */
-//	public static String getString(
-//		final String key,
-//		final int param1
-//	) {
-//		return getString(key)
-//		.replace("{0}",Integer.toString(param1));
-//	}
 
 	/**
 	 * replaces all occurrences of "{n}" (with n an integer)
@@ -115,51 +85,9 @@ public class Msg {
 	 * @return
 	 */
 	public static String getString(final String key, final Object... args) {
-		String s = getString(key);
-		int i = 0;
-		for (Object arg : args) {
-			s = s.replace(
-				"{" + i + "}",
-				arg.toString()
-			);
-			i++;
-		}
-		return s;
+		// Richer formatting rules using built in Message Format class
+		return MessageFormat.format(getString(key), args);
 	}
-	
-	/*
-	 * replaces all occurrences of "{0}" with the given parameter.
-	 * @param key {@link String}
-	 * @param param1 {@link Double}
-	 * @return {@link String}
-	 *
-	 */
-//	public static String getString(
-//		final String key,
-//		final double param1
-//	) {
-//		return getString(key)
-//		.replace("{0}",Double.toString(param1));
-//	}
-
-	/*
-	 * replaces all occurrences of "{0}" with the given parameter.
-	 * replaces all occurrences of "{1}" with the given second parameter.
-	 * @param key {@link String}
-	 * @param param1 {@link String}
-	 * @param param2 {@link String}
-	 * @return {@link String}
-	 *
-	 */
-//	public static String getString(
-//		final String key,
-//		final String param1,
-//		final String param2
-//	) {
-//		return getString(key)
-//		.replace("{0}",param1)
-//		.replace("{1}",param2);
-//	}
 
 	public static boolean getBool(String key) {
 		try {
@@ -210,7 +138,7 @@ public class Msg {
 			) {
 				rest = rest.substring(1,rest.length() - 1);
 				String[] parts = rest.split(",");
-				List<String> list = new ArrayList<String>();
+				List<String> list = new ArrayList<>();
 				for (String part : parts) {
 					if (part != null && part.length() > 0) {
 						list.add(part);
@@ -228,9 +156,9 @@ public class Msg {
 	}
 
 	/** prints an error message to the console. */
-	public static final String handle(Exception e,String key) {
-		// Note : StringBuffer is thread safe and synchronized whereas StringBuilder is not, 
-		// thats why StringBuilder is more faster than StringBuffer.
+	public static final String handle(Exception e, String key) {
+		// Note : StringBuffer is thread safe and synchronized whereas StringBuilder is not.
+		// StringBuilder is not synchronized and is faster than StringBuffer.
 		StringBuffer msg = new StringBuffer();
 		msg.append("!!") //$NON-NLS-1$
 		.append(key)
@@ -274,9 +202,9 @@ public class Msg {
 				stream = loader.getResourceAsStream(resourceName);
 			}
 			if (stream != null) {
-				try {
+				try (InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
 					// Only this line is changed to make it to read properties files as UTF-8.
-					bundle = new PropertyResourceBundle(new InputStreamReader(stream, "UTF-8"));
+					bundle = new PropertyResourceBundle(reader);
 				} finally {
 					stream.close();
 				}

@@ -1,141 +1,98 @@
-/**
+/*
  * Mars Simulation Project
  * BuildingPanelInhabitable.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-10
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
-import org.apache.commons.collections.CollectionUtils;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.util.Collection;
+
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.structure.building.function.LifeSupport;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-
-import javax.swing.DefaultListModel;
-import javax.swing.JList;
+import org.mars_sim.msp.ui.swing.unit_window.UnitListPanel;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
 /**
  * The InhabitableBuildingPanel class is a building function panel representing 
  * the inhabitants of a settlement building.
  */
-public class BuildingPanelInhabitable
-extends BuildingFunctionPanel
-implements MouseListener {
+@SuppressWarnings("serial")
+public class BuildingPanelInhabitable extends BuildingFunctionPanel {
+
+	private static final String PEOPLE_ICON = "people";
 
 	/** The inhabitable building. */
 	private LifeSupport inhabitable;
-	private DefaultListModel<Person> inhabitantListModel;
-	private JList<Person> inhabitantList;
-	private Collection<Person> inhabitantCache;
-	private WebLabel numberLabel;
+	private JLabel numberLabel;
+	private UnitListPanel<Person> inhabitantListPanel;
 
 	/**
 	 * Constructor.
+	 * 
 	 * @param inhabitable The inhabitable building this panel is for.
 	 * @param desktop The main desktop.
 	 */
 	public BuildingPanelInhabitable(LifeSupport inhabitable, MainDesktopPane desktop) {
 
 		// Use BuildingFunctionPanel constructor
-		super(inhabitable.getBuilding(), desktop);
+		super(
+			Msg.getString("BuildingPanelInhabitable.title"), 
+			ImageLoader.getIconByName(PEOPLE_ICON),
+			inhabitable.getBuilding(), 
+			desktop
+		);
 
 		// Initialize data members.
 		this.inhabitable = inhabitable;
-
-		// Set panel layout
-		setLayout(new BorderLayout());
-
+	}
+	
+	/**
+	 * Build the UI
+	 */
+	@Override
+	protected void buildUI(JPanel center) {
 		// Create label panel
-		WebPanel labelPanel = new WebPanel(new GridLayout(3, 1, 0, 0));
-		add(labelPanel, BorderLayout.NORTH);
-		labelPanel.setOpaque(false);
-		labelPanel.setBackground(new Color(0,0,0,128));
-
-		// Create inhabitant label
-		WebLabel inhabitantLabel = new WebLabel(Msg.getString("BuildingPanelInhabitable.title"), WebLabel.CENTER); //$NON-NLS-1$
-		inhabitantLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		//inhabitantLabel.setForeground(new Color(102, 51, 0)); // dark brown
-		labelPanel.add(inhabitantLabel);
-		inhabitantLabel.setOpaque(false);
-		inhabitantLabel.setBackground(new Color(0,0,0,128));
+		AttributePanel labelPanel = new AttributePanel(2);
+		center.add(labelPanel, BorderLayout.NORTH);
 
 		// Create number label
-		numberLabel = new WebLabel(Msg.getString("BuildingPanelInhabitable.number", inhabitable.getOccupantNumber()), WebLabel.CENTER); //$NON-NLS-1$
-		labelPanel.add(numberLabel);
-//		numberLabel.setOpaque(false);
-//		numberLabel.setBackground(new Color(0,0,0,128));
+		numberLabel = labelPanel.addTextField(Msg.getString("BuildingPanelInhabitable.number"),
+								   Integer.toString(inhabitable.getOccupantNumber()), null); //$NON-NLS-1$
 
 		// Create capacity label
-		WebLabel capacityLabel = new WebLabel(
-			Msg.getString(
-				"BuildingPanelInhabitable.capacity", //$NON-NLS-1$
-				inhabitable.getOccupantCapacity()
-			),WebLabel.CENTER
-		);
-		labelPanel.add(capacityLabel);
-//		capacityLabel.setOpaque(false);
-//		capacityLabel.setBackground(new Color(0,0,0,128));
+		labelPanel.addTextField(Msg.getString("BuildingPanelInhabitable.capacity"),
+					 Integer.toString(inhabitable.getOccupantCapacity()), null);
+
 
 		// Create inhabitant list panel
-		WebPanel inhabitantListPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		add(inhabitantListPanel, BorderLayout.CENTER);
-
-		// Create inhabitant list model
-		inhabitantListModel = new DefaultListModel<Person>();
-		inhabitantCache = new ArrayList<Person>(inhabitable.getOccupants());
-		Iterator<Person> i = inhabitantCache.iterator();
-		while (i.hasNext()) inhabitantListModel.addElement(i.next());
-
-		// Create inhabitant list
-		inhabitantList = new JList<Person>(inhabitantListModel);
-		inhabitantList.addMouseListener(this);
-
+		inhabitantListPanel = new UnitListPanel<>(getDesktop(), new Dimension(200, 250)) {
+			@Override
+			protected Collection<Person> getData() {
+				return inhabitable.getOccupants();
+			}
+		};
+		
+		addBorder(inhabitantListPanel, "Inhabitants");
+		center.add(inhabitantListPanel, BorderLayout.NORTH);
 	}
 
 	/**
 	 * Update this panel.
 	 */
+	@Override
 	public void update() {
-
 		// Update population list and number label
-		if (!CollectionUtils.isEqualCollection(inhabitantCache, inhabitable.getOccupants())) {
-			inhabitantCache = new ArrayList<Person>(inhabitable.getOccupants());
-			inhabitantListModel.clear();
-			Iterator<Person> i = inhabitantCache.iterator();
-			while (i.hasNext()) inhabitantListModel.addElement(i.next());
-
-			numberLabel.setText(Msg.getString("BuildingPanelInhabitable.number", inhabitantCache.size())); //$NON-NLS-1$
+		if (inhabitantListPanel.update()) {
+			numberLabel.setText(Integer.toString(inhabitantListPanel.getUnitCount()));
 		}
 	}
-
-	/** 
-	 * Mouse clicked event occurs.
-	 * @param event the mouse event
-	 */
-	public void mouseClicked(MouseEvent event) {
-
-		// If double-click, open person window.
-		if (event.getClickCount() >= 2) 
-			desktop.openUnitWindow((Person) inhabitantList.getSelectedValue(), false);
-	}
-
-	public void mousePressed(MouseEvent event) {}
-	public void mouseReleased(MouseEvent event) {}
-	public void mouseEntered(MouseEvent event) {}
-	public void mouseExited(MouseEvent event) {}
 }

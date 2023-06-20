@@ -1,34 +1,51 @@
-/**
+/*
  * Mars Simulation Project
- * ThermalGeneration.java
- * @version 3.1.2 2020-09-02
+ * PowerSourceType.java
+ * @date 2023-06-02
  * @author stpa
  */
 
 package org.mars_sim.msp.core.structure.building.function;
 
+import org.mars_sim.msp.core.Msg;
+
 public enum PowerSourceType {
 
-	SOLAR_POWER ("Solar Power Source"),
-	AREOTHERMAL_POWER ("Areothermal Power Source"),
-	WIND_POWER ("Wind Power Source"),
-	STANDARD_POWER ("Standard Power Source"),
-	FUEL_POWER ("Fuel Power Source"),
-	SOLAR_THERMAL ("Solar Thermal Power Source");
+	AREOTHERMAL_POWER 			(Msg.getString("PowerSourceType.areothermalPower")), //$NON-NLS-1$ 
+	FISSION_POWER 				(Msg.getString("PowerSourceType.fissionPower")), //$NON-NLS-1$ 
+	FUEL_POWER 					(Msg.getString("PowerSourceType.fuelPower")), //$NON-NLS-1$ 
+	SOLAR_POWER 				(Msg.getString("PowerSourceType.solarPower")), //$NON-NLS-1$ 
+	SOLAR_THERMAL 				(Msg.getString("PowerSourceType.solarThermalPower")), //$NON-NLS-1$ 
+	THERMIONIC_NUCLEAR_POWER 	(Msg.getString("PowerSourceType.thermionicNuclearPower")), //$NON-NLS-1$ 	
+	WIND_POWER 					(Msg.getString("PowerSourceType.windPower")); //$NON-NLS-1$
 
-	private String string;
+	private String name;
 
-	/** hidden constructor. */
-	private PowerSourceType(String string) {
-		this.string = string;
+	/** 
+	 * Constructor. 
+	 */
+	private PowerSourceType(String name) {
+		this.name = name;
 	}
 	
 	public final String getName() {
-		return this.string;
+		return this.name;
 	}
 
 	@Override
 	public final String toString() {
 		return getName();
+	}
+	
+	public static PowerSourceType getType(String name) {
+		if (name != null) {
+	    	for (PowerSourceType pst : PowerSourceType.values()) {
+	    		if (name.equalsIgnoreCase(pst.name)) {
+	    			return pst;
+	    		}
+	    	}
+		}
+		
+		return null;
 	}
 }

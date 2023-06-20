@@ -1,107 +1,120 @@
-/**
+/*
  * Mars Simulation Project
  * Research.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-16
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.LogConsolidated;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.structure.Lab;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.BuildingException;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
+import org.mars_sim.msp.core.structure.building.function.farming.Farming;
 import org.mars_sim.msp.core.time.ClockPulse;
-import org.mars_sim.msp.core.time.MarsClock;
 
 /**
  * The Research class is a building function for research.
  */
 public class Research
 extends Function
-implements Lab, Serializable {
+implements Lab {
 
     /** default serial id. */
     private static final long serialVersionUID = 1L;
     
-	private static transient Logger logger = Logger.getLogger(Research.class.getName());
+	private static final SimLogger logger = SimLogger.getLogger(Research.class.getName());
 
-	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-			logger.getName().length());
-	
-	private static final int NUM_INSPECTIONS = 2;
+	private static final int NUM_INSPECTIONS = 3;
 	
     private int techLevel;
     private int researcherCapacity = 0;
     private int researcherNum = 0;
-    private int solCache;
     
     private List<ScienceType> researchSpecialties;
-
-    /** This map is the log book for tallying the # of daily inspections on the tissue cultures that this lab maintains */
-    private Map<String, Integer> tissueCultureMap;
-    //private List<String> tissueCultureList;
     
-
+    /** 
+     * This map records the quality of the research on
+     * a science subject in the form of a score. 
+     * It can go up and down over time. 
+     */
+    private Map<ScienceType, Double> researchQualityMap;
+    
+    /** 
+     * This map is the log book for tallying the # of daily 
+     * inspections on the tissue cultures that this lab maintains.
+     */
+    private Map<String, Integer> tissueCultureInspection;
+    
+    /** 
+     * The amount of tissue cultures that this lab maintains.
+     */
+    private Map<String, Double> tissueCultureAmount;
+    
+    /** 
+     * The incubator in which crop tissue grows
+     */
+	private Map<String, Double> tissueIncubator;
+	
     /**
      * Constructor.
+     * 
      * @param building the building this function is for.
      */
-    public Research(Building building) {
+    public Research(Building building, FunctionSpec spec) {
         // Use Function constructor
-        super(FunctionType.RESEARCH, building);
+        super(FunctionType.RESEARCH, spec, building);
 
         setupTissueCultures();
         
-        String type = building.getBuildingType();
-        techLevel = buildingConfig.getResearchTechLevel(type);
-        researcherCapacity = buildingConfig.getResearchCapacity(type);
-        researchSpecialties = buildingConfig.getResearchSpecialties(type);
-
-        // Load activity spots
-        loadActivitySpots(buildingConfig.getResearchActivitySpots(type));
+        techLevel = spec.getTechLevel();
+        researcherCapacity = spec.getCapacity();
+        researchSpecialties = buildingConfig.getResearchSpecialties(building.getBuildingType());
+        researchQualityMap = new HashMap<>();
+		
+        // Initialize the research quality map
+        for (ScienceType scienceType : researchSpecialties) {
+        	researchQualityMap.put(scienceType, techLevel * 1.0);
+        }
     }
 
     /**
-     * Gets the value of the function for a named building.
-     * @param buildingName the building name.
+     * Gets the value of the function for a named building type.
+     * 
+     * @param type the building type.
      * @param newBuilding true if adding a new building.
      * @param settlement the settlement.
      * @return value (VP) of building function.
      */
-    public static double getFunctionValue(String buildingName, boolean newBuilding,
+    public static double getFunctionValue(String type, boolean newBuilding,
             Settlement settlement) {
 
         double result = 0D;
 
-        List<ScienceType> specialties = buildingConfig.getResearchSpecialties(buildingName);
-
-        for (ScienceType specialty : specialties) {
+        for (ScienceType specialty : buildingConfig.getResearchSpecialties(type)) {
             double researchDemand = 0D;
-            Iterator<Person> j = settlement.getAllAssociatedPeople().iterator();
-            while (j.hasNext())
-                researchDemand += j.next().getSkillManager().getSkillLevel(specialty.getSkill());
+            for(Person p : settlement.getAllAssociatedPeople()) {
+                researchDemand += p.getSkillManager().getSkillLevel(specialty.getSkill());
+            }
 
             double researchSupply = 0D;
             boolean removedBuilding = false;
 
-            List<Building> b_list = settlement.getBuildingManager().getBuildings(FunctionType.RESEARCH);
-            for (Building building : b_list) {
-                if (!newBuilding && building.getBuildingType().equalsIgnoreCase(buildingName) && !removedBuilding) {
+            for (Building building : settlement.getBuildingManager().getBuildings(FunctionType.RESEARCH)) {
+                if (!newBuilding && building.getBuildingType().equalsIgnoreCase(type) && !removedBuilding) {
                     removedBuilding = true;
                 }
                 else {
@@ -120,8 +133,9 @@ implements Lab, Serializable {
 
             double existingResearchValue = researchDemand / (researchSupply + 1D);
 
-            int techLevel = buildingConfig.getResearchTechLevel(buildingName);
-            int labSize = buildingConfig.getResearchCapacity(buildingName);
+            FunctionSpec spec = buildingConfig.getFunctionSpec(type, FunctionType.RESEARCH);
+            int techLevel = spec.getTechLevel();
+            int labSize = spec.getCapacity();
             int buildingResearchSupply = techLevel * labSize;
 
             result += buildingResearchSupply * existingResearchValue;
@@ -132,6 +146,7 @@ implements Lab, Serializable {
 
     /**
      * Gets the research tech level of this building.
+     * 
      * @return tech level
      */
     public int getTechnologyLevel() {
@@ -140,6 +155,7 @@ implements Lab, Serializable {
 
     /**
      * Gets the number of researchers who can use the laboratory at once.
+     * 
      * @return capacity
      */
     public int getLaboratorySize() {
@@ -148,6 +164,7 @@ implements Lab, Serializable {
 
     /**
      * Gets an array of the building's research tech specialties.
+     * 
      * @return array of specialties.
      */
     public ScienceType[] getTechSpecialties() {
@@ -156,6 +173,7 @@ implements Lab, Serializable {
 
     /**
      * Checks to see if the laboratory has a given tech specialty.
+     * 
      * @return true if lab has tech specialty
      */
     public boolean hasSpecialty(ScienceType specialty) {
@@ -164,6 +182,7 @@ implements Lab, Serializable {
 
     /**
      * Gets the number of people currently researching in the laboratory.
+     * 
      * @return number of researchers
      */
     public int getResearcherNum() {
@@ -172,14 +191,13 @@ implements Lab, Serializable {
 
     /**
      * Adds a researcher to the laboratory.
+     * 
      * @return true if the person can be added. 
      */
     public boolean addResearcher() {
-
         if (researcherNum > researcherCapacity) {
             researcherNum = researcherCapacity;
             return false;
-            //throw new IllegalStateException("Lab already full of researchers.");
         }
         else {
             researcherNum ++;
@@ -189,74 +207,138 @@ implements Lab, Serializable {
 
     /**
      * Checks if there is an available slot in the laboratory.
+     * 
      * @throws Exception if person cannot be added.
      */
     public Boolean checkAvailability() {
-    	//System.out.println("lab : " + researcherNum + " of " + researcherCapacity);
-        if (researcherNum < researcherCapacity) {
-            return true;
-        }
-        else
-        	return false;
+        return researcherNum < researcherCapacity;
     }
 
 
     /**
      * Removes a researcher from the laboratory.
+     * 
      * @throws Exception if person cannot be removed.
      */
     public void removeResearcher() {
         researcherNum --;
         if (researcherNum < 0) {
             researcherNum = 0;
-            Settlement s = building.getSettlement();
-			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName,
-					"[" + s + "] "
-					+ building + "'s lab has no researchers.");
-//            throw new IllegalStateException("Lab is already empty of researchers.");
+			logger.severe(building, "Lab has no researchers to remove.");
         }
     }
 	
     /**
      * Time passing for the building.
+     * 
      * @param time amount of time passing (in millisols)
      * @throws BuildingException if error occurs.
      */
     @Override
     public boolean timePassing(ClockPulse pulse) {
 		boolean valid = isValid(pulse);
-		if (valid) {
-			if (pulse.isNewSol()) {
-				for (String s : tissueCultureMap.keySet()) {
-					tissueCultureMap.put(s, 0);
+		if (!valid) {
+			return false;
+		}
+		
+		if (pulse.isNewSol()) {
+            tissueCultureInspection.replaceAll((s, v) -> 0);
+		}
+		
+		if (pulse.isNewMSol()) {
+			Map<String, Double> newMap = new HashMap<>();
+			Iterator<Map.Entry<String, Double>> i = tissueIncubator.entrySet().iterator();
+			while (i.hasNext()) {
+				Map.Entry<String, Double> entry = i.next();
+				String key = entry.getKey();
+				double amount = entry.getValue();
+				if (amount > 0) {
+					i.remove();
+					
+					double time = pulse.getMarsTime().getMillisol();
+					double delta = obtainGrow(time, key);
+					
+					// Increase the amount by millisols / 1000.0 
+					newMap.put(key, amount * (1 + delta)/1000.0);
 				}
 			}
+			tissueIncubator.putAll(newMap);
 		}
+		
 		return valid;
     }
 
+    /**
+     * Obtains the grow factor.
+     * 
+     * @param time
+     * @param key
+     * @return
+     */
+    private double obtainGrow(double time, String key) {
+		// Grow the tissue a little bit in each millisol
+		double delta = 0;
+		
+		// Check if the tissue culture has been well taken care of
+		if (tissueCultureInspection.containsKey(key)) {
+			int num = tissueCultureInspection.get(key);
+			// Incur penalty if having less than NUM_INSPECTIONS
+			delta = (num - NUM_INSPECTIONS) * time;
+			delta = Math.min(0, delta);
+		}
+		
+		return delta;
+    }
+    
+    /**
+     * Harvests and extract a crop tissue.
+     * 
+     * @param worker
+     */
+    public boolean harvestTissue(Worker worker) {
+    	Iterator<Map.Entry<String, Double>> i = tissueIncubator.entrySet().iterator();
+		while (i.hasNext()) {
+			Map.Entry<String, Double> entry = i.next();
+			String cropName = entry.getKey();
+			double amount = entry.getValue();
+			if (amount > 0.5) {
+				String tissueName = cropName + Farming.TISSUE;
+				int tissueID = ResourceUtil.findIDbyAmountResourceName(tissueName);
+				building.getFarming().store(Farming.LOW_AMOUNT_TISSUE_CULTURE, tissueID, "Farming::growCropTissue");
+				logger.log(building, worker, Level.INFO, 10_000,  
+						"Harvested 0.5 kg " + tissueName + " in Botany lab.");
+				return true;
+			}
+		}
+		logger.log(building, worker, Level.INFO, 10_000,  
+				"Not ready to harvest/extract any crop tissues yet in Botany lab.");
+		return false;
+    }
+    
+	public void addToIncubator(String c, double amountToAdd) {
+		if (tissueIncubator.containsKey(c)) {
+			double amount = tissueIncubator.get(c);
+			tissueIncubator.put(c, amount + amountToAdd);
+		}
+	}
+    
     private void setupTissueCultures() {
-       	tissueCultureMap = new HashMap<>();
-
-//        Set<AmountResource> tissues = SimulationConfig.instance().getResourceConfiguration().getTissueCultures();
-//        for (AmountResource ar : tissues) {
-//        	String s = ar.getName();
-//        	tissueCultureMap.put(s, 0);
-//        }	
-        
+       	tissueCultureInspection = new HashMap<>();
+       	tissueCultureAmount = new HashMap<>();
+       	tissueIncubator = new HashMap<>();
     }
     
 	public List<String> getUncheckedTissues() {
 		List<String> batch = new ArrayList<>();
-		for (String s : tissueCultureMap.keySet()) {
-			if (tissueCultureMap.get(s) < NUM_INSPECTIONS)
+		for (String s : tissueCultureInspection.keySet()) {
+			if (tissueCultureInspection.get(s) < NUM_INSPECTIONS)
 				batch.add(s);
 		}
 		return batch;
 	}
-	
+
     public void markChecked(String s) {
-    	tissueCultureMap.put(s, tissueCultureMap.get(s) + 1);
+    	tissueCultureInspection.put(s, tissueCultureInspection.get(s) + 1);
     }
     
     
@@ -267,32 +349,30 @@ implements Lab, Serializable {
      * @return true if the lab has it
      */
     public boolean hasTissueCulture(String tissueName) {
-    	if (!tissueCultureMap.containsKey(tissueName)) {
-    		tissueCultureMap.put(tissueName, 0);
-    		return false;
+    	if (tissueCultureAmount.containsKey(tissueName)
+    		&& tissueCultureAmount.get(tissueName) > 0) {
+    			return true;
     	}
-    	return true;
+
+    	return false;
     }
     
     @Override
     public double getMaintenanceTime() {
 
         double result = 0D;
-
         // Add maintenance for tech level.
         result += techLevel * 10D;
-
         // Add maintenance for researcher capacity.
         result += researcherCapacity * 10D;
 
         return result;
     }
 
-
-	   @Override
-	    public void destroy() {
-	        super.destroy();
-	        researchSpecialties.clear();
-	        researchSpecialties = null;
-	    }
+	@Override
+	public void destroy() {
+		super.destroy();
+		researchSpecialties.clear();
+		researchSpecialties = null;
+	}
 }

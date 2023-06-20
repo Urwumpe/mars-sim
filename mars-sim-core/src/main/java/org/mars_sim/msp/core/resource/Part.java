@@ -1,16 +1,15 @@
-/**
+/*
  * Mars Simulation Project
  * Part.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-05-17
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.resource;
 
-import java.io.Serializable;
-import java.util.*;
+import java.util.Set;
 
-import org.mars_sim.msp.core.Msg;
-//import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.CollectionUtils;
+import org.mars_sim.msp.core.goods.GoodType;
 
 /**
  * The Part class represents a type of unit resource that is used for
@@ -21,102 +20,37 @@ public class Part extends ItemResource {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	// Domain members
-	private List<MaintenanceEntity> maintenanceEntities;
+	/** The assumed # of years for calculating MTBF. */
+	public static final int NUM_YEARS = 3;
+	/** The maximum possible mean time between failure rate on Mars (Note that Mars has 669 sols in a year). */
+	public static final double MAX_MTBF = 669D * NUM_YEARS;
+	/** The maximum possible reliability percentage. */
+	public static final double MAX_RELIABILITY = 99.999;
+
+	// Number of failures
+	private int numFailures = 0;
+
+	private double mtbf = MAX_MTBF;
+
+	private double percentReliability = MAX_RELIABILITY;
 
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param name        the name of the part.
 	 * @param id          the id# of the part
 	 * @param description {@link String}
 	 * @param mass        the mass of the part (kg)
 	 * @param the         sol when this part is put to use
 	 */
-	public Part(String name, int id, String description, double mass, int solsUsed) {
+	public Part(String name, int id, String description, GoodType type, double mass, int solsUsed) {
 		// Use ItemResource constructor.
-		super(name, id, description, mass, solsUsed);
-
-		maintenanceEntities = new ArrayList<MaintenanceEntity>();
-	}
-
-	/**
-	 * Adds a maintenance entity for the part.
-	 * 
-	 * @param name        the name of the entity.
-	 * @param probability the probability of the part being needed for maintenance.
-	 * @param maxNumber   the maximum number of parts needed for maintenance.
-	 */
-	void addMaintenanceEntity(String name, int probability, int maxNumber) {
-		maintenanceEntities.add(new MaintenanceEntity(name, probability, maxNumber));
-	}
-
-	/**
-	 * Checks if the part has a maintenance entity of a given name.
-	 * 
-	 * @param entityName the name of the entity.
-	 * @return true if part has the maintenance entity.
-	 */
-	public boolean hasMaintenanceEntity(String entityName) {
-		if (entityName == null) {
-			throw new IllegalArgumentException(Msg.getString("Part.error.nameIsNull")); //$NON-NLS-1$
-		}
-		boolean result = false;
-		Iterator<MaintenanceEntity> i = maintenanceEntities.iterator();
-		while (i.hasNext()) {
-			if (i.next().name.equalsIgnoreCase(entityName)) {
-				result = true;
-			}
-		}
-		return result;
-	}
-
-	/**
-	 * Gets the percentage probability of a part being needed by an maintenance
-	 * entity.
-	 * 
-	 * @param entityName the name of the entity.
-	 * @return percentage probability (0 - 100)
-	 */
-	public int getMaintenanceProbability(String entityName) {
-		if (entityName == null) {
-			throw new IllegalArgumentException(Msg.getString("Part.error.nameIsNull")); //$NON-NLS-1$
-		}
-		int result = 0;
-		Iterator<MaintenanceEntity> i = maintenanceEntities.iterator();
-		while (i.hasNext()) {
-			MaintenanceEntity entity = i.next();
-			if (entity.name.equalsIgnoreCase(entityName)) {
-				result = entity.probability;
-			}
-		}
-		return result;
-	}
-
-	/**
-	 * Gets the maximum number of this part needed by a maintenance entity.
-	 * 
-	 * @param entityName the name of the entity.
-	 * @return maximum number of parts.
-	 */
-	public int getMaintenanceMaximumNumber(String entityName) {
-		if (entityName == null) {
-			throw new IllegalArgumentException(Msg.getString("Part.error.nameIsNull")); //$NON-NLS-1$
-		}
-		int result = 0;
-		Iterator<MaintenanceEntity> i = maintenanceEntities.iterator();
-		while (i.hasNext()) {
-			MaintenanceEntity entity = i.next();
-			if (entity.name.equalsIgnoreCase(entityName)) {
-				result = entity.maxNumber;
-			}
-		}
-		return result;
+		super(name, id, description, type, mass, solsUsed);
 	}
 
 	/**
 	 * Gets a set of all parts.
-	 * 
+	 *
 	 * @return set of parts.
 	 */
 	public static Set<Part> getParts() {
@@ -124,76 +58,57 @@ public class Part extends ItemResource {
 	}
 
 	/**
-	 * Gets a set of all parts.
-	 * 
-	 * @return set of parts.
+	 * Computes the reliability.
 	 */
-	public static Set<Integer> getItemIDs() {
-		return ItemResourceUtil.getItemIDs();
-//    			
-//        Set<Integer> result = new HashSet<>();
-//
-//        Iterator<Integer> i = ItemResourceUtil.getItemIDs().iterator();
-//        while (i.hasNext()) {
-//        	Integer resource = i.next();
-////            if (resource instanceof Part) {
-//                result.add(resource);
-////            }
-//        }
-//        
-///*
-//        Iterator<Part> i = ItemResource.getItemResources().iterator();
-//        while (i.hasNext()) {
-//            Part p = i.next();
-//            result.add(p);
-//        }
-//*/        
-//        return result;
-	}
+	public void computeReliability(int missionSol) {
 
-	public final List<MaintenanceEntity> getMaintenanceEntities() {
-		return this.maintenanceEntities;
+		int numSols = missionSol - getStartSol();
+
+		if (numFailures == 0)
+			mtbf = MAX_MTBF;
+		else {
+			numSols = Math.max(1, numSols);
+			mtbf = computeMTBF(numSols);
+		}
+
+		if (mtbf == 0) {
+			percentReliability = 0;
+		}
+		else {
+			percentReliability = Math.min(MAX_RELIABILITY, Math.exp(-numSols / mtbf) * 100);
+		}
 	}
 
 	/**
-	 * A private inner class for holding maintenance entity information.
+	 * Computes the MTBF.
+	 *
+	 * @param numSols
+	 * @return
 	 */
-	public static class MaintenanceEntity implements Serializable {
+	private double computeMTBF(double numSols) {
+		// Obtain the total # of this part in used from all settlements
+		int numItem = CollectionUtils.getTotalNumPart(getID());
 
-		/** default serial id. */
-		private static final long serialVersionUID = 1L;
-
-		// Domain members
-		private String name;
-		private int probability;
-		private int maxNumber;
-
-		/**
-		 * Constructor
-		 * 
-		 * @param name        name of the entity.
-		 * @param probability the probability of this part being needed for maintenance.
-		 * @param maxNumber   the maximum number of this part needed for maintenance.
-		 */
-		private MaintenanceEntity(String name, int probability, int maxNumber) {
-			if (name == null) {
-				throw new IllegalArgumentException(Msg.getString("Part.error.nameIsNull")); //$NON-NLS-1$
-			}
-			this.name = name;
-			this.probability = probability;
-			this.maxNumber = maxNumber;
-		}
-
-		public int getProbability() {
-			return probability;
-		}
-
-		public int getMaxNumber() {
-			return maxNumber;
-		}
-
-		public String getName() {
-			return name;
-		}
+		// Take the average between the factory mtbf and the field measured mtbf
+		return Math.min(MAX_MTBF, (numItem * numSols / numFailures + MAX_MTBF) / 2D);
 	}
+
+	public double getReliability() {
+		return percentReliability;
+	}
+
+	public double getMTBF() {
+		return mtbf;
+	}
+
+	public void setFailure(int num, int missionSol) {
+		numFailures += num;
+		// Recompute the reliability for this part
+		computeReliability(missionSol);
+	}
+
+	public int getFailure() {
+		return numFailures;
+	}
+
 }

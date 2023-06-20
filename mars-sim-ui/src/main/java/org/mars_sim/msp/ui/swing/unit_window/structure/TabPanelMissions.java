@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * TabPanelMissions.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-09
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -9,7 +9,6 @@ package org.mars_sim.msp.ui.swing.unit_window.structure;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
@@ -20,7 +19,6 @@ import java.util.List;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -30,13 +28,15 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
+import org.mars_sim.msp.core.structure.OverrideType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
+import org.mars_sim.msp.ui.swing.tool.monitor.MonitorWindow;
 import org.mars_sim.msp.ui.swing.tool.monitor.PersonTableModel;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.vehicle.TabPanelMission;
@@ -50,14 +50,15 @@ import org.mars_sim.msp.ui.swing.unit_window.vehicle.TabPanelMission;
 @SuppressWarnings("serial")
 public class TabPanelMissions
 extends TabPanel {
+	/** default logger. */
+	private static SimLogger logger = SimLogger.getLogger(TabPanelMissions.class.getName());
 
-	// Data members
-	/** Is UI constructed. */
-	private boolean uiDone = false;
+	private static final String FLAG_ICON = "mission";
 	
+	// Data members
 	/** The Settlement instance. */
 	private Settlement settlement;
-	
+
 	private List<Mission> missionsCache;
 	private DefaultListModel<Mission> missionListModel;
 	private JList<Mission> missionList;
@@ -65,7 +66,6 @@ extends TabPanel {
 	private JButton monitorButton;
 	private JCheckBox overrideCheckbox;
 
-	private static MissionManager missionManager;
 
 	/**
 	 * Constructor.
@@ -75,43 +75,34 @@ extends TabPanel {
 	public TabPanelMissions(Settlement settlement, MainDesktopPane desktop) {
 		// Use the TabPanel constructor
 		super(
-			Msg.getString("TabPanelMissions.title"), //$NON-NLS-1$
 			null,
-			Msg.getString("TabPanelMissions.tooltip"), //$NON-NLS-1$
+			ImageLoader.getIconByName(FLAG_ICON),
+			Msg.getString("TabPanelMissions.title"), //$NON-NLS-1$
 			settlement, desktop
 		);
 
 		// Initialize data members.
 		this.settlement = settlement;
 	}
-	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
-		
-		missionManager = Simulation.instance().getMissionManager();
-		
-		// Create label panel.
-		JPanel labelPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(labelPanel);
 
-		// Create settlement missions label.
-		JLabel label = new JLabel(Msg.getString("TabPanelMissions.label"), JLabel.CENTER); //$NON-NLS-1$
-		label.setFont(new Font("Serif", Font.BOLD, 16));
-		//label.setForeground(new Color(102, 51, 0)); // dark brown
-		labelPanel.add(label);
+	@Override
+	protected void buildUI(JPanel content) {
 
 		// Create center panel.
 		JPanel centerPanel = new JPanel(new BorderLayout());
-//		centerPanel.setBorder(new MarsPanelBorder());
-		centerContentPanel.add(centerPanel, BorderLayout.CENTER);
+		content.add(centerPanel, BorderLayout.CENTER);
 
 		// Create mission list panel.
 		JPanel missionListPanel = new JPanel();
 		centerPanel.add(missionListPanel, BorderLayout.CENTER);
+
+		buildScrollPanel(centerPanel, missionListPanel);
+		buildButtonPanel(centerPanel);
+		buildBottomPanel(content);
+	}
+		
+	public void buildScrollPanel(JPanel centerPanel, JPanel missionListPanel) {
+		MissionManager missionManager = getSimulation().getMissionManager();
 
 		// Create mission scroll panel.
 		JScrollPane missionScrollPanel = new JScrollPane();
@@ -136,7 +127,9 @@ extends TabPanel {
 			}
 		});
 		missionScrollPanel.setViewportView(missionList);
-
+	}
+	
+	private void buildButtonPanel(JPanel centerPanel) {
 		// Create button panel.
 		JPanel buttonPanel = new JPanel(new BorderLayout());
 		buttonPanel.setBorder(new EmptyBorder(5, 0, 0, 0));
@@ -147,7 +140,7 @@ extends TabPanel {
 		buttonPanel.add(innerButtonPanel, BorderLayout.NORTH);
 
 		// Create mission button.
-		missionButton = new JButton(ImageLoader.getIcon(Msg.getString("img.mission"))); //$NON-NLS-1$
+		missionButton = new JButton(ImageLoader.getIconByName(MissionWindow.ICON)); //$NON-NLS-1$
 		missionButton.setMargin(new Insets(1, 1, 1, 1));
 		missionButton.setToolTipText(Msg.getString("TabPanelMissions.tooltip.mission")); //$NON-NLS-1$
 		missionButton.setEnabled(false);
@@ -159,7 +152,7 @@ extends TabPanel {
 		innerButtonPanel.add(missionButton);
 
 		// Create monitor button.
-		monitorButton = new JButton(ImageLoader.getIcon(Msg.getString("img.monitor"))); //$NON-NLS-1$
+		monitorButton = new JButton(ImageLoader.getIconByName(MonitorWindow.ICON)); //$NON-NLS-1$
 		monitorButton.setMargin(new Insets(1, 1, 1, 1));
 		monitorButton.setToolTipText(Msg.getString("TabPanelMissions.tooltip.monitor")); //$NON-NLS-1$
 		monitorButton.setEnabled(false);
@@ -169,11 +162,12 @@ extends TabPanel {
 			}
 		});
 		innerButtonPanel.add(monitorButton);
-
+	}
+	
+	private void buildBottomPanel(JPanel content) {
 		// Create bottom panel.
 		JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-//		bottomPanel.setBorder(new MarsPanelBorder());
-		topContentPanel.add(bottomPanel, BorderLayout.SOUTH);
+		content.add(bottomPanel, BorderLayout.SOUTH);
 
 		// Create override check box.
 		overrideCheckbox = new JCheckBox(Msg.getString("TabPanelMissions.checkbox.overrideMissionCreation")); //$NON-NLS-1$
@@ -183,18 +177,14 @@ extends TabPanel {
 				setMissionCreationOverride(overrideCheckbox.isSelected());
 			}
 		});
-		overrideCheckbox.setSelected(settlement.getMissionCreationOverride());
+		overrideCheckbox.setSelected(settlement.getProcessOverride(OverrideType.MISSION));
 		bottomPanel.add(overrideCheckbox);
 	}
 
 	@Override
 	public void update() {
-		if (!uiDone)
-			initializeUI();
-		
 		// Get all missions for the settlement.
-		//MissionManager manager = Simulation.instance().getMissionManager();
-		List<Mission> missions = missionManager.getMissionsForSettlement(settlement);
+		List<Mission> missions = getSimulation().getMissionManager().getMissionsForSettlement(settlement);
 
 		// Update mission list if necessary.
 		if (!missions.equals(missionsCache)) {
@@ -210,8 +200,8 @@ extends TabPanel {
 		}
 
 		// Update mission override check box if necessary.
-		if (settlement.getMissionCreationOverride() != overrideCheckbox.isSelected()) 
-			overrideCheckbox.setSelected(settlement.getMissionCreationOverride());
+		if (settlement.getProcessOverride(OverrideType.MISSION) != overrideCheckbox.isSelected())
+			overrideCheckbox.setSelected(settlement.getProcessOverride(OverrideType.MISSION));
 	}
 
 	/**
@@ -220,18 +210,23 @@ extends TabPanel {
 	private void openMissionTool() {
 		Mission mission = (Mission) missionList.getSelectedValue();
 		if (mission != null) {
-			((MissionWindow) getDesktop().getToolWindow(MissionWindow.NAME)).selectMission(mission);
-			getDesktop().openToolWindow(MissionWindow.NAME);
+			getDesktop().showDetails(mission);
 		}
 	}
 
 	/**
-	 * Opens the monitor tool with a mission tab for the selected mission 
+	 * Opens the monitor tool with a mission tab for the selected mission
 	 * in the mission list.
 	 */
 	private void openMonitorTool() {
 		Mission mission = (Mission) missionList.getSelectedValue();
-		if (mission != null) getDesktop().addModel(new PersonTableModel(mission));
+		if (mission != null) {
+			try {
+				getDesktop().addModel(new PersonTableModel(mission));
+			} catch (Exception e) {
+				logger.severe("PersonTableModel cannot be added.");
+			}
+		}
 	}
 
 	/**
@@ -239,13 +234,16 @@ extends TabPanel {
 	 * @param override the mission creation override flag.
 	 */
 	private void setMissionCreationOverride(boolean override) {
-		settlement.setMissionCreationOverride(override);
+		settlement.setProcessOverride(OverrideType.MISSION, override);
 	}
-	
+
 	/**
 	 * Prepare object for garbage collection.
 	 */
+	@Override
 	public void destroy() {
+		super.destroy();
+		
 		settlement = null;
 		missionsCache = null;
 		missionListModel = null;
@@ -253,6 +251,5 @@ extends TabPanel {
 		missionButton = null;
 		monitorButton = null;
 		overrideCheckbox = null;
-		missionManager = null;
 	}
 }

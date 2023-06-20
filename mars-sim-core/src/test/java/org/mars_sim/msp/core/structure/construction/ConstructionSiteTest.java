@@ -12,17 +12,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.goods.GoodType;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ItemResource;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.Part;
-import org.mars_sim.msp.core.resource.PhaseType;
 import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.structure.MockSettlement;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
-//import org.mars_sim.msp.simulation.structure.MockSettlement;
-//import org.mars_sim.msp.simulation.structure.Settlement;
-//import org.mars_sim.msp.simulation.structure.building.Building;
 
 import junit.framework.TestCase;
 
@@ -41,28 +41,34 @@ public class ConstructionSiteTest extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
 
-        site = new ConstructionSite(Settlement.createConstructionStage());
-
-        Map<Integer, Integer> parts = new HashMap<Integer, Integer>(1);
+        SimulationConfig.instance().loadConfig();
+        Simulation.instance().testRun();
         
-        Part ir = ItemResourceUtil.createItemResource("test part", 1, "test part description", 1D, 1);
+        Settlement settlement = new MockSettlement();
+        site = new ConstructionSite(settlement);
+
+        Map<Integer, Integer> parts = new HashMap<>(1);
+        GoodType type = GoodType.CONSTRUCTION;
+        
+        Part ir = ItemResourceUtil.createItemResource("test part", 1, "test part description", type, 1D, 1);
         parts.put(ir.getID(), 1);
 
-        Map<Integer, Double> resources = new HashMap<Integer, Double>(1);
+        Map<Integer, Double> resources = new HashMap<>(1);
 
-        AmountResource ar = ResourceUtil.createAmountResource(1, "test resource", "test type", "test resource description", PhaseType.SOLID, false, false);
+        AmountResource ar = ResourceUtil.sandAR;
         resources.put(ar.getID(), 1D);
-        
+
         List<ConstructionVehicleType> vehicles =
-            new ArrayList<ConstructionVehicleType>(1);
-        List<Integer> attachments = new ArrayList<Integer>(1);
+            new ArrayList<>(1);
+        List<Integer> attachments = new ArrayList<>(1);
+        GoodType aType = GoodType.VEHICLE;
         
-        ItemResource atth = ItemResourceUtil.createItemResource("attachment part", 2, "test attachment description", 1D, 1);
+        ItemResource atth = ItemResourceUtil.createItemResource("attachment part", 2, "test attachment description", aType, 1D, 1);
         parts.put(atth.getID(), 1);
-        
+
         attachments.add(atth.getID());
-        
-        
+
+
         vehicles.add(new ConstructionVehicleType("Light Utility Vehicle", LightUtilityVehicle.class,
                 attachments));
 
@@ -185,28 +191,4 @@ public class ConstructionSiteTest extends TestCase {
             fail(e.getMessage());
         }
     }
-
-//    /*
-//     * Test method for 'org.mars_sim.msp.simulation.structure.construction.
-//     * ConstructionSite.createBuilding(BuildingManager)'
-//     */
-//     Note: commenting out for now.  Fails on null pointer exception thrown by
-//     testSite.createBuilding() due to use of MarsClock from uninitialized Simulation.
-//    
-//    public void testCreateBuilding() {
-//        try {
-//            Settlement settlement = new MockSettlement();
-//            ConstructionManager constructionManager = settlement.getConstructionManager();
-//            ConstructionSite testSite = constructionManager.createNewConstructionSite();
-//            testSite.addNewStage(foundationStage);
-//            testSite.addNewStage(frameStage);
-//            testSite.addNewStage(buildingStage);
-//            Building building = testSite.createBuilding(settlement.getBuildingManager());
-//            assertNotNull(building);
-//        }
-//        catch (Exception e) {
-//            fail(e.getMessage());
-//        }
-//    }
-    
 }

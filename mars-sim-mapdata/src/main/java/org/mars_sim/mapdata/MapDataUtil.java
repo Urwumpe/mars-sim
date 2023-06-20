@@ -1,100 +1,95 @@
-/**
+/*
  * Mars Simulation Project
- * MapDataUtility.java
- * @version 3.1.2 2020-09-02
+ * MapDataUtil.java
+ * @date 2023-06-03
  * @author Scott Davis
  */
 
  package org.mars_sim.mapdata;
+
+import java.util.Collection;
 
 /**
   * Static utility class for accessing Mars map data.
   */
  public final class MapDataUtil {
  	
- 	public static final int IMAGE_WIDTH = 300;
- 	public static final int IMAGE_HEIGHT = IMAGE_WIDTH;
- 	private static final int HEIGHT = MEGDRMapReader.HEIGHT;
- 	private static final int WIDTH = MEGDRMapReader.WIDTH;
- 	
- 	private static final double PI = Math.PI;
+	private static final double PI = Math.PI;
  	private static final double TWO_PI = Math.PI * 2D;
 
-     // Singleton instance.
-     private static MapDataUtil instance;
-     private static MapDataFactory mapDataFactory;
-     private static MEGDRMapReader reader;
+	// Singleton instance.
+	private static MapDataUtil instance;
+	private static MapDataFactory mapDataFactory;
+	private static MEGDRMapReader reader;
 
- 	private static int[] elevationArray;
+ 	private static short[] elevationArray;
  	
-// 	static {
-// 		reader = new MEGDRMapReader();
-// 		elevationArray = reader.getElevationArray();
-// 	}
+ 	private static short height;
+ 	private static short width;
  	
      /**
       * Private constructor for static utility class.
       */
      private MapDataUtil() {
          mapDataFactory = new MapDataFactory();
- 		reader = new MEGDRMapReader();
+         reader = new MEGDRMapReader(0);
+         
+         height = reader.getHeight();
+         width = reader.getWidth();
      }
      
-     public int[] getElevationArray() {
-     	
-     	if (elevationArray == null) {		
-     		elevationArray = reader.loadElevation();
-     	}
-     		
+     /**
+      * Gets the elevation array.
+      * 
+      * @return
+      */
+     public short[] getElevationArray() {
+    	 
+     	if (elevationArray == null)	
+     		elevationArray = reader.loadElevation(0);
+  
  		return elevationArray;
  	}
  	
-     /**
- 	 * Gets the elevation as an integer at a given location.
+    /**
+ 	 * Gets the elevation as a short integer at a given location.
  	 * 
  	 * @param phi   the phi location.
  	 * @param theta the theta location.
  	 * @return the elevation as an integer.
  	 */
- 	public int getElevationInt(double phi, double theta) {
- 		// Make sure phi is between 0 and PI.
- 		while (phi > PI)
- 			phi -= PI;
- 		while (phi < 0)
- 			phi += PI;
-
- 		// Adjust theta with PI for the map offset.
- 		// Note: the center of the map is when theta = 0
- 		if (theta > PI)
- 			theta -= PI;
- 		else
- 			theta += PI;
+ 	public short getElevation(double phi, double theta) {
+ 		// Note that row 0 and column 0 are at top left 
+ 		short row = (short) Math.round(phi * height / PI);
  		
- 		// Make sure theta is between 0 and 2 PI.
- 		while (theta > TWO_PI)
- 			theta -= TWO_PI;
- 		while (theta < 0)
- 			theta += TWO_PI;
-
- 		int row = (int) Math.round(phi * HEIGHT / PI);
- 		if (row == HEIGHT) 
+ 		if (row == height) 
  			row--;
  		
- 		int column = WIDTH /2 + (int) Math.round(theta * WIDTH / TWO_PI);
-// 		if (column < 0)
-// 			column = 0;		
- 		if (column == WIDTH)
+ 		short column = (short) (width / 2 + Math.round(theta * width / TWO_PI));
+
+ 		if (column == width)
  			column--;
 
- 		int index = row * WIDTH + column;
- 		if (index >= HEIGHT * WIDTH)
- 			index = HEIGHT * WIDTH - 1;
+ 		int index = row * width + column;
  		
- 		return getElevationArray()[index];
+ 		if (index > height * width)
+ 			index = height * width - 1;
+ 		
+
+ 		short [] data = getElevationArray();
+ 		
+        short result = 0;
+        
+        if (data != null) {
+            result = data[index];
+        }
+
+        return result;
  	}
  	
      /**
-      * Get the singleton instance of MapData.
+      * Gets the singleton instance of MapData.
+      * 
       * @return instance.
       */
      public static MapDataUtil instance() {
@@ -105,27 +100,20 @@
      }
      
      /**
-      * Get the surface map data.
+      * Gets the surface map data.
+      * 
       * @return surface map data.
       */
-     public MapData getSurfaceMapData() {
-         return mapDataFactory.getMapData(MapDataFactory.SURFACE_MAP_DATA);
+     public MapData getMapData(String mapType) {
+         return mapDataFactory.getMapData(mapType);
      }
-     
+
      /**
-      * Get the topographical map data.
-      * @return topographical map data.
+      * Gets the map types available.
+      * 
+      * @return
       */
-     public MapData getTopoMapData() {
-         return mapDataFactory.getMapData(MapDataFactory.TOPO_MAP_DATA);
-     }
-     
-     /**
-      * Get the geology map data.
-      * @return geology map data.
-      */
-     public MapData getGeologyMapData() {
-         return mapDataFactory.getMapData(MapDataFactory.GEOLOGY_MAP_DATA);
-     }
-     
+    public Collection<MapMetaData> getMapTypes() {
+        return mapDataFactory.getLoadedTypes();
+    }
  }

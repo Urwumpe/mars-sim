@@ -1,12 +1,11 @@
-/**
+/*
  * Mars Simulation Project
- * BuildingPath.java
- * @version 3.1.2 2020-09-02
+ * InsideBuildingPath.java
+ * @date 2022-09-08
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.connection;
 
-import java.awt.geom.Point2D;
 import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
@@ -15,23 +14,39 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * A path of location navigation objects at a settlement.
  */
-public class InsideBuildingPath implements Serializable, Cloneable {
+public class InsideBuildingPath implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 	// Data members.
     private List<InsidePathLocation> pathLocations;
+    
     private int nextLocationIndex;
     
     /**
      * Constructor
      */
     public InsideBuildingPath() {
-        pathLocations = new CopyOnWriteArrayList<InsidePathLocation>();
+        pathLocations = new CopyOnWriteArrayList<>();
         nextLocationIndex = 0;
     }
     
     /**
-     * Add a new location object to the path.
+     * Copy Constructor.
+     */
+    public InsideBuildingPath(InsideBuildingPath insideBuildingPath) {
+    	this();
+    	
+        Iterator<InsidePathLocation> i = insideBuildingPath.getPathLocations().iterator();
+        while (i.hasNext()) {
+        	addPathLocation(i.next());
+        }
+        
+        nextLocationIndex = insideBuildingPath.getNextLocationIndex();
+    }
+    
+    /**
+     * Adds a new location object to the path.
+     * 
      * @param newLocation new location object.
      */
     public void addPathLocation(InsidePathLocation newLocation){
@@ -45,6 +60,7 @@ public class InsideBuildingPath implements Serializable, Cloneable {
     
     /**
      * Checks if the building path contains a given location object.
+     * 
      * @param point a location object.
      * @return true if path contains the location object.
      */
@@ -55,6 +71,7 @@ public class InsideBuildingPath implements Serializable, Cloneable {
     
     /**
      * Gets the next location object in the path.
+     * 
      * @return location location object.
      */
     public InsidePathLocation getNextPathLocation() {
@@ -73,7 +90,7 @@ public class InsideBuildingPath implements Serializable, Cloneable {
     public List<InsidePathLocation> getRemainingPathLocations() {
         
 //        int size = pathLocations.size() - nextLocationIndex;
-        List<InsidePathLocation> result = new CopyOnWriteArrayList<InsidePathLocation>();
+        List<InsidePathLocation> result = new CopyOnWriteArrayList<>();
         for (int x = nextLocationIndex; x < pathLocations.size(); x++) {
             result.add(pathLocations.get(x));
         }
@@ -82,7 +99,7 @@ public class InsideBuildingPath implements Serializable, Cloneable {
     }
     
     /**
-     * Iterate the next path location object.
+     * Iterates the next path location object.
      */
     public void iteratePathLocation() {
         
@@ -93,6 +110,7 @@ public class InsideBuildingPath implements Serializable, Cloneable {
     
     /**
      * Checks if the next location navigation point is the end of the path.
+     * 
      * @return true if end of path.
      */
     public boolean isEndOfPath() {
@@ -102,6 +120,7 @@ public class InsideBuildingPath implements Serializable, Cloneable {
     
     /**
      * Gets the total path length.
+     * 
      * @return path length (meters).
      */
     public double getPathLength() {
@@ -113,9 +132,7 @@ public class InsideBuildingPath implements Serializable, Cloneable {
             Iterator<InsidePathLocation> i = pathLocations.iterator();
             while (i.hasNext()) {
                 InsidePathLocation location = i.next();
-                result += Point2D.Double.distance(previousLocation.getXLocation(), 
-                        previousLocation.getYLocation(), location.getXLocation(), 
-                        location.getYLocation());
+                result += previousLocation.getPosition().getDistanceTo(location.getPosition());
                 previousLocation = location;
             }
         }
@@ -123,23 +140,16 @@ public class InsideBuildingPath implements Serializable, Cloneable {
         return result;
     }
     
-    @Override
-    public Object clone() {
-        
-        InsideBuildingPath result = new InsideBuildingPath();
-        
-        Iterator<InsidePathLocation> i = pathLocations.iterator();
-        while (i.hasNext()) {
-            result.addPathLocation(i.next());
-        }
-        
-        result.nextLocationIndex = nextLocationIndex;
-        
-        return result;
+    public List<InsidePathLocation> getPathLocations() {
+    	return pathLocations;
+    }
+    
+    public int getNextLocationIndex() {
+    	return nextLocationIndex;
     }
     
     /**
-     * Destroy object.
+     * Destroys object.
      */
     public void destroy() {
         pathLocations.clear();

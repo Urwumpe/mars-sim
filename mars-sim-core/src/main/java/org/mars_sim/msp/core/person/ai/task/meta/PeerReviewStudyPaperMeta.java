@@ -1,44 +1,42 @@
-/**
+/*
  * Mars Simulation Project
  * PeerReviewStudyPaperMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-26
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
 import java.util.Iterator;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.FavoriteType;
+import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.fav.FavoriteType;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.task.PeerReviewStudyPaper;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.tool.RandomUtil;
+import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * Meta task for the PeerReviewStudyPaper task.
  */
-public class PeerReviewStudyPaperMeta implements MetaTask, Serializable {
+public class PeerReviewStudyPaperMeta extends FactoryMetaTask {
 
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
-    
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.peerReviewStudyPaper"); //$NON-NLS-1$
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
+    public PeerReviewStudyPaperMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.WORK_HOUR);
+		setFavorite(FavoriteType.RESEARCH);
+		setTrait(TaskTrait.ACADEMIC, TaskTrait.TEACHING);
+		setPreferredJob(JobType.ACADEMICS);
+	}
 
     @Override
     public Task constructInstance(Person person) {
@@ -49,20 +47,16 @@ public class PeerReviewStudyPaperMeta implements MetaTask, Serializable {
     public double getProbability(Person person) {
 
         double result = 0D;
-        
+
         if (person.isInside()) {
-        	
+
             // Probability affected by the person's stress and fatigue.
-            PhysicalCondition condition = person.getPhysicalCondition();
-            double fatigue = condition.getFatigue();
-            double stress = condition.getStress();
-            double hunger = condition.getHunger();
-            
-            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            if (!person.getPhysicalCondition().isFitByLevel(800, 80, 800))
             	return 0;
-            
+
 	        // Get all studies in the peer review phase.
-	        Iterator<ScientificStudy> i = scientificStudyManager.getOngoingStudies().iterator();
+            ScientificStudyManager sm = Simulation.instance().getScientificStudyManager();
+	        Iterator<ScientificStudy> i = sm.getOngoingStudies().iterator();
 	        while (i.hasNext()) {
 	            ScientificStudy study = i.next();
 	            if (ScientificStudy.PEER_REVIEW_PHASE.equals(study.getPhase())) {
@@ -73,20 +67,20 @@ public class PeerReviewStudyPaperMeta implements MetaTask, Serializable {
 
 	                    // If person's current job is related to study primary science,
 	                    // add chance to review.
-	                    Job job = person.getMind().getJob();
+	                    JobType job = person.getMind().getJob();
 	                    if (job != null) {
 	                        //ScienceType jobScience = ScienceType.getJobScience(job);
-	                        if (study.getScience().equals(ScienceType.getJobScience(job))) {
+	                        if (study.getScience() == ScienceType.getJobScience(job)) {
 	                            result += 50D * person.getAssociatedSettlement().getGoodsManager().getResearchFactor();;
 	                        }
 	                    }
 	                }
-	            }            
+	            }
 	        }
-	        
+
 	        if (result == 0) return 0;
-	        
-            if (person.isInVehicle()) {	
+
+            if (person.isInVehicle()) {
     	        // Check if person is in a moving rover.
     	        if (Vehicle.inMovingRover(person)) {
     	        	result += -10D;
@@ -95,41 +89,9 @@ public class PeerReviewStudyPaperMeta implements MetaTask, Serializable {
     	        	result += 10D;
             }
 
-	        if (result == 0) return 0;
-	        
-	        // Effort-driven task modifier.
-	        result *= person.getPerformanceRating();
-
-	        // Job modifier.
-	        Job job = person.getMind().getJob();
-	        if (job != null) {
-	            result *= job.getStartTaskProbabilityModifier(PeerReviewStudyPaper.class);
-	        }
-
-	        // Modify if research is the person's favorite activity.
-	        if (person.getFavorite().getFavoriteActivity() == FavoriteType.RESEARCH) {
-	            result += RandomUtil.getRandomInt(1, 20);
-	        }
-
-	        // Add Preference modifier
-            if (result > 0)
-            	result = result + result * person.getPreference().getPreferenceScore(this)/2D;
-
-	        if (result < 0) result = 0;
+	        result *= getPersonModifier(person);
         }
 
         return result;
     }
-
-	@Override
-	public Task constructInstance(Robot robot) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 }

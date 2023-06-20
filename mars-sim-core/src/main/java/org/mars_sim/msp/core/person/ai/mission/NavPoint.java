@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * RoverMission.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission;
@@ -26,31 +26,37 @@ public class NavPoint implements Serializable {
 	private Settlement settlement;
 	/** The description of the navpoint. */
 	private String description;
+	private double distance;
 
 	/**
 	 * Constructor with location.
 	 * 
 	 * @param location    the location of the navpoint.
 	 * @param description the navpoint description.
+	 * @param start Starting point
 	 */
-	public NavPoint(Coordinates location, String description) {
+	public NavPoint(Coordinates location, String description, Coordinates start) {
 		if (location == null)
 			throw new IllegalArgumentException("location is null");
-		this.location = new Coordinates(location);
+		this.location = location;
 		this.description = description;
+
+		if (start != null) {
+			distance = location.getDistance(start);
+		}
+		else {
+			distance = 0;
+		}
 	}
 
 	/**
-	 * Constructor with location and settlement.
+	 * Constructor with settlement.
 	 * 
-	 * @param location    the location of the navpoint.
 	 * @param settlement  the settlement at the navpoint.
-	 * @param description the navpoint description.
+	 * @param start Starting point
 	 */
-	public NavPoint(Coordinates location, Settlement settlement, String description) {
-		this(location, description);
-		if (settlement == null)
-			throw new IllegalArgumentException("settlement is null");
+	public NavPoint(Settlement settlement, Coordinates start) {
+		this(settlement.getCoordinates(), settlement.getName(), start);
 		this.settlement = settlement;
 	}
 
@@ -60,8 +66,15 @@ public class NavPoint implements Serializable {
 	 * @return the coordinate location.
 	 */
 	public Coordinates getLocation() {
-		return new Coordinates(location);
+		return location;
 	}
+
+	/**
+	 * Distance to travel to reach this point from the previous
+	 */
+    public double getDistance() {
+        return distance;
+    }
 
 	/**
 	 * Gets the description of the navpoint.
@@ -116,9 +129,14 @@ public class NavPoint implements Serializable {
 	 * @return hash code.
 	 */
 	public int hashCode() {
-		return getLocation().hashCode() * settlement.hashCode();
+		return location.hashCode();
 	}
 	
+	@Override
+	public String toString() {
+		return description + " @ " + location.getFormattedString();
+	}
+
 	/**
 	 * Prepare object for garbage collection.
 	 */

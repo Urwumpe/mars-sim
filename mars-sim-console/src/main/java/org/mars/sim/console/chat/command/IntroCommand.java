@@ -1,3 +1,10 @@
+/*
+ * Mars Simulation Project
+ * IntroCommand.java
+ * @date 2022-06-20
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.command;
 
 import org.mars.sim.console.chat.ChatCommand;

@@ -1,114 +1,92 @@
-/**
+/*
  * Mars Simulation Project
  * Settlement.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-05-09
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.structure;
 
-import java.awt.geom.Point2D;
-import java.io.Serializable;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.LifeSupportInterface;
-import org.mars_sim.msp.core.LogConsolidated;
+import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitEventType;
-import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.air.AirComposition;
 import org.mars_sim.msp.core.data.SolMetricDataLogger;
+import org.mars_sim.msp.core.data.UnitSet;
+import org.mars_sim.msp.core.environment.DustStorm;
+import org.mars_sim.msp.core.environment.MineralMap;
+import org.mars_sim.msp.core.environment.SurfaceFeatures;
+import org.mars_sim.msp.core.environment.TerrainElevation;
+import org.mars_sim.msp.core.equipment.Container;
 import org.mars_sim.msp.core.equipment.Equipment;
+import org.mars_sim.msp.core.equipment.EquipmentInventory;
+import org.mars_sim.msp.core.equipment.EquipmentOwner;
+import org.mars_sim.msp.core.equipment.EquipmentType;
+import org.mars_sim.msp.core.equipment.ItemHolder;
+import org.mars_sim.msp.core.equipment.ResourceHolder;
+import org.mars_sim.msp.core.events.ScheduledEventManager;
+import org.mars_sim.msp.core.goods.CreditManager;
+import org.mars_sim.msp.core.goods.GoodsManager;
 import org.mars_sim.msp.core.location.LocationStateType;
-import org.mars_sim.msp.core.mars.DustStorm;
+import org.mars_sim.msp.core.logging.SimLogger;
+import org.mars_sim.msp.core.person.Commander;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PersonConfig;
 import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ShiftType;
-import org.mars_sim.msp.core.person.ai.job.Astronomer;
-import org.mars_sim.msp.core.person.ai.job.Engineer;
-import org.mars_sim.msp.core.person.ai.job.Job;
-import org.mars_sim.msp.core.person.ai.job.JobAssignmentType;
-import org.mars_sim.msp.core.person.ai.job.JobUtil;
-import org.mars_sim.msp.core.person.ai.job.Meteorologist;
-import org.mars_sim.msp.core.person.ai.job.Technician;
-import org.mars_sim.msp.core.person.ai.mission.AreologyFieldStudy;
-import org.mars_sim.msp.core.person.ai.mission.BiologyFieldStudy;
-import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
-import org.mars_sim.msp.core.person.ai.mission.CollectIce;
-import org.mars_sim.msp.core.person.ai.mission.CollectRegolith;
-import org.mars_sim.msp.core.person.ai.mission.EmergencySupply;
+import org.mars_sim.msp.core.person.ai.job.util.AssignmentType;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
+import org.mars_sim.msp.core.person.ai.job.util.JobUtil;
 import org.mars_sim.msp.core.person.ai.mission.Exploration;
-import org.mars_sim.msp.core.person.ai.mission.MeteorologyFieldStudy;
-import org.mars_sim.msp.core.person.ai.mission.Mining;
-import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.person.ai.mission.MissionType;
-import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
-import org.mars_sim.msp.core.person.ai.mission.RoverMission;
-import org.mars_sim.msp.core.person.ai.mission.Trade;
-import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
-import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
+import org.mars_sim.msp.core.person.ai.role.RoleType;
+import org.mars_sim.msp.core.person.ai.task.Conversation;
+import org.mars_sim.msp.core.person.ai.task.DayDream;
 import org.mars_sim.msp.core.person.ai.task.EatDrink;
-import org.mars_sim.msp.core.person.ai.task.HaveConversation;
-import org.mars_sim.msp.core.person.ai.task.Maintenance;
 import org.mars_sim.msp.core.person.ai.task.Read;
 import org.mars_sim.msp.core.person.ai.task.Relax;
-import org.mars_sim.msp.core.person.ai.task.Repair;
-import org.mars_sim.msp.core.person.ai.task.meta.MaintenanceEVAMeta;
-import org.mars_sim.msp.core.person.ai.task.meta.MaintenanceMeta;
-import org.mars_sim.msp.core.person.ai.task.meta.RepairEVAMalfunctionMeta;
-import org.mars_sim.msp.core.person.ai.task.meta.RepairMalfunctionMeta;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.SettlementTaskManager;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.person.health.RadiationExposure;
-import org.mars_sim.msp.core.reportingAuthority.CNSAMissionControl;
-import org.mars_sim.msp.core.reportingAuthority.CSAMissionControl;
-import org.mars_sim.msp.core.reportingAuthority.ESAMissionControl;
-import org.mars_sim.msp.core.reportingAuthority.ISROMissionControl;
-import org.mars_sim.msp.core.reportingAuthority.JAXAMissionControl;
-import org.mars_sim.msp.core.reportingAuthority.MarsSocietyMissionControl;
-import org.mars_sim.msp.core.reportingAuthority.NASAMissionControl;
-import org.mars_sim.msp.core.reportingAuthority.RKAMissionControl;
+import org.mars_sim.msp.core.project.Stage;
+import org.mars_sim.msp.core.reportingAuthority.PreferenceKey;
+import org.mars_sim.msp.core.reportingAuthority.PreferenceKey.Type;
 import org.mars_sim.msp.core.reportingAuthority.ReportingAuthority;
-import org.mars_sim.msp.core.reportingAuthority.ReportingAuthorityType;
-import org.mars_sim.msp.core.reportingAuthority.SpaceXMissionControl;
-import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.robot.RobotType;
 import org.mars_sim.msp.core.science.ScienceType;
+import org.mars_sim.msp.core.structure.Airlock.AirlockMode;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
-import org.mars_sim.msp.core.structure.building.connection.BuildingConnector;
 import org.mars_sim.msp.core.structure.building.connection.BuildingConnectorManager;
 import org.mars_sim.msp.core.structure.building.function.EVA;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.LivingAccommodations;
-import org.mars_sim.msp.core.structure.building.function.PowerMode;
-import org.mars_sim.msp.core.structure.building.function.Storage;
-import org.mars_sim.msp.core.structure.building.function.farming.Crop;
 import org.mars_sim.msp.core.structure.construction.ConstructionManager;
-import org.mars_sim.msp.core.structure.goods.GoodsManager;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
-import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
+import org.mars_sim.msp.core.vehicle.Drone;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.core.vehicle.VehicleType;
@@ -117,63 +95,98 @@ import org.mars_sim.msp.core.vehicle.VehicleType;
  * The Settlement class represents a settlement unit on virtual Mars. It
  * contains information related to the state of the settlement.
  */
-public class Settlement extends Structure implements Serializable, Temporal, LifeSupportInterface, Objective {
+public class Settlement extends Structure implements Temporal,
+	LifeSupportInterface, Objective, EquipmentOwner, ItemHolder  {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
-	/* default logger. */
-	private static final Logger logger = Logger.getLogger(Settlement.class.getName());
+	/** default logger. */
+	private static final SimLogger logger = SimLogger.getLogger(Settlement.class.getName());
 
-	private static final String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-			logger.getName().length());
-
-	private static final String DETECTOR_GRID = "] The detector grid forecast a ";
+	// Static members
+	private static final String DETECTOR_GRID = "The detector grid forecast a ";
 	private static final String TRADING_OUTPOST = "Trading Outpost";
 	private static final String MINING_OUTPOST = "Mining Outpost";
 	private static final String ASTRONOMY_OBSERVATORY = "Astronomy Observatory";
-	
-	public static final int CHECK_GOODS = 15;
-	
+
+
+	private static final int MAX = 6000;
+	private static final int UPDATE_GOODS_PERIOD = (1000/20); // Update 20 times per day
 	public static final int CHECK_MISSION = 20; // once every 10 millisols
-
 	public static final int MAX_NUM_SOLS = 3;
-
 	public static final int MAX_SOLS_DAILY_OUTPUT = 14;
-
 	public static final int SUPPLY_DEMAND_REFRESH = 7;
-
-	private static final int RESOURCE_UPDATE_FREQ = 50;
-
-	private static final int CHECK_WATER_RATION = 100;
-	
-	private static final int SAMPLING_FREQ = 250; // in millisols
-
-	public static final int NUM_CRITICAL_RESOURCES = 9;
-
+	private static final int RESOURCE_UPDATE_FREQ = 30;
+	private static final int CHECK_WATER_RATION = 66;
+	private static final int RESOURCE_SAMPLING_FREQ = 50; // in msols
+	public static final int NUM_CRITICAL_RESOURCES = 10;
 	private static final int RESOURCE_STAT_SOLS = 12;
-
 	private static final int SOL_SLEEP_PATTERN_REFRESH = 3;
+	public static final int REGOLITH_MAX = 4000;
+	public static final int MIN_REGOLITH_RESERVE = 400; // per person
+	public static final int MIN_SAND_RESERVE = 400; // per person
+	
+	public static final int ICE_MAX = 4000;
+	public static final int WATER_MAX = 4000;
+	
+	public static final int MIN_WATER_RESERVE = 400; // per person
+	public static final int MIN_ICE_RESERVE = 400; // per person
 
-	public static final int MIN_REGOLITH_RESERVE = 20; // per person
+	private static final int OXYGEN_ID = ResourceUtil.oxygenID;
+	private static final int HYDROGEN_ID = ResourceUtil.hydrogenID;
+	private static final int METHANE_ID = ResourceUtil.methaneID;
+	private static final int METHANOL_ID = ResourceUtil.methanolID;
+	private static final int CO2_ID = ResourceUtil.co2ID;
+	
+	private static final int WATER_ID = ResourceUtil.waterID;
+	private static final int ICE_ID = ResourceUtil.iceID;
+	private static final int BRINE_WATER_ID = ResourceUtil.brineWaterID;
 
-	public static final int MIN_SAND_RESERVE = 5; // per person
+	private static final int REGOLITH_ID = ResourceUtil.regolithID;
+	private static final int SAND_ID = ResourceUtil.sandID;
+	private static final int CONCRETE_ID = ResourceUtil.concreteID;
+	private static final int CEMENT_ID = ResourceUtil.cementID;
+	
 
-	public static final int MIN_ICE_RESERVE = 200; // per person
+	private static final int GREY_WATER_ID = ResourceUtil.greyWaterID;
+	private static final int BLACK_WATER_ID = ResourceUtil.blackWaterID;
+	private static final int ROCK_SAMPLES_ID = ResourceUtil.rockSamplesID;
 
-	public static final double MIN_WATER_RESERVE = 400D; // per person
+	/** The settlement sampling resources. */
+	public static final int[] samplingResources;
+	
+	/** The definition of static arrays */
+	static {
+		samplingResources = new int[] {
+				OXYGEN_ID,
+				HYDROGEN_ID,
+				CO2_ID,
+				METHANE_ID,
+				METHANOL_ID,
+				BRINE_WATER_ID,
+				WATER_ID,
+				
+				ICE_ID,
+				BRINE_WATER_ID,
+				GREY_WATER_ID,
+				BLACK_WATER_ID,
+				ROCK_SAMPLES_ID,
 
+				REGOLITH_ID };
+	}
+	
+	/** Threshold to adjust filtering rate. */
+	private static final double GREY_WATER_THRESHOLD = 0.00001;
+	/** Safe low temperature range. */
 	public static final double SAFE_TEMPERATURE_RANGE = 18;
+	/** Initial mission passing score. */
+	private static final double INITIAL_MISSION_PASSING_SCORE = 500D;
+	/** The Maximum mission score that can be recorded. */
+	private static final double MAX_MISSION_SCORE = 1000D;
 
-	// public static final double SAFETY_PRESSURE = 20;
+	/** Normal air pressure [in kPa]. */
+	private static final double NORMAL_AIR_PRESSURE = 34D;
 
-	/** Normal air pressure [in kPa] */
-	private static final double NORMAL_AIR_PRESSURE = CompositionOfAir.SKYLAB_TOTAL_AIR_PRESSURE_kPA;
-	/** The minimal amount of resource to be retrieved. */
-	private static final double MIN = 0.00001;
-	
-	/** The unit count for this settlement. */
-	private static int uniqueCount = Unit.FIRST_SETTLEMENT_UNIT_ID;
-	
 	/** The settlement water consumption */
 	public static double water_consumption_rate;
 	/** The settlement minimum air pressure requirement. */
@@ -181,192 +194,66 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	/** The settlement life support requirements. */
 	public static double[][] life_support_value = new double[2][7];
 	
-	/** Amount of time (millisols) required for periodic maintenance. */
-	// private static final double MAINTENANCE_TIME = 1000D;
-
-	/** Override flag for food production. */
-	private transient boolean foodProductionOverride = false;
-	/** Override flag for mission creation at settlement. */
-	private transient boolean missionCreationOverride = false;
-	/** Override flag for manufacturing at settlement. */
-	private transient boolean manufactureOverride = false;
-	/** Override flag for resource process at settlement. */
-	private transient boolean resourceProcessOverride = false;
-	/* Override flag for construction/salvage mission creation at settlement. */
-	private transient boolean constructionOverride = false;
-	
-	/** The Flag showing if the settlement has been exposed to the last radiation event. */
-	private boolean[] exposed = { false, false, false };
-	/** The cache for the number of building connectors. */
-	private transient int numConnectorsCache = 0;
-
-	/** The settlement objective type string array. */
-	private final static String[] objectiveStrings;
-	/** The settlement objective type array. */
-	private final static ObjectiveType[] objectives;
-
-	static {
-		objectiveStrings = new String[] { 
-				Msg.getString("ObjectiveType.crop"),
-				Msg.getString("ObjectiveType.manu"), 
-				Msg.getString("ObjectiveType.research"),
-				Msg.getString("ObjectiveType.transportation"), 
-				Msg.getString("ObjectiveType.trade"),
-				Msg.getString("ObjectiveType.tourism") };
-		
-		objectives = new ObjectiveType[] { 
-				ObjectiveType.CROP_FARM,
-				ObjectiveType.MANUFACTURING_DEPOT, 
-				ObjectiveType.RESEARCH_CAMPUS, 
-				ObjectiveType.TRANSPORTATION_HUB,
-				ObjectiveType.TRADE_CENTER, 
-				ObjectiveType.TOURISM };
-	}
-	
-	/** The settlement's resource statistics. */
-	private transient Map<Integer, Map<Integer, List<Double>>> resourceStat = new ConcurrentHashMap<>();
-	/** The settlement's map of adjacent buildings. */
-	private transient Map<Building, List<Building>> adjacentBuildingMap = new ConcurrentHashMap<>();
-	/** The settlement's list of citizens. */
-	private Collection<Person> citizens = new ConcurrentLinkedQueue<Person>();
-	/** The settlement's list of owned robots. */
-	private Collection<Robot> ownedRobots = new ConcurrentLinkedQueue<Robot>();
-	/** The settlement's list of owned vehicles. */
-	private Collection<Vehicle> ownedVehicles = new ConcurrentLinkedQueue<Vehicle>();
-	/** The list of people currently within the settlement. */
-	private Collection<Person> peopleWithin = new ConcurrentLinkedQueue<Person>();
-	/** The list of equipment currently within the settlement. */
-	private Collection<Equipment> ownedEquipment = new ConcurrentLinkedQueue<Equipment>();
-	
 	/** The flag for checking if the simulation has just started. */
 	private boolean justLoaded = true;
-
-	/** Unique identifier for this settlement. */
-	private int identifier;
-	/** The base mission probability of the settlement. */
-	private int missionProbability = -1;
-	/** The water ration level of the settlement. */
+	/** The flag signifying this settlement as the destination of the user-defined commander. */
+	private boolean hasDesignatedCommander = false;
+	/** The Flag showing if the settlement has been exposed to the last radiation event. */
+	private RadiationStatus exposed = RadiationStatus.calculateCurrent(0D);
+	
+	/** The water ration level of the settlement. The higher the more urgent. */
 	private int waterRationLevel = 1;
 	/** The number of people at the start of the settlement. */
 	private int initialPopulation;
 	/** The number of robots at the start of the settlement. */
-	private int projectedNumOfRobots;
-	/** The scenario ID of the settlement. */
-	private int scenarioID;
+	private int initialNumOfRobots;
+	/** The template ID of the settlement. */
+	private int templateID;
 	/** The cache for the mission sol. */
 	private int solCache = 0;
-	// NOTE: can't be static since each settlement needs to keep tracking of it
-	private int numShiftsCache;
-	/** number of people with work shift A */
-	private int numA;
-	/** number of people with work shift B */
-	private int numB;
-	/** number of people with work shift X */
-	private int numX;
-	/** number of people with work shift Y */
-	private int numY;
-	/** number of people with work shift Z */
-	private int numZ;
-	/** number of people with work shift "On Call" */
-	private int numOnCall;
-	/** number of people with work shift "Off" */
-	private int numOff;
-	/** Total numbers of on-going manufacturing processes. */
-	private int sumOfCurrentManuProcesses = 0;
-	/** The cache for the numbers of crops that need tending. */
-	private int cropsNeedingTendingCache = 5;
-	/** The cache for millisol. */
-	private int millisolCache = -5;
 	/** Numbers of citizens of this settlement. */
 	private int numCitizens;
 	/** Numbers of bots owned by this settlement. */
 	private int numOwnedBots;
 	/** Numbers of vehicles owned by this settlement. */
 	private int numOwnedVehicles;
-	/** Numbers of equipment owned by this settlement. */
-	private int numOwnedEquipment;
-	/** Minimum amount of methane to stay in this settlement when considering a mission. */
-	private int minMethane = 50;
-	/** Minimum amount of oxygen to stay in this settlement when considering a mission. */
-	private int mineOxygen = 50;
-	/** Minimum amount of water to stay in this settlement when considering a mission. */
-	private int minWater = 50;
-	/** Minimum amount of food to stay in this settlement when considering a mission. */
-	private int minFood = 50;
 
-	/** The flag signifying this settlement as the destination of the user-defined commander. */
-	private boolean hasDesignatedCommander = false;
-	/** Flags that track if each of the 13 missions have been disable. */
-	private boolean[] missionsDisable = new boolean[12];
 
-	/** The average ice collection rate of the water ice nearby */
-	private double iceCollectionRate = 1;
+	/** The average regolith collection rate nearby. */
+	private double regolithCollectionRate = RandomUtil.getRandomDouble(4, 8);
+	/** The average ice collection rate of the water ice nearby. */
+	private double iceCollectionRate = RandomUtil.getRandomDouble(0.2, 1);
 	/** The composite value of the minerals nearby. */
 	public double mineralValue = -1;
 	/** The rate [kg per millisol] of filtering grey water for irrigating the crop. */
 	public double greyWaterFilteringRate = 1;
 	/** The currently minimum passing score for mission approval. */
-	private double minimumPassingScore = 100;
-	/** The trending score for curving the minimum score for mission approval. */
-	private double trendingScore = 30D;
-	/** The recently computed average score of the missions. */
-	private double currentAverageScore = 100;
-	/** Goods manager update time. */
-	private double goodsManagerUpdateTime = 0D;
+	private double minimumPassingScore = INITIAL_MISSION_PASSING_SCORE;
 	/** The settlement's current indoor temperature. */
 	private double currentTemperature = 22.5;
 	/** The settlement's current indoor pressure [in kPa], not Pascal. */
 	private double currentPressure = NORMAL_AIR_PRESSURE;
-//	/** Amount of time (millisols) that the settlement has had zero population. */
-//	private double zeroPopulationTime;
 	/** The settlement's current meal replenishment rate. */
-	public double mealsReplenishmentRate = 0.6;
+	public double mealsReplenishmentRate = 0.3;
 	/** The settlement's current dessert replenishment rate. */
-	public double dessertsReplenishmentRate = 0.7;
+	public double dessertsReplenishmentRate = 0.4;
 	/** The settlement's current probability value for ice. */
 	private double iceProbabilityValue = 0;
 	/** The settlement's current probability value for regolith. */
 	private double regolithProbabilityValue = 0;
-	/** The settlement's current probability value for oxygen. */
-	private double oxygenProbabilityValue = 0;
-	/** The settlement's current probability value for methane. */
-	private double methaneProbabilityValue = 0;
 	/** The settlement's outside temperature. */
 	private double outside_temperature;
-	/** The maximum distance (in km) the rovers are allowed to travel. */
-	private double maxMssionRange = 2200;
-	/** The mission radius [in km] for the rovers of this settlement for each type of mission . */
-	private double[] missionRange = new double[] {
-			500, // 0. Areo
-			500, // 1. Bio
-			500, // 2. CollectIce
-			500, // 3. CollectRegolith
-			1000,// 4. Emergency
-			500, // 5. Exploration
-			500, // 6. Meteorology
-			500, // 7. Mining
-			1000,// 8. RescueSalvageVehicle
-			maxMssionRange,   // 9. Trade
-			maxMssionRange*2, // 10.TravelToSettlement			
-	};
+	/** Total Crop area */
+	private double cropArea = -1;
+
 	/** The settlement terrain profile. */
 	public double[] terrainProfile = new double[2];
-	/** The settlement mission directive modifiers. */
-	public double[] missionModifiers = new double[9];
 
-	/** The settlement sponsor. */
-	private String sponsor;
 	/** The settlement template name. */
 	private String template;
-	/** The settlement name. */
-	private String name;
 
 	/** The settlement's ReportingAuthority instance. */
-	private ReportingAuthority ra;
-	
-	/** The settlement objective type instance. */
-	private ObjectiveType objectiveType;
-
+	private ReportingAuthority sponsor;
 	/** The settlement's building manager. */
 	protected BuildingManager buildingManager;
 	/** The settlement's building connector manager. */
@@ -381,17 +268,22 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	protected ThermalSystem thermalSystem;
 	/** The settlement's chain of command. */
 	private ChainOfCommand chainOfCommand;
-	/** The settlement's composition of air. */
-	private CompositionOfAir compositionOfAir;
 	/** The settlement's location. */
 	private Coordinates location;
 	/** The settlement's last dust storm. */
 	private DustStorm storm;
+	/** The settlement's EquipmentInventory instance. */
+	private EquipmentInventory eqmInventory;
+	/** The settlement's CreditManager instance manages trade credit between settlements. */
+	private CreditManager creditManager;
+	/** Mamanges the shifts */
+	private ShiftManager shiftManager;
+	private SettlementTaskManager taskManager;
+	private ScheduledEventManager futureEvents;
+	
+	/** The settlement objective type instance. */
+	private ObjectiveType objectiveType;
 
-	/** The last 20 mission scores */
-	private List<Double> missionScores;
-	/** The settlement's achievement in scientific fields. */
-	private Map<ScienceType, Double> scientificAchievement;
 	/** The settlement's water consumption in kitchen when preparing/cleaning meal and dessert. */
 	private SolMetricDataLogger<WaterUseType> waterConsumption;
 	/** The settlement's daily output (resources produced). */
@@ -399,148 +291,104 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	/** The settlement's daily labor hours output. */
 	private SolMetricDataLogger<Integer> dailyLaborTime;
 
-	private Map<Integer, Boolean> allowTradeMissionSettlements;
+	/** The object that keeps track of wheelbarrows. */
+//	private StorableItem wheelbarrows;
 	
-	// Static members	
-	private static final int sample1 = ResourceUtil.findIDbyAmountResourceName("regolith");// "polyethylene");
-	private static final int sample2 = ResourceUtil.findIDbyAmountResourceName("ice");// concrete");
+	/** The settlement's achievement in scientific fields. */
+	private EnumMap<ScienceType, Double> scientificAchievement;
+	/** The map of settlements allowed to trade. */
+	private Map<Integer, Boolean> allowTradeMissionSettlements;
+	/** The total amount resource collected/studied. */
+	private Map<Integer, Double> resourcesCollected = new HashMap<>();
+	/** The settlement's resource statistics. */
+	private Map<Integer, Map<Integer, Map<Integer, Double>>> resourceStat = new HashMap<>();
+	
+	/** The last 20 mission scores */
+	private List<Double> missionScores;
 
-	private static final int oxygenID = ResourceUtil.oxygenID;
-	private static final int waterID = ResourceUtil.waterID;
-	private static final int co2ID = ResourceUtil.co2ID;
-	private static final int foodID = ResourceUtil.foodID;
-	private static final int methaneID = ResourceUtil.methaneID;
-
-	private static MaintenanceMeta maintenanceMeta;
-	private static MaintenanceEVAMeta maintenanceEVAMeta;
-	private static RepairMalfunctionMeta repairMalfunctionMeta;
-	private static RepairEVAMalfunctionMeta repairEVAMalfunctionMeta;
-
+	/** The set of processes being overridden. */
+	private Set<OverrideType> processOverrides = new HashSet<>();
+	/** The set of available pressurized/pressurizing airlocks. */
+	private Set<Integer> availablePAirlocks = new HashSet<>();
+	/** The set of available depressurized/depressurizing airlocks. */
+	private Set<Integer> availableDAirlocks = new HashSet<>();
+	/** The settlement's list of citizens. */
+	private Set<Person> citizens;
+	/** The settlement's list of owned robots. */
+	private Set<Robot> ownedRobots;
+	/** The settlement's list of owned vehicles. */
+	private Set<Vehicle> ownedVehicles;
+	/** The settlement's list of parked vehicles. */
+	private Set<Vehicle> parkedVehicles;
+	/** The list of people currently within the settlement. */
+	private Set<Person> peopleWithin;
+	/** The settlement's list of robots within. */
+	private Set<Robot> robotsWithin;
+	/** The settlement's preference modifiers map. */
+	private Map<PreferenceKey, Double> preferenceModifiers = new HashMap<>();
+	
 	private static SettlementConfig settlementConfig = SimulationConfig.instance().getSettlementConfiguration();
 	private static PersonConfig personConfig = SimulationConfig.instance().getPersonConfig();
-	
-	private static List<String> travelMissionNames;
-	
-	static {
-		/**
-		 * Creates an array of all missions
-		 */
-		travelMissionNames = Arrays.asList(
-					AreologyFieldStudy.DEFAULT_DESCRIPTION,
-					BiologyFieldStudy.DEFAULT_DESCRIPTION,
-					CollectIce.DEFAULT_DESCRIPTION,
-					CollectRegolith.DEFAULT_DESCRIPTION,
-					EmergencySupply.DEFAULT_DESCRIPTION,
-					
-					Exploration.DEFAULT_DESCRIPTION,
-					MeteorologyFieldStudy.DEFAULT_DESCRIPTION,
-					Mining.DEFAULT_DESCRIPTION,
-					RescueSalvageVehicle.DEFAULT_DESCRIPTION,
-					Trade.DEFAULT_DESCRIPTION,
-					
-					TravelToSettlement.DEFAULT_DESCRIPTION
-			);
-	}
-	
-	/**
-	 * Must be synchronised to prevent duplicate ids being assigned via different
-	 * threads.
-	 * 
-	 * @return
-	 */
-	private static synchronized int getNextIdentifier() {
-		return uniqueCount++;
-	}
-	
-	/**
-	 * Get the unique identifier for this settlement
-	 * 
-	 * @return Identifier
-	 */
-	public int getIdentifier() {
-		return identifier;
-	}
-	
-	public void incrementID() {
-		// Gets the identifier
-		this.identifier = getNextIdentifier();
-	}
-	
+	private static SurfaceFeatures surfaceFeatures;
+	private static TerrainElevation terrainElevation;
+
 	static {
 		water_consumption_rate = personConfig.getWaterConsumptionRate();
 		minimum_air_pressure = personConfig.getMinAirPressure();
-		life_support_value = settlementConfig.loadLifeSupportRequirements();
+		life_support_value = settlementConfig.getLifeSupportRequirements();
 	}
-	
+
 	/**
 	 * Constructor 1 called by ConstructionStageTest suite for maven testing.
 	 */
 	private Settlement() {
 		super(null, null);
-	
-		unitManager = sim.getUnitManager();
-		// Add this settlement to the lookup map
-		unitManager.addSettlementID(this);
+
 		// set location
 		location = getCoordinates();
-		
-	}
-
-	/**
-	 * The static factory method called by ConstructionStageTest to return a new
-	 * instance of Settlement for maven testing.
-	 */
-	public static Settlement createConstructionStage() {
-		return new Settlement();
 	}
 
 	/**
 	 * Constructor 2 called by MockSettlement for maven testing.
-	 * 
+	 *
 	 * @param name
-	 * @param scenarioID
+	 * @param id
 	 * @param location
 	 */
-	public Settlement(String name, int scenarioID, Coordinates location) {
+	public Settlement(String name, int id, Coordinates location) {
 		// Use Structure constructor.
 		super(name, location);
-		
-		if (unitManager == null) {// for passing maven test
-			unitManager = sim.getUnitManager();
-		}
 
-		if (unitManager != null) {// for passing maven test
-			// Add this settlement to the lookup map
-			unitManager.addSettlementID(this);
-		}
-		
-		this.name = name;
-		this.scenarioID = scenarioID;
+		this.templateID = id;
 		this.location = location;
 
-		if (missionManager == null) {// for passing maven test
-			missionManager = sim.getMissionManager();
-		}
-	}
+		citizens = new UnitSet<>();
+		ownedRobots = new UnitSet<>();
+		ownedVehicles = new UnitSet<>();
+		parkedVehicles = new UnitSet<>();
+		peopleWithin = new UnitSet<>();
+		robotsWithin = new UnitSet<>();
 
-	/**
-	 * The static factory method called by ConstructionStageTest to return a new
-	 * instance of Settlement for maven testing.
-	 * 
-	 * @param name
-	 * @param scenarioID
-	 * @param location
-	 * @return
-	 */
-	public static Settlement createMockSettlement(String name, int scenarioID, Coordinates location) {
-		return new Settlement(name, scenarioID, location);
+		final double GEN_MAX = 1_000_000;
+		
+		// Create EquipmentInventory instance
+		eqmInventory = new EquipmentInventory(this, GEN_MAX);
+
+		// Initialize schedule event manager
+		futureEvents = new ScheduledEventManager(marsClock);
+
+		creditManager = new CreditManager(this, unitManager);
+
+		// Mock use the default shifts
+		ShiftPattern shifts = settlementConfig.getShiftPattern(SettlementConfig.DEFAULT_3SHIFT);
+		shiftManager = new ShiftManager(this, shifts, 0, marsClock.getMillisolInt());
 	}
 
 	/**
 	 * Constructor 3 for creating settlements. Called by UnitManager to create the
 	 * initial settlement Called by ArrivingSettlement to create a brand new
 	 * settlement
-	 * 
+	 *
 	 * @param name
 	 * @param id
 	 * @param template
@@ -549,53 +397,35 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	 * @param populationNumber
 	 * @param initialNumOfRobots
 	 */
-	private Settlement(String name, int id, String template, String sponsor, Coordinates location, int populationNumber,
-			int projectedNumOfRobots) {
+	private Settlement(String name, int id, String template, ReportingAuthority sponsor, Coordinates location, int populationNumber,
+			int initialNumOfRobots) {
 		// Use Structure constructor
 		super(name, location);
-		
-		unitManager = sim.getUnitManager();
-		// Add this settlement to the lookup map
-		unitManager.addSettlementID(this);
-		
-		this.name = name;
+
 		this.template = template;
-		this.sponsor = sponsor;
 		this.location = location;
-		this.scenarioID = id;
-		this.projectedNumOfRobots = projectedNumOfRobots;
+		this.templateID = id;
+		this.initialNumOfRobots = initialNumOfRobots;
 		this.initialPopulation = populationNumber;
 
 		// Determine the reporting authority
-		setReportingAuthority(sponsor);
-		// Determine the mission directive modifiers
-		determineMissionAgenda();
-		
-//		// The surface of Mars contains this settlement
-//		setContainerUnit(marsSurface);
-//		// Set the containerID
-//		setContainerID(Unit.MARS_SURFACE_ID);
-		
-		// Create Task instances
-		maintenanceMeta = new MaintenanceMeta();
-		maintenanceEVAMeta = new MaintenanceEVAMeta();
-		repairMalfunctionMeta = new RepairMalfunctionMeta();
-		repairEVAMalfunctionMeta = new RepairEVAMalfunctionMeta();
+		this.sponsor = sponsor;
+		preferenceModifiers.putAll(sponsor.getPreferences());
 
-		int size = missionsDisable.length;
-		for (int i=0; i<size; i++) {
-			missionsDisable[i] = false;
-		}
-		
-		allowTradeMissionSettlements = new ConcurrentHashMap<Integer, Boolean>(); 
-		
+		citizens = new UnitSet<>();
+		ownedRobots = new UnitSet<>();
+		ownedVehicles = new UnitSet<>();
+		parkedVehicles = new UnitSet<>();
+		peopleWithin = new UnitSet<>();
+		robotsWithin = new UnitSet<>();
+		allowTradeMissionSettlements = new HashMap<>();
 	}
 
-	
+
 	/**
 	 * The static factory method called by UnitManager and ArrivingSettlement to
 	 * create a brand new settlement
-	 * 
+	 *
 	 * @param name
 	 * @param id
 	 * @param template
@@ -605,72 +435,96 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	 * @param initialNumOfRobots
 	 * @return
 	 */
-	public static Settlement createNewSettlement(String name, int id, String template, String sponsor,
+	public static Settlement createNewSettlement(String name, int id, String template, ReportingAuthority sponsor,
 			Coordinates location, int populationNumber, int initialNumOfRobots) {
 		return new Settlement(name, id, template, sponsor, location, populationNumber, initialNumOfRobots);
 	}
-
 
 	/**
 	 * Initialize field data, class and maps
 	 */
 	public void initialize() {
-		if (terrainElevation == null)
+		if (surfaceFeatures == null) 
+			surfaceFeatures = Simulation.instance().getSurfaceFeatures();
+		
+		if (terrainElevation == null) 
 			terrainElevation = surfaceFeatures.getTerrainElevation();
 		
 //		// Get the elevation and terrain gradient factor
 		terrainProfile = terrainElevation.getTerrainProfile(location);
-//				
-//		double elevation = terrainProfile[0];
-//		double gradient = terrainProfile[1];		
-//		
-//		iceCollectionRate = (- 0.639 * elevation + 14.2492) / 10D  + gradient / 250;
-//		
-//		if (iceCollectionRate < 0)
-//			iceCollectionRate = 0;
-//		
-//		logger.info(this + "           elevation : " + Math.round(elevation*1000.0)/1000.0 + " km");
-//		logger.info(this + "   terrain steepness : " + Math.round(gradient*10.0)/10.0);
-//		logger.info(this + " ice collection rate : " + Math.round(iceCollectionRate*100.0)/100.0 + " kg/millisol");
-		
-		iceCollectionRate = terrainElevation.getIceCollectionRate(location);
-//		logger.config("Done iceCollectionRate");
-		
-		// Set inventory total mass capacity.
-		getInventory().addGeneralCapacity(Double.MAX_VALUE); // 10_000_000);//100_000_000);//
 
-		double max = 500;
-		// Initialize inventory of this building for resource storage
-		for (AmountResource ar : ResourceUtil.getAmountResources()) {
-			double resourceCapacity = getInventory().getAmountResourceRemainingCapacity(ar, true, false);
-			if (resourceCapacity >= 0) {
-				getInventory().addAmountResourceTypeCapacity(ar, max);
-			}
-		}
-//		logger.config("Done addAmountResourceTypeCapacity()");
+//		Note: to check elevation, do this -> double elevation = terrainProfile[0];
+//		Note: to check gradient, do this ->double gradient = terrainProfile[1];
+
+		iceCollectionRate = iceCollectionRate + terrainElevation.obtainIceCollectionRate(location);
+		regolithCollectionRate = regolithCollectionRate + terrainElevation.obtainRegolithCollectionRate(location);
+
+		logger.config(this, " iceCollectionRate: " + Math.round(iceCollectionRate * 100.0)/100.0);
+		logger.config(this, " regolithCollectionRate: " + Math.round(regolithCollectionRate * 100.0)/100.0);
+		
+		double areoThermalPot = surfaceFeatures.getAreothermalPotential(location);
+		
+		logger.config(this, " Areothermal Potential: " + Math.round(areoThermalPot * 1000.0)/1000.0);
+		
+		final double GEN_MAX = 1_000_000;
+		// Create EquipmentInventory instance
+		eqmInventory = new EquipmentInventory(this, GEN_MAX);
+
+		final double INITIAL_FREE_OXYGEN = 1_000;
+		// Stores limited amount of oxygen in this settlement
+		storeAmountResource(ResourceUtil.oxygenID, INITIAL_FREE_OXYGEN);
+
+		SettlementTemplate sTemplate = settlementConfig.getItem(template);
+
 		// Initialize building manager
-		buildingManager = new BuildingManager(this);
-//		logger.config("Done BuildingManager()");
+		buildingManager = new BuildingManager(this, sTemplate.getBuildings());
+		
+		buildingManager.initialize();
+		
 		// Initialize building connector manager.
-		buildingConnectorManager = new BuildingConnectorManager(this);
+		buildingConnectorManager = new BuildingConnectorManager(this, sTemplate.getBuildings());
+
+		// Create adjacent building map
+		buildingManager.createAdjacentBuildingMap();
+		
+		// Initialize schedule event manager
+		futureEvents = new ScheduledEventManager(marsClock);
+
+		// Get the rotation about the planet and convert that to a fraction of the Sol.
+		double fraction = getCoordinates().getTheta()/(Math.PI * 2D); 
+		if (fraction == 1D) {
+			// Gone round the planet
+			fraction = 0D;
+		}
+		int sunRiseOffSet = (int) (100 * fraction) * 10; // Do the offset in units of 10
+
+		shiftManager = new ShiftManager(this, sTemplate.getShiftDefinition(),
+										sunRiseOffSet, marsClock.getMillisolInt());
+
+		// Initialize Credit Manager.
+		creditManager = new CreditManager(this);
+		
 		// Initialize goods manager.
-		goodsManager = new GoodsManager(this);
-//		logger.config("Done GoodsManager()");
+		goodsManager = new GoodsManager(this, sunRiseOffSet);
+
 		// Initialize construction manager.
 		constructionManager = new ConstructionManager(this);
+
 		// Initialize power grid
 		powerGrid = new PowerGrid(this);
-		// Added thermal control system
+
+		// Initialize thermal control system
 		thermalSystem = new ThermalSystem(this);
-//		logger.config("Done ThermalSystem()");
+
+		// Initialize settlement task manager
+		taskManager = new SettlementTaskManager(this);
+
 		// Initialize scientific achievement.
-		scientificAchievement = new ConcurrentHashMap<ScienceType, Double>(0);
+		scientificAchievement = new EnumMap<>(ScienceType.class);
+
 		// Add chain of command
 		chainOfCommand = new ChainOfCommand(this);
-//		logger.config("Done ChainOfCommand()");
-		// Add tracking composition of air
-		compositionOfAir = new CompositionOfAir(this);
-//		logger.config("Done CompositionOfAir()");
+
 		// Set objective()
 		if (template.equals(TRADING_OUTPOST))
 			setObjective(ObjectiveType.TRADE_CENTER, 2);
@@ -679,13 +533,9 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		else
 			setObjective(ObjectiveType.CROP_FARM, 2);
 
-//		LogConsolidated.log(Level.INFO, 0, sourceName,
-//				"[" + this + "] Set development objective to " + objectiveType.toString() 
-//				+ " (based upon the '" + template + "' Template).", null);
-
 		// initialize the missionScores list
-		missionScores = new CopyOnWriteArrayList<>();
-		missionScores.add(200D);
+		missionScores = new ArrayList<>();
+		missionScores.add(INITIAL_MISSION_PASSING_SCORE);
 
 		// Create the water consumption map
 		waterConsumption = new SolMetricDataLogger<>(MAX_NUM_SOLS);
@@ -693,131 +543,36 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		dailyResourceOutput = new SolMetricDataLogger<>(MAX_NUM_SOLS);
 		// Create the daily labor hours map
 		dailyLaborTime = new SolMetricDataLogger<>(MAX_NUM_SOLS);
-//		logger.config("Done initialize()");
-	}
-
-	/*
-	 * Sets sponsoring agency for this settlement
-	 */
-	public void setReportingAuthority(String sponsor) {
-		
-		if (sponsor.contains(ReportingAuthorityType.CNSA.getName())) {
-			ra = CNSAMissionControl.createMissionControl(); // ProspectingMineral
-
-		} else if (sponsor.contains(ReportingAuthorityType.CSA.getName())) {
-			ra = CSAMissionControl.createMissionControl(); // AdvancingSpaceKnowledge
-
-		} else if (sponsor.contains(ReportingAuthorityType.ESA.getName())) {
-			ra = ESAMissionControl.createMissionControl(); // DevelopingSpaceActivity;
-
-		} else if (sponsor.contains(ReportingAuthorityType.ISRO.getName())) {
-			ra = ISROMissionControl.createMissionControl(); // DevelopingAdvancedTechnology
-
-		} else if (sponsor.contains(ReportingAuthorityType.JAXA.getName())) {
-			ra = JAXAMissionControl.createMissionControl(); // ResearchingSpaceApplication
-
-		} else if (sponsor.contains(ReportingAuthorityType.NASA.getName())) {
-			ra = NASAMissionControl.createMissionControl(); // FindingLife
-
-		} else if (sponsor.contains(ReportingAuthorityType.RKA.getName())) {
-			ra = RKAMissionControl.createMissionControl(); // ResearchingHealthHazard
-
-		} else if (sponsor.contains(ReportingAuthorityType.MS.getName())) {
-			ra = MarsSocietyMissionControl.createMissionControl(); // SettlingMars
-
-		} else if (sponsor.contains(ReportingAuthorityType.SPACEX.getName())) {
-			ra = SpaceXMissionControl.createMissionControl(); // BuildingSelfSustainingColonies
-
-		} else {
-			logger.warning(getName() + " has no reporting authority!");
-		}
-	}
-	
-	
-	public void determineMissionAgenda() {
-		int[][] mod = ra.getMissionAgenda().getMissionModifiers();
-		int row = mod.length;
-		for (int i=0; i<row; i++) {
-			int sum = 0;
-			int column = mod[0].length;
-			for (int j=0; j<column; j++) {
-				sum += mod[i][j];
-			}
-			double total = 1D * sum / row;
-			setMissionDirectiveModifiers(i, total);
-		}
-		
-	}
-
-	/*
-	 * Gets sponsoring agency for the person
-	 */
-	public ReportingAuthority getReportingAuthority() {
-		return ra;
 	}
 
 	/**
-	 * Create a map of buildings with their lists of building connectors attached to
-	 * it
+	 * Gets the terrain elevation.
 	 * 
-	 * @return a map
-	 */
-	public Map<Building, List<Building>> createAdjacentBuildingMap() {
-//		adjacentBuildingMap.clear();
-		if (adjacentBuildingMap == null)
-			adjacentBuildingMap = new ConcurrentHashMap<>();
-		for (Building b : buildingManager.getBuildings()) {
-			List<Building> connectors = createAdjacentBuildings(b);
-			// if (b == null)
-			// System.out.println("b = null");
-			adjacentBuildingMap.put(b, connectors);
-		}
-
-		return adjacentBuildingMap;
-	}
-
-	/**
-	 * Gets a list of building connectors attached to this building
-	 * 
-	 * @param building
 	 * @return
 	 */
-	public List<Building> getBuildingConnectors(Building building) {
-		if (!adjacentBuildingMap.containsKey(building))
-			adjacentBuildingMap = createAdjacentBuildingMap();
-
-		return adjacentBuildingMap.get(building);
+	public double getElevation() {
+		return terrainProfile[0];
 	}
 
 	/**
-	 * Creates a list of adjacent buildings attached to this building
+	 * Gets the terrain gradient.
 	 * 
-	 * @param building
-	 * @return a list of adjacent buildings
+	 * @return
 	 */
-	public List<Building> createAdjacentBuildings(Building building) {
-		List<Building> buildings = new CopyOnWriteArrayList<>();
-		Set<BuildingConnector> connectors = getConnectionsToBuilding(building);
-		for (BuildingConnector c : connectors) {
-			Building b1 = c.getBuilding1();
-			Building b2 = c.getBuilding2();
-			if (b1 != building) {
-				buildings.add(b1);
-			} else if (b2 != building) {
-				buildings.add(b2);
-			}
-		}
-
-		return buildings;
+	public double getGradient() {
+		return terrainProfile[1];
 	}
-
-	public Set<BuildingConnector> getConnectionsToBuilding(Building building) {
-		return getBuildingConnectorManager().getConnectionsToBuilding(building);
+	
+	/**
+	 * Gets the space agency.
+	 */
+	public ReportingAuthority getReportingAuthority() {
+		return sponsor;
 	}
 
 	/**
 	 * Gets the settlement's meals replenishment rate.
-	 * 
+	 *
 	 * @return mealsReplenishmentRate
 	 */
 	public double getMealsReplenishmentRate() {
@@ -826,7 +581,7 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 	/**
 	 * Sets the settlement's meals replenishment rate.
-	 * 
+	 *
 	 * @param rate
 	 */
 	public void setMealsReplenishmentRate(double rate) {
@@ -835,7 +590,7 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 	/**
 	 * Gets the settlement's desserts replenishment rate.
-	 * 
+	 *
 	 * @return DessertsReplenishmentRate
 	 */
 	public double getDessertsReplenishmentRate() {
@@ -844,7 +599,7 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 	/**
 	 * Sets the settlement's desserts replenishment rate.
-	 * 
+	 *
 	 * @param rate
 	 */
 	public void setDessertsReplenishmentRate(double rate) {
@@ -852,180 +607,73 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	}
 
 	/**
-	 * Gets the settlement template's unique ID.
-	 * 
-	 * @return ID number.
-	 */
-	public int getID() {
-		return scenarioID;
-	}
-
-	/**
-	 * Gets the population capacity of the settlement
-	 * 
+	 * Gets the population capacity of the settlement.
+	 *
 	 * @return the population capacity
 	 */
 	public int getPopulationCapacity() {
-		int result = 0;
-		List<Building> bs = buildingManager.getBuildings(FunctionType.LIVING_ACCOMMODATIONS);
-		for (Building building : bs) {
-			result += building.getLivingAccommodations().getBedCap();
-		}
-
-		return result;
-	}
-
-	public int getNumOccupiedSpots() {
-		int result = 0;
-		List<Building> bs = buildingManager.getBuildings(FunctionType.LIVING_ACCOMMODATIONS);
-		for (Building building : bs) {
-			result += building.getLivingAccommodations().getNumOccupiedActivitySpots();
-		}
-		return result;
-	}	
-	
-	public int getUnoccupiedBeds() {
-		int result = 0;
-		List<Building> bs = buildingManager.getBuildings(FunctionType.LIVING_ACCOMMODATIONS);
-		for (Building building : bs) {
-			result += building.getLivingAccommodations().getNumEmptyActivitySpots();
-		}
-		return result;
-	}
-
-	public int getTotalNumDesignatedBeds() {
-		int result = 0;
-		List<Building> bs = buildingManager.getBuildings(FunctionType.LIVING_ACCOMMODATIONS);
-		for (Building building : bs) {
-			result += building.getLivingAccommodations().getNumAssignedBeds();
-		}
-
-		return result;
+		return buildingManager.getPopulationCapacity();
 	}
 
 	/**
-	 * Gets the current number of people who are inside the settlement
-	 * 
+	 * Gets the current number of people who are inside the settlement.
+	 *
 	 * @return the number indoor
 	 */
 	public int getIndoorPeopleCount() {
-		return peopleWithin.size();	
-		
-//		return Math.toIntExact(getInventory().getAllContainedUnits().stream().filter(p -> p instanceof Person)
-//				.collect(Collectors.counting()));
-
-		// TODO: need to factor in those inside a vehicle parked inside a garage
-
-//		int n = 0;
-//		Iterator<Unit> i = getInventory().getAllContainedUnits().iterator();
-//		while (i.hasNext()) {
-//			if (i.next() instanceof Person)
-//				n++;
-//		}
-//		
-//		return n;
-
+		return peopleWithin.size();
 	}
 
+	/**
+	 * Ends all the indoor tasks people are doing.
+	 */
 	public void endAllIndoorTasks() {
 		for (Person p : getIndoorPeople()) {
-			LogConsolidated.log(logger, Level.INFO, 4_000, sourceName, 
-					"[" + p.getLocale() + "] "
-					+ p.getName() 
-					+ " had to end the current inddor tasks at ("
-					+ Math.round(p.getXLocation()*10.0)/10.0 + ", " 
-					+ Math.round(p.getYLocation()*10.0)/10.0 + ").");
-			p.getMind().getTaskManager().clearAllTasks();
+			logger.log(this, p, Level.INFO, 4_000,
+						"Ended the current indoor task at "
+						+  p.getPosition() + ".", null);
+			p.getMind().getTaskManager().clearAllTasks("Stop indoor tasks");
 		}
 	}
 
 	/**
 	 * Gets a collection of the people who are currently inside the settlement.
-	 * 
+	 *
 	 * @return Collection of people within
 	 */
 	public Collection<Person> getIndoorPeople() {
-		return getPeopleWithin();
-		
-//		return CollectionUtils.getPerson(getInventory().getContainedUnits());
-//		return allAssociatedPeople
-//				.stream().filter(p -> !p.isDeclaredDead()
-//						&& p.getLocationStateType() == LocationStateType.INSIDE_SETTLEMENT && p.getSettlement() == this)
-//				.collect(Collectors.toList());
+		return peopleWithin;
 	}
 
 	/**
 	 * Gets a collection of people who are doing EVA outside the settlement.
-	 * 
+	 *
 	 * @return Collection of people
 	 */
 	public Collection<Person> getOutsideEVAPeople() {
-
-		return citizens.stream().filter(
-				p -> !p.isDeclaredDead() && (p.getLocationStateType() == LocationStateType.WITHIN_SETTLEMENT_VICINITY
-						|| p.getLocationStateType() == LocationStateType.OUTSIDE_ON_MARS))
-				.collect(Collectors.toList());
-
-	}
-
-	/**
-	 * Gets a collection of people who are doing EVA outside the settlement.
-	 * 
-	 * @return Collection of people
-	 */
-	public Collection<Person> getOnMissionPeople() {
-
 		return citizens.stream()
-				.filter(p -> !p.isDeclaredDead() && p.getMind().getMission() != null
-						&& !p.getMind().getMission().getPhase().equals(VehicleMission.REVIEWING))
+				.filter(p -> !p.isDeclaredDead()
+						&& (p.getLocationStateType() == LocationStateType.WITHIN_SETTLEMENT_VICINITY
+						|| p.getLocationStateType() == LocationStateType.MARS_SURFACE))
 				.collect(Collectors.toList());
-
 	}
 
 	/**
-	 * Gets the number of people currently doing EVA outside the settlement
+	 * Gets the number of citizens doing EVA outside.
 	 * 
-	 * @return the available population capacity
+	 * @return
 	 */
-	public int getNumOutsideEVAPeople() {
-		Collection<Person> ppl = getOutsideEVAPeople();
-		if (ppl == null || ppl.isEmpty())
-			return 0;
-		else
-			return ppl.size();
+	public Long getNumOutsideEVA() {
+		return citizens.stream()
+				.filter(p -> !p.isDeclaredDead()
+						&& (p.getLocationStateType() == LocationStateType.WITHIN_SETTLEMENT_VICINITY
+						|| p.getLocationStateType() == LocationStateType.MARS_SURFACE))
+				.collect(Collectors.counting());
 	}
-
-	/**
-	 * Gets the current available population capacity of the settlement
-	 * 
-	 * @return the available population capacity
-	 */
-	public int getAvailableSpace() {
-		return getPopulationCapacity() - numCitizens;// getIndoorPeopleCount();
-	}
-
-//	/**
-//	 * Gets an array of current inhabitants of the settlement
-//	 * 
-//	 * @return array of inhabitants
-//	 */
-//	public Person[] getInhabitantArray() {
-//		return getIndoorPeople().toArray(new Person[getIndoorPeople().size()]);
-//		
-//		Collection<Person> people = getIndoorPeople();
-//		Person[] personArray = new Person[people.size()];
-//		Iterator<Person> i = people.iterator();
-//		int count = 0;
-//		while (i.hasNext()) {
-//			personArray[count] = i.next();
-//			count++;
-//		}
-//		return personArray;
-//	}
 
 	/**
 	 * Gets the robot capacity of the settlement
-	 * 
+	 *
 	 * @return the robot capacity
 	 */
 	public int getRobotCapacity() {
@@ -1043,21 +691,11 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 	/**
 	 * Gets the current number of robots in the settlement
-	 * 
+	 *
 	 * @return the number of robots
 	 */
 	public int getIndoorRobotsCount() {
-		return Math.toIntExact(getInventory().getAllContainedUnitIDs()
-				.stream().filter(id -> unitManager.getRobotByID(id) instanceof Robot)
-				.collect(Collectors.counting()));
-		
-		
-//		int n = 0;
-//		Iterator<Unit> i = getInventory().getAllContainedUnits().iterator();
-//		while (i.hasNext()) {
-//			if (i.next() instanceof Robot)
-//				n++;
-//		}
+		return ownedRobots.size();
 	}
 
 	/**
@@ -1066,177 +704,124 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	 * @return Collection of robots
 	 */
 	public Collection<Robot> getRobots() {
-		return CollectionUtils.getRobot(getInventory().getContainedUnits());
+		return ownedRobots;
 	}
 
 	/**
-	 * Gets the current available robot capacity of the settlement
-	 * 
-	 * @return the available robots capacity
+	 * Gets a collection of the number of robots of a particular type.
+	 *
+	 * @return Collection of robots
 	 */
-	public int getAvailableRobotCapacity() {
-		return getRobotCapacity() - numOwnedBots;
-	}
-
-	/**
-	 * Gets an array of current robots of the settlement
-	 * 
-	 * @return array of robots
-	 */
-	public Robot[] getRobotArray() {
-		return getRobots().toArray(new Robot[getRobots().size()]);
-//		Collection<Robot> robots = getRobots();
-//		Robot[] robotArray = new Robot[robots.size()];
-//		Iterator<Robot> i = robots.iterator();
-//		int count = 0;
-//		while (i.hasNext()) {
-//			robotArray[count] = i.next();
-//			count++;
-//		}
-//		return robotArray;
+	public Collection<Robot> getRobots(RobotType type) {
+		// using java 8 stream
+		return getRobots().stream()
+				.filter(r -> r.getRobotType() == type)
+				.collect(Collectors.toList());
 	}
 
 	/**
 	 * Returns true if life support is working properly and is not out of oxygen or
 	 * water.
-	 * 
+	 *
 	 * @return true if life support is OK
 	 * @throws Exception if error checking life support.
 	 */
 	public boolean lifeSupportCheck() {
-		// boolean result = true;
-		try {
-			if (getInventory().getAmountResourceStored(ResourceUtil.oxygenID, false) <= 0D)
-				return false;
-			if (getInventory().getAmountResourceStored(ResourceUtil.waterID, false) <= 0D)
-				return false;
 
-			// TODO: check against indoor air pressure
+		try {
+			double amount = getAmountResourceStored(ResourceUtil.oxygenID);
+			if (amount <= 0D) {
+				logger.warning(this, "No more oxygen.");
+				return false;
+			}
+			amount = getAmountResourceStored(WATER_ID);
+			if (amount <= 0D) {
+				logger.warning(this, "No more water.");
+				return false;
+			}
+
+			// Check against indoor air pressure
 			double p = getAirPressure();
 			if (p > PhysicalCondition.MAXIMUM_AIR_PRESSURE || p < Settlement.minimum_air_pressure) {
-				LogConsolidated.log(logger, Level.SEVERE, 10_000, sourceName, "[" + this.getName()
-						+ "] out-of-range overall air pressure at " + Math.round(p * 10D) / 10D + " kPa detected.");
+				logger.warning(this, "Out-of-range overall air pressure at " + Math.round(p * 10D) / 10D + " kPa detected.");
 				return false;
 			}
 
 			double t = currentTemperature;
 			if (t < life_support_value[0][4] - SAFE_TEMPERATURE_RANGE
 					|| t > life_support_value[1][4] + SAFE_TEMPERATURE_RANGE) {
-				LogConsolidated.log(logger, Level.SEVERE, 10_000, sourceName,
-						"[" + this.getName() + "] out-of-range overall temperature at " + Math.round(t * 10D) / 10D
-								+ " " + Msg.getString("temperature.sign.degreeCelsius") + " detected.");
+				logger.warning(this, "Out-of-range overall temperature at "
+						   + Math.round(t * 10D) / 10D
+						   + " " + Msg.getString("temperature.sign.degreeCelsius") + " detected.");
 				return false;
 			}
-			// result = false;
+
 		} catch (Exception e) {
-			e.printStackTrace();
+			logger.severe("Problems in lifeSupportCheck(): " + e.getMessage());
 		}
+
 		return true;
-		// return result;
 	}
 
 	/**
 	 * Gets the number of people the life support can provide for.
-	 * 
+	 *
 	 * @return the capacity of the life support system
 	 */
+	@Override
 	public int getLifeSupportCapacity() {
 		return getPopulationCapacity();
 	}
 
 	/**
 	 * Gets oxygen from the inventory.
-	 * 
-	 * @param amountRequested the amount of oxygen requested [kg]
+	 *
+	 * @param oxygenTaken the amount of oxygen requested [kg]
 	 * @return the amount of oxygen actually received [kg]
 	 * @throws Exception if error providing oxygen.
 	 */
-	public double provideOxygen(double amountRequested) {
-		double oxygenTaken = amountRequested;
-		try {
-			double oxygenLeft = getInventory().getAmountResourceStored(oxygenID, false);
-			// System.out.println("oxygenLeft : " + oxygenLeft);
-			if (oxygenTaken > oxygenLeft)
-				oxygenTaken = oxygenLeft;
-			// Note: do NOT retrieve O2 here since calculateGasExchange() in
-			// CompositionOfAir
-			// is doing it for all inhabitants once per frame.
-			getInventory().retrieveAmountResource(oxygenID, oxygenTaken);
-//			getInventory().addAmountDemandTotalRequest(oxygenID);
-			getInventory().addAmountDemand(oxygenID, oxygenTaken);
-
-			double carbonDioxideProvided = oxygenTaken;
-			double carbonDioxideCapacity = getInventory().getAmountResourceRemainingCapacity(co2ID, true, false);
-			if (carbonDioxideProvided > carbonDioxideCapacity)
-				carbonDioxideProvided = carbonDioxideCapacity;
-			// Note: do NOT store CO2 here since calculateGasExchange() in CompositionOfAir
-			// is doing it for all inhabitants once per frame.
-			getInventory().storeAmountResource(co2ID, carbonDioxideProvided, true);
-//			getInventory().addAmountSupply(co2ID, carbonDioxideProvided);
-
-		} catch (Exception e) {
-			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName, name + " - Error in providing O2/removing CO2: ", e);
-		}
-
+	public double provideOxygen(double oxygenTaken) {
+		// Note: do NOT retrieve O2 here since calculateGasExchange() in
+		// CompositionOfAir is doing it for all inhabitants once per frame.
 		return oxygenTaken;
-		// return oxygenTaken * (malfunctionManager.geOxygenFlowModifier() / 100D);
 	}
 
 	/**
 	 * Gets water from the inventory
 	 *
-	 * @param amountRequested the amount of water requested [kg]
+	 * @param waterTaken the amount of water requested [kg]
 	 * @return the amount of water actually received [kg]
 	 * @throws Exception if error providing water.
 	 */
-	public double provideWater(double amountRequested) {
-		double waterTaken = amountRequested;
-		try {
-			double waterLeft = getInventory().getAmountResourceStored(waterID, false);
-			if (waterTaken > waterLeft)
-				waterTaken = waterLeft;
-			if (waterTaken > MIN) {
-				Storage.retrieveAnResource(waterTaken, waterID, getInventory(), true);
-				getInventory().retrieveAmountResource(waterID, waterTaken);
-//				getInventory().addAmountDemandTotalRequest(waterID);
-//				getInventory().addAmountDemand(waterID, waterTaken);
-			}
-		} catch (Exception e) {
-			LogConsolidated.log(logger, Level.SEVERE, 5000, sourceName, name + " - Error in providing H2O needs: ", e);
-		}
-
-		return waterTaken;
-//		return waterTaken * (malfunctionManager.getWaterFlowModifier() / 100D);
+	public double provideWater(double waterTaken) {
+		double lacking = retrieveAmountResource(WATER_ID, waterTaken);
+		return waterTaken - lacking;
 	}
 
 	/**
-	 * Computes the average air pressure of the life support system.
-	 * 
-	 * @return air pressure [kPa]
+	 * Computes the average air pressure & temperature of the life support system.
 	 */
-	public double computeAveragePressure() {
-//		double total = 0;
-//		List<Building> buildings = buildingManager.getBuildingsWithLifeSupport();
-//		int size = buildings.size();
-//		for (Building b : buildings) {
-//			int id = b.getInhabitableID();
-//			total += compositionOfAir.getTotalPressure()[id];
-//		}
-//		// convert from atm to kPascal
-//		return total * CompositionOfAir.KPA_PER_ATM / size;
+	private void computeEnvironmentalAverages() {
 
 		double totalArea = 0;
+		double totalTArea = 0;
 		double totalPressureArea = 0;
 		List<Building> buildings = buildingManager.getBuildingsWithLifeSupport();
 		for (Building b : buildings) {
-			int id = b.getInhabitableID();
 			double area = b.getFloorArea();
 			totalArea += area;
-			totalPressureArea += compositionOfAir.getTotalPressure()[id] * area;
+			totalPressureArea += b.getLifeSupport().getAir().getTotalPressure() * area;
+			totalTArea += b.getCurrentTemperature() * area;
 		}
-		// convert from atm to kPascal
-		return totalPressureArea * CompositionOfAir.KPA_PER_ATM / totalArea;
+		if (totalArea == 0) {
+			totalArea = 0.1;
+		}
 
+		// convert from atm to kPascal
+		currentPressure =  totalPressureArea * AirComposition.KPA_PER_ATM / totalArea;
+		currentTemperature = totalTArea / totalArea;
+
+		outside_temperature = weather.getTemperature(location);
 	}
 
 	/**
@@ -1250,17 +835,16 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		List<Building> buildings = buildingManager.getBuildingsWithLifeSupport();
 		for (Building b : buildings) {
 			if (b == building) {
-				int id = b.getInhabitableID();
-				p = compositionOfAir.getTotalPressure()[id];
+				p = b.getLifeSupport().getAir().getTotalPressure();
 			}
 		}
 		// convert from atm to kPascal
-		return p * CompositionOfAir.KPA_PER_ATM;
+		return p * AirComposition.KPA_PER_ATM;
 	}
-	
+
 	/**
 	 * Gets the air pressure of the life support system.
-	 * 
+	 *
 	 * @return air pressure [in kPa] (not Pa)
 	 */
 	public double getAirPressure() {
@@ -1271,100 +855,15 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		return currentTemperature;
 	}
 
-	/**
-	 * Computes the average temperature in the settlement (from the life support
-	 * system of all buildings)
-	 * 
-	 * @return temperature (degrees C)
-	 */
-	public double computeAverageTemperature() {
-//		List<Building> buildings = buildingManager.getBuildingsWithThermal();
-//		int size = buildings.size();
-//		double total = 0;
-//		for (Building b : buildings) {
-//			total += b.getCurrentTemperature();
-//		}
-//
-//		return total / size;
-
-		double totalArea = 0;
-		double totalTArea = 0;
-		List<Building> buildings = buildingManager.getBuildingsWithThermal();
-		for (Building b : buildings) {
-			double area = b.getFloorArea();
-			totalArea += area;
-			totalTArea += b.getCurrentTemperature() * area;
-		}
-		return totalTArea / totalArea;
-	}
-
-	/**
-	public ShiftType getCurrentSettlementShift() {
-
-		int millisols = marsClock.getMillisolInt();
-
-		int num = getNumShift();
-
-		if (num == 2) {
-
-			if (millisols >= TaskSchedule.A_START && millisols <= TaskSchedule.A_END)
-				return ShiftType.A;
-
-			else if (millisols >= TaskSchedule.B_START || millisols <= TaskSchedule.B_END)
-				return ShiftType.B;
-
-		}
-
-		else if (num == 3) {
-
-			if (millisols >= TaskSchedule.X_START && millisols <= TaskSchedule.X_END)
-				return ShiftType.X;
-
-			else if (millisols >= TaskSchedule.Y_START && millisols <= TaskSchedule.Y_END)
-				return ShiftType.Y;
-
-			else if (millisols >= TaskSchedule.Z_START && millisols <= TaskSchedule.Z_END)
-				return ShiftType.Z;
-
-		} else
-			return ShiftType.ON_CALL;
-
-		return null;
-
-	}
-**/
-	
-	/**
-	 * Reloads instances after loading from a saved sim
-	 * 
-	 * @param clock
-	 * @param w
-	 */
-	public static void initializeInstances(UnitManager u) {
-		unitManager = u;
-	}
-
-	/**
-	 * Prints the raw scores of certain tasks
-	 */
-	public void printTaskProbability() {
-		double maintScore = maintenanceMeta.getSettlementProbability(this);
-		double maintEVAScore = maintenanceEVAMeta.getSettlementProbability(this);
-		double repairScore = repairMalfunctionMeta.getSettlementProbability(this);
-		double repairEVAScore = repairEVAMalfunctionMeta.getSettlementProbability(this);
-
-		LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-				"[" + name + "] MaintenanceMeta Task score : " + Math.round(maintScore * 10.0) / 10.0 + ".");
-		LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-				"[" + name + "] MaintenanceEVAMeta Task score : " + Math.round(maintEVAScore * 10.0) / 10.0 + ".");
-		LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-				"[" + name + "] RepairMalfunctionMeta Task score : " + Math.round(repairScore * 10.0) / 10.0 + ".");
-		LogConsolidated.log(logger, Level.INFO, 0, sourceName, "[" + name + "] RepairEVAMalfunctionMeta Task score : "
-				+ Math.round(repairEVAScore * 10.0) / 10.0 + ".");
-//		LogConsolidated.log(Level.INFO,0, sourceName,
-//				"[" + name + "] ConstructBuildingMeta Task score : "+  Math.round(buildingScore*10.0)/10.0 + ".");
-
-	}
+//	/**
+//	 * Reloads instances after loading from a saved sim
+//	 *
+//	 * @param clock
+//	 * @param w
+//	 */
+//	public static void initializeInstances(UnitManager u) {
+//		unitManager = u;
+//	}
 
 	/**
 	 * Perform time-related processes
@@ -1377,205 +876,204 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		if (!isValid(pulse)) {
 			return false;
 		}
-		
-		// If settlement is overcrowded, increase inhabitant's stress.
-		// TODbooleanO: should the number of robots be accounted for here?
 
-		double time = pulse.getElapsed();
-		int overCrowding = getIndoorPeopleCount() - getPopulationCapacity();
-		if (overCrowding > 0) {
-			double stressModifier = .1D * overCrowding * time;
-			for (Person p : getIndoorPeople()) {
-				PhysicalCondition c = p.getPhysicalCondition();
-				c.setStress(c.getStress() + stressModifier);
-			}
-		}
-
-		doCropsNeedTending(pulse.getMarsTime());
-		
-		// TODO: what to take into consideration the presence of robots ?
-		// If no current population at settlement for one sol, power down the
-		// building and turn the heat off ?
-		
-		if (powerGrid.getPowerMode() != PowerMode.POWER_UP)
-			powerGrid.setPowerMode(PowerMode.POWER_UP);
-		// TODO: check if POWER_UP is necessary
-		// Question: is POWER_UP a prerequisite of FULL_POWER ?
-
+		// Calls other time passings
+		futureEvents.timePassing(pulse);
 		powerGrid.timePassing(pulse);
-
 		thermalSystem.timePassing(pulse);
-
 		buildingManager.timePassing(pulse);
+		taskManager.timePassing();
+
+		// Update citizens
+		timePassingCitizens(pulse);
+
+		// Update remaining Units
+		timePassing(pulse, ownedVehicles);
+		timePassing(pulse, ownedRobots);
 
 		if (pulse.isNewSol()) {
 			performEndOfDayTasks(pulse.getMarsTime());
 		}
-		
-		// Sample a data point every SAMPLE_FREQ (in millisols)
-		int mInt = pulse.getMarsTime().getMillisolInt();
+
+		// Keeps track of things based on msol
+		trackByMSol(pulse);
+
+		// Computes the average air pressure & temperature of the life support system.
+		computeEnvironmentalAverages();
+
+		return true;
+	}
+
+	/**
+	 * Gets the stress factor due to occupancy density
+	 *
+	 * @param time
+	 * @return
+	 */
+	public double getStressFactor(double time) {
+		int overCrowding = getIndoorPeopleCount() - getPopulationCapacity();
+		if (overCrowding > 0) {
+			return .1D * overCrowding * time;
+		}
+		return 0;
+	}
+
+
+	/**
+	 * Keeps track of things based on msol.
+	 *
+	 * @param pulse
+	 */
+	private void trackByMSol(ClockPulse pulse) {
+		// Sample a data point every SAMPLE_FREQ (in msols)
+		int msol = pulse.getMarsTime().getMillisolInt();
 
 		// Avoid checking at < 10 or 1000 millisols
 		// due to high cpu util during the change of day
-		if (mInt >= 10 && mInt != 1000) {
-		
+		if (pulse.isNewMSol() && msol >= 10 && msol < 995) {
+
 			// Initialize tasks at the start of the sim only
 			if (justLoaded) {
+				// Reset justLoaded
 				justLoaded = false;
+
+				iceProbabilityValue = computeIceProbability();
+
+				regolithProbabilityValue = computeRegolithProbability();
 				
 				for (Person p : citizens) {
-					// Register each settler a quarter/bed			
+					// Register each settler a quarter/bed
 					Building b = getBestAvailableQuarters(p, true);
 					if (b != null)
 						b.getLivingAccommodations().registerSleeper(p, false);
 				}
-				
-				// Initialize the goods manager
-				goodsManager.timePassing(pulse);
-			}
-			
-			// Reduce the recurrent passing score daily to its 90% value
-			minimumPassingScore = minimumPassingScore * .9;
-			
-			// Updates the goods manager 
-			updateGoodsManager(pulse);
 
-			int remainder = mInt % CHECK_GOODS;
-			if (remainder == 1) {
-				// Update the goods value gradually with the use of buffers
-				if (goodsManager.isInitialized()) 
-					goodsManager.updateGoodsValueBuffers(time);
+				// Initialize the goods manager
+				goodsManager.updateGoodValues();
+		
 			}
-			
-			remainder = mInt % CHECK_MISSION;
+
+			// Tag available airlocks into two categories
+			checkAvailableAirlocks();
+
+			// Check if good need updating
+			int remainder = msol % UPDATE_GOODS_PERIOD;
+			if (remainder == templateID) {
+				// Update the goods value gradually with the use of buffers
+				goodsManager.updateGoodValues();
+			}
+
+			remainder = msol % CHECK_MISSION;
 			if (remainder == 1) {
 				// Reset the mission probability back to 1
-				missionProbability = -1;
 				mineralValue = -1;
 			}
 
-			remainder = mInt % SAMPLING_FREQ;
+			remainder = msol % RESOURCE_SAMPLING_FREQ;
 			if (remainder == 1) {
 				// will NOT check for radiation at the exact 1000 millisols in order to balance
 				// the simulation load
-				// take a sample for each critical resource
+				// take a sample of how much each critical resource has in store
 				sampleAllResources();
 			}
 
-			remainder = mInt % CHECK_WATER_RATION;
+			remainder = msol % CHECK_WATER_RATION;
 			if (remainder == 1) {
 				// Recompute the water ration level
-				computeWaterRation();
+				computeWaterRationLevel();
 			}
 
 			// Check every RADIATION_CHECK_FREQ (in millisols)
 			// Compute whether a baseline, GCR, or SEP event has occurred
-			remainder = mInt % RadiationExposure.RADIATION_CHECK_FREQ;
+			remainder = msol % RadiationExposure.RADIATION_CHECK_FREQ;
 			if (remainder == 5) {
-				checkRadiationProbability(time);
+				RadiationStatus newExposed = RadiationStatus.calculateCurrent(pulse.getElapsed());
+				setExposed(newExposed);
 			}
 
-			remainder = mInt % RESOURCE_UPDATE_FREQ;
-			if (remainder == 5) {
+			remainder = msol % RESOURCE_UPDATE_FREQ;
+			if (remainder == 9) {
 				iceProbabilityValue = computeIceProbability();
 			}
 
-			if (remainder == 10) {
+			if (remainder == 8) {
 				regolithProbabilityValue = computeRegolithProbability();
 			}
-
-			// if (remainder == 15) {
-			// oxygenProbabilityValue = computeOxygenProbability();
-			// }
-
-			// if (remainder == 20) {
-			// methaneProbabilityValue = computeMethaneProbability();
-			// }
 		}
+	}
 
-		// updateRegistry();
+	/**
+	 * Apply a clock pulse to a list of Temporal objects. This traps exceptions
+	 * to avoid the impact spreading to other units.
+	 * 
+	 * @param pulse
+	 * @param ownedUnits
+	 */
+	private void timePassing(ClockPulse pulse, Collection<? extends Temporal> ownedUnits) {
+		for (Temporal t : ownedUnits) {
+			t.timePassing(pulse);
+		}
+	}
 
-		compositionOfAir.timePassing(pulse);
-
-		currentPressure = computeAveragePressure();
-
-		currentTemperature = computeAverageTemperature();
-
-		outside_temperature = weather.getTemperature(location);
-
-		if (adjacentBuildingMap != null && !adjacentBuildingMap.isEmpty()) {
-			int numConnectors = adjacentBuildingMap.size();
-
-			if (numConnectorsCache != numConnectors) {
-				numConnectorsCache = numConnectors;
-				createAdjacentBuildingMap();
+	/**
+	 * Pass pulse to Citizens that are not dead. Thos etht are buried are removed.
+	 */
+	private void timePassingCitizens(ClockPulse pulse) {
+		List<Person> remove = null;
+		for(Person p : citizens) {
+			if (p.isDeclaredDead()) {
+				// If also buried then remove it at the end of loop
+				if (p.isBuried()) {
+					if (remove == null) {
+						remove = new ArrayList<>();
+					}
+					remove.add(p);
+				}
 			}
-		} else {
-			createAdjacentBuildingMap();
+			else {
+				p.timePassing(pulse);
+			}
 		}
-	
-		/**
-		 * Construction Sites are passive
-		for (ConstructionSite s : constructionManager.getConstructionSites()) {
-			s.timePassing(time);
+
+		if (remove != null) {
+			for(Person r : remove) {
+				removeACitizen(r);
+			}
 		}
-		*/
-		
-		for (Equipment e : ownedEquipment) {
-			e.timePassing(pulse);
-		}
-		
-		for (Vehicle v : ownedVehicles) {
-			v.timePassing(pulse);
-		}
-		
-		for (Person p : citizens) {
-			p.timePassing(pulse);
-		}
-		/**
-		 * Robots are already updated as Equipment ? Seems not so should Robots be based diretly on a Unit
-		 */
-		for (Robot r : ownedRobots) {
-			r.timePassing(pulse);
-		}
-		return true;
 	}
 
 	/**
 	 * Gets the best available living accommodations building that the person can
 	 * use. Returns null if no living accommodations building is currently
 	 * available.
-	 * 
+	 *
 	 * @param person   the person
 	 * @param unmarked does the person wants an unmarked(aka undesignated) bed or
 	 *                 not.
 	 * @return a building with available bed(s)
 	 */
-	public static Building getBestAvailableQuarters(Person person, boolean unmarked) {
+	private static Building getBestAvailableQuarters(Person person, boolean unmarked) {
 
 		Building result = null;
 
 		if (person.isInSettlement()) {
-			// BuildingManager manager = person.getSettlement().getBuildingManager();
-			List<Building> b = person.getSettlement().getBuildingManager()
-					.getBuildings(FunctionType.LIVING_ACCOMMODATIONS);
+			Set<Building> b = person.getSettlement().getBuildingManager()
+					.getBuildingSet(FunctionType.LIVING_ACCOMMODATIONS);
 			b = BuildingManager.getNonMalfunctioningBuildings(b);
 			b = getQuartersWithEmptyBeds(b, unmarked);
-			if (b.size() == 1) {
-				return b.get(0);
-			}
+
 			if (b.size() > 0) {
 				b = BuildingManager.getLeastCrowdedBuildings(b);
 			}
-			
+
 			if (b.size() > 1) {
 				Map<Building, Double> probs = BuildingManager.getBestRelationshipBuildings(person,
 						b);
 				result = RandomUtil.getWeightedRandomObject(probs);
 			}
-			else if (b.size() == 1) {
-				return b.get(0);
-			}
+//			else if (b.size() == 1) {
+//				return b.get(0);
+//			}
 		}
 
 		return result;
@@ -1584,149 +1082,133 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	/**
 	 * Gets living accommodations with empty beds from a list of buildings with the
 	 * living accommodations function.
-	 * 
+	 *
 	 * @param buildingList list of buildings with the living accommodations
 	 *                     function.
 	 * @param unmarked     does the person wants an unmarked(aka undesignated) bed
 	 *                     or not.
 	 * @return list of buildings with empty beds.
 	 */
-	private static List<Building> getQuartersWithEmptyBeds(List<Building> buildingList, boolean unmarked) {
-		List<Building> result = new CopyOnWriteArrayList<Building>();
+	private static Set<Building> getQuartersWithEmptyBeds(Set<Building> buildingList, boolean unmarked) {
+		Set<Building> result = new UnitSet<>();
 
 		for (Building building : buildingList) {
 			LivingAccommodations quarters = building.getLivingAccommodations();
-//			boolean notFull = quarters.getNumEmptyActivitySpots() > 0;//quarters.getRegisteredSleepers() < quarters.getBedCap();
+
 			// Check if an unmarked bed is wanted
 			if (unmarked) {
 				if (quarters.hasAnUnmarkedBed()) {// && notFull) {
 					result.add(building);
 				}
 			}
-//			else if (notFull) {
-//				result.add(building);
-//			}
 		}
 
 		return result;
 	}
-	
-	public void sampleAllResources() {
 
-		for (int i = 0; i < NUM_CRITICAL_RESOURCES; i++) {
-			sampleOneResource(i);
+	/**
+	 * Samples all the critical resources for stats
+	 *
+	 * @param resourceType
+	 */
+	private void sampleAllResources() {
+		int size = samplingResources.length;
+		int sol = marsClock.getMissionSol();
+		for (int i = 0; i < size; i++) {
+			int id = samplingResources[i];
+			sampleOneResource(id, sol);
 		}
 	}
 
-	public void sampleOneResource(int resourceType) {
-		int resource = -1;
-
-		if (resourceType == 0) {
-			resource = ResourceUtil.oxygenID;// LifeSupportType.OXYGEN;
-		} else if (resourceType == 1) {
-			resource = ResourceUtil.hydrogenID;// "hydrogen";
-		} else if (resourceType == 2) {
-			resource = ResourceUtil.co2ID;// "carbon dioxide";
-		} else if (resourceType == 3) {
-			resource = ResourceUtil.methaneID;// "methane";
-		} else if (resourceType == 4) {
-			resource = ResourceUtil.waterID;// LifeSupportType.WATER;
-		} else if (resourceType == 5) {
-			resource = ResourceUtil.greyWaterID;// "grey water";
-		} else if (resourceType == 6) {
-			resource = ResourceUtil.blackWaterID;// "black water";
-		} else if (resourceType == 7) {
-			resource = ResourceUtil.rockSamplesID;// "rock samples";
-		} else if (resourceType == 8) {
-			resource = ResourceUtil.iceID;// "ice";
-		}
+	/**
+	 * Samples a critical resources for stats.
+	 * Creates a map for sampling how many or
+	 * how much a resource has in a settlement
+	 *
+	 * @param resourceType
+	 */
+	private void sampleOneResource(int resourceType, int sol) {
+		int msol = marsClock.getMillisolInt();
 
 		if (resourceStat == null)
-			resourceStat = new ConcurrentHashMap<>();
-		if (resourceStat.containsKey(solCache)) {
-			Map<Integer, List<Double>> todayMap = resourceStat.get(solCache);
+			resourceStat = new HashMap<>();
 
+		Map<Integer, Map<Integer, Double>> todayMap = null;
+		Map<Integer, Double> msolMap = null;
+		double newAmount = getAmountResourceStored(resourceType);
+
+		if (resourceStat.containsKey(sol)) {
+			todayMap = resourceStat.get(sol);
 			if (todayMap.containsKey(resourceType)) {
-				List<Double> list = todayMap.get(resourceType);
-				double newAmount = getInventory().getAmountResourceStored(resource, false);
-				list.add(newAmount);
-
+				msolMap = todayMap.get(resourceType);
 			}
-
 			else {
-				List<Double> list = new CopyOnWriteArrayList<>();
-				double newAmount = getInventory().getAmountResourceStored(resource, false);
-				list.add(newAmount);
-				todayMap.put(resourceType, list);
+				msolMap = new HashMap<>();
 			}
-
 		}
-
 		else {
-			List<Double> list = new CopyOnWriteArrayList<>();
-			Map<Integer, List<Double>> todayMap = new ConcurrentHashMap<>();
-			double newAmount = getInventory().getAmountResourceStored(resource, false);
-			list.add(newAmount);
-			todayMap.put(resourceType, list);
-			resourceStat.put(solCache, todayMap);
+			msolMap = new HashMap<>();
+			todayMap = new HashMap<>();
 		}
+
+		msolMap.put(msol, newAmount);
+		todayMap.put(resourceType, msolMap);
+		resourceStat.put(sol, todayMap);
 	}
 
-	/*
-	 * Gets the average amount of a resource on a particular sol
-	 */
-	// Called by getOneResource() in MarqueeTicker.java
-	public double getAverage(int solType, int resourceType) {
-		int sol = 0;
-		if (solType == 0) // today's average
-			sol = solCache;
-		else if (solType == -1) // yesterday's average
-			sol = solCache - 1;
-		else if (solType == -3) // average from 3 sols ago
-			sol = solCache - 3;
-		else if (solType == -10) // average from 10 sols ago
-			sol = solCache - 10;
 
+	/**
+	 * Gathers yestersol's statistics for the critical resources
+	 *
+	 * @return
+	 */
+	public Map<Integer, Double> gatherResourceStat(int sol) {
+		Map<Integer, Double> map = new HashMap<>();
+		int size = samplingResources.length;
+
+		for (int i=0; i<size; i++) {
+			int id = samplingResources[i];
+			double amount = calculateDailyAverageResource(sol, id);
+			map.put(id, amount);
+		}
+		return map;
+	}
+
+	/**
+	 * Gets the average amount of a critical resource on a sol
+	 *
+	 * @param sol
+	 * @param resourceType
+	 * @return
+	 */
+	private double calculateDailyAverageResource(int sol, int resourceType) {
 		int size = 0;
 		double average = 0;
 
 		if (resourceStat.containsKey(sol)) {
-			Map<Integer, List<Double>> map = resourceStat.get(sol);
-			// map.containsKey(resourceType));
-			if (map.containsKey(resourceType)) {
-				List<Double> list = map.get(resourceType);
-				size = list.size();
-				for (int i = 0; i < size; i++) {
-					average += list.get(i);
+			Map<Integer, Map<Integer, Double>> solMap = resourceStat.get(sol);
+			if (solMap.containsKey(resourceType)) {
+				Map<Integer, Double> msolMap = solMap.get(resourceType);
+				size = msolMap.size();
+				Iterator<Double> i = msolMap.values().iterator();
+				while (i.hasNext()) {
+					average += i.next();
 				}
-
-				average = average / size;
-
-			} else {
-				average = 0; // how long will it be filled ? ?
+				average = Math.round(average / size * 10.0)/10.0;
 			}
-
-		} else
-			average = 0;
-
-		// if (size != 0)
-		// average = average/size;
+		}
 
 		return average;
 	}
 
 	/**
-	 * Provides the daily statistics on inhabitant's food energy intake
+	 * Removes all airlock reservations
 	 */
-	public void getFoodEnergyIntakeReport() {
-		Iterator<Person> i = citizens.iterator();
-		while (i.hasNext()) {
-			Person p = i.next();
-			PhysicalCondition condition = p.getPhysicalCondition();
-			double energy = Math.round(condition.getEnergy() * 100.0) / 100.0;
-			String name = p.getName();
-			LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-					"[" + this + "] " + name + "'s current energy level : " + energy + " kJ");
+	public void removeAllReservations() {
+		List<Airlock> airlocks = getAllAirlocks();
+
+		for (Airlock a: airlocks) {
+			a.getReservationMap().clear();
 		}
 	}
 
@@ -1736,8 +1218,7 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	private void performEndOfDayTasks(MarsClock marsNow) {
 		int solElapsed = marsNow.getMissionSol();
 
-		// getFoodEnergyIntakeReport();
-		reassignWorkShift();
+		removeAllReservations();
 
 		tuneJobDeficit();
 
@@ -1745,35 +1226,42 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 		refreshSleepMap(solElapsed);
 
-//			getSupplyDemandSampleReport(solElapsed);
+		// Decrease the Mission score.
+		minimumPassingScore *= 0.9D;
 
-		refreshSupplyDemandMap(solElapsed);
-		
+		// Check the Grey water situation
+		if (getAmountResourceStored(GREY_WATER_ID) < GREY_WATER_THRESHOLD) {
+			// Adjust the grey water filtering rate
+			changeGreyWaterFilteringRate(false);
+			double r = getGreyWaterFilteringRate();
+			logger.log(this, Level.WARNING, 1_000,
+					"Low stores of grey water decreases filtering rate to " + Math.round(r*100.0)/100.0 + ".");
+		}
+		else if (getAmountResourceRemainingCapacity(GREY_WATER_ID) < GREY_WATER_THRESHOLD) {
+			// Adjust the grey water filtering rate
+			changeGreyWaterFilteringRate(true);
+			double r = getGreyWaterFilteringRate();
+			logger.log(this, Level.WARNING, 10_000,
+					   "Low capacity for grey water increases filtering rate to " + Math.round(r*100.0)/100.0 + ".");
+		}
+
 		solCache = solElapsed;
 	}
 
-	public void refreshResourceStat() {
+	private void refreshResourceStat() {
 		if (resourceStat == null)
-			resourceStat = new ConcurrentHashMap<>();
-		// Remove the resourceStat map data from 12 days ago
+			resourceStat = new HashMap<>();
+		// Remove the resourceStat map data from 12 sols ago
 		if (resourceStat.size() > RESOURCE_STAT_SOLS)
 			resourceStat.remove(0);
-		// if (counter30 == 31) {
-		// resourceStat.remove(0);
-		// resourceStat.clear();
-		// resourceStat = new HashMap<>();
-		// counter30--;
-		// }
-		// else
-		// counter30++;
 	}
 
 	/***
 	 * Refreshes the sleep map for each person in the settlement
-	 * 
+	 *
 	 * @param solElapsed
 	 */
-	public void refreshSleepMap(int solElapsed) {
+	private void refreshSleepMap(int solElapsed) {
 		// Update the sleep pattern once every x number of days
 		if (solElapsed % SOL_SLEEP_PATTERN_REFRESH == 0) {
 			Collection<Person> people = getIndoorPeople();
@@ -1783,356 +1271,10 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		}
 	}
 
-	/***
-	 * Prints out the work shift status for this settlement
-	 * 
-	 * @param sol
-	 */
-	public void printWorkShift(String sol) {
-		logger.info(sol + " " + getName() + "'s Work Shift " + "-- [A:" + numA + " B:" + numB + "], [X:" + numX + " Y:"
-				+ numY + " Z:" + numZ + "], OnCall:" + numOnCall + ", Off:" + numOff);
-	}
-
-	/*
-	 * Reassigns the work shift for all
-	 */
-	public void reassignWorkShift() {
-		// TODO: should call this method at, say, 800 millisols, not right at 1000
-		// millisols
-		Collection<Person> people = citizens;// getIndoorPeople();
-		int pop = people.size();
-
-		int nShift = 0;
-
-		if (pop == 1) {
-			nShift = 1;
-		} else if (pop < UnitManager.THREE_SHIFTS_MIN_POPULATION) {
-			nShift = 2;
-		} else {// if pop => 6
-			nShift = 3;
-		}
-
-//		System.out.println();
-//		System.out.println(this + " used to have " + numShiftsCache + " shifts.");
-
-		if (numShiftsCache != nShift) {
-			numShiftsCache = nShift;
-
-//			System.out.println(this + " now has " + nShift + " shifts.");
-
-			for (Person p : people) {
-
-				// Skip the person who is dead or is on a mission
-				if (!p.isBuried() && !p.isDeclaredDead() && !p.getPhysicalCondition().isDead()
-						&& p.getMind().getMission() == null) {
-
-					assignWorkShift(p, pop);
-				}
-				
-				// Just for sanity check for those on a vehicle mission
-				// Note: shouldn't be needed this way but currently, when currently when
-				// starting a trade mission,
-				// the code fails to change a person's work shift to On-call.
-				else if (p.getMind().getMission() != null && p.isInVehicle()) {
-
-					ShiftType oldShift = p.getTaskSchedule().getShiftType();
-
-					if (oldShift != ShiftType.ON_CALL) {
-						p.setShiftType(ShiftType.ON_CALL);
-					}
-				}
-//				System.out.println(p + " is now on " + p.getShiftType() + " shift in " + this);
-			} // end of people for loop
-		} // end of for loop
-	}
-
-	/**
-	 * Assign this person a work shift, based on the need of the settlement
-	 * 
-	 * @param p
-	 * @param pop
-	 */
-	public void assignWorkShift(Person p, int pop) {
-		
-		// Check if person is an astronomer.
-		boolean isAstronomer = (p.getMind().getJob() instanceof Astronomer);
-
-		ShiftType oldShift = p.getTaskSchedule().getShiftType();
-
-//		System.out.println(p + " has " + oldShift + " shift in " + this);
-
-		if (isAstronomer) {
-			// TODO: find the darkest time of the day
-			// and set work shift to cover time period
-
-			// For now, we may assume it will usually be X or Z, NOT Y
-			// since Y is usually where midday is at unless a person is at polar region.
-			if (oldShift == ShiftType.Y || oldShift == ShiftType.Z) {
-
-				ShiftType newShift = ShiftType.X;
-				
-//				boolean x_ok = isWorkShiftSaturated(ShiftType.X, false);
-//				boolean z_ok = isWorkShiftSaturated(ShiftType.Z, false);
-//				// TODO: Instead of throwing a dice,
-//				// take the shift that has less sunlight
-//				int rand;
-//				ShiftType newShift = null;
-//
-//				if (x_ok && z_ok) {
-//					rand = RandomUtil.getRandomInt(1);
-//					if (rand == 0)
-//						newShift = ShiftType.X;
-//					else
-//						newShift = ShiftType.Z;
-//				}
-//
-//				else if (x_ok)
-//					newShift = ShiftType.X;
-//
-//				else if (z_ok)
-//					newShift = ShiftType.Z;
-
-				p.setShiftType(newShift);
-			}
-
-		} // end of if (isAstronomer)
-
-		else {// Not an astronomer
-			
-			// Note: if a person's shift is over-filled or saturated, he will need to change
-			// shift
-
-			// Get an unfilled work shift
-			ShiftType newShift = getAnEmptyWorkShift(pop);
-//			System.out.println(this + " found a new unfilled work shift : " + newShift);
-
-			int tendency = p.getTaskSchedule().getWorkShiftScore(newShift);
-			// TODO: should find the person with the highest tendency to take this shift
-
-			// if the person just came back from a mission, he would have on-call shift
-			if (oldShift == ShiftType.ON_CALL) {
-				// TODO: check a person's sleep habit map and request changing his work shift
-				// to avoid taking a work shift that overlaps his sleep hour
-
-				if (newShift != oldShift) {// sanity check
-
-					if (tendency > 50) {
-						p.setShiftType(newShift);
-					}
-
-					else {
-						ShiftType anotherShift = getAnEmptyWorkShift(pop);
-						if (anotherShift == newShift) {
-							anotherShift = getAnEmptyWorkShift(pop);
-						}
-
-						tendency = p.getTaskSchedule().getWorkShiftScore(newShift);
-
-						if (newShift != oldShift && tendency > 50) { // sanity check
-							p.setShiftType(newShift);
-						}
-					}
-				}
-			}
-
-			else {
-				// Not on-call
-
-				// Note: if a person's shift is NOT over-filled or saturated, he doesn't need to
-				// change shift
-				boolean oldShift_ok = isWorkShiftSaturated(oldShift, true);
-
-				// TODO: check a person's sleep habit map and request changing his work shift
-				// to avoid taking a work shift that overlaps his sleep hour
-
-				if (!oldShift_ok) {
-
-					if (newShift != oldShift && tendency > 50) { // sanity check
-						p.setShiftType(newShift);
-					}
-
-					else if (tendency <= 50) {
-						ShiftType anotherShift = getAnEmptyWorkShift(pop);
-						if (anotherShift == newShift) {
-							anotherShift = getAnEmptyWorkShift(pop);
-						}
-
-						tendency = p.getTaskSchedule().getWorkShiftScore(newShift);
-
-						if (newShift != oldShift && tendency > 50) { // sanity check
-							p.setShiftType(newShift);
-						}
-
-						else {
-							ShiftType shift3 = getAnEmptyWorkShift(pop);
-							if (shift3 == newShift) {
-								shift3 = getAnEmptyWorkShift(pop);
-							}
-
-							if (shift3 != oldShift) { // sanity check
-								p.setShiftType(shift3);
-							}
-						}
-					}
-				}
-			}
-		} // end of if (isAstronomer)
-	}
-	
-	/**
-	 * Provides the daily demand statistics on sample amount resources
-	 */
-	// Added supply data
-	public void getSupplyDemandSampleReport(int solElapsed) {
-		logger.info("<<< Sol " + solElapsed + " at " + this.getName()
-				+ " End of Day Report of Amount Resource Supply and Demand Statistics >>>");
-
-		// Sample supply and demand data on Potato and Water
-
-		double vp1 = goodsManager.getGoodValuePerItem(GoodsUtil.getResourceGood(sample1));
-		double vp2 = goodsManager.getGoodValuePerItem(GoodsUtil.getResourceGood(sample2));
-
-		double supplyAmount1 = getInventory().getAmountSupply(sample1);
-		double supplyAmount2 = getInventory().getAmountSupply(sample2);
-
-		int supplyRequest1 = getInventory().getAmountSupplyRequest(sample1);
-		int supplyRequest2 = getInventory().getAmountSupplyRequest(sample2);
-
-		double demandAmount1 = getInventory().getAmountDemand(sample1);
-		double demandAmount2 = getInventory().getAmountDemand(sample2);
-
-		// For items :
-//		double demandItem1 = getInventory().getItemDemand(sample1);
-//		double demandItem2 = getInventory().getItemDemand(sample2);
-
-		// int totalRequest1 = getInventory().getDemandTotalRequest(sample1);
-		// int totalRequest2 = getInventory().getDemandTotalRequest(sample2);
-
-		int demandSuccessfulRequest1 = getInventory().getAmountDemandMetRequest(sample1);
-		int demandSuccessfulRequest2 = getInventory().getAmountDemandMetRequest(sample2);
-		// int numOfGoodsInDemandAmountMap = getInventory().getDemandAmountMapSize();
-		// int numOfGoodsInDemandTotalRequestMap =
-		// getInventory().getDemandTotalRequestMapSize();
-		// int numOfGoodsInDemandSuccessfulRequestMap =
-		// getInventory().getDemandSuccessfulRequestMapSize();
-
-		// logger.info(" numOfGoodsInDemandRequestMap : " +
-		// numOfGoodsInDemandTotalRequestMap);
-		// logger.info(" numOfGoodsInDemandSuccessfulRequestMap : " +
-		// numOfGoodsInDemandSuccessfulRequestMap);
-		// logger.info(" numOfGoodsInDemandAmountMap : " +
-		// numOfGoodsInDemandAmountMap);
-		String name1 = ResourceUtil.findAmountResourceName(sample1);
-		String name2 = ResourceUtil.findAmountResourceName(sample2);
-
-		logger.info(name1 + " (" + sample1 + ")" + "  vp : " + Math.round(vp1 * 100.0) / 100.0);
-		logger.info(name2 + " (" + sample2 + ")" + "  vp : " + Math.round(vp2 * 100.0) / 100.0);
-
-		logger.info(name1 + " Supply Amount : " + Math.round(supplyAmount1 * 100.0) / 100.0);
-		logger.info(name1 + " Supply Request : " + supplyRequest1);
-
-		logger.info(name1 + " Demand Amount : " + Math.round(demandAmount1 * 100.0) / 100.0);
-		// logger.info(sample1 + " Demand Total Request : " + totalRequest1);
-		logger.info(name1 + " Demand Successful Request : " + demandSuccessfulRequest1);
-
-		logger.info(name2 + " Supply Amount : " + Math.round(supplyAmount2 * 100.0) / 100.0);
-		logger.info(name2 + " Supply Request : " + supplyRequest2);
-
-		logger.info(name2 + " Demand Amount : " + Math.round(demandAmount2 * 100.0) / 100.0);
-		// logger.info(sample2 + " Demand Total Request : " + totalRequest2);
-		logger.info(name2 + " Demand Successful Request : " + demandSuccessfulRequest2);
-
-	}
-
-	/**
-	 * Refreshes and clears settlement's data on the supply/demand and weather
-	 * 
-	 * @param solElapsed # of sols since the start of the sim
-	 */
-	public void refreshSupplyDemandMap(int solElapsed) {
-		// Clear maps once every x number of days
-		if (solElapsed % SUPPLY_DEMAND_REFRESH == 0) {
-			// True if solElapsed is an exact multiple of x
-
-			// Compact amount resource map
-			// Carry out the daily average of the previous x days
-			getInventory().compactAmountSupplyMap(SUPPLY_DEMAND_REFRESH);
-			getInventory().clearAmountSupplyRequestMap();
-			// Carry out the daily average of the previous x days
-			getInventory().compactAmountDemandMap(SUPPLY_DEMAND_REFRESH);
-			getInventory().clearAmountDemandTotalRequestMap();
-			getInventory().clearAmountDemandMetRequestMap();
-
-			// compact item resource map
-			getInventory().compactItemSupplyMap(SUPPLY_DEMAND_REFRESH);
-			getInventory().clearItemSupplyRequestMap();
-			// Carry out the daily average of the previous x days
-			getInventory().compactItemDemandMap(SUPPLY_DEMAND_REFRESH);
-			getInventory().clearItemDemandTotalRequestMap();
-			getInventory().clearItemDemandMetRequestMap();
-
-			// Added clearing of weather data map
-			weather.clearMap();
-			// logger.info(name + " : Compacted the settlement's supply demand data &
-			// cleared weather data.");
-		}
-	}
-
-	/**
-	 * Updates the GoodsManager twice per day
-	 *
-	 * @param time
-	 */
-	private void updateGoodsManager(ClockPulse pulse) {
-		goodsManagerUpdateTime += pulse.getElapsed();
-
-		// Randomly update goods manager twice per Sol.
-		double timeThreshold = 250D + RandomUtil.getRandomDouble(250D);
-		if (!goodsManager.isInitialized() || (goodsManagerUpdateTime > timeThreshold)) {
-			goodsManager.timePassing(pulse);
-			goodsManagerUpdateTime = 0D;
-		}
-	}
-
-	/**
-	 * Gets a collection of people affected by this entity.
-	 *
-	 * @return person collection
-	 */
-	// TODO: will this method be called by robots?
-	public Collection<Person> getAffectedPeople() {
-		Collection<Person> people = new ConcurrentLinkedQueue<Person>(getIndoorPeople());
-
-		// Check all people.
-		Iterator<Person> i = unitManager.getPeople().iterator();
-		while (i.hasNext()) {
-			Person person = i.next();
-			Task task = person.getMind().getTaskManager().getTask();
-
-			// Add all people maintaining this settlement.
-			if (task instanceof Maintenance) {
-				if (((Maintenance) task).getEntity() == this) {
-					if (!people.contains(person))
-						people.add(person);
-				}
-			}
-
-			// Add all people repairing this settlement.
-			if (task instanceof Repair) {
-				if (((Repair) task).getEntity() == this) {
-					if (!people.contains(person))
-						people.add(person);
-				}
-			}
-		}
-
-		return people;
-	}
-
 	/**
 	 * Gets a collection of people who are available for social conversation in the
 	 * same/another building in the same/another settlement
-	 * 
+	 *
 	 * @param initiator      the initiator of this conversation
 	 * @param checkIdle      true if the invitee is idling/relaxing (false if the
 	 *                       invitee is in a chat)
@@ -2144,9 +1286,9 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	 */
 	public Collection<Person> getChattingPeople(Person initiator, boolean checkIdle, boolean sameBuilding,
 			boolean sameSettlement) {
-		Collection<Person> people = new ConcurrentLinkedQueue<Person>();
+		Collection<Person> people = new ArrayList<>();
 		Iterator<Person> i;
-		// TODO: set up rules that allows
+		// Set up rules that allows
 
 		if (sameSettlement) {
 			// could be either radio (non face-to-face) conversation, don't care
@@ -2160,60 +1302,55 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 		while (i.hasNext()) {
 			Person person = i.next();
-			if (person.isInSettlement() // .getLocationStateType() == LocationStateType.INSIDE_SETTLEMENT
-					&& initiator.isInSettlement()) {// getLocationStateType() == LocationStateType.INSIDE_SETTLEMENT) {
-				Task task = person.getMind().getTaskManager().getTask();
+			Task task = person.getMind().getTaskManager().getTask();
+
+			if (person.isInSettlement()
+					&& initiator.isInSettlement()) {
 
 				if (sameBuilding) {
 					// face-to-face conversation
 					if (initiator.getBuildingLocation().equals(person.getBuildingLocation())) {
-						if (checkIdle) {
-							if (isIdleTask(task)) {
-								if (!person.equals(initiator))
-									people.add(person);
-							}
-						} else if (task instanceof HaveConversation) {
-							// boolean isOff =
-							// person.getTaskSchedule().getShiftType().equals(ShiftType.OFF);
-							// if (isOff)
-							if (!person.equals(initiator))
-								people.add(person);
-						}
+						addPerson(checkIdle, task, initiator, people, person);
 					}
 				}
 
 				else {
 					// may be radio (non face-to-face) conversation
-					// if (!initiator.getBuildingLocation().equals(person.getBuildingLocation())) {
-					if (checkIdle) {
-						if (isIdleTask(task)) {
-							if (!person.equals(initiator))
-								people.add(person);
-						}
-					} else if (task instanceof HaveConversation) {
-						// boolean isOff =
-						// person.getTaskSchedule().getShiftType().equals(ShiftType.OFF);
-						// if (isOff)
-						if (!person.equals(initiator))
-							people.add(person);
-					}
+					addPerson(checkIdle, task, initiator, people, person);
 				}
+			}
+			
+			else {
+				addPerson(checkIdle, task, initiator, people, person);
 			}
 		}
 
 		return people;
 	}
-
-	public boolean isIdleTask(Task task) {
-		if (task instanceof Relax
-				 || task instanceof Read
-				 || task instanceof HaveConversation
-				 || task instanceof EatDrink)
-			return true;
-		
-		return false;
-	}
 	
+	private void addPerson(boolean checkIdle, Task task, Person initiator, Collection<Person> people, Person person) {
+		if (checkIdle
+			&& isIdleTask(task)
+				&& !person.equals(initiator)) {
+					people.add(person);
+	
+		} else if ((task == null 
+			|| initiator.getMind().getTaskManager().getTask() == null
+			|| task.getName().equals(initiator.getMind().getTaskManager().getTask().getName())
+			|| task instanceof Conversation)
+				&& !person.equals(initiator)) {
+				people.add(person);
+		}
+	}
+
+	private boolean isIdleTask(Task task) {
+        return task instanceof Relax
+                || task instanceof Read
+                || task instanceof DayDream
+                || task instanceof Conversation
+                || task instanceof EatDrink;
+    }
+
 	/**
 	 * Gets the settlement's building manager.
 	 *
@@ -2223,6 +1360,16 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		return buildingManager;
 	}
 
+	/**
+	 * Gets a set of adjacent buildings.
+	 *
+	 * @param building
+	 * @return 
+	 */
+	public Set<Building> getAdjacentBuildings(Building building) {
+		return buildingManager.getAdjacentBuildings(building);
+	}
+	
 	/**
 	 * Gets the settlement's building connector manager.
 	 *
@@ -2242,26 +1389,56 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	}
 
 	/**
+	 * Gets a list of airlock of this settlement
+	 *
+	 * @return
+	 */
+	public List<Airlock> getAllAirlocks() {
+		return buildingManager.getBuildings(FunctionType.EVA).stream()
+				.map(b -> b.getEVA().getAirlock())
+				.collect(Collectors.toList());
+	}
+
+
+	/**
 	 * Gets the closest available airlock to a person.
 	 *
 	 * @param person the person.
+	 * @param ingress is the person ingressing ?
 	 * @return airlock or null if none available.
 	 */
-	public Airlock getClosestAvailableAirlock(Person person) {
+	public Airlock getClosestAvailableAirlock(Person person, boolean ingress) {
+
 		Airlock result = null;
 
 		double leastDistance = Double.MAX_VALUE;
-		BuildingManager manager = buildingManager;
-		Iterator<Building> i = manager.getBuildings(FunctionType.EVA).iterator();
+
+		Set<Integer> bldgs = null;
+		if (ingress) {
+			bldgs = availableDAirlocks;
+		}
+		else {
+			bldgs = availablePAirlocks;
+		}
+		Iterator<Integer> i = bldgs.iterator();
 		while (i.hasNext()) {
-			Building building = i.next();
-			if (!ASTRONOMY_OBSERVATORY.equalsIgnoreCase(building.getBuildingType())) {
-				double distance = Point2D.distance(building.getXLocation(), building.getYLocation(), person.getXLocation(),
-						person.getYLocation());
-				if (distance < leastDistance) {
-					// EVA eva = (EVA) building.getFunction(BuildingFunction.EVA);
-					result = building.getEVA().getAirlock();
-					leastDistance = distance;
+			Building nextBuilding = unitManager.getBuildingByID(i.next());
+			Airlock airlock = nextBuilding.getEVA().getAirlock();
+			boolean chamberFull = nextBuilding.getEVA().getAirlock().areAll4ChambersFull();
+//			boolean reservationFull = building.getEVA().getAirlock().isReservationFull();
+
+			// Note: ingress is not being used here
+			
+			if (!ASTRONOMY_OBSERVATORY.equalsIgnoreCase(nextBuilding.getBuildingType())) {
+				if (result == null) {
+					result = airlock;
+					continue;
+				}
+				double distance = nextBuilding.getPosition().getDistanceTo(person.getPosition());
+				if (distance < leastDistance
+					&& !chamberFull) {
+						result = airlock;
+						leastDistance = distance;
 				}
 			}
 		}
@@ -2269,26 +1446,71 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		return result;
 	}
 
-	public Airlock getClosestAvailableAirlock(Robot robot) {
-		Airlock result = null;
+	/**
+	 * Are any airlocks available for ingree or egress ?
+	 * Used by DigLocalMeta
+	 * 
+	 * @param person
+	 * @param ingress
+	 * @return
+	 */
+	public boolean anyAirlocksForIngressEgress(Person person, boolean ingress) {
+		Set<Building> bldgs = person.getSettlement().getBuildingManager().getBuildingSet(FunctionType.EVA);
 
-		double leastDistance = Double.MAX_VALUE;
-		BuildingManager manager = buildingManager;
-		Iterator<Building> i = manager.getBuildings(FunctionType.EVA).iterator();
+		Iterator<Building> i = bldgs.iterator();
 		while (i.hasNext()) {
-			Building building = i.next();
-			if (!ASTRONOMY_OBSERVATORY.equalsIgnoreCase(building.getBuildingType())) {
-				double distance = Point2D.distance(building.getXLocation(), building.getYLocation(), robot.getXLocation(),
-						robot.getYLocation());
-				if (distance < leastDistance) {
-					// EVA eva = (EVA) building.getFunction(BuildingFunction.EVA);
-					result = building.getEVA().getAirlock();
-					leastDistance = distance;
-				}
+			Airlock airlock = i.next().getEVA().getAirlock();
+			boolean chamberFull = airlock.areAll4ChambersFull();
+			AirlockMode airlockMode = airlock.getAirlockMode();
+			boolean isIngressMode = airlockMode == AirlockMode.INGRESS;
+			boolean isEgressMode = airlockMode == AirlockMode.EGRESS;
+			boolean notInUse = airlockMode == AirlockMode.NOT_IN_USE;
+
+			if (!chamberFull
+				&& (notInUse
+					|| (ingress && isIngressMode)
+					|| (!ingress && isEgressMode))) {
+						return true;
+			}
+		}
+		
+		return false;
+	}
+		
+	
+	/**
+	 * is an airlock available ? 
+	 * Note: currently not being used.
+	 * 
+	 * @param person
+	 * @param ingress
+	 * @return
+	 */
+	public boolean isAirlockAvailable(Person person, boolean ingress) {
+		Building currentBldg = person.getBuildingLocation();
+	
+		Set<Integer> bldgs = null;
+		if (ingress)
+			bldgs = availableDAirlocks;
+		else
+			bldgs = availablePAirlocks;
+		Iterator<Integer> i = bldgs.iterator();
+		while (i.hasNext()) {
+			Building building = unitManager.getBuildingByID(i.next());
+			boolean chamberFull = building.getEVA().getAirlock().areAll4ChambersFull();
+			boolean reservationFull = building.getEVA().getAirlock().isReservationFull();
+
+			// Select airlock that fulfill either conditions:
+			// 1. Chambers are NOT full
+			// 2. Chambers are full but the reservation is NOT full
+			if ((!chamberFull || !reservationFull)
+				// Check valid path
+				&& buildingConnectorManager.hasValidPath(currentBldg, building)) {
+					return true;
 			}
 		}
 
-		return result;
+		return false;
 	}
 
 	/**
@@ -2297,148 +1519,187 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	 * current location.
 	 *
 	 * @param person    the person.
-	 * @param xLocation the X location.
-	 * @param yLocation the Y location.
+	 * @param pos Position to search
+	 * @param ingress is the person ingressing ?
 	 * @return airlock or null if none available.
 	 */
-	public Airlock getClosestWalkableAvailableAirlock(Person person, double xLocation, double yLocation) {
-		Airlock result = null;
-		Building currentBuilding = BuildingManager.getBuilding(person);
+	public Airlock getClosestWalkableAvailableAirlock(Worker worker, LocalPosition pos, boolean ingress) {
+		Building currentBuilding = BuildingManager.getBuilding(worker);
 
 		if (currentBuilding == null) {
-			// throw new IllegalStateException(person.getName() + " is not currently in a
-			// building."); //throw new IllegalStateException(robot.getName() + " is not
-			// currently in a building.");
-			// this major bug is due to getBuilding(robot) above in BuildingManager
-			// what if a person is out there in ERV building for maintenance. ERV building
-			// has no LifeSupport function. currentBuilding will be null
-			LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName, person.getName() + " is not currently in a building.");
+			// Note: What if a person is out there in ERV building for maintenance ?
+			// ERV building has no LifeSupport function. currentBuilding will be null
+			logger.log(worker, Level.WARNING, 10_000, "Not currently in a building.");
 			return null;
 		}
 
-		result = getAirlock(currentBuilding, xLocation, yLocation);
-
-		return result;
+		return getAirlock(currentBuilding, pos, ingress);
 	}
 
 	/**
-	 * Gets an airlock for an EVA egress
-	 * 
-	 * @param robot
-	 * @param xLocation
-	 * @param yLocation
-	 * @return
-	 */
-	public Airlock getClosestWalkableAvailableAirlock(Robot robot, double xLocation, double yLocation) {
-		Airlock result = null;
-		Building currentBuilding = BuildingManager.getBuilding(robot);
-
-		if (currentBuilding == null) {
-			// throw new IllegalStateException(robot.getName() + " is not currently in a
-			// building.");
-			// this major bug is due to getBuilding(robot) above in BuildingManager
-			// need to refine the concept of where a robot can go. They are thought to need
-			// RoboticStation function to "survive",
-			// much like a person who needs LifeSupport function
-			LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName, robot.getName() + " is not currently in a building.");
-			return null;
-		}
-
-		result = getAirlock(currentBuilding, xLocation, yLocation);
-
-		return result;
-	}
-
-	
-	/**
-	 * Gets an airlock for an EVA egress, preferably an pressurized airlock
-	 * 
+	 * Gets an airlock for an EVA egress, preferably an pressurized airlock.
+	 * Consider if the chambers are full and if the reservation is full.
+	 *
 	 * @param currentBuilding
-	 * @param xLocation
-	 * @param yLocation
+	 * @param pos Position for search
+	 * @param ingress is the person ingressing ?
 	 * @return
 	 */
-	public Airlock getAirlock(Building currentBuilding, double xLocation, double yLocation) {
+	private Airlock getAirlock(Building currentBuilding, LocalPosition pos, boolean ingress) {
 		Airlock result = null;
 
-		List<Building> pressurizedBldgs = new CopyOnWriteArrayList<>();
-		List<Building> depressurizedBldgs = new CopyOnWriteArrayList<>();
-		List<Building> selectedPool = new CopyOnWriteArrayList<>();
-		
-		Iterator<Building> i = buildingManager.getBuildings(FunctionType.EVA).iterator();
-		while (i.hasNext()) {
-			Building building = i.next();
-			if (building.getEVA().getAirlock().isPressurized()
-					|| building.getEVA().getAirlock().isPressurizing())
-				pressurizedBldgs.add(building);
-			else if (building.getEVA().getAirlock().isDepressurized()
-					|| building.getEVA().getAirlock().isDepressurizing())
-				depressurizedBldgs.add(building);
-		}
-		
-		if (pressurizedBldgs.size() > 1) {
-			selectedPool = pressurizedBldgs;
-		}
-		
-		else if (pressurizedBldgs.size() == 1) {
-			return pressurizedBldgs.get(0).getEVA().getAirlock();
-		}
-		
-		else if (depressurizedBldgs.size() > 1) {
-			selectedPool = depressurizedBldgs;
-		}
-		
-		else if (depressurizedBldgs.size() == 1) {
-			return depressurizedBldgs.get(0).getEVA().getAirlock();
-		}
-		
-		else {
-			return null;
-		}
-		
+		// Search the closest of the buildings
 		double leastDistance = Double.MAX_VALUE;
 
-		Iterator<Building> ii = selectedPool.iterator();
+		Set<Integer> bldgs = null;
+		if (ingress) {
+			bldgs = availableDAirlocks;
+		}
+		else {
+			bldgs = availablePAirlocks;
+		}
+		Iterator<Integer> i = bldgs.iterator();
 		while (i.hasNext()) {
-			Building building = ii.next();
+			Building building = unitManager.getBuildingByID(i.next());
+			Airlock airlock = building.getEVA().getAirlock();
+			boolean chamberFull = airlock.areAll4ChambersFull();
+//			boolean reservationFull = building.getEVA().getAirlock().isReservationFull();
+
+			// Select airlock that fulfill either conditions:
+			// 1. Chambers are NOT full
+			// 2. Chambers are full but the reservation is NOT full
+//			if ((!chamberFull || !reservationFull)
+					
 			if (buildingConnectorManager.hasValidPath(currentBuilding, building)) {
-
-				double distance = Point2D.distance(building.getXLocation(), building.getYLocation(), xLocation,
-						yLocation);
-				if (distance < leastDistance) {
-
-					result = building.getEVA().getAirlock();
-					leastDistance = distance;
+				if (result == null) {
+					result = airlock;
+					continue;
+				}
+				double distance = building.getPosition().getDistanceTo(pos);
+				if (distance < leastDistance
+					&& !chamberFull) {
+						result = airlock;
+						leastDistance = distance;
 				}
 			}
 		}
-		
+
 		return result;
+	}
+
+
+	/**
+	 * Checks for available airlocks.
+	 */
+	private void checkAvailableAirlocks() {
+		Set<Building> pressurizedBldgs = new HashSet<>();
+		Set<Building> depressurizedBldgs = new HashSet<>();
+
+		for(Building airlockBdg : buildingManager.getBuildingSet(FunctionType.EVA)) {
+			Airlock airlock = airlockBdg.getEVA().getAirlock();
+			if (airlock.isPressurized()	|| airlock.isPressurizing())
+				pressurizedBldgs.add(airlockBdg);
+			else if (airlock.isDepressurized() || airlock.isDepressurizing())
+				depressurizedBldgs.add(airlockBdg);
+		}
+
+		if (!pressurizedBldgs.isEmpty()) {
+			trackAirlocks(pressurizedBldgs, true);
+		}
+
+		if (!depressurizedBldgs.isEmpty()) {
+			trackAirlocks(depressurizedBldgs, false);
+		}
+	}
+		
+	/**
+	 * Categorizes the state of the airlocks.
+	 * 
+	 * @param bldgs
+	 * @param pressurized
+	 */
+	public void trackAirlocks(Set<Building> bldgs, boolean pressurized) {	
+		for (Building building : bldgs) {
+			boolean chamberFull = building.getEVA().getAirlock().areAll4ChambersFull();
+			boolean reservationFull = building.getEVA().getAirlock().isReservationFull();
+
+			int id = building.getIdentifier();
+			// Select airlock that fulfill either conditions:
+			// 1. Chambers are NOT full
+			// 2. Chambers are full but the reservation is NOT full
+			if (!chamberFull || !reservationFull) {
+				if (pressurized) {
+					if (!availablePAirlocks.contains(id)) {
+						availablePAirlocks.add(id);
+					}
+				}
+				else {
+					if (!availableDAirlocks.contains(id)) {
+						availableDAirlocks.add(id);
+					}
+				}
+			}
+			else {
+				if (pressurized) {
+					if (availablePAirlocks.contains(id)) {
+						availablePAirlocks.remove(id);
+					}
+				}
+				else {
+					if (!availableDAirlocks.contains(id)) {
+						availableDAirlocks.add(id);
+					}
+				}
+			}
+		}
 	}
 
 	/**
 	 * Gets the closest available airlock at the settlement to the given location.
 	 * The airlock must have a valid walkable interior path from the given
 	 * building's current location.
+	 * 
+	 * @Note: Currently, not being in use
 	 *
 	 * @param building  the building in the walkable interior path.
-	 * @param xLocation the X location.
-	 * @param yLocation the Y location.
+	 * @param location  Starting position.
+	 * @param isIngress is airlock in ingress mode ?
 	 * @return airlock or null if none available.
 	 */
-	public Airlock getClosestWalkableAvailableAirlock(Building building, double xLocation, double yLocation) {
+	public Airlock getClosestWalkableAvailableAirlock(Building building, LocalPosition location, 
+			boolean isIngress) {
 		Airlock result = null;
 
 		double leastDistance = Double.MAX_VALUE;
-//		BuildingManager manager = buildingManager;
+
 		Iterator<Building> i = buildingManager.getBuildings(FunctionType.EVA).iterator();
 		while (i.hasNext()) {
 			Building nextBuilding = i.next();
+			Airlock airlock = nextBuilding.getEVA().getAirlock();		
+			boolean chamberFull = airlock.areAll4ChambersFull();
+			
+//			boolean reservationFull = airlock.isReservationFull();
 
-			if (buildingConnectorManager.hasValidPath(building, nextBuilding)) {
+			// Select airlock that fulfill either conditions:
+			// 1. Chambers are NOT full
+			// 2. Chambers are full but the reservation is NOT full
+			// 3. if ingressing, make sure this airlock is in ingress mode or not-in-use mode
+			// 4. if egressing, make sure this airlock is in egress mode or not-in-use mode
 
-				double distance = Point2D.distance(nextBuilding.getXLocation(), nextBuilding.getYLocation(), xLocation,
-						yLocation);
+			// Note: the use of reservationFull is being put on hold
+			
+			AirlockMode airlockMode = airlock.getAirlockMode();
+			boolean isIngressMode = airlockMode == AirlockMode.INGRESS;
+			boolean isEgressMode = airlockMode == AirlockMode.EGRESS;
+			boolean notInUse = airlockMode == AirlockMode.NOT_IN_USE;
+			
+			if (!chamberFull
+				&& (notInUse
+						|| (isIngress && isIngressMode)
+						|| (!isIngress && isEgressMode)) 
+				&& buildingConnectorManager.hasValidPath(building, nextBuilding)) {
+
+				double distance = nextBuilding.getPosition().getDistanceTo(location);
 				if (distance < leastDistance) {
 					EVA eva = nextBuilding.getEVA();
 					if (eva != null) {
@@ -2453,13 +1714,83 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	}
 
 	/**
+	 * Gets the closest available airlock at the settlement to the given location.
+	 * The airlock must have a valid walkable interior path from the given
+	 * building's current location.
+	 *
+	 * @param building  the building in the walkable interior path.
+	 * @param location  Starting position.
+	 * @return airlock or null if none available.
+	 */
+	public Airlock getClosestWalkableAvailableAirlock(Building building, LocalPosition location) {
+		Airlock result = null;
+
+		double leastDistance = Double.MAX_VALUE;
+
+		Iterator<Building> i = buildingManager.getBuildings(FunctionType.EVA).iterator();
+		while (i.hasNext()) {
+			Building nextBuilding = i.next();
+			Airlock airlock = nextBuilding.getEVA().getAirlock();
+			
+			boolean chamberFull = airlock.areAll4ChambersFull();
+//			boolean reservationFull = airlock.isReservationFull();
+
+			// Select airlock that fulfill either conditions:
+			// 1. Chambers are NOT full
+			// 2. Chambers are full but the reservation is NOT full
+
+			// Note: the use of chamberFull and reservationFull are being put on hold
+			// since it creates excessive logs. Thus it needs to be handled differently 
+			
+			if (buildingConnectorManager.hasValidPath(building, nextBuilding)) {
+				if (result == null) {
+					result = airlock;
+					continue;
+				}
+				double distance = nextBuilding.getPosition().getDistanceTo(location);
+				if (distance < leastDistance
+					&& !chamberFull) {
+						result = airlock;
+						leastDistance = distance;
+				}
+			}
+		}
+
+		return result;
+	}
+	
+	/**
+	 * Gets the closest available airlock at the settlement to the given location.
+	 * The airlock must have a valid walkable interior path from the given
+	 * building's current location.
+	 *
+	 * @param building  the building in the walkable interior path.
+	 * @param location  Starting position.
+	 * @param isIngress is airlock in ingress mode ?
+	 * @return airlock or null if none available.
+	 */
+	public boolean hasClosestWalkableAvailableAirlock(Building building, LocalPosition location) {
+		Iterator<Building> i = buildingManager.getBuildings(FunctionType.EVA).iterator();
+		while (i.hasNext()) {
+			Building nextBuilding = i.next();
+			boolean chamberFull = nextBuilding.getEVA().getAirlock().areAll4ChambersFull();
+			if (!chamberFull
+				&& buildingConnectorManager.hasValidPath(building, nextBuilding)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+	
+	/**
 	 * Checks if a building has a walkable path from it to an airlock.
 	 *
 	 * @param building the building.
 	 * @return true if an airlock is walkable from the building.
 	 */
 	public boolean hasWalkableAvailableAirlock(Building building) {
-		return (getClosestWalkableAvailableAirlock(building, 0D, 0D) != null);
+		return hasClosestWalkableAvailableAirlock(building, LocalPosition.DEFAULT_POSITION);
 	}
 
 	/**
@@ -2518,501 +1849,345 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	}
 
 	/**
-	 * Gets the number of deceased people
-	 * 
-	 * @return int
-	 */
-	public int getNumBuried() {
-		return getBuriedPeople().size();
-	}
-
-	/**
 	 * Returns a collection of people buried outside this settlement
-	 * 
+	 *
 	 * @return {@link Collection<Person>}
 	 */
 	public Collection<Person> getBuriedPeople() {
 		// using java 8 stream
-		return unitManager.getPeople().stream().filter(p -> p.getBuriedSettlement() == this)
+		return unitManager.getPeople().stream()
+				.filter(p -> p.getBuriedSettlement() == this)
 				.collect(Collectors.toList());
-	}
-
-	/**
-	 * Gets the number of deceased people
-	 * 
-	 * @return int
-	 */
-	public int getNumDeceased() {
-		return getDeceasedPeople().size();
 	}
 
 	/**
 	 * Returns a collection of deceased people who may or may NOT have been buried
 	 * outside this settlement
-	 * 
+	 *
 	 * @return {@link Collection<Person>}
 	 */
 	public Collection<Person> getDeceasedPeople() {
 		// using java 8 stream
-		return unitManager.getPeople().stream().filter(
-				p -> (p.getAssociatedSettlement() == this && p.isDeclaredDead()) || p.getBuriedSettlement() == this)
+		return unitManager.getPeople().stream()
+				.filter(p -> (p.getAssociatedSettlement() == this && p.isDeclaredDead()) || p.getBuriedSettlement() == this)
 				.collect(Collectors.toList());
 	}
 
+
 	/**
-	 * Gets a list of people (may or may not be citizens) within this settlement
-	 * 
-	 * @return collection of people within.
-	 */
-	public Collection<Person> getPeopleWithin() {
-		return peopleWithin;
-	}
-		
-	/**
-	 * Makes this person within this settlement
-	 * 
+	 * Does it contains this person
+	 *
 	 * @param p the person
+	 * @return true if added successfully
 	 */
-	public void addPeopleWithin(Person p) {
-		if (!peopleWithin.contains(p)) {
-			peopleWithin.add(p);
-		}
+	public boolean containsPerson(Person p) {
+		if (peopleWithin.contains(p))
+			return true;
+		return false;
 	}
-	
+
 	/**
-	 * Removes this person from being within this settlement
-	 * 
+	 * Makes this person's physical location to be inside this settlement.
+	 *
 	 * @param p the person
+	 * @return true if added successfully
 	 */
-	public void removePeopleWithin(Person p) {
+	public boolean addPeopleWithin(Person p) {
 		if (peopleWithin.contains(p)) {
-			peopleWithin.remove(p);
+			return true;
 		}
+		if (peopleWithin.add(p)) {
+			p.setContainerUnit(this);
+			return true;
+		}
+		return false;
 	}
-	
+
 	/**
-	 * Makes this person a legal citizen of this settlement
-	 * 
+	 * Removes this person's physical location from being inside this settlement.
+	 *
 	 * @param p the person
+	 * @return true if removed successfully
 	 */
-	public void addACitizen(Person p) {
-		if (!citizens.contains(p)) {
-			citizens.add(p);
+	public boolean removePeopleWithin(Person p) {
+		if (!peopleWithin.contains(p))
+			return true;
+		if (peopleWithin.remove(p)) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Assigns a person to be a legal citizen of this settlement.
+	 *
+	 * @param p the person
+	 * @return true if removed successfully
+	 */
+	public boolean addACitizen(Person p) {
+		if (citizens.contains(p))
+			return true;
+		if (citizens.add(p)) {
+			addPeopleWithin(p);
+			p.setCoordinates(getCoordinates());
+			p.setContainerUnit(this);
 			// Update the numCtizens
 			numCitizens = citizens.size();
 			fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_PERSON_EVENT, this);
+			return true;
 		}
-	}
-	
-	/**
-	 * Removes this person from being a legal citizen of this settlement
-	 * 
-	 * @param p the person
-	 */
-	public void removeACitizen(Person p) {
-		if (citizens.contains(p)) {
-			citizens.remove(p);
-			// Update the numCtizens
-			numCitizens = citizens.size();
-//			System.out.println("numCitizens: " + numCitizens);
-			fireUnitUpdate(UnitEventType.REMOVE_ASSOCIATED_PERSON_EVENT, this);
-		}
-	}
-
-	/**
-	 * Adds a robot to be owned by the settlement
-	 * 
-	 * @param r
-	 */
-	public void addOwnedRobot(Robot r) {
-		if (!ownedRobots.contains(r)) {
-			ownedRobots.add(r);
-			fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_ROBOT_EVENT, this);
-			numOwnedBots = ownedRobots.size();
-		}
-	}
-
-	/**
-	 * Removes a robot from being owned by the settlement
-	 * 
-	 * @param r
-	 */
-	public void removeOwnedRobot(Robot r) {
-		if (ownedRobots.contains(r)) {
-			ownedRobots.remove(r);
-			fireUnitUpdate(UnitEventType.REMOVE_ASSOCIATED_ROBOT_EVENT, this);
-			numOwnedBots = ownedRobots.size();
-		}
-	}
-
-	/**
-	 * Adds a vehicle to be owned by the settlement
-	 * 
-	 * @param r
-	 */
-	public void addOwnedVehicle(Vehicle v) {
-		if (!ownedVehicles.contains(v)) {
-			ownedVehicles.add(v);
-			numOwnedVehicles = ownedVehicles.size();
-		}
-	}
-
-	/**
-	 * Removes a vehicle from being owned by the settlement
-	 * 
-	 * @param r
-	 */
-	public void removeOwnedVehicle(Vehicle v) {
-		if (ownedVehicles.contains(v)) {
-			ownedVehicles.remove(v);
-			numOwnedVehicles = ownedVehicles.size();
-		}
-	}
-	
-	/**
-	 * Adds an equipment to be owned by the settlement
-	 * 
-	 * @param r
-	 */
-	public void addOwnedEquipment(Equipment e) {
-		if (!ownedEquipment.contains(e)) {
-			ownedEquipment.add(e);
-			fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_EQUIPMENT_EVENT, this);
-			numOwnedEquipment = ownedEquipment.size();
-		}
-	}
-
-	/**
-	 * Removes an equipment from being owned by the settlement
-	 * 
-	 * @param r
-	 */
-	public void removeOwnedEquipment(Equipment e) {
-		if (ownedEquipment.contains(e)) {
-			ownedEquipment.remove(e);
-			fireUnitUpdate(UnitEventType.REMOVE_ASSOCIATED_EQUIPMENT_EVENT, this);
-			numOwnedEquipment = ownedEquipment.size();
-		}
-	}
-	
-	/**
-	 * Checks if the settlement has a particular person
-	 * 
-	 * @param aPerson
-	 * @return boolean
-	 */
-	public boolean hasPerson(Person aPerson) {
-
-		return citizens.stream()
-				// .filter(p -> p.equals(aPerson))
-				// .findFirst() != null;
-				.anyMatch(p -> p.equals(aPerson));
-	}
-
-	/**
-	 * Returns a list of persons with a given name (first or last)
-	 * 
-	 * @param aName a person's first/last name
-	 * @param exactMatch want an exact word-to-word match
-	 * @return a list of persons
-	 */
-	public List<Person> returnPersonList(String aName, boolean exactMatch) {
-		List<Person> personList = new CopyOnWriteArrayList<>();
-		aName = aName.trim();
-
-		// Checked if "," is presented in "last, first"
-		if (aName.contains(", ")) {
-			int index = aName.indexOf(",");
-			String last = aName.substring(0, index);
-			String first = aName.substring(index + 2, aName.length());
-			aName = first + " " + last;
-		}
-
-		String initial = null;
-		boolean hasASpace = aName.contains(" ");
-		// int found = 0;
-		int s_Index = 0;
-		// int dead = 0;
-
-		int len = aName.length();
-		boolean hasInitial = len > 3 && hasASpace;
-
-		if (hasInitial) {
-			for (int i = 0; i < len; i++) {
-				if (aName.charAt(i) == ' ')
-					s_Index = i;
-			}
-
-			if (s_Index == len - 2) {
-				// e.g. Cory_S
-				initial = aName.substring(len - 1, len);
-				aName = aName.substring(0, len - 2);
-				// System.out.println("initial is " + initial);
-				// System.out.println("aName is " + aName);
-			} else if (s_Index == 1) {
-				// e.g. S_Cory
-				initial = aName.substring(0);
-				aName = aName.substring(2, len);
-				// System.out.println("initial is " + initial);
-				// System.out.println("aName is " + aName);
-			}
-		}
-
-		Set<Person> list = ConcurrentHashMap.newKeySet();
-		list.addAll(citizens);
-
-		// Add those who are deceased
-		list.addAll(getDeceasedPeople());
-		list.addAll(getBuriedPeople());
-
-		Iterator<Person> i = list.iterator();
-		while (i.hasNext()) {
-			Person person = i.next();
-			// Case 1: if aName is a full name
-			if (hasASpace && person.getName().equalsIgnoreCase(aName)) {
-				// found++;
-				personList.add(person);
-				// if (person.getPhysicalCondition().isDead())
-				// dead--;
-				// personList.add(person);
-			} else if (!exactMatch) {
-				
-				if (hasInitial) {
-					// Case 2: if aName is a first name + space + last initial
-					if (person.getName().toLowerCase().contains((aName + " " + initial).toLowerCase())) {
-						// found++;
-						personList.add(person);
-					}
-					// Case 3: if aName is a first initial + space + last name
-					else if (person.getName().toLowerCase().contains((initial + " " + aName).toLowerCase())) {
-						// found++;
-						personList.add(person);
-					}
-				} else {
-					String first = "";
-					String last = "";
-					String full = person.getName();
-					int len1 = full.length();
-					// int index1 = 0;
-	
-					for (int j = len1 - 1; j > 0; j--) {
-						// Note: finding the whitespace from the end to 0 (from right to left) works
-						// better than from left to right
-						// e.g. Mary L. Smith (last name should be "Smith", not "L. Smith"
-						if (full.charAt(j) == ' ') {
-							// index1 = j;
-							first = full.substring(0, j);
-							last = full.substring(j + 1, len1);
-							break;
-						} else {
-							first = full;
-						}
-					}
-	
-					// Case 4: if aName is a last name
-					if (first.equalsIgnoreCase(aName)) {
-						// found++;
-						personList.add(person);
-					}
-	
-					// Case 5: if aName is a first name
-					else if (last != null)
-						if (last.equalsIgnoreCase(aName)) {
-							// found++;
-							personList.add(person);
-						}
-				}
-			}
-		}
-
-		return personList;
-	}
-
-	/**
-	 * Checks if any elements from the two string are matching
-	 * 
-	 * @param aNameArray
-	 * @param vNameArray
-	 * @return
-	 */
-	public boolean hasAnyMatch(String[] aNameArray, String[] vNameArray) {
-//		boolean value = false;
-		for (String a : aNameArray) {
-			for (String v : vNameArray) {
-				if (v.equalsIgnoreCase(a))
-					return true;
-			}
-		}
-		
 		return false;
 	}
-	
-	/**
-	 * Returns a list of robots containing a particular name
-	 * 
-	 * @param aName bot's name
-	 * @param exactMatch want an exact word-to-word match
-	 * @return a list of robots
-	 *
-	 */
-	public List<Vehicle> returnVehicleList(String aName, boolean exactMatch) {
-		String[] aNameArray = aName.split(" ");
-//		String first = elements[0];
-//		String[] trailing = Arrays.copyOfRange(elements,1,elements.length);
-		
-		List<Vehicle> vList = new CopyOnWriteArrayList<>();
-		Iterator<Vehicle> i = getAllAssociatedVehicles().iterator();
-		while (i.hasNext()) {
-			Vehicle v = i.next();
-			String vName =  v.getName();
-			String[] vNameArray = vName.split(" ");
-			
-			// Case 1: exact match
-			if (vName.equalsIgnoreCase(aName)
-					|| vName.replace(" ", "").equalsIgnoreCase(aName.replace(" ", ""))) {
-				vList.add(v);
-			}
-			
-			else if (!exactMatch && hasAnyMatch(aNameArray, vNameArray)) {
-				vList.add(v);
-			}
-		}
 
-		return vList;
+	/**
+	 * Removes this person from being a legal citizen of this settlement.
+	 *
+	 * @param p the person
+	 */
+	public boolean removeACitizen(Person p) {
+		if (!citizens.contains(p))
+			return true;
+		if (citizens.remove(p)) {
+			removePeopleWithin(p);
+			// Update the numCtizens
+			numCitizens = citizens.size();
+			fireUnitUpdate(UnitEventType.REMOVE_ASSOCIATED_PERSON_EVENT, this);
+			return true;
+		}
+		return false;
 	}
 
 	/**
-	 * Returns a list of robots containing a particular name
+	 * Returns the person instance of the commander of this settlement.
 	 * 
-	 * @param aName bot's name
-	 * @param exactMatch want an exact word-to-word match
-	 * @return a list of robots
-	 *
-	 */
-	public List<Robot> returnRobotList(String aName, boolean exactMatch) {
-		List<Robot> robotList = new CopyOnWriteArrayList<>();
-		aName = aName.trim();
-		aName = aName.replace(" ", "");
-
-		String last4digits = null;
-		char first = '?';
-		char second = '?';
-		char third = '?';
-		char fourth = '?';
-
-		boolean firstIsDigit = false;
-		boolean secondIsDigit = false;
-		boolean thirdIsDigit = false;
-		boolean fourthIsDigit = false;
-
-		int size = aName.length();
-
-		if (size >= 8) {
-			last4digits = aName.substring(size - 4, size);
-			first = last4digits.charAt(0);
-			second = last4digits.charAt(1);
-			third = last4digits.charAt(2);
-			fourth = last4digits.charAt(3);
-
-			// System.out.println("The last 4 are : " + first + second + third + fourth);
-
-			firstIsDigit = (first >= '0' && first <= '9');
-			secondIsDigit = (second >= '0' && second <= '9');
-			thirdIsDigit = (third >= '0' && third <= '9');
-			fourthIsDigit = (fourth >= '0' && fourth <= '9');
-		}
-
-		Collection<Robot> list = getAllAssociatedRobots();
-
-		Iterator<Robot> i = list.iterator();
-		while (i.hasNext()) {
-			Robot robot = i.next();
-			// Case 1: exact match e.g. chefbot001
-			if (robot.getName().equalsIgnoreCase(aName)
-					|| robot.getName().replace(" ", "").equalsIgnoreCase(aName.replace(" ", ""))) {
-				robotList.add(robot);
-			}
-			// Case 2: some parts are matched
-			else if (!exactMatch) {
-				// Case 2 e.g. chefbot, chefbot0_, chefbot0__, chefbot1_, chefbot00_, chefbot01_
-				// need more information !
-				if (robot.getName().replace(" ", "").toLowerCase().contains(aName.toLowerCase().replace(" ", ""))) {
-					// System.out.println("aName is a part of " + robot.getName().replace(" ", ""));
-					robotList.add(robot);
-				}
-
-				else if (size >= 8) { // Case 3 e.g. filter out semi-good names such as chefbot01, chefbot1, chefbot10
-										// from bad/invalid name
-
-					// Case 3A : e.g. chefbot0003 -- a typo having an extra zero before the digit
-					if (size >= 11 && !firstIsDigit && secondIsDigit && thirdIsDigit && fourthIsDigit) {
-						if (first == '0' && second == '0') {
-							String newName = aName.substring(0, size - 4) + aName.substring(size - 3, size);
-							// System.out.println("Case 3A: newName is : " + newName);
-							boolean result = checkRobotName(robot, newName);
-							if (result)
-								robotList.add(robot);
-						}
-					}
-
-					// Case 3B : e.g. chefbot01 or chefbot11 -- a typo missing a zero before the
-					// digit
-					else if (size >= 9 && !firstIsDigit && !secondIsDigit && thirdIsDigit && fourthIsDigit) {
-						String newName = aName.substring(0, size - 2) + "0" + aName.substring(size - 2, size);
-						// System.out.println("Case 3B: newName is : " + newName);
-						boolean result = checkRobotName(robot, newName);
-						if (result)
-							robotList.add(robot);
-					}
-
-					// Case 3C : e.g. chefbot1 -- a typo missing two zeroes before the digit
-					else if (size >= 8 && !firstIsDigit && !secondIsDigit && !thirdIsDigit && fourthIsDigit) {
-						String newName = aName.substring(0, size - 1) + "00" + aName.substring(size - 1, size);
-						// System.out.println("Case 3C: newName is : " + newName);
-						boolean result = checkRobotName(robot, newName);
-						if (result)
-							robotList.add(robot);
-					}
-				}
-			}
-		}
-
-		return robotList;
-	}
-
-	/**
-	 * Checks against the input name with the robot name
-	 * 
-	 * @param robot
-	 * @param aName
 	 * @return
 	 */
-	public boolean checkRobotName(Robot robot, String aName) {
-		// System.out.println("modified aName is " + aName);
-		// aName = aName.substring(0, size-2) + "0" + aName.substring(size-2, size-1);
-		if (robot.getName().replace(" ", "").equalsIgnoreCase(aName)) {
+	public Person getCommander() {
+		for (Person p: citizens) {
+			if (RoleType.COMMANDER == p.getRole().getType())
+				return p;
+		}
+		
+		return null;
+	}
+	
+	
+	/**
+	 * Assigns a robot to be owned by the settlement.
+	 *
+	 * @param r the robot
+	 */
+	public boolean addOwnedRobot(Robot r) {
+		if (ownedRobots.contains(r))
 			return true;
-		} else
-			return false;
+		if (ownedRobots.add(r)) {
+			addRobotsWithin(r);
+			r.setCoordinates(getCoordinates());
+			r.setContainerUnit(this);
+			fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_ROBOT_EVENT, this);
+			numOwnedBots = ownedRobots.size();
+			return true;
+		}
+		return false;
 	}
 
-//	/**
-//	 * Returns a collection of deceased people buried outside this settlement
-//	 * 
-//	 * @return {@link Collection<Person>}
-//	 */
-//	public Collection<Person> getDecomissionedRobots() {
-//		// using java 8 stream
-//		return Simulation.instance().getUnitManager()
-//				.getRobots().stream()
-//				.filter(r -> r.getDecommissionedSettlement() == this)
-//				.collect(Collectors.toList());
-//	}
+	/**
+	 * Removes a robot from being owned by the settlement.
+	 *
+	 * @param r the robot
+	 */
+	public boolean removeOwnedRobot(Robot r) {
+		if (!ownedRobots.contains(r))
+			return true;
+		if (ownedRobots.remove(r)) {
+			fireUnitUpdate(UnitEventType.REMOVE_ASSOCIATED_ROBOT_EVENT, this);
+			numOwnedBots = ownedRobots.size();
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Assigns a robot to being within this settlement.
+	 *
+	 * @param r the robot
+	 */
+	public boolean addRobotsWithin(Robot r) {
+		if (robotsWithin.contains(r)) {
+			return true;
+		}
+		if (robotsWithin.add(r)) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Removes a robot from being within this settlement.
+	 *
+	 * @param r the robot
+	 */
+	public boolean removeRobotsWithin(Robot r) {
+		if (!robotsWithin.contains(r)) {
+			return true;
+		}
+		if (robotsWithin.remove(r)) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Adds a parked vehicle.
+	 *
+	 * @param vehicle
+	 * @param true if the parked vehicle can be added
+	 */
+	public boolean addParkedVehicle(Vehicle vehicle) {
+		if (parkedVehicles.contains(vehicle)) {
+			return true;
+		}
+		if (parkedVehicles.add(vehicle)) {
+			// Directly update the location state type
+			vehicle.updateLocationStateType(LocationStateType.WITHIN_SETTLEMENT_VICINITY);
+			vehicle.setContainerUnit(this);
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Removes a parked vehicle
+	 *
+	 * @param vehicle
+	 * @param true if the parked vehicle can be removed
+	 */
+	public boolean removeParkedVehicle(Vehicle vehicle) {
+		if (!parkedVehicles.contains(vehicle))
+			return true;
+		if (parkedVehicles.remove(vehicle)) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Does it have this vehicle parked at the settlement ?
+	 *
+	 * @param vehicle
+	 * @return
+	 */
+	public boolean containsParkedVehicle(Vehicle vehicle) {
+		if (parkedVehicles.contains(vehicle)) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Adds a vehicle into ownership
+	 *
+	 * @param vehicle
+	 * @param true if the vehicle can be added
+	 */
+	public boolean addOwnedVehicle(Vehicle vehicle) {
+		if (ownedVehicles.contains(vehicle))
+			return true;
+		if (ownedVehicles.add(vehicle)) {
+			addParkedVehicle(vehicle);
+			vehicle.setCoordinates(getCoordinates());
+			vehicle.setContainerUnit(this);
+			numOwnedVehicles = ownedVehicles.size();
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Removes a vehicle from ownership
+	 *
+	 * @param vehicle
+	 * @param true if the vehicle can be removed
+	 */
+	public boolean removeOwnedVehicle(Vehicle vehicle) {
+		if (!ownedVehicles.contains(vehicle))
+			return true;
+		if (ownedVehicles.remove(vehicle)) {
+			numOwnedVehicles = ownedVehicles.size();
+			return true;
+		}
+		return false;
+	}
+
+	
+	/**
+	 * Gets a vehicle of this particular vehicle type.
+	 * 
+	 * @param vehicleType
+	 * @return
+	 */
+	public Vehicle getAVehicle(VehicleType vehicleType) {
+		return ownedVehicles
+		.stream()
+		.filter(v -> v.getVehicleType() == vehicleType)
+		.findAny().orElse(null);
+	}
+	
+	
+	/**
+	 * Adds an equipment to be owned by the settlement.
+	 *
+	 * @param e the equipment
+	 * @return true if this settlement can carry it
+	 */
+	@Override
+	public boolean addEquipment(Equipment e) {
+		if (eqmInventory.addEquipment(e)) {
+			e.setContainerUnit(this);
+			fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_EQUIPMENT_EVENT, this);
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Removes an equipment from being owned by the settlement.
+	 *
+	 * @param e the equipment
+	 */
+	@Override
+	public boolean removeEquipment(Equipment e) {
+		if (eqmInventory.removeEquipment(e)) {
+			fireUnitUpdate(UnitEventType.REMOVE_ASSOCIATED_EQUIPMENT_EVENT, this);
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Finds all of the containers (excluding EVA suit).
+	 *
+	 * @return collection of containers or empty collection if none.
+	 */
+	@Override
+	public Collection<Container> findAllContainers() {
+		return eqmInventory.findAllContainers();
+	}
+
+	/**
+	 * Finds all of the containers of a particular type (excluding EVA suit).
+	 *
+	 * @return collection of containers or empty collection if none.
+	 */
+	@Override
+	public Collection<Container> findContainersOfType(EquipmentType type){
+		return eqmInventory.findContainersOfType(type);
+	}
 
 	/**
 	 * Gets all robots owned by this settlement, even if they are out on
 	 * missions.
-	 * 
+	 *
 	 * @return collection of owned robots.
 	 */
 	public Collection<Robot> getAllAssociatedRobots() {
@@ -3044,46 +2219,97 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	 *
 	 * @return collection of associated equipment.
 	 */
-	public Collection<Equipment> getAllAssociatedEquipment() {	
-		return ownedEquipment;
+	public Collection<Equipment> getAllAssociatedEquipment() {
+		return getEquipmentSet();
 	}
-	
+
 	/**
-	 * Gets all associated vehicles currently on mission
+	 * Gets all associated vehicles currently already embarked on missions out there
+	 * (include vehicles doing building construction/salvage missions in a settlement)
 	 *
 	 * @return collection of vehicles.
 	 */
 	public Collection<Vehicle> getMissionVehicles() {
-//		return getAllAssociatedVehicles().stream()
-//				.filter(v -> v.isReservedForMission())
-//				.collect(Collectors.toList());
+		return ownedVehicles.stream()
+				.filter(v -> v.getMission() != null
+					&& (v.getMission().getStage() == Stage.ACTIVE))
+				.collect(Collectors.toList());
+	}
 
-		Collection<Vehicle> result = new CopyOnWriteArrayList<Vehicle>();
-		Iterator<Mission> i = missionManager.getMissionsForSettlement(this).iterator();
-		while (i.hasNext()) {
-			Mission mission = i.next();
-			if (mission instanceof VehicleMission) {
-				Vehicle vehicle = ((VehicleMission) mission).getVehicle();
-//			Vehicle vehicle = mission.getVehicle();
-				if ((vehicle != null) 
-						&& !result.contains(vehicle)
-						&& this.equals(vehicle.getAssociatedSettlement()))
-					result.add(vehicle);
-			}
-			
-			else if (mission instanceof BuildingConstructionMission) {
-				result.addAll(((BuildingConstructionMission) mission).getConstructionVehicles());
-				
-//				Iterator<GroundVehicle> ii = ((BuildingConstructionMission) mission).getConstructionVehicles().iterator();;
-//				while (i.hasNext()) {
-//					GroundVehicle gv = ii.next();
-//				}
-			}
-		}
-		
-//		System.out.println(this + "'s Mission Vehicles : " + result);
+	/**
+	 * Gets numbers vehicles currently on mission
+	 *
+	 * @return numbers of vehicles on mission.
+	 */
+	public int getMissionVehicleNum() {
+		return Math.toIntExact(ownedVehicles
+				.stream()
+				.filter(v -> v.getMission() != null)
+				.collect(Collectors.counting()));
+	}
 
-		return result;
+	/**
+	 * Gets a collection of drones parked or garaged at the settlement.
+	 *
+	 * @return Collection of parked drones
+	 */
+	public Collection<Drone> getParkedDrones() {
+		return ownedVehicles.stream()
+				.filter(v -> v.getVehicleType() == VehicleType.DELIVERY_DRONE)
+				.filter(v -> this.equals(v.getSettlement()))
+				.map(Drone.class::cast)
+				.collect(Collectors.toList());
+	}
+
+	/**
+	 * Gets the number of drones parked or garaged at the settlement.
+	 *
+	 * @return parked drones number
+	 */
+	public int getNumParkedDrones() {
+		return Math.toIntExact(ownedVehicles
+				.stream()
+				.filter(v -> v.getVehicleType() == VehicleType.DELIVERY_DRONE)
+				.filter(v -> this.equals(v.getSettlement()))
+				.collect(Collectors.counting()));
+	}
+	
+	/**
+	 * Gets a collection of drones parked or garaged at the settlement.
+	 *
+	 * @return Collection of parked drones
+	 */
+	public Collection<Unit> getVehicleTypeList(VehicleType vehicleType) {
+		return ownedVehicles.stream()
+				.filter(v -> v.getVehicleType() == vehicleType)
+				.map(Unit.class::cast)
+				.collect(Collectors.toList());
+	}
+
+	/**
+	 * Finds the number of vehicles of a particular type
+	 *
+	 * @param vehicleType the vehicle type.
+	 * @return number of vehicles.
+	 */
+	public int findNumVehiclesOfType(VehicleType vehicleType) {
+		return Math.toIntExact(ownedVehicles
+					.stream()
+					.filter(v -> v.getVehicleType() == vehicleType)
+					.collect(Collectors.counting()));
+	}
+
+	/**
+	 * Finds the number of parked rovers
+	 *
+	 * @return number of parked rovers.
+	 */
+	public int findNumParkedRovers() {
+		return Math.toIntExact(ownedVehicles
+					.stream()
+					.filter(v -> VehicleType.isRover(v.getVehicleType()))
+					.filter(v -> this.equals(v.getSettlement()))
+					.collect(Collectors.counting()));
 	}
 
 	/**
@@ -3092,248 +2318,58 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	 * @return Collection of parked vehicles
 	 */
 	public Collection<Vehicle> getParkedVehicles() {
-		return getInventory().getContainedVehicles();
-//		return getAllAssociatedVehicles()
-//				.stream()
-//				.filter(v -> !v.isSalvaged() && v.isParked())//!v.isReservedForMission())
-//				.collect(Collectors.toList());
+		// Get all Vehicles that are back home
+		return 	ownedVehicles.stream()
+					.filter(v -> this.equals(v.getSettlement()))
+					.collect(Collectors.toList());
 	}
 
 	/**
-	 * Gets the number of vehicles parked or garaged at the settlement.
-	 * 
+	 * Gets the number of vehicles (rovers, LUVs, and drones) parked or garaged at the settlement.
+	 *
 	 * @return parked vehicles number
 	 */
-	public int getParkedVehicleNum() {
-		return getInventory().getNumContainedVehicles();
-//		return Math.toIntExact(getAllAssociatedVehicles().stream()
-//				.filter(v -> !v.isSalvaged() && v.isParked())// !v.isReservedForMission())
-//				.collect(Collectors.counting()));
-//		return getParkedVehicles().size();
+	public int getNumParkedVehicles() {
+		return Math.toIntExact(ownedVehicles
+				.stream()
+				.filter(v -> this.equals(v.getSettlement()))
+				.collect(Collectors.counting()));
 	}
 
 	/**
 	 * Gets the number of vehicles owned by the settlement.
-	 * 
+	 *
 	 * @return number of owned vehicles
 	 */
-	public int getVehicleNum() {
+	public int getOwnedVehicleNum() {
 		return numOwnedVehicles;
 	}
 
-	public Collection<Vehicle> getLUVs(int mode) {
-		Collection<Vehicle> LUVs = new CopyOnWriteArrayList<Vehicle>();
-
-		if (mode == 0 || mode == 1) {
-			Collection<Vehicle> parked = getParkedVehicles();
-			Iterator<Vehicle> i = parked.iterator();
-			while (i.hasNext()) {
-				Vehicle vehicle = i.next();
-				if (vehicle instanceof LightUtilityVehicle) {
-					LUVs.add(vehicle);
-				}
-			}
+	/**
+	 * Sets the process override flag.
+	 *
+	 * @param type Name of process type
+	 * @param override override for processes.
+	 */
+	public void setProcessOverride(OverrideType type, boolean override) {
+		if (override) {
+			logger.log(this, Level.CONFIG, 0L, "Player enables the override on '" + type.toString() + "'.");
+			this.processOverrides.add(type);
 		}
-
-		if (mode == 0 || mode == 2) {
-			Collection<Vehicle> onMission = getMissionVehicles();
-			Iterator<Vehicle> j = onMission.iterator();
-			while (j.hasNext()) {
-				Vehicle vehicle = j.next();
-				if (vehicle instanceof LightUtilityVehicle) {
-					LUVs.add(vehicle);
-				}
-			}
+		else {
+			logger.log(this, Level.CONFIG, 0L, "Player disables the override on '" + type.toString() + "'.");
+			this.processOverrides.remove(type);
 		}
-		return LUVs;
-	}
-
-	public List<Vehicle> getCargoRovers(int mode) {
-
-		List<Vehicle> rovers = new CopyOnWriteArrayList<Vehicle>();
-
-		if (mode == 0 || mode == 1) {
-			Collection<Vehicle> parked = getParkedVehicles();
-			Iterator<Vehicle> i = parked.iterator();
-			while (i.hasNext()) {
-				Vehicle vehicle = i.next();
-				// if (vehicle instanceof Rover) {
-				String d = vehicle.getVehicleType();
-				// System.out.println("type is " + d);
-				if (d.equals(VehicleType.CARGO_ROVER.getName()))
-					rovers.add(vehicle);
-				// }
-			}
-		}
-
-		if (mode == 0 || mode == 2) {
-			Collection<Vehicle> onMission = getMissionVehicles();
-			Iterator<Vehicle> j = onMission.iterator();
-			while (j.hasNext()) {
-				Vehicle vehicle = j.next();
-				// if (vehicle instanceof Rover) {
-				String d = vehicle.getVehicleType();
-				if (d.equals(VehicleType.CARGO_ROVER.getName()))
-					rovers.add(vehicle);
-				// }
-			}
-		}
-		return rovers;
-	}
-
-	public List<Vehicle> getTransportRovers(int mode) {
-		List<Vehicle> rovers = new CopyOnWriteArrayList<Vehicle>();
-
-		if (mode == 0 || mode == 1) {
-			Collection<Vehicle> parked = getParkedVehicles();
-			Iterator<Vehicle> i = parked.iterator();
-			while (i.hasNext()) {
-				Vehicle vehicle = i.next();
-				// if (vehicle instanceof Rover) {
-				String d = vehicle.getVehicleType();
-				// System.out.println("type is " + d);
-				if (d.equals(VehicleType.TRANSPORT_ROVER.getName()))
-					rovers.add(vehicle);
-				// }
-			}
-		}
-
-		if (mode == 0 || mode == 2) {
-			Collection<Vehicle> onMission = getMissionVehicles();
-			Iterator<Vehicle> j = onMission.iterator();
-			while (j.hasNext()) {
-				Vehicle vehicle = j.next();
-				// if (vehicle instanceof Rover) {
-				String d = vehicle.getVehicleType();
-				if (d.equals(VehicleType.TRANSPORT_ROVER.getName()))
-					rovers.add(vehicle);
-				// }
-			}
-		}
-		return rovers;
-	}
-
-	public List<Vehicle> getExplorerRovers(int mode) {
-		List<Vehicle> rovers = new CopyOnWriteArrayList<Vehicle>();
-
-		if (mode == 0 || mode == 1) {
-			Collection<Vehicle> parked = getParkedVehicles();
-			Iterator<Vehicle> i = parked.iterator();
-			while (i.hasNext()) {
-				Vehicle vehicle = i.next();
-				// if (vehicle instanceof Rover) {
-				String d = vehicle.getVehicleType();
-				// System.out.println("type is " + d);
-				if (d.equals(VehicleType.EXPLORER_ROVER.getName()))
-					rovers.add(vehicle);
-				// }
-			}
-		}
-
-		if (mode == 0 || mode == 2) {
-			Collection<Vehicle> onMission = getMissionVehicles();
-			Iterator<Vehicle> j = onMission.iterator();
-			while (j.hasNext()) {
-				Vehicle vehicle = j.next();
-				// if (vehicle instanceof Rover) {
-				String d = vehicle.getVehicleType();
-				if (d.equals(VehicleType.EXPLORER_ROVER.getName()))
-					rovers.add(vehicle);
-				// }
-			}
-		}
-		return rovers;
 	}
 
 	/**
-	 * Sets the mission creation override flag.
+	 * Gets the process override flag.
 	 *
-	 * @param missionCreationOverride override for settlement mission creation.
+	 * @param type Name of process type
+	 * @return Is this override flag set
 	 */
-	public void setMissionCreationOverride(boolean missionCreationOverride) {
-		this.missionCreationOverride = missionCreationOverride;
-	}
-
-	/**
-	 * Gets the mission creation override flag.
-	 *
-	 * @return override for settlement mission creation.
-	 */
-	public boolean getMissionCreationOverride() {
-		return missionCreationOverride;
-	}
-
-	/**
-	 * Sets the construction override flag.
-	 *
-	 * @param constructionOverride override for settlement construction/salvage
-	 *                             mission creation.
-	 */
-	public void setConstructionOverride(boolean constructionOverride) {
-		this.constructionOverride = constructionOverride;
-	}
-
-	/**
-	 * Gets the construction override flag.
-	 *
-	 * @return override for settlement construction mission creation.
-	 */
-	public boolean getConstructionOverride() {
-		return constructionOverride;
-	}
-
-	/**
-	 * Sets the FoodProduction override flag.
-	 *
-	 * @param foodProductionOverride override for FoodProduction.
-	 */
-	public void setFoodProductionOverride(boolean foodProductionOverride) {
-		this.foodProductionOverride = foodProductionOverride;
-	}
-
-	/**
-	 * Gets the FoodProduction override flag.
-	 *
-	 * @return override for settlement FoodProduction.
-	 */
-	public boolean getFoodProductionOverride() {
-		return foodProductionOverride;
-	}
-
-	/**
-	 * Sets the manufacture override flag.
-	 *
-	 * @param manufactureOverride override for manufacture.
-	 */
-	public void setManufactureOverride(boolean manufactureOverride) {
-		this.manufactureOverride = manufactureOverride;
-	}
-
-	/**
-	 * Gets the manufacture override flag.
-	 *
-	 * @return override for settlement manufacture.
-	 */
-	public boolean getManufactureOverride() {
-		return manufactureOverride;
-	}
-
-	/**
-	 * Sets the resource process override flag.
-	 *
-	 * @param resourceProcessOverride override for resource processes.
-	 */
-	public void setResourceProcessOverride(boolean resourceProcessOverride) {
-		this.resourceProcessOverride = resourceProcessOverride;
-	}
-
-	/**
-	 * Gets the resource process override flag.
-	 *
-	 * @return override for settlement resource processes.
-	 */
-	public boolean getResourceProcessOverride() {
-		return resourceProcessOverride;
+	public boolean getProcessOverride(OverrideType type) {
+		return this.processOverrides.contains(type);
 	}
 
 	/**
@@ -3390,7 +2426,7 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 	/**
 	 * Gets the initial population of the settlement.
-	 * 
+	 *
 	 * @return initial population number.
 	 */
 	public int getInitialPopulation() {
@@ -3399,16 +2435,16 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 	/**
 	 * Gets the initial number of robots the settlement.
-	 * 
+	 *
 	 * @return initial number of robots.
 	 */
-	public int getProjectedNumOfRobots() {
-		return projectedNumOfRobots;
+	public int getInitialNumOfRobots() {
+		return initialNumOfRobots;
 	}
 
 	/**
 	 * Returns the chain of command
-	 * 
+	 *
 	 * @return chainOfCommand
 	 */
 	public ChainOfCommand getChainOfCommand() {
@@ -3416,567 +2452,74 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	}
 
 	/**
-	 * Decrements a particular shift type
-	 * 
-	 * @param shiftType
+	 * Get the shift manager for this Settlement
 	 */
-	public void decrementShiftType(ShiftType shiftType) {
-
-		if (shiftType.equals(ShiftType.A)) {
-			numA--;
-		}
-
-		else if (shiftType.equals(ShiftType.B)) {
-			numB--;
-		}
-
-		else if (shiftType.equals(ShiftType.X)) {
-			numX--;
-		}
-
-		else if (shiftType.equals(ShiftType.Y)) {
-			numY--;
-		}
-
-		else if (shiftType.equals(ShiftType.Z)) {
-			numZ--;
-		}
-
-		else if (shiftType.equals(ShiftType.ON_CALL)) {
-			numOnCall--;
-		}
-
-		else if (shiftType.equals(ShiftType.OFF)) {
-			numOff--;
-		}
-
+	public ShiftManager getShiftManager() {
+		return shiftManager;
 	}
 
-	/**
-	 * Increments a particular shift type
-	 * 
-	 * @param shiftType
-	 */
-	public void incrementShiftType(ShiftType shiftType) {
-
-		if (shiftType == ShiftType.A) {
-			numA++;
-		}
-
-		else if (shiftType == ShiftType.B) {
-			numB++;
-		}
-
-		else if (shiftType == ShiftType.X) {
-			numX++;
-		}
-
-		else if (shiftType == ShiftType.Y) {
-			numY++;
-		}
-
-		else if (shiftType == ShiftType.Z) {
-			numZ++;
-		}
-
-		else if (shiftType == ShiftType.ON_CALL) {
-			numOnCall++;
-		}
-
-		else if (shiftType == ShiftType.OFF) {
-			numOff++;
-		}
-	}
-
-	/**
-	 * Checks if a particular work shift has been saturated
-	 * 
-	 * @param st                The ShiftType
-	 * @param inclusiveChecking
-	 * @return true/false
-	 */
-	public boolean isWorkShiftSaturated(ShiftType st, boolean inclusiveChecking) {
-		boolean result = false;
-
-		// Reduce the shiftType of interest to find out if it's saturated
-		if (inclusiveChecking)
-			decrementShiftType(st);
-
-		int pop = getNumCitizens();// getIndoorPeopleCount();
-		int quotient = pop / numShiftsCache;
-		int remainder = pop % numShiftsCache;
-
-		switch (numShiftsCache) {
-		case 1: // (numShift == 1)
-			if (st != ShiftType.ON_CALL)
-				result = false;
-			break;
-		case 2: // else if (numShift == 2) {
-
-			switch (remainder) {
-			case 0: // if (remainder == 0) {
-				if (numA < quotient && numB < quotient) {
-					result = true;
-					break;
-				}
-				if (quotient == 1) {
-					if (numA < 1) { // allow only 1 person with "A shift"
-						if (st == ShiftType.A)
-							result = true;
-					} else {
-						if (st == ShiftType.B)
-							result = true;
-					}
-				} else if (quotient == 2) {
-					if (numA < 2) { // allow 2 persons with "A shift"
-						if (st == ShiftType.A)
-							result = true;
-					} else {
-						if (st == ShiftType.B)
-							result = true;
-					}
-				}
-				break;
-			case 1: // else { //if (remainder == 1) {
-				if (numA < quotient && numB < quotient) {
-					result = true;
-					break;
-				}
-				if (quotient == 1) {
-					if (numA < 2) { // allow 1 person with "A shift"
-						if (st == ShiftType.A)
-							result = true;
-					} else {
-						if (st == ShiftType.B)
-							result = true;
-					}
-				} else if (quotient == 2) {
-					if (numA < 3) { // allow 2 persons with "A shift"
-						if (st == ShiftType.A)
-							result = true;
-					} else {
-						if (st == ShiftType.B)
-							result = true;
-					}
-				}
-				break;
-			} // end of switch (remainder)
-			break;
-		case 3: // else if (numShift == 3) {
-			switch (remainder) {
-			case 0: // if (remainder == 0) {
-				if (numX < quotient && numY < quotient && numZ < quotient) {
-					result = true;
-					break;
-				}
-				if (numX < quotient + 1) { // allow up to q persons with "X shift"
-					if (st == ShiftType.X)
-						result = true;
-				} else if (numY < quotient + 1) { // allow up to q persons with "Y shift"
-					if (st == ShiftType.Y)
-						result = true;
-				} else {
-					if (st == ShiftType.Z)
-						result = true;
-				}
-				break;
-			case 1: // else if (remainder == 1) {
-				if (numX < quotient && numY < quotient && numZ < quotient) {
-					result = true;
-					break;
-				}
-				if (numX < quotient + 1) { // allow up to q persons with "X shift"
-					if (st == ShiftType.X)
-						result = true;
-				} else if (numY < quotient + 2) { // allow up to q + 1 persons with "Y shift"
-					if (st == ShiftType.Y)
-						result = true;
-				} else {
-					if (st == ShiftType.Z)
-						result = true;
-				}
-				break;
-			case 2: // else {//if (remainder == 2) {
-				if (numX < quotient && numY < quotient && numZ < quotient) {
-					result = true;
-					break;
-				}
-				if (numX < quotient + 2) { // allow up to q+1 persons with "X // shift"
-					if (st == ShiftType.X)
-						result = true;
-				} else if (numY < quotient + 2) { // allow up to q+1 persons with "Y shift"
-					if (st == ShiftType.Y)
-						result = true;
-				} else {
-					if (st == ShiftType.Z)
-						result = true;
-				}
-				break;
-			} // end of switch for case 3
-			break;
-		} // end of switch
-
-		// fill back the shiftType of interest
-		if (inclusiveChecking)
-			incrementShiftType(st);
-
-		return result;
-	}
-
-	/**
-	 * Finds an empty work shift in a settlement
-	 * 
-	 * @param pop If it wasn't known, use -1 to obtain the latest figure
-	 * @return The ShifType
-	 */
-	public ShiftType getAnEmptyWorkShift(int population) {
-		int pop = 0;
-		if (population == -1)
-			pop = this.getNumCitizens();// getIndoorPeopleCount();
-		else
-			pop = population;
-
-		int rand = -1;
-		ShiftType shiftType = ShiftType.OFF;
-		int quotient = pop / numShiftsCache;
-		int remainder = pop % numShiftsCache;
-
-		int limX = 0;
-		int limY = 0;
-		int limZ = 0;
-
-		limX = quotient;
-		
-		if (remainder == 0)
-			limZ = limX + 1;
-		else
-			limZ = limX + 2;
-
-		limY = pop - limX - limZ;
-
-		switch (numShiftsCache) {
-
-		case 1: // for numShift = 1
-			shiftType = ShiftType.ON_CALL;
-			break;
-
-		case 2: // for umShift = 2
-			switch (remainder) {
-			case 0: // if (remainder == 0) {
-				if (numA < quotient && numB < quotient) {
-					rand = RandomUtil.getRandomInt(1);
-					if (rand == 0) {
-						shiftType = ShiftType.A;
-					} else if (rand == 1) {
-						shiftType = ShiftType.B;
-					}
-					break;
-				}
-				if (quotient == 1) {
-					if (numA < 1) { // allow only 1 person with "A shift"
-						shiftType = ShiftType.A;
-					} else {
-						shiftType = ShiftType.B;
-					}
-					break;
-				} else if (quotient == 2) {
-					if (numA < 2) { // allow 2 persons with "A shift"
-						shiftType = ShiftType.A;
-					} else {
-						shiftType = ShiftType.B;
-					}
-					break;
-				}
-				break;
-
-			case 1: // else { //if (remainder == 1) {
-				if (numA < quotient && numB < quotient) {
-					rand = RandomUtil.getRandomInt(1);
-					if (rand == 0) {
-						shiftType = ShiftType.A;
-					} else if (rand == 1) {
-						shiftType = ShiftType.B;
-					}
-					break;
-				}
-				if (quotient == 1) {
-					if (numA < 2) { // allow 1 person with "A shift"
-						shiftType = ShiftType.A;
-					} else {
-						shiftType = ShiftType.B;
-					}
-					break;
-				} else if (quotient == 2) {
-					if (numA < 3) { // allow 2 persons with "A shift"
-						shiftType = ShiftType.A;
-					} else {
-						shiftType = ShiftType.B;
-					}
-					break;
-				}
-				break;
-
-			} // end of switch (remainder)
-			break;
-
-		case 3: // for numShift = 3
-
-			if (numX < limX && numZ < limZ) {
-				rand = RandomUtil.getRandomInt(3);
-				if (rand == 0)
-					shiftType = ShiftType.X;
-				else if (rand == 1)
-					shiftType = ShiftType.Z;
-				else
-					shiftType = ShiftType.Y;
-			} else if (numX < limX) {
-				rand = RandomUtil.getRandomInt(2);
-				if (rand == 0)
-					shiftType = ShiftType.X;
-				else {
-					if (numY <= limY)
-						shiftType = ShiftType.Y;
-					else
-						shiftType = ShiftType.X;
-				}
-
-			} else if (numZ < limZ) {
-				rand = RandomUtil.getRandomInt(2);
-				if (rand == 0)
-					shiftType = ShiftType.Z;
-				else {
-					if (numY <= limY)
-						shiftType = ShiftType.Y;
-					else
-						shiftType = ShiftType.Z;
-				}
-			} else
-				shiftType = ShiftType.Y;
-
-			break;
-		} // end of switch
-
-		return shiftType;
-	}
-
-	/**
-	 * Sets the number of shift of a settlement
-	 * 
-	 * @param numShift
-	 */
-	public void setNumShift(int numShift) {
-		this.numShiftsCache = numShift;
-	}
-
-	/**
-	 * Gets the current number of work shifts in a settlement
-	 * 
-	 * @return a number, either 2 or 3
-	 */
-	public int getNumShift() {
-		return numShiftsCache;
-	}
-
-	/*
-	 * Increments the number of people in a particular work shift
-	 *
-	 * @param shiftType
-	 */
-	public void incrementAShift(ShiftType shiftType) {
-		if (shiftType != null) {
-			if (shiftType == ShiftType.A)
-				numA++;
-			else if (shiftType == ShiftType.B)
-				numB++;
-			else if (shiftType == ShiftType.X)
-				numX++;
-			else if (shiftType == ShiftType.Y)
-				numY++;
-			else if (shiftType == ShiftType.Z)
-				numZ++;
-			else if (shiftType == ShiftType.ON_CALL)
-				numOnCall++;
-			else if (shiftType == ShiftType.OFF)
-				numOff++;
-		}
-	}
-
-	/*
-	 * Decrements the number of people in a particular work shift
-	 *
-	 * @param shiftType
-	 */
-	public void decrementAShift(ShiftType shiftType) {
-		if (shiftType != null) {
-			if (shiftType == ShiftType.A)
-				numA--;
-			else if (shiftType == ShiftType.B)
-				numB--;
-			else if (shiftType == ShiftType.X)
-				numX--;
-			else if (shiftType == ShiftType.Y)
-				numY--;
-			else if (shiftType == ShiftType.Z)
-				numZ--;
-			else if (shiftType == ShiftType.ON_CALL)
-				numOnCall--;
-			else if (shiftType == ShiftType.OFF)
-				numOff--;
-		}
-	}
-
-	public Map<Integer, Map<Integer, List<Double>>> getResourceStat() {
-		return resourceStat;
-	}
-
-	public int getSolCache() {
-		return solCache;
-	}
-
-	public boolean[] getExposed() {
+	public RadiationStatus getExposed() {
 		return exposed;
 	}
 
 	/*
-	 * Compute the probability of radiation exposure during EVA/outside walk
+	 * Update the status of Radiation exposure
+	 * @param newExposed
 	 */
-	public void checkRadiationProbability(double time) {
-		// boolean[] exposed = {false, false, false};
-		// double exposure = 0;
-		double ratio = time / RadiationExposure.RADIATION_CHECK_FREQ;
-		double mag_variation1 = 1 + RandomUtil.getRandomDouble(RadiationExposure.GCR_CHANCE_SWING)
-				- RandomUtil.getRandomDouble(RadiationExposure.GCR_CHANCE_SWING);
-		if (mag_variation1 < 0)
-			mag_variation1 = 0;
-		double mag_variation2 = 1 + RandomUtil.getRandomDouble(RadiationExposure.SEP_CHANCE_SWING)
-				- RandomUtil.getRandomDouble(RadiationExposure.SEP_CHANCE_SWING);
-		if (mag_variation2 < 0)
-			mag_variation2 = 0;
+	public void setExposed(RadiationStatus newExposed) {
+		RadiationStatus oldStatus = exposed;
+		exposed = newExposed;
+		
+		if (exposed.isBaselineEvent() && !oldStatus.isBaselineEvent()) {
+			logger.log(this, Level.INFO, 1_000, DETECTOR_GRID + UnitEventType.BASELINE_EVENT.toString() + " is imminent.");
+			this.fireUnitUpdate(UnitEventType.BASELINE_EVENT);
+		}
 
-		// Galactic cosmic rays (GCRs) event
-		double chance1 = RadiationExposure.GCR_PERCENT * ratio * mag_variation1; // normally 1.22%
-		// Solar energetic particles (SEPs) event
-		double chance2 = RadiationExposure.SEP_PERCENT * ratio * mag_variation2; // 0.122 %
-		// Baseline radiation event
-		double chance0 = 100 - chance1 - chance2; // RadiationExposure.BASELINE_PERCENT * ratio * (variation1 +
-													// variation2); // average 3.53%
-		if (chance0 < 0)
-			chance0 = 0;
-
-		// Baseline radiation event
-		// Note: RadiationExposure.BASELINE_CHANCE_PER_100MSOL_DURING_EVA * time / 100D
-		// Assume the baseline radiation can be fully shielded by the EVA suit
-//		if (RandomUtil.lessThanRandPercent(chance0)) {
-//	    	//System.out.println("chance0 : " + chance0);
-//	    	exposed[0] = true;
-//	    	//logger.info("An unspecified low-dose radiation event is detected by the radiation sensor grid on " + getName());
-//			LogConsolidated.log(Level.INFO, 0, sourceName,
-//					"[" + name + DETECTOR_GRID + UnitEventType.LOW_DOSE_EVENT.toString() + " is imminent.", null);
-//	    	this.fireUnitUpdate(UnitEventType.LOW_DOSE_EVENT);
-//	    }
-//	    else
-//	    	exposed[0] = false;
-
-		// Galactic cosmic rays (GCRs) event
-		// double rand2 = Math.round(RandomUtil.getRandomDouble(100) * 100.0)/100.0;
-		if (RandomUtil.lessThanRandPercent(chance1)) {
-			exposed[1] = true;
-			LogConsolidated.log(logger, Level.INFO, 1_000, sourceName,
-					"[" + name + DETECTOR_GRID + UnitEventType.GCR_EVENT.toString() + " is imminent.");
+		if (exposed.isGCREvent() && !oldStatus.isGCREvent()) {
+			logger.log(this, Level.INFO, 1_000, DETECTOR_GRID + UnitEventType.GCR_EVENT.toString() + " is imminent.");
 			this.fireUnitUpdate(UnitEventType.GCR_EVENT);
-		} else
-			exposed[1] = false;
+		}
 
-		// ~ 300 milli Sieverts for a 500-day mission
-		// Solar energetic particles (SEPs) event
-		if (RandomUtil.lessThanRandPercent(chance2)) {
-			exposed[2] = true;
-			LogConsolidated.log(logger, Level.INFO, 1_000, sourceName,
-					"[" + name + DETECTOR_GRID + UnitEventType.SEP_EVENT.toString() + " is imminent.");
+		if (exposed.isSEPEvent() && !oldStatus.isSEPEvent()) {
+			logger.log(this, Level.INFO, 1_000, DETECTOR_GRID + UnitEventType.SEP_EVENT.toString() + " is imminent.");
 			this.fireUnitUpdate(UnitEventType.SEP_EVENT);
-		} else
-			exposed[2] = false;
-	}
-
-	public CompositionOfAir getCompositionOfAir() {
-		return compositionOfAir;
+		}
 	}
 
 	/**
 	 * Computes the water ration level at the settlement due to low water supplies.
-	 * 
+	 *
 	 * @return level of water ration.
 	 */
-	public int getWaterRation() {
+	public int getWaterRationLevel() {
 		return waterRationLevel;
 	}
 
 	/**
 	 * Computes the water ration level at the settlement due to low water supplies.
-	 * 
+	 *
 	 * @return level of water ration.
 	 */
-	public void computeWaterRation() {
-		double storedWater = getInventory().getAmountResourceStored(ResourceUtil.waterID, false);
-		double requiredDrinkingWaterOrbit = water_consumption_rate * getNumCitizens() // getIndoorPeopleCount()
+	private void computeWaterRationLevel() {
+		double storedWater = Math.max(1, getAmountResourceStored(WATER_ID) - getNumCitizens() * 500.0);
+		double requiredDrinkingWaterOrbit = water_consumption_rate * getNumCitizens()
 				* MarsClock.SOLS_PER_ORBIT_NON_LEAPYEAR;
 
-		// If stored water is less than 20% of required drinking water for Orbit, wash
-		// water should be rationed.
-		double ratio = storedWater / requiredDrinkingWaterOrbit;
-		GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER / ratio;
-		if (GoodsManager.WATER_VALUE_MODIFIER < 1)
-			GoodsManager.WATER_VALUE_MODIFIER = 1;
-		else if (GoodsManager.WATER_VALUE_MODIFIER > 1000)
-			GoodsManager.WATER_VALUE_MODIFIER = 1000;
-
-		waterRationLevel = (int) (1.0 / ratio);
+		double ratio = requiredDrinkingWaterOrbit / storedWater;
+		waterRationLevel = (int) ratio;
 
 		if (waterRationLevel < 1)
 			waterRationLevel = 1;
-		else if (waterRationLevel > 50)
-			waterRationLevel = 50;
-//				
-//		if (storedWater < (requiredDrinkingWaterOrbit * .0025D)) {
-//			result = 11;
-//			GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER * 64;
-//		} else if (storedWater < (requiredDrinkingWaterOrbit * .005D)) {
-//			result = 10;
-//			GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER * 48;
-//		} else if (storedWater < (requiredDrinkingWaterOrbit * .01D)) {
-//			result = 9;
-//			GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER * 32;
-//		} else if (storedWater < (requiredDrinkingWaterOrbit * .015D)) {
-//			result = 8;
-//			GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER * 24;
-//		} else if (storedWater < (requiredDrinkingWaterOrbit * .025D)) {
-//			result = 7;
-//			GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER * 16;
-//		} else if (storedWater < (requiredDrinkingWaterOrbit * .05D)) {
-//			result = 6;
-//			GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER * 12;
-//		} else if (storedWater < (requiredDrinkingWaterOrbit * .075D)) {
-//			result = 5;
-//			GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER * 8;
-//		} else if (storedWater < (requiredDrinkingWaterOrbit * .1D)) {
-//			result = 4;
-//			GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER * 6;
-//		} else if (storedWater < (requiredDrinkingWaterOrbit * .125D)) {
-//			result = 3;
-//			GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER * 4;
-//		} else if (storedWater < (requiredDrinkingWaterOrbit * .15D)) {
-//			result = 2;
-//			GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER * 3;
-//		} else if (storedWater < (requiredDrinkingWaterOrbit * .2D)) {
-//			result = 1;
-//			GoodsManager.WATER_VALUE_MODIFIER = GoodsManager.WATER_VALUE_MODIFIER * 2;
-//		}		
-//		waterRationLevel = result;
+		else if (waterRationLevel > 1000)
+			waterRationLevel = 1000;
+
+		if (waterRationLevel > 100)
+			logger.severe(this, 20_000L, "Water Ration Level: " + waterRationLevel);
 	}
 
 	/**
 	 * Sets the objective
-	 * 
+	 *
 	 * @param {@link ObjectiveType}
 	 * @param level
 	 */
@@ -3990,8 +2533,6 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		goodsManager.setResearchFactor(1);
 		goodsManager.setTransportationFactor(1);
 		goodsManager.setTradeFactor(1);
-		// goodsManager.setTourismFactor(1);
-		// goodsManager.setFreeMarketFactor(1);
 
 		if (objectiveType == ObjectiveType.CROP_FARM) {
 			goodsManager.setCropFarmFactor(lvl);
@@ -4021,39 +2562,30 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 	/**
 	 * Gets the objective level
-	 * 
+	 *
 	 * @param {@link ObjectiveType}
 	 * @return the level
 	 */
 	public double getObjectiveLevel(ObjectiveType objectiveType) {
-		
-		if (objectiveType == ObjectiveType.CROP_FARM) {
-			return goodsManager.getCropFarmFactor();
-		}
 
-		else if (objectiveType == ObjectiveType.MANUFACTURING_DEPOT) {
-			return goodsManager.getManufacturingFactor();
+		switch(objectiveType) {
+			case CROP_FARM:
+				return goodsManager.getCropFarmFactor();
+			case MANUFACTURING_DEPOT:
+				return goodsManager.getManufacturingFactor();
+			case RESEARCH_CAMPUS:
+				return goodsManager.getResearchFactor();
+			case TRANSPORTATION_HUB:
+				return goodsManager.getTransportationFactor();
+			case TRADE_CENTER:
+				return goodsManager.getTradeFactor();
+			case TOURISM:
+				return goodsManager.getTourismFactor();
+			default:
+				return -1;
 		}
-
-		else if (objectiveType == ObjectiveType.RESEARCH_CAMPUS) {
-			return goodsManager.getResearchFactor();
-		}
-
-		else if (objectiveType == ObjectiveType.TRANSPORTATION_HUB) {
-			return goodsManager.getTransportationFactor();
-		}
-
-		else if (objectiveType == ObjectiveType.TRADE_CENTER) {
-			return goodsManager.getTradeFactor();
-		}
-
-		else if (objectiveType == ObjectiveType.TOURISM) {
-			return goodsManager.getTourismFactor();
-		}
-
-		return -1;
 	}
-	
+
 	/**
 	 * Gets the objective
 	 */
@@ -4063,7 +2595,7 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 	/**
 	 * Gets the building type related to the objective
-	 * 
+	 *
 	 * @return
 	 */
 	public String getObjectiveBuildingType() {
@@ -4086,239 +2618,199 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 			return "storage shed";
 		else if (objectiveType == ObjectiveType.TOURISM)
 			return "loading dock garage";
-
-		// Future alternatives :
-		// FREE_MARKET
-		// POWER_HUB
-		// RESIDENTIAL_DISTRICT
-		// " bunkhouse" or "outpost hub";
-
 		else
 			return null;
 	}
 
-	public String[] getObjectiveArray() {
-		return objectiveStrings;
-	}
-
-	public ObjectiveType[] getObjectives() {
-		return objectives;
-	}
-
-	public String getSponsor() {
-		return sponsor;
-	}
-
-//	public int getSumOfManuProcesses() {
-//		return sumOfCurrentManuProcesses;
-//	}
-//
-//	public void addManuProcesses(int value) {
-//		sumOfCurrentManuProcesses = sumOfCurrentManuProcesses + value;
-//	}
-//
-//	public void removeManuProcesses(int value) {
-//		sumOfCurrentManuProcesses = sumOfCurrentManuProcesses - value;
-//	}
-	
 	/**
-	 * Gets the number of crops that currently need work this Sol.
-	 * 
-	 * @return number of crops.
+	 * Get the total area of Crops in this Settlement
 	 */
-	public int getCropsNeedingTending() {
-		return cropsNeedingTendingCache;
-	}
-	
-	/**
-	 * Calculate if the crops need tending. Add a buffer of 5 millisol.
-	 * @param now Curretn time
-	 */
-	private void doCropsNeedTending(MarsClock now) {
-
-		int m = now.getMillisolInt();
-		if (millisolCache + 5 < m) {
-			millisolCache = m;
-			cropsNeedingTendingCache = 0;
+	public double getTotalCropArea() {
+		if (cropArea < 0D) {
+			cropArea = 0D;
+			
 			for (Building b : buildingManager.getBuildings(FunctionType.FARMING)) {
-				for (Crop c : b.getFarming().getCrops()) {
-					if (c.requiresWork()) {
-						cropsNeedingTendingCache++;
-					}
-					// if the health condition is below 50%,
-					// need special care
-					if (c.getHealthCondition() < .5)
-						cropsNeedingTendingCache++;
-				}
+				cropArea += b.getFarming().getGrowingArea();
 			}
 		}
-	}
 
-	public int getCropsNeedingTendingCache() {
-		return cropsNeedingTendingCache;
-	}
-
-	@Override
-	public String toString() {
-		return name;
-	}
-
-	/***
+		return cropArea;
+	} 
+	
+	/**
 	 * Computes the probability of the presence of regolith
-	 * 
+	 *
 	 * @return probability of finding regolith
 	 */
-	public double computeRegolithProbability() {
+	private double computeRegolithProbability() {
 		double result = 0;
+		double regolithDemand = goodsManager.getDemandValueWithID(REGOLITH_ID);
+		if (regolithDemand > REGOLITH_MAX)
+			regolithDemand = REGOLITH_MAX;
+		else if (regolithDemand < 1)
+			regolithDemand = 1;
 
-		double regolith_value = goodsManager.getGoodValuePerItem(GoodsUtil.getResourceGood(ResourceUtil.regolithID));
-		regolith_value = regolith_value * GoodsManager.REGOLITH_VALUE_MODIFIER;
-		if (regolith_value > 5000)
-			regolith_value = 5000;
-		else if (regolith_value < 0)
-			return 0;
+		double sandDemand = goodsManager.getDemandValueWithID(SAND_ID);
+		if (sandDemand > REGOLITH_MAX)
+			sandDemand = REGOLITH_MAX;
+		else if (sandDemand < 1)
+			sandDemand = 1;
+		
+		double concreteDemand = goodsManager.getDemandValueWithID(CONCRETE_ID);
+		if (concreteDemand > REGOLITH_MAX)
+			concreteDemand = REGOLITH_MAX;
+		else if (concreteDemand < 1)
+			concreteDemand = 1;
+		
+		double cementDemand = goodsManager.getDemandValueWithID(CEMENT_ID);
+		if (cementDemand > REGOLITH_MAX)
+			cementDemand = REGOLITH_MAX;
+		else if (cementDemand < 1)
+			cementDemand = 1;
 
-		double sand_value = goodsManager.getGoodValuePerItem(GoodsUtil.getResourceGood(ResourceUtil.sandID));
-		sand_value = sand_value * GoodsManager.SAND_VALUE_MODIFIER;
-		if (sand_value > 5000)
-			sand_value = 5000;
-		else if (sand_value < 0)
-			return 0;
-
-		int pop = numCitizens;// getAllAssociatedPeople().size();// getCurrentPopulationNum();
-
-		double regolith_available = getInventory().getAmountResourceStored(ResourceUtil.regolithID, false);
-		double sand_available = getInventory().getAmountResourceStored(ResourceUtil.sandID, false);
-
-		if (regolith_available < MIN_REGOLITH_RESERVE * pop + regolith_value / 10
-				&& sand_available < MIN_SAND_RESERVE * pop + sand_value / 10) {
-			result = (MIN_REGOLITH_RESERVE * pop - regolith_available) / 10D;
+		double regolithAvailable = goodsManager.getSupplyValue(REGOLITH_ID);
+		regolithAvailable = regolithAvailable * regolithAvailable - 1;
+		
+		double sandAvailable = goodsManager.getSupplyValue(SAND_ID);
+		sandAvailable = sandAvailable * sandAvailable - 1;
+		
+		int pop = numCitizens;
+		int reserve = (MIN_REGOLITH_RESERVE + MIN_SAND_RESERVE) * pop;
+		
+		if (regolithAvailable + sandAvailable > reserve + regolithDemand + sandDemand) {
+			result = reserve + regolithDemand + sandDemand - regolithAvailable - sandAvailable;
+		}
+		
+		else if (regolithAvailable + sandAvailable > reserve) {
+			result = reserve - regolithAvailable - sandAvailable;
 		}
 
-		// Prompt the regolith mission if regolith resource is low,
-		if (regolith_available > MIN_REGOLITH_RESERVE * pop) {
-			;// no change to missionProbability
-		} else if (regolith_available > MIN_REGOLITH_RESERVE * pop / 1.5) {
-			result = 20D * result + (MIN_REGOLITH_RESERVE * pop - regolith_available);
-		} else if (regolith_available > MIN_REGOLITH_RESERVE * pop / 2D) {
-			result = 10D * result + (MIN_REGOLITH_RESERVE * pop - regolith_available);
-		} else
-			result = 5D * result + (MIN_REGOLITH_RESERVE * pop - regolith_available);
+		else {
+			result = 1.0 * reserve / pop ;
+		}
 
+		result = result + .5 * concreteDemand + .5 * cementDemand;
+		
 		if (result < 0)
 			result = 0;
-
-//		System.out.println("computeRegolithProbability() " + result);
+		if (result > MAX)
+			result = MAX;
+		
+//		logger.info(this, 30_000L, "regolithDemand: " + regolithDemand
+//						+ "   cementDemand: " + cementDemand
+//						+ "   concreteDemand: " + concreteDemand
+//						+ "   sandDemand: " + sandDemand
+//						+ "   regolith Prob value: " + result);
 		return result;
 	}
 
 	/***
 	 * Computes the probability of the presence of ice
-	 * 
+	 *
 	 * @return probability of finding ice
 	 */
-	public double computeIceProbability() {
+	private double computeIceProbability() {
 		double result = 0;
-
-		double ice_value = goodsManager.getGoodValuePerItem(GoodsUtil.getResourceGood(ResourceUtil.iceID));
-		ice_value = ice_value * GoodsManager.ICE_VALUE_MODIFIER;
-		if (ice_value > 4_000)
-			ice_value = 4_000;
-		if (ice_value < 1)
-			ice_value = 1;
-
-		double water_value = goodsManager.getGoodValuePerItem(GoodsUtil.getResourceGood(ResourceUtil.waterID));
-		water_value = water_value * GoodsManager.WATER_VALUE_MODIFIER;
-		if (water_value > 16_000)
-			water_value = 16_000;
-		if (water_value < 1)
-			water_value = 1;
-
-//        double oxygen_value = goodsManager.getGoodValuePerItem(GoodsUtil.getResourceGood(ResourceUtil.oxygenAR));
-//        oxygen_value = oxygen_value * GoodsManager.OXYGEN_VALUE_MODIFIER;
-//        if (oxygen_value > 4000)
-//        	oxygen_value = 4000;
-//    	if (oxygen_value < 1)
-//    		oxygen_value = 1;
-
+		double iceDemand = goodsManager.getDemandValueWithID(ICE_ID);
+		if (iceDemand > ICE_MAX)
+			iceDemand = ICE_MAX;
+		if (iceDemand < 1)
+			iceDemand = 1;
+		
+		double waterDemand = goodsManager.getDemandValueWithID(WATER_ID);
+		waterDemand = waterDemand * waterRationLevel / 10;
+		if (waterDemand > WATER_MAX)
+			waterDemand = WATER_MAX;
+		if (waterDemand < 1)
+			waterDemand = 1;
+		
+		double brineWaterDemand = goodsManager.getDemandValueWithID(BRINE_WATER_ID);
+		brineWaterDemand = brineWaterDemand * waterRationLevel / 10;
+		if (waterDemand > WATER_MAX)
+			waterDemand = WATER_MAX;
+		if (waterDemand < 1)
+			waterDemand = 1;
+		
 		// Compare the available amount of water and ice reserve
-		double ice_available = getInventory().getAmountResourceStored(ResourceUtil.iceID, false);
-		double water_available = getInventory().getAmountResourceStored(ResourceUtil.waterID, false);
-		// double oxygen_available =
-		// getInventory().getAmountResourceStored(ResourceUtil.oxygenAR, false);
+		double iceSupply = goodsManager.getSupplyValue(ICE_ID);
+		double waterSupply = goodsManager.getSupplyValue(WATER_ID);
+		double brineWaterSupply = goodsManager.getSupplyValue(BRINE_WATER_ID);
+		
+		int pop = numCitizens;
+		int reserve = (MIN_WATER_RESERVE + MIN_ICE_RESERVE) * pop;
 
-		int pop = numCitizens;// getCurrentPopulationNum();
-
-		// TODO: create a task to find local ice and simulate the probability of finding
-		// local ice and its quantity
-		if (ice_available < MIN_ICE_RESERVE * pop + ice_value / 10D
-				&& water_available < MIN_WATER_RESERVE * pop + water_value / 10D) {
-			result = (MIN_ICE_RESERVE * pop - ice_available + MIN_WATER_RESERVE * pop - water_available) * 2D
-					+ water_value + ice_value;
+		double totalSupply = iceSupply + waterSupply + brineWaterSupply;
+		double totalDemand = iceDemand + waterDemand + brineWaterDemand;
+		
+		if (totalSupply > reserve + totalDemand) {
+			result = reserve + totalDemand - totalSupply;
+		}
+		
+		else if (totalSupply > reserve) {
+			result = reserve - totalSupply;
 		}
 
 		// Prompt the collect ice mission to proceed more easily if water resource is
 		// dangerously low,
-		if (water_available > MIN_WATER_RESERVE * pop) {
-			;// no change to missionProbability
-		} else if (water_available > MIN_WATER_RESERVE * pop / 1.5) {
-			result = 20D * result + (MIN_WATER_RESERVE * pop - water_available);
-		} else if (water_available > MIN_WATER_RESERVE * pop / 2D) {
-			result = 10D * result + (MIN_WATER_RESERVE * pop - water_available);
-		} else
-			result = 5D * result + (MIN_WATER_RESERVE * pop - water_available);
-
+		else {
+			// no change to missionProbability
+			result = 1.0 * reserve / pop;
+		}
+		
+		if (result < 0)
+			result = 0;
+		
+//		logger.info(this, 30_000L, "iceDemand: " + iceDemand
+//				+ "   waterDemand: " + waterDemand
+//				+ "   ice Prob value: " + result
+//				);
+		
+		if (result > MAX)
+			result = MAX;
+		
 		return result;
 	}
 
 	/**
-	 * Checks if the last 20 mission scores are above the threshold
-	 * 
+	 * Checks if the last 20 mission scores are above the threshold.
+	 *
 	 * @param score
 	 * @return true/false
 	 */
 	public boolean passMissionScore(double score) {
-		double total = 0;
-		for (double s : missionScores) {
-			total += s;
-		}
-		currentAverageScore = total / missionScores.size();
 
-		minimumPassingScore = Math.round((currentAverageScore + trendingScore) * 10D) / 10D;
-
-		if (score > currentAverageScore + trendingScore) {
-			trendingScore = (score - currentAverageScore + 2D * trendingScore) / 3D;
-			return true;
-		} else {
-			trendingScore = (currentAverageScore - score + 2D * trendingScore) / 3D;
-			return false;
-		}
+		return (score > minimumPassingScore);
 	}
 
 	/**
-	 * Calculates the current minimum passing score
-	 * 
+	 * Calculates the current minimum passing score.
+	 *
 	 * @return
 	 */
 	public double getMinimumPassingScore() {
-//		double total = 0;
-//		for (double s : missionScores) {
-//			total += s;
-//		}
-//		double ave = total/ missionScores.size();
-//		
-//		return Math.round((currentAverageScore + trendingScore) * 10D) / 10D;
-
 		return minimumPassingScore;
 	}
 
 	/**
-	 * Saves the mission score
-	 * 
+	 * Saves the mission score.
+	 *
 	 * @param score
 	 */
 	public void saveMissionScore(double score) {
-		missionScores.add(score);
+
+		// Recalculate the new minimum score; minimum score ages in the timePulse method
+		double total = 0;
+		for (double s : missionScores) {
+			total += s;
+		}
+
+		// Simplify how minimum score is calculated. Use of trending scores
+		// seems to make it harder to get missions approved over time
+		minimumPassingScore = total / missionScores.size();
+
+		// Cap any very large score to protect the average
+		double desiredMax = Math.min(MAX_MISSION_SCORE, minimumPassingScore * 1.5D);
+		missionScores.add(Math.min(score, desiredMax));
 
 		if (missionScores.size() > 20)
 			missionScores.remove(0);
@@ -4330,14 +2822,6 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 	public double getRegolithProbabilityValue() {
 		return regolithProbabilityValue;
-	}
-
-	public double getOxygenProbabilityValue() {
-		return oxygenProbabilityValue;
-	}
-
-	public double getMethaneProbabilityValue() {
-		return methaneProbabilityValue;
 	}
 
 	public double getOutsideTemperature() {
@@ -4352,61 +2836,21 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		this.storm = storm;
 	}
 
-	public double getMaxMssionRange() {
-		return maxMssionRange;
-	}
-
-	public void setMaxMssionRange(double value) {
-		maxMssionRange = value;
-	}
-
-	/**
-	 * Gets the allowed traveled distance for a particular type of mission
-	 * 
-	 * @param missionType : must be a number from 0 to 10; 
-	 * 			0 : Areo, 
-	 *		    1 : Bio, 
-	 *		    2 : CollectIce, 
-	 *			3 : CollectRegolith, 
-	 *			4 : Emergency, 
-	 *
-	 *			5 : Exploration, 
-	 * 			6 : Meteorology, 
-	 *			7 : Mining, 
-     * 			8 : RescueSalvageVehicle, 
-	 * 			9 : Trade, 
-	 * 
-	 * 		   10 : TravelToSettlement	
-	 * @return the range [in km]
-	 */
-	public double getMissionRadius(int missionType) {
-		return missionRange[missionType];
-	}
-	
-	public void setMissionRadius(int missionType, double newRange) {
-		missionRange[missionType] = newRange;
-	}
-	
-	public double getMissionRadius(MissionType missionType) {
-		return missionRange[missionType.ordinal()];
-	}
-	
 	public boolean hasDesignatedCommander() {
 		return hasDesignatedCommander;
 	}
 
-	public void setDesignatedCommander(boolean value) {
-		hasDesignatedCommander = value;
+	public Person setDesignatedCommander(Commander profile) {
+		hasDesignatedCommander = true;
+
+		return chainOfCommand.applyCommander(profile);
 	}
 
-	public void increaseGreyWaterFilteringRate() {
-		if (greyWaterFilteringRate < 100) {
+	private void changeGreyWaterFilteringRate(boolean increase) {
+		if (increase && (greyWaterFilteringRate < 100)) {
 			greyWaterFilteringRate = 1.1 * greyWaterFilteringRate;
 		}
-	}
-
-	public void decreaseGreyWaterFilteringRate() {
-		if (greyWaterFilteringRate > .01) {
+		else if (!increase && (greyWaterFilteringRate > .01)) {
 			greyWaterFilteringRate = 0.9 * greyWaterFilteringRate;
 		}
 	}
@@ -4417,7 +2861,7 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 
 	/**
 	 * Records the daily output.
-	 * 
+	 *
 	 * @param resource the resource id of the good
 	 * @param amount the amount or quantity produced
 	 * @param millisols the labor time
@@ -4428,24 +2872,10 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		dailyResourceOutput.increaseDataPoint(resource, amount);
 		dailyLaborTime.increaseDataPoint(resource, millisols);
 	}
-	
-	/**
-	 * Gets the daily labor time [millisols]
-	 * 
-	 * @param resource  the resource id of the good
-	 * @return
-	 */
-	public double getDailyLaborTime(Integer resource) {
-		Map<Integer, Double> yesterday = dailyLaborTime.getYesterdayData();
-		if (yesterday != null) {
-			return yesterday.get(resource);
-		}
-		return 0;
-	}
-	
+
 	/**
 	 * Records the amount of water being consumed.
-	 * 
+	 *
 	 * @param type
 	 * @param amount
 	 */
@@ -4456,20 +2886,24 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	/**
 	 * Gets the daily average water usage of the last x sols Not: most weight on
 	 * yesterday's usage. Least weight on usage from x sols ago
-	 * 
+	 *
 	 * @return
 	 */
 	public double getDailyWaterUsage(WaterUseType type) {
 		return waterConsumption.getDailyAverage(type);
 	}
 
-	public static void assignBestCandidate(Settlement settlement, Class<? extends Job> jobClass) {// String jobName) {
-		Job job = JobUtil.getJob(jobClass.getSimpleName());
-//		Job job = (Job)(jobClass);
+	/**
+	 * Assigns the best candidate to a job position.
+	 * 
+	 * @param settlement
+	 * @param job
+	 */
+	private static void assignBestCandidate(Settlement settlement, JobType job) {
 		Person p0 = JobUtil.findBestFit(settlement, job);
 		// Designate a specific job to a person
 		if (p0 != null) {
-			p0.getMind().setJob(job, true, JobUtil.SETTLEMENT, JobAssignmentType.APPROVED, JobUtil.SETTLEMENT);
+			p0.getMind().assignJob(job, true, JobUtil.SETTLEMENT, AssignmentType.APPROVED, JobUtil.SETTLEMENT);
 		}
 	}
 
@@ -4477,252 +2911,150 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 	 * Tune up the settlement with unique job position
 	 */
 	public void tuneJobDeficit() {
-		int numEngs = JobUtil.numJobs(Engineer.class.getSimpleName(), this);
-		if (numEngs == 0) {
-			assignBestCandidate(this, Engineer.class);
+		int numEngs = JobUtil.numJobs(JobType.ENGINEER, this);
+		int numTechs = JobUtil.numJobs(JobType.TECHNICIAN, this);
+
+		if ((numEngs == 0) || (numTechs == 0)) {
+			Person bestEng = JobUtil.findBestFit(this, JobType.ENGINEER);
+			Person bestTech = JobUtil.findBestFit(this, JobType.TECHNICIAN);
+
+			// Make sure the best person is not the only one in the other Job
+			if ((bestEng != null) && bestEng.equals(bestTech)) {
+				// Can only do one so job
+				if (numEngs == 0) {
+					// Keep the bestEng find
+					bestTech = null;
+				}
+				else if (numTechs == 0) {
+					// Keep best tech Loose the eng
+					bestEng = null;
+				}
+			}
+			if ((numEngs == 0) && (bestEng != null)) {
+				bestEng.getMind().assignJob(JobType.ENGINEER, true,
+						JobUtil.SETTLEMENT,
+						AssignmentType.APPROVED,
+						JobUtil.SETTLEMENT);
+			}
+			if ((numTechs == 0) && (bestTech != null)) {
+				bestTech.getMind().assignJob(JobType.TECHNICIAN, true,
+						JobUtil.SETTLEMENT,
+						AssignmentType.APPROVED,
+						JobUtil.SETTLEMENT);
+			}
 		}
 
-		int numTechs = JobUtil.numJobs(Technician.class.getSimpleName(), this);
-		if (numTechs == 0) {
-			assignBestCandidate(this, Technician.class);
-		}
 
 		if (this.getNumCitizens() > ChainOfCommand.POPULATION_WITH_CHIEFS) {
-			int numWeatherman = JobUtil.numJobs(Meteorologist.class.getSimpleName(), this);
+			int numWeatherman = JobUtil.numJobs(JobType.METEOROLOGIST, this);
 			if (numWeatherman == 0) {
-				assignBestCandidate(this, Meteorologist.class);
+				assignBestCandidate(this, JobType.METEOROLOGIST);
 			}
 		}
 	}
 
-	public void setMissionDisable(String missionName, boolean disable) {
-		List<String> names = MissionManager.getMissionNames();
-		int size = missionsDisable.length;
-		for (int i=0; i<size; i++) {
-			if (missionName.equalsIgnoreCase(names.get(i)) 
-					&& missionsDisable[i] == true) {
-				missionsDisable[i] = disable;
-			}
-		}
+	public void setMissionDisable(MissionType mission, boolean disable) {
+		double newValue = (disable ? 0D : 1D);
+		setPreferenceModifier(new PreferenceKey(Type.MISSION, mission.name()), newValue);
 	}
-	
-	public boolean isMissionDisable(String missionName) {
-		List<String> names = MissionManager.getMissionNames();
-		int size = missionsDisable.length;
-		for (int i=0; i<size; i++) {
-			if (missionName.equalsIgnoreCase(names.get(i))) {
-				return missionsDisable[i];
-			}
-		}
-		// by default it's false
-		return false;
-	}
-	
+
 	public void setAllowTradeMissionFromASettlement(Settlement settlement, boolean allowed) {
 		allowTradeMissionSettlements.put(settlement.getIdentifier(), allowed);
 	}
-	
-	public void setTradeMissionFromAllSettlements(boolean allowed) {
-		for (Settlement s: unitManager.getSettlements()) {
-			allowTradeMissionSettlements.put(s.getIdentifier(), allowed);
-		}
+
+	public boolean isAllowedTradeMission(Settlement settlement) {
+		return allowTradeMissionSettlements.getOrDefault(settlement.getIdentifier(), Boolean.TRUE);
 	}
-	
-	public boolean isTradeMissionAllowedFromASettlement(Settlement settlement) {
-		if (allowTradeMissionSettlements.containsKey(settlement.getIdentifier())) {
-			return allowTradeMissionSettlements.get(settlement.getIdentifier());
-		}
-		// by default it's allowed
-		return true;
-	}
-	
+
 	/**
-	 * Calculate the base mission probability used by all missions
-	 * 
-	 * @param missionName the name of the mission calling this method
+	 * Checks if the mission is enabled.
+	 *
+	 * @param mission the type of the mission calling this method
 	 * @return probability value
 	 */
-	public double getMissionBaseProbability(String missionName) {
-
-		if (missionProbability == -1) {
-			
-			List<String> names = MissionManager.getMissionNames();
-			int size = names.size();
-			// 0. Check if a mission has been overridden
-			for (int i=0; i<size; i++) {
-				if (missionName.equalsIgnoreCase(names.get(i)) 
-					&& missionsDisable[i] == true) {
-					missionProbability = 0;
-					return 0;
-				}
-			}
-		
-			// 1. Check if a mission-capable rover is available.
-			if (!RoverMission.areVehiclesAvailable(this, false)) {
-				missionProbability = 0;
-				return 0;
-			}
-//			System.out.println("1.  missionProbability is " + missionProbability);
-			// 2. Check if available backup rover.
-			if (!RoverMission.hasBackupRover(this)) {
-				missionProbability = 0;
-				return 0;
-			}
-//			System.out.println("2.  missionProbability is " + missionProbability);	
-			// 3. Check if at least 1 person is there
-			// A settlement with <= 4 population can always do DigLocalRegolith task
-			// should avoid the risk of mission.
-			if (getIndoorPeopleCount() <= 1) {// .getAllAssociatedPeople().size() <= 4)
-				missionProbability = 0;
-				return 0;
-			}
-//			System.out.println("3.  missionProbability is " + missionProbability);			
-			// 4. Check if minimum number of people are available at the settlement.
-			if (!RoverMission.minAvailablePeopleAtSettlement(this, RoverMission.MIN_STAYING_MEMBERS)) {
-				missionProbability = 0;
-				return 0;
-			}
-//			System.out.println("4.  missionProbability is " + missionProbability);
-			// // Check for embarking missions.
-			// else if (VehicleMission.hasEmbarkingMissions(this)) {
-			// return 0;
-			// }
-
-			// 5. Check if min number of EVA suits at settlement.
-			if (Mission.getNumberAvailableEVASuitsAtSettlement(this) < RoverMission.MIN_GOING_MEMBERS) {
-				missionProbability = 0;
-				return 0;
-			}
-//			System.out.println("5.  missionProbability is " + missionProbability);	
-			// // Check for embarking missions.
-			// else if (getNumCitizens() / 4.0 < VehicleMission.numEmbarkingMissions(this))
-			// {
-			// return 0;
-			// }
-
-			// 6. Check if settlement has enough basic resources for a rover mission.
-			if (!hasEnoughBasicResources(true)) {
-				missionProbability = 0;
-				return 0;
-			}
-//			System.out.println("6.  missionProbability is " + missionProbability);	
-			// 7. Check if starting settlement has minimum amount of methane fuel.
-			if (getInventory().getAmountResourceStored(ResourceUtil.methaneID,
-					false) < RoverMission.MIN_STARTING_SETTLEMENT_METHANE) {
-				missionProbability = 0;
-				return 0;
-			}
-
-			if (VehicleMission.numEmbarkingMissions(this) > getNumCitizens() / 4D) {
-				missionProbability = 0;
-				return 0;
-			}
-
-			if (VehicleMission.numApprovingMissions(this) > getNumCitizens() / 4D) {
-				missionProbability = 0;
-				return 0;
-			}
-
-//			System.out.println("7.  missionProbability is " + missionProbability);			
-			missionProbability = 1;
-
-//			System.out.println(this + "  missionProbability is " + missionProbability);
-		}
-
-		return missionProbability;
+	public boolean isMissionEnable(MissionType mission) {
+		return (getPreferenceModifier(new PreferenceKey(Type.MISSION, mission.name())) > 0D);
 	}
 
 	public double getTotalMineralValue(Rover rover) {
 		if (mineralValue == -1) {
 			// Check if any mineral locations within rover range and obtain their
 			// concentration
-			Map<String, Double> minerals = Exploration.getNearbyMineral(rover, this);
+			Map<String, Double> minerals = getNearbyMineral(rover, this);
 			if (!minerals.isEmpty()) {
 				mineralValue = Exploration.getTotalMineralValue(this, minerals);
 			}
 		}
 		return mineralValue;
 	}
-
 	/**
-	 * Checks if there are enough basic mission resources at the settlement to start
-	 * mission.
-	 * 
-	 * @param settlement the starting settlement.
-	 * @return true if enough resources.
+	 * Checks if there are any mineral locations within rover/mission range.
+	 *
+	 * @param rover          the rover to use.
+	 * @param homeSettlement the starting settlement.
+	 * @return true if mineral locations.
+	 * @throws Exception if error determining mineral locations.
 	 */
-	public boolean hasEnoughBasicResources(boolean unmasked) {
-		// if unmasked is false, it won't check the amount of H2O and O2.
-		// the goal of this mission can potentially increase O2 & H2O of the settlement
-		// e.g. an ice mission is desperately needed especially when there's
-		// not enough water since ice will produce water.
+	public Map<String, Double> getNearbyMineral(Rover rover, Settlement homeSettlement) {
+		Map<String, Double> minerals = new HashMap<>();
 
-		Inventory inv = getInventory();
+		double roverRange = rover.getRange();
+		double tripTimeLimit = rover.getTotalTripTimeLimit(true);
+		double tripRange = getTripTimeRange(tripTimeLimit, rover.getBaseSpeed() / 1.25D);
+		double range = roverRange;
+		if (tripRange < range)
+			range = tripRange;
 
-		try {
-			if (inv.getAmountResourceStored(methaneID, false) < minMethane) {
-				return false;
-			}
-			if (unmasked && inv.getAmountResourceStored(oxygenID, false) < mineOxygen) {
-				return false;
-			}
-			if (unmasked && inv.getAmountResourceStored(waterID, false) < minWater) {
-				return false;
-			}
-			if (inv.getAmountResourceStored(foodID, false) < minFood) {
-				return false;
-			}
-		} catch (Exception e) {
-			e.printStackTrace(System.err);
-		}
+		MineralMap map = surfaceFeatures.getMineralMap();
+		Coordinates mineralLocation = map.findRandomMineralLocation(homeSettlement.getCoordinates(), range / 2D);
 
-		return true;
+		if (mineralLocation != null)
+			minerals = map.getAllMineralConcentrations(mineralLocation);
+
+		return minerals;
 	}
 	
-	public void setName(String value) {
-		super.setName(value);
-		this.name = value;
-		fireUnitUpdate(UnitEventType.NAME_EVENT, name);
+	/**
+	 * Gets the range of a trip based on its time limit and exploration sites.
+	 *
+	 * @param tripTimeLimit time (millisols) limit of trip.
+	 * @param averageSpeed  the average speed of the vehicle.
+	 * @return range (km) limit.
+	 */
+	private double getTripTimeRange(double tripTimeLimit, double averageSpeed) {
+		int sol = marsClock.getMissionSol();
+		int numSites = 2 + (int)(1.0 * sol / 20);
+		double siteTime = 250;
+		
+		double tripTimeTravellingLimit = tripTimeLimit - (numSites * siteTime);
+		double millisolsInHour = MarsClock.convertSecondsToMillisols(60D * 60D);
+		double averageSpeedMillisol = averageSpeed / millisolsInHour;
+		return tripTimeTravellingLimit * averageSpeedMillisol;
 	}
+	
 
 	
-    public double[] getTerrainProfile() {
-        return terrainProfile;
-    }
-    
+	/**
+	 * Returns the ice collection rate in the vicinity of this settlement.
+	 * 
+	 * @return
+	 */
     public double getIceCollectionRate() {
-//    	if (iceCollectionRate == -1) {
-//			if (terrainElevation == null)
-//				terrainElevation = surfaceFeatures.getTerrainElevation();
-//			iceCollectionRate = terrainElevation.getIceCollectionRate(location);
-//    	}
     	return iceCollectionRate;
     }
-	
+
+    /**
+	 * Returns the regolith collection rate in the vicinity of this settlement.
+     * 
+     * @return
+     */
+    public double getRegolithCollectionRate() {
+    	return regolithCollectionRate;
+    }
+
 	/**
-	 * Gets a list of all travel related mission names
-	 */
-	public static List<String> getTravelMissionNames() {
-		return travelMissionNames;
-	}
-	
-	/** 
-	 * Sets the settlement mission directive modifiers. 
-	 * 
-	 * @param index
-	 * @param value
-	 */
-	public void setMissionDirectiveModifiers(int index, double value) {
-		missionModifiers[index] = value;
-	}
-	
-	public double getMissionDirectiveModifier(int index) {
-		return missionModifiers[index];
-	}
-	
-	/**
-	 * Remove the record of the deceased person from airlock
-	 * 
+	 * Removes the record of the deceased person from airlock.
+	 *
 	 * @param person
 	 */
 	public void removeAirlockRecord(Person person) {
@@ -4732,21 +3064,450 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 			lock.removeAirlockRecord(person);
 		}
 	}
-	
+
 	/**
-	 * Reset uniqueCount to the current number of settlements
+	 * The total amount of rock samples collected.
+	 * @param id resource id
 	 */
-	public static void reinitializeIdentifierCount() {
-		uniqueCount = unitManager.getSettlementNum() + Unit.FIRST_SETTLEMENT_UNIT_ID;
+	public double getResourceCollected(int id) {
+		return resourcesCollected.get(id);
+	}
+
+	/**
+	 * Adds the amount of resource collected.
+	 * @param id resource id
+	 * @param value collected
+	 */
+	public void addResourceCollected(int id, double value) {
+		if (resourcesCollected.containsKey(id)) {
+			double rs = resourcesCollected.get(id);
+			resourcesCollected.put(id, rs + value);
+		}
+		else {
+			resourcesCollected.put(id, value);
+		}
+	}
+
+	public int getSolCache() {
+		return solCache;
+	}
+
+	public boolean isFirstSol() {
+        return solCache == 0 || solCache == 1;
+    }
+
+	@Override
+	public Settlement getSettlement() {
+		return null;
+	}
+
+	/**
+	 * Gets the stored mass
+	 */
+	@Override
+	public double getStoredMass() {
+		return eqmInventory.getStoredMass();
+	}
+
+	/**
+	 * Gets the equipment list.
+	 *
+	 * @return the equipment list
+	 */
+	@Override
+	public Set<Equipment> getEquipmentSet() {
+		return eqmInventory.getEquipmentSet();
+	}
+
+	/**
+	 * Gets a list of the equipment with particular equipment type.
+	 *
+	 * @return the equipment list
+	 */
+	public Set<Equipment> getEquipmentTypeList(EquipmentType equipmentType) {
+		return eqmInventory.getEquipmentSet().stream()
+				.filter(e -> e.getEquipmentType() == equipmentType)
+				.collect(Collectors.toSet());
+	}
+
+	/**
+	 * Gets the number of available EVA suits.
+	 * 
+	 * @return
+	 */
+	public int getNumEVASuit() {
+		return Math.toIntExact(getEquipmentTypeList(EquipmentType.EVA_SUIT)
+				.stream()
+				.collect(Collectors.counting()));
 	}
 	
 	/**
-	 * Reinitialize references after loading from a saved sim
+	 * Does it possess an equipment of this equipment type ?
+	 *
+	 * @param typeID
+	 * @return true if this person possess this equipment type
+	 */
+	@Override
+	public boolean containsEquipment(EquipmentType type) {
+		return eqmInventory.containsEquipment(type);
+	}
+
+	/**
+	 * Stores the item resource
+	 *
+	 * @param resource the item resource
+	 * @param quantity
+	 * @return excess quantity that cannot be stored
+	 */
+	@Override
+	public int storeItemResource(int resource, int quantity) {
+		return eqmInventory.storeItemResource(resource, quantity);
+	}
+
+	/**
+	 * Retrieves the item resource
+	 *
+	 * @param resource
+	 * @param quantity
+	 * @return quantity that cannot be retrieved
+	 */
+	@Override
+	public int retrieveItemResource(int resource, int quantity) {
+		return eqmInventory.retrieveItemResource(resource, quantity);
+	}
+
+	/**
+	 * Gets the item resource stored
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public int getItemResourceStored(int resource) {
+		return eqmInventory.getItemResourceStored(resource);
+	}
+
+	/**
+	 * Stores the amount resource
+	 *
+	 * @param resource the amount resource
+	 * @param quantity
+	 * @return excess quantity that cannot be stored
+	 */
+	@Override
+	public double storeAmountResource(int resource, double quantity) {
+		return eqmInventory.storeAmountResource(resource, quantity);
+	}
+
+	/**
+	 * Retrieves the resource
+	 *
+	 * @param resource
+	 * @param quantity
+	 * @return quantity that cannot be retrieved
+	 */
+	@Override
+	public double retrieveAmountResource(int resource, double quantity) {
+		return eqmInventory.retrieveAmountResource(resource, quantity);
+	}
+
+	/**
+	 * Gets the capacity of a particular amount resource
+	 *
+	 * @param resource
+	 * @return capacity
+	 */
+	@Override
+	public double getAmountResourceCapacity(int resource) {
+		return eqmInventory.getAmountResourceCapacity(resource);
+	}
+
+	/**
+	 * Obtains the remaining storage space of a particular amount resource
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAmountResourceRemainingCapacity(int resource) {
+		return eqmInventory.getAmountResourceRemainingCapacity(resource);
+	}
+
+	/**
+	 * Does it have unused space or capacity for a particular resource ?
+	 * 
+	 * @param resource
+	 * @return
+	 */
+	@Override
+	public boolean hasAmountResourceRemainingCapacity(int resource) {
+		return eqmInventory. hasAmountResourceRemainingCapacity(resource);
+	}
+	
+	/**
+	 * Obtains the remaining general storage space.
+	 *
+	 * @return quantity
+	 */
+	@Override
+	public double getRemainingCargoCapacity() {
+		return eqmInventory.getRemainingCargoCapacity();
+	}
+
+	/**
+     * Gets the total capacity that this inventory can hold.
+     *
+     * @return total capacity (kg).
+     */
+	@Override
+	public double getCargoCapacity() {
+		return eqmInventory.getCargoCapacity();
+	}
+
+	/**
+	 * Gets the amount resource stored.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAmountResourceStored(int resource) {
+		return eqmInventory.getAmountResourceStored(resource);
+	}
+
+	/**
+	 * Gets all the amount resource resource stored, including inside equipment.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAllAmountResourceStored(int resource) {
+		return eqmInventory.getAllAmountResourceStored(resource);
+	}
+	
+	/**
+	 * Gets the amount resource owned by all resource holders.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	public double getAllAmountResourceOwned(int resource) {
+		double sum = 0;
+		for (ResourceHolder rh: citizens) {
+			sum += rh.getAmountResourceStored(resource);
+		}
+		for (ResourceHolder rh: ownedVehicles) {
+			sum += rh.getAmountResourceStored(resource);
+		}		
+		return sum + getAmountResourceStored(resource);
+	}
+	
+	/**
+	 * Gets all stored amount resources.
+	 *
+	 * @return all stored amount resources.
+	 */
+	@Override
+	public Set<Integer> getAmountResourceIDs() {
+		return eqmInventory.getAmountResourceIDs();
+	}
+
+	/**
+	 * Gets all stored item resources.
+	 *
+	 * @return all stored item resources.
+	 */
+	@Override
+	public Set<Integer> getItemResourceIDs() {
+		return eqmInventory.getItemResourceIDs();
+	}
+
+	/**
+	 * Gets all stored amount resources in eqmInventory, including inside equipment
+	 *
+	 * @return all stored amount resources.
+	 */
+	@Override
+	public Set<Integer> getAllAmountResourceIDs() {
+		return eqmInventory.getAllAmountResourceIDs();
+	}
+	
+	/**
+	 * Does it have this item resource ?
+	 *
+	 * @param resource
+	 * @return
+	 */
+	@Override
+	public boolean hasItemResource(int resource) {
+		return eqmInventory.hasItemResource(resource);
+	}
+
+	/**
+	 * Gets the remaining quantity of an item resource.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public int getItemResourceRemainingQuantity(int resource) {
+		return eqmInventory.getItemResourceRemainingQuantity(resource);
+	}
+
+	/**
+	 * Finds the number of empty containers of a class that are contained in storage and have
+	 * an empty inventory.
+	 *
+	 * @param containerClass  the unit class.
+	 * @param brandNew  does it include brand new bag only
+	 * @return number of empty containers.
+	 */
+	@Override
+	public int findNumEmptyContainersOfType(EquipmentType containerType, boolean brandNew) {
+		return eqmInventory.findNumEmptyContainersOfType(containerType, brandNew);
+	}
+
+	/**
+	 * Finds the number of containers of a particular type.
+	 *
+	 * @param containerType the equipment type.
+	 * @return number of empty containers.
+	 */
+	@Override
+	public int findNumContainersOfType(EquipmentType containerType) {
+		return eqmInventory.findNumContainersOfType(containerType);
+	}
+
+	/**
+	 * Finds a container in storage.
+	 *
+	 * @param containerType
+	 * @param empty does it need to be empty ?
+	 * @param resource If -1 then resource doesn't matter
+	 * @return instance of container or null if none.
+	 */
+	@Override
+	public Container findContainer(EquipmentType containerType, boolean empty, int resource) {
+		return eqmInventory.findContainer(containerType, empty, resource);
+	}
+
+	/**
+	 * Gets the EquipmentInventory instance.
+	 * 
+	 * @return
+	 */
+	public EquipmentInventory getEquipmentInventory() {
+		return eqmInventory;
+	}
+
+	/**
+	 * Gets the task manager that controls the backlog for the Settlement.
+	 */
+    public SettlementTaskManager getTaskManager() {
+        return taskManager;
+    }
+
+	/**
+	 * Gets the credit manager.
+	 *
+	 * @return credit manager.
+	 */
+	public CreditManager getCreditManager() {
+		return creditManager;
+	}
+	
+	/**
+	 * Sets the credit manager.
+	 * 
+	 * @param cm
+	 */
+	public void setCreditManager(CreditManager cm) {
+		creditManager = cm;
+	}
+	
+	/**
+	 * Gets the manager of future scheduled events for this settlement.
+	 */
+	public ScheduledEventManager getFutureManager() {
+		return futureEvents;
+	}
+
+	/**
+	 * Gets the unit's container unit. Returns null if unit has no container unit.
+	 *
+	 * @return the unit's container unit
+	 */
+	@Override
+	public Unit getContainerUnit() {
+		if (unitManager == null) // for maven test
+			return null;
+		return unitManager.getMarsSurface();
+	}
+
+	@Override
+	public UnitType getUnitType() {
+		return UnitType.SETTLEMENT;
+	}
+
+	/**
+	 * Is this unit inside a settlement
+	 *
+	 * @return true if the unit is inside a settlement
+	 */
+	@Override
+	public boolean isInSettlement() {
+		return false;
+	}
+
+	/**
+	 * Gets the holder's unit instance.
+	 *
+	 * @return the holder's unit instance
+	 */
+	@Override
+	public Unit getHolder() {
+		return this;
+	}
+	
+	/**
+	 * Get the modifier to apply of a certain preference
+	 * @param key The preference
+	 * @return The appropriate modifier; return 1 by default
+	 */
+	public double getPreferenceModifier(PreferenceKey key) {
+		return preferenceModifiers.getOrDefault(key, 1D);
+	}
+
+	/**
+	 * Set the modifier to apply to preference of a certain type.
+	 * @param key The preference to update
+	 * @param value The new modifier value
+	 */
+	public void setPreferenceModifier(PreferenceKey key, double value) {
+		preferenceModifiers.put(key, value);
+	}
+
+	/**
+	 * Get the preference that this Settlement influences
+	 */
+	public Set<PreferenceKey> getKnownPreferences() {
+		return preferenceModifiers.keySet();
+	}
+
+	/**
+	 * Reinitialize references after loading from a saved sim.
 	 */
 	public void reinit() {
+		if (surfaceFeatures == null) 
+			surfaceFeatures = Simulation.instance().getSurfaceFeatures();
+		
+		if (terrainElevation == null) 
+			terrainElevation = surfaceFeatures.getTerrainElevation();
+		
 		buildingManager.reinit();
 	}
-	
+
 	@Override
 	public void destroy() {
 		super.destroy();
@@ -4777,10 +3538,13 @@ public class Settlement extends Structure implements Serializable, Temporal, Lif
 		}
 		thermalSystem = null;
 
+		if (creditManager != null) {
+			creditManager.destroy();
+			creditManager = null;
+		}
+		
 		template = null;
-		// if (scientificAchievement != null) {
-		// scientificAchievement.clear();
-		// }
+
 		scientificAchievement = null;
 	}
 }

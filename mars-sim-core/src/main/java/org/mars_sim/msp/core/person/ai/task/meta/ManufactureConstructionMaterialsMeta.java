@@ -1,48 +1,54 @@
-/**
+/*
  * Mars Simulation Project
  * ManufactureConstructionMaterialsMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-01
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.fav.FavoriteType;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.task.ManufactureConstructionMaterials;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskProbabilityUtil;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.robot.RobotType;
+import org.mars_sim.msp.core.structure.OverrideType;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * Meta task for the ManufactureConstructionMaterials task.
  */
-public class ManufactureConstructionMaterialsMeta implements MetaTask, Serializable {
-
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
+public class ManufactureConstructionMaterialsMeta extends FactoryMetaTask {
+    
+    private static final double CAP = 3000D;
     
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.manufactureConstructionMaterials"); //$NON-NLS-1$
-
+    
     /** default logger. */
-    private static Logger logger = Logger.getLogger(ManufactureConstructionMaterialsMeta.class.getName());
+    private static final Logger logger = Logger.getLogger(ManufactureConstructionMaterialsMeta.class.getName());
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
+    public ManufactureConstructionMaterialsMeta() {
+		super(NAME, WorkerType.BOTH, TaskScope.WORK_HOUR);
+		setFavorite(FavoriteType.TINKERING);
+		setTrait(TaskTrait.ARTISTIC);
+		setPreferredJob(JobType.ARCHITECT, JobType.CHEMIST, JobType.ENGINEER);
+        
+        addPreferredRobot(RobotType.MAKERBOT);
+        addPreferredRobot(RobotType.REPAIRBOT);
+        addPreferredRobot(RobotType.CONSTRUCTIONBOT);
+	}
 
     @Override
     public Task constructInstance(Person person) {
@@ -51,26 +57,18 @@ public class ManufactureConstructionMaterialsMeta implements MetaTask, Serializa
 
     @Override
     public double getProbability(Person person) {
-
+        // Probability affected by the person's stress and fatigue.
+        if (!person.getPhysicalCondition().isFitByLevel(1000, 70, 1000))
+        	return 0;
+            
         double result = 0D;
 
         if (person.isInSettlement()) {
-    	
-            // Probability affected by the person's stress and fatigue.
-            PhysicalCondition condition = person.getPhysicalCondition();
-            double fatigue = condition.getFatigue();
-            double stress = condition.getStress();
-            double hunger = condition.getHunger();
-            
-            if (fatigue > 1000 || stress > 50 || hunger > 667)
-            	return 0;
-            
-            // If settlement has manufacturing override, no new
-            // manufacturing processes can be created.
-            if (person.getSettlement().getManufactureOverride()) {
+            // Check for the override
+            if (person.getSettlement().getProcessOverride(OverrideType.MANUFACTURE)) {
                 return 0;
             }
-            
+
             try {
                 // See if there is an available manufacturing building.
                 Building manufacturingBuilding = ManufactureConstructionMaterials.getAvailableManufacturingBuilding(person);
@@ -91,43 +89,27 @@ public class ManufactureConstructionMaterialsMeta implements MetaTask, Serializa
                     }
                     
                     // Crowding modifier.
-                    result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(person,
-                            manufacturingBuilding);
-                    result *= TaskProbabilityUtil.getRelationshipModifier(person,
-                            manufacturingBuilding);
+                    result *= getBuildingModifier(manufacturingBuilding, person);
 
                     // Manufacturing good value modifier.
                     result *= ManufactureConstructionMaterials.getHighestManufacturingProcessValue(person,
                             manufacturingBuilding);
+                    
+            		result *= person.getSettlement().getGoodsManager().getManufacturingFactor();
+
+            		result *= getPersonModifier(person);
+            		
+                    // Capping the probability as manufacturing process values can be very large numbers.
+                    if (result > CAP) {
+                        result = CAP;
+                    }
+                    else if (result < 0) result = 0;
                 }
                 
             } catch (Exception e) {
                 logger.log(Level.SEVERE,
                         "ManufactureConstructionMaterials.getProbability()", e);
             }
-
-            // Effort-driven task modifier.
-            result *= person.getPerformanceRating();
-
-            // Job modifier.
-            Job job = person.getMind().getJob();
-            if (job != null) {
-                result *= job.getStartTaskProbabilityModifier(ManufactureConstructionMaterials.class)
-                		* person.getSettlement().getGoodsManager().getManufacturingFactor();
-            }
-
-            // Modify if tinkering is the person's favorite activity.
-            if (person.getFavorite().getFavoriteActivity() == FavoriteType.TINKERING) {
-                result += RandomUtil.getRandomInt(1, 20);
-            }
-
-            // Added Preference modifier
-            if (result > 0D) {
-                result = result + result * person.getPreference().getPreferenceScore(this)/6D;
-            }
-            
-            if (result < 0) result = 0;
-
 
         }
 
@@ -141,11 +123,15 @@ public class ManufactureConstructionMaterialsMeta implements MetaTask, Serializa
 
 	@Override
 	public double getProbability(Robot robot) {
-
+		// Check for the override
+        if (robot.getSettlement().getProcessOverride(OverrideType.MANUFACTURE)) {
+            return 0;
+        }
+			
         double result = 0D;
 
         if (robot.isInSettlement()) {
-    	
+        	
             try {
                 // See if there is an available manufacturing building.
                 Building manufacturingBuilding = ManufactureConstructionMaterials.getAvailableManufacturingBuilding(robot);
@@ -172,13 +158,6 @@ public class ManufactureConstructionMaterialsMeta implements MetaTask, Serializa
                     
                     if (ManufactureConstructionMaterials.hasProcessRequiringWork(manufacturingBuilding, skill)) {
                         result += 10D;
-                    }
-
-                    // If settlement has manufacturing override, no new
-                    // manufacturing processes can be created.
-                    else if (robot.getSettlement().getManufactureOverride()) {
-                        result = 0;
-                        return 0;
                     }
                 }
                 

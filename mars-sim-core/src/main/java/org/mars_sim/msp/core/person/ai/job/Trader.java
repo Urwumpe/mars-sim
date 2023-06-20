@@ -1,62 +1,32 @@
-/**
+/*
  * Mars Simulation Project
  * Trader.java
- * @version 3.1.2 2020-09-02
+ * @Date 2021-09-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.job;
 
-import java.io.Serializable;
 import java.util.Iterator;
 
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.mission.Trade;
-import org.mars_sim.msp.core.person.ai.task.ConsolidateContainers;
-import org.mars_sim.msp.core.person.ai.task.LoadVehicleEVA;
-import org.mars_sim.msp.core.person.ai.task.LoadVehicleGarage;
-import org.mars_sim.msp.core.person.ai.task.UnloadVehicleEVA;
-import org.mars_sim.msp.core.person.ai.task.UnloadVehicleGarage;
+import org.mars_sim.msp.core.person.ai.job.util.Job;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.structure.Settlement;
 
-public class Trader extends Job implements Serializable {
-
-	/** default serial id. */
-	private static final long serialVersionUID = 1L;
-
-	private final int JOB_ID = 16;
+public class Trader extends Job {
 	
-	private double[] roleProspects = new double[] {5.0, 5.0, 30.0, 25.0, 25.0, 5.0, 5.0};
-
-	private static double TRADING_RANGE = 500D;
-	private static double SETTLEMENT_MULTIPLIER = 3D;
+	private static final double TRADING_RANGE = 500D;
+	private static final double SETTLEMENT_MULTIPLIER = 3D;
 
 	/**
 	 * Constructor.
 	 */
 	public Trader() {
 		// Use Job constructor.
-		super(Trader.class);
-
-		// Add trader-related tasks.
-		jobTasks.add(ConsolidateContainers.class);
-		jobTasks.add(LoadVehicleEVA.class);
-		jobTasks.add(LoadVehicleGarage.class);
-		jobTasks.add(UnloadVehicleEVA.class);
-		jobTasks.add(UnloadVehicleGarage.class);
-
-		// Add side tasks
-		// None
-
-		// Add trader-related missions.
-		jobMissionStarts.add(Trade.class);
-		jobMissionJoins.add(Trade.class);
-
-//		jobMissionJoins.add(BuildingConstructionMission.class);
-//		jobMissionJoins.add(BuildingSalvageMission.class);
-
+		super(JobType.TRADER, Job.buildRoleMap(5.0, 5.0, 5.0, 30.0, 25.0, 25.0, 5.0, 5.0));
 	}
 
 	/**
@@ -67,21 +37,17 @@ public class Trader extends Job implements Serializable {
 	 */
 	public double getCapability(Person person) {
 
-		double result = 0D;
-
-		int tradingSkill = person.getSkillManager().getSkillLevel(SkillType.TRADING);
-		result = tradingSkill;
+		double result = person.getSkillManager().getSkillLevel(SkillType.TRADING);
 
 		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
 
 		// Add experience aptitude.
 		int experienceAptitude = attributes.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
-//		result += result * ((experienceAptitude - 50D) / 100D);
+		
 		// Add conversation.
 		int conversation = attributes.getAttribute(NaturalAttributeType.CONVERSATION);
-//		result += result * ((conversation - 50D) / 100D);
 
-		double averageAptitude = experienceAptitude + conversation;
+		double averageAptitude = 1.0 * experienceAptitude + conversation;
 		result += result * ((averageAptitude - 100D) / 100D);
 		
 		return result;
@@ -105,28 +71,11 @@ public class Trader extends Job implements Serializable {
 			if (otherSettlement != settlement) {
 				double distance = settlement.getCoordinates().getDistance(otherSettlement.getCoordinates());
 				result += TRADING_RANGE / distance * SETTLEMENT_MULTIPLIER / 4.0;
-//				if (distance <= TRADING_RANGE) {
-//					result += SETTLEMENT_MULTIPLIER;
-//				}
 			}
 		}
 
 		result = (result + population / 12D) / 2.0;
-
-//		System.out.println(settlement + " Trader need: " + result);
 		
 		return result;
-	}
-
-	public double[] getRoleProspects() {
-		return roleProspects;
-	}
-	
-	public void setRoleProspects(int index, int weight) {
-		roleProspects[index] = weight;
-	}
-	
-	public int getJobID() {
-		return JOB_ID;
 	}
 }

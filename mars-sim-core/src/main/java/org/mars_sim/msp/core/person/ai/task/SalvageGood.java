@@ -1,31 +1,28 @@
 /**
  * Mars Simulation Project
  * SalvageGood.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
+import java.util.Set;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.location.LocationStateType;
+import org.mars_sim.msp.core.data.UnitSet;
+import org.mars_sim.msp.core.malfunction.Malfunctionable;
 import org.mars_sim.msp.core.manufacture.ManufactureUtil;
 import org.mars_sim.msp.core.manufacture.SalvageProcess;
 import org.mars_sim.msp.core.manufacture.SalvageProcessInfo;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
@@ -37,15 +34,10 @@ import org.mars_sim.msp.core.tool.RandomUtil;
  * A task for salvaging a malfunctionable piece of equipment back down
  * into parts.
  */
-public class SalvageGood
-extends Task
-implements Serializable {
+public class SalvageGood extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
-
-	/** default logger. */
-	private static Logger logger = Logger.getLogger(SalvageGood.class.getName());
 
 	/** Task name */
     private static final String NAME = Msg.getString(
@@ -71,15 +63,15 @@ implements Serializable {
 	 */
 	public SalvageGood(Person person) {
 		super(NAME, person, true, false, STRESS_MODIFIER,
-				true, 10D + RandomUtil.getRandomDouble(40D));
+				SkillType.MATERIALS_SCIENCE, 100D, 10D + RandomUtil.getRandomDouble(40D));
 
 		// Get available manufacturing workshop if any.
 		Building manufactureBuilding = getAvailableManufacturingBuilding(person);
 		if (manufactureBuilding != null) {
-			workshop = (Manufacture) manufactureBuilding.getFunction(FunctionType.MANUFACTURE);
+			workshop = manufactureBuilding.getManufacture();
 
 			// Walk to manufacturing workshop.
-			walkToTaskSpecificActivitySpotInBuilding(manufactureBuilding, false);
+			walkToTaskSpecificActivitySpotInBuilding(manufactureBuilding, FunctionType.MANUFACTURE, false);
 		}
 		else {
 			endTask();
@@ -99,37 +91,6 @@ implements Serializable {
 		// Initialize phase
 		addPhase(SALVAGE);
 		setPhase(SALVAGE);
-	}
-
-    @Override
-    public FunctionType getLivingFunction() {
-        return FunctionType.MANUFACTURE;
-    }
-
-	@Override
-	protected void addExperience(double time) {
-		// Add experience to "Materials Science" skill
-		// (1 base experience point per 100 millisols of work)
-		// Experience points adjusted by person's "Experience Aptitude"
-		// attribute.
-		double newPoints = time / 100D;
-		int experienceAptitude = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
-		newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
-		newPoints *= getTeachingExperienceModifier();
-		person.getSkillManager().addExperience(SkillType.MATERIALS_SCIENCE, newPoints, time);
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(1);
-		results.add(SkillType.MATERIALS_SCIENCE);
-		return results;
-	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		SkillManager manager = person.getSkillManager();
-		return manager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
 	}
 
 	@Override
@@ -153,7 +114,8 @@ implements Serializable {
 	private double salvagePhase(double time) {
 
 		// Check if workshop has malfunction.
-		if (workshop.getBuilding().getMalfunctionManager().hasMalfunction()) {
+		Malfunctionable entity = workshop.getBuilding();
+		if (entity.getMalfunctionManager().hasMalfunction()) {
 			endTask();
 			return time;
 		}
@@ -190,45 +152,11 @@ implements Serializable {
 		addExperience(time);
 
 		// Check for accident in workshop.
-		checkForAccident(time);
+		checkForAccident(entity, 0.005D, time);
 
 		return 0D;
 	}
 
-	/**
-	 * Check for accident in manufacturing building.
-	 * @param time the amount of time working (in millisols)
-	 */
-	private void checkForAccident(double time) {
-
-		double chance = .005D;
-
-		// Materials science skill modification.
-		int skill = getEffectiveSkillLevel();
-		if (skill <= 3) {
-			chance *= (4 - skill);
-		}
-		else {
-			chance /= (skill - 2);
-		}
-
-		// Modify based on the workshop building's wear condition.
-		chance *= workshop.getBuilding().getMalfunctionManager().getWearConditionAccidentModifier();
-
-		if (RandomUtil.lessThanRandPercent(chance * time)) {
-
-			if (person != null) {
-//				logger.info("[" + person.getLocationTag().getShortLocationName() +  "] " + person.getName() + " has accident while salvaging " +
-//					process.getInfo().getItemName() + ".");
-				workshop.getBuilding().getMalfunctionManager().createASeriesOfMalfunctions(person);
-			}
-			else if (robot != null) {
-//				logger.info("[" + robot.getLocationTag().getShortLocationName() +  "] " + robot.getName() + " has accident while salvaging " +
-//					process.getInfo().getItemName() + ".");
-				workshop.getBuilding().getMalfunctionManager().createASeriesOfMalfunctions(robot);
-			}
-		}
-	}
 
 	/**
 	 * Gets an available manufacturing building that the person can use.
@@ -243,9 +171,9 @@ implements Serializable {
 		SkillManager skillManager = person.getSkillManager();
 		int skill = skillManager.getEffectiveSkillLevel(SkillType.MATERIALS_SCIENCE);
 
-		if (person.getLocationStateType() == LocationStateType.INSIDE_SETTLEMENT) {
+		if (person.isInSettlement()) {
 			BuildingManager manager = person.getSettlement().getBuildingManager();
-			List<Building> manufacturingBuildings = manager.getBuildings(FunctionType.MANUFACTURE);
+			Set<Building> manufacturingBuildings = manager.getBuildingSet(FunctionType.MANUFACTURE);
 			manufacturingBuildings = BuildingManager.getNonMalfunctioningBuildings(manufacturingBuildings);
 			manufacturingBuildings = getManufacturingBuildingsNeedingSalvageWork(manufacturingBuildings, skill);
 			manufacturingBuildings = getBuildingsWithSalvageProcessesRequiringWork(manufacturingBuildings, skill);
@@ -269,15 +197,15 @@ implements Serializable {
 	 * @param skill the materials science skill level of the person.
 	 * @return list of manufacture buildings needing work.
 	 */
-	private static List<Building> getManufacturingBuildingsNeedingSalvageWork(List<Building> buildingList,
+	private static Set<Building> getManufacturingBuildingsNeedingSalvageWork(Set<Building> buildingList,
 			int skill) {
 
-		List<Building> result = new ArrayList<Building>();
+		Set<Building> result = new UnitSet<>();
 
 		Iterator<Building> i = buildingList.iterator();
 		while (i.hasNext()) {
 			Building building = i.next();
-			Manufacture manufacturingFunction = (Manufacture) building.getFunction(FunctionType.MANUFACTURE);
+			Manufacture manufacturingFunction = building.getManufacture();
 			if (manufacturingFunction.requiresSalvagingWork(skill)) {
 				result.add(building);
 			}
@@ -292,10 +220,10 @@ implements Serializable {
 	 * @param skill the materials science skill level of the person.
 	 * @return subset list of buildings with processes requiring work, or original list if none found.
 	 */
-	private static List<Building> getBuildingsWithSalvageProcessesRequiringWork(List<Building> buildingList,
+	private static Set<Building> getBuildingsWithSalvageProcessesRequiringWork(Set<Building> buildingList,
 			int skill) {
 
-		List<Building> result = new ArrayList<Building>();
+		Set<Building> result = new UnitSet<>();
 
 		// Add all buildings with processes requiring work.
 		Iterator<Building> i = buildingList.iterator();
@@ -325,7 +253,7 @@ implements Serializable {
 
 		boolean result = false;
 
-		Manufacture manufacturingFunction = (Manufacture) manufacturingBuilding.getFunction(FunctionType.MANUFACTURE);
+		Manufacture manufacturingFunction = manufacturingBuilding.getManufacture();
 		Iterator<SalvageProcess> i = manufacturingFunction.getSalvageProcesses().iterator();
 		while (i.hasNext()) {
 			SalvageProcess process = i.next();
@@ -345,16 +273,16 @@ implements Serializable {
 	 * @param buildingList list of buildings with the manufacture function.
 	 * @return subset list of highest tech level buildings.
 	 */
-	private static List<Building> getHighestManufacturingTechLevelBuildings(
-			List<Building> buildingList) {
+	private static Set<Building> getHighestManufacturingTechLevelBuildings(
+			Set<Building> buildingList) {
 
-		List<Building> result = new ArrayList<Building>();
+		Set<Building> result = new UnitSet<>();
 
 		int highestTechLevel = 0;
 		Iterator<Building> i = buildingList.iterator();
 		while (i.hasNext()) {
 			Building building = i.next();
-			Manufacture manufacturingFunction = (Manufacture) building.getFunction(FunctionType.MANUFACTURE);
+			Manufacture manufacturingFunction = building.getManufacture();
 			if (manufacturingFunction.getTechLevel() > highestTechLevel) {
 				highestTechLevel = manufacturingFunction.getTechLevel();
 			}
@@ -363,7 +291,7 @@ implements Serializable {
 		Iterator<Building> j = buildingList.iterator();
 		while (j.hasNext()) {
 			Building building = j.next();
-			Manufacture manufacturingFunction = (Manufacture) building.getFunction(FunctionType.MANUFACTURE);
+			Manufacture manufacturingFunction = building.getManufacture();
 			if (manufacturingFunction.getTechLevel() == highestTechLevel) {
 				result.add(building);
 			}
@@ -422,7 +350,7 @@ implements Serializable {
 		Iterator<SalvageProcess> i = manufactureBuilding.getSalvageProcesses().iterator();
 		while (i.hasNext()) {
 			SalvageProcess process = i.next();
-			if (process.getInfo().getItemName() == processInfo.getItemName()) {
+			if (process.getInfo().getItemName().equals(processInfo.getItemName())) {
 				result = true;
 			}
 		}
@@ -458,12 +386,12 @@ implements Serializable {
 	private SalvageProcess createNewSalvageProcess() {
 		SalvageProcess result = null;
 
-		if (workshop.getCurrentProcesses() < workshop.getNumPrintersInUse()) {
+		if (workshop.getCurrentTotalProcesses() < workshop.getNumPrintersInUse()) {
 
 			int skillLevel = getEffectiveSkillLevel();
 			int techLevel = workshop.getTechLevel();
 
-			Map<SalvageProcessInfo, Double> processValues = new HashMap<SalvageProcessInfo, Double>();
+			Map<SalvageProcessInfo, Double> processValues = new HashMap<>();
 			Iterator<SalvageProcessInfo> i = ManufactureUtil.getSalvageProcessesForTechSkillLevel(
 					techLevel, skillLevel).iterator();
 			while (i.hasNext()) {
@@ -503,13 +431,5 @@ implements Serializable {
 			process = createNewSalvageProcess();
 		}
 		return process;
-	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
-
-		workshop = null;
-		process = null;
 	}
 }

@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * SolSingleMetricDataLogger.java
+ * @version 3.2.0 2021-06-20
+ * @author Barry Evans
+ */
+
 package org.mars_sim.msp.core.data;
 
 /**
@@ -12,16 +19,17 @@ public class SolSingleMetricDataLogger extends DataLogger<Double> {
 	}
 	
 	/**
-	 * The generated item is null to start with
+	 * The generated item is null to start with.
 	 */
 	@Override
-	protected Double getDataItem() {
+	protected Double getNewDataItem() {
 		return 0D;
 	}
 
 	/**
-	 * Increase the metric on one of the data points. It adds the increment to any existing value.
+	 * Increases the metric on one of the data points. It adds the increment to any existing value.
 	 * If no value for this metric is present; it created one.
+	 * 
 	 * @param increment Value to add to the existing metric.
 	 */
 	public void increaseDataPoint(Double increment) {
@@ -30,11 +38,16 @@ public class SolSingleMetricDataLogger extends DataLogger<Double> {
 		double current = (currentData == null ? 0 : currentData);
 		current += increment;
 		currentData = current;
+		
+		// For a single dataitem the item needs to be refreshed
+		// because current data is not by reference
+		dailyData.set(0, currentData);
 	}
 	
 	/**
-	 * Calculate the daily average for the metric.
+	 * Calculates the daily average for the metric.
 	 * For the current day the current msol is taken into account to produce an estimate. 
+	 * 
 	 * @return Daily average
 	 */
 	public double getDailyAverage() {

@@ -1,11 +1,14 @@
-/**
+/*
  * Mars Simulation Project
  * VehicleType.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-06-16
  * @author Manny Kung
  *
  */
 package org.mars_sim.msp.core.vehicle;
+
+import java.util.HashSet;
+import java.util.Set;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.resource.ResourceUtil;
@@ -13,6 +16,7 @@ import org.mars_sim.msp.core.resource.ResourceUtil;
 public enum VehicleType {
 		
 	LUV					(Msg.getString("VehicleType.luv")), //$NON-NLS-1$
+	DELIVERY_DRONE		(Msg.getString("VehicleType.deliveryDrone")), //$NON-NLS-1$
 	EXPLORER_ROVER 		(Msg.getString("VehicleType.explorer")), //$NON-NLS-1$ 
 	TRANSPORT_ROVER		(Msg.getString("VehicleType.transport")), //$NON-NLS-1$ 
 	CARGO_ROVER			(Msg.getString("VehicleType.cargo")); //$NON-NLS-1$
@@ -20,36 +24,107 @@ public enum VehicleType {
 	//Note: the vehicle types used in message.properties must match those in vehicles.xml.
 	
 	private String name;
-
+	
+	private static Set<Integer> idSet;
+	
+	/**
+	 * Returns a set of all vehicle types.
+	 */
+	public static final Set<VehicleType> ALL_VEHICLES =
+				Set.of(VehicleType.LUV,
+						VehicleType.DELIVERY_DRONE,
+						VehicleType.EXPLORER_ROVER,
+						VehicleType.TRANSPORT_ROVER,
+						VehicleType.CARGO_ROVER);
+	
 	private VehicleType(String name) {
 		this.name = name;
 	}
 
 	public String getName() {
-		// TODO change all names to i18n-keys for accessing messages.properties
 		return this.name;
 	}
 	
+	/**
+	 * Gets a set of vehicle resource ids.
+	 * 
+	 * @return
+	 */
+	public static Set<Integer> getIDs() {
+		if (idSet == null) {
+			idSet = new HashSet<Integer>();
+			for (VehicleType e : VehicleType.values()) {
+				idSet.add(e.ordinal() + ResourceUtil.FIRST_VEHICLE_RESOURCE_ID);
+			}
+		}
+		return idSet;
+	}
+	
+	/**
+	 * Converts vehicle name to vehicle type.
+	 * 
+	 * @param name
+	 * @return VehicleType
+	 */
+	public static VehicleType convertNameToVehicleType(String name) {
+		if (name != null) {
+	    	for (VehicleType e : VehicleType.values()) {
+	    		if (name.equalsIgnoreCase(e.name)) {
+	    			return e;
+	    		}
+	    	}
+		}
+		return null;
+	}
+	
+	/**
+	 * Converts vehicle name to vehicle id.
+	 * 
+	 * @param name
+	 * @return
+	 */
 	public static int convertName2ID(String name) {
 		if (name != null) {
 	    	for (VehicleType e : VehicleType.values()) {
 	    		if (name.equalsIgnoreCase(e.name)) {
-	    			return e.ordinal() + ResourceUtil.FIRST_VEHICLE_RESOURCE_ID;
+	    			return getVehicleID(e);
 	    		}
 	    	}
 		}
 		return -1;
 	}
 	
+	/**
+	 * Converts vehicle id to vehicle type.
+	 * 
+	 * @param id
+	 * @return
+	 */
 	public static VehicleType convertID2Type(int id) {
 		return VehicleType.values()[id - ResourceUtil.FIRST_VEHICLE_RESOURCE_ID];
 	}
 	
+	/**
+	 * Converts vehicle type to id.
+	 * 
+	 * @param type
+	 * @return
+	 */
 	public static int getVehicleID(VehicleType type) {
-		if (type == LUV) return LUV.ordinal() + ResourceUtil.FIRST_VEHICLE_RESOURCE_ID;
-		else if (type == EXPLORER_ROVER) return EXPLORER_ROVER.ordinal() + ResourceUtil.FIRST_VEHICLE_RESOURCE_ID;
-		else if (type == TRANSPORT_ROVER) return TRANSPORT_ROVER.ordinal() + ResourceUtil.FIRST_VEHICLE_RESOURCE_ID;
-		else if (type == CARGO_ROVER) return CARGO_ROVER.ordinal() + ResourceUtil.FIRST_VEHICLE_RESOURCE_ID;
-		else return -1;
+		return ResourceUtil.FIRST_VEHICLE_RESOURCE_ID + type.ordinal();
 	}
+	
+	/**
+	 * Is this vehicle a rover ?
+	 * 
+	 * @param type
+	 * @return
+	 */
+	public static boolean isRover(VehicleType type) {
+		if (type == EXPLORER_ROVER
+				|| type == TRANSPORT_ROVER
+				|| type == CARGO_ROVER) 
+			return true;
+		return false;
+	}	
 }

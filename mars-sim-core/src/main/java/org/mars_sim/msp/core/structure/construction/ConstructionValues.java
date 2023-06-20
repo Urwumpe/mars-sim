@@ -1,25 +1,22 @@
-/**
+/*
  * Mars Simulation Project
  * ConstructionValues.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-15
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.core.structure.construction;
 
 import java.io.Serializable;
 import java.text.DecimalFormat;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.goods.GoodsManager;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.goods.Good;
-import org.mars_sim.msp.core.structure.goods.GoodsManager;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
 import org.mars_sim.msp.core.time.MarsClock;
 
 /**
@@ -70,9 +67,9 @@ implements Serializable {
         if ((settlementConstructionValueCacheTime == null) || 
                 (MarsClock.getTimeDiff(currentTime, settlementConstructionValueCacheTime) > 1000D)) {
             if (settlementConstructionValueCache == null) 
-                settlementConstructionValueCache = new ConcurrentHashMap<Integer, Double>();
+                settlementConstructionValueCache = new HashMap<>();
             settlementConstructionValueCache.clear();
-            settlementConstructionValueCacheTime = (MarsClock) currentTime.clone();
+            settlementConstructionValueCacheTime = new MarsClock(currentTime);
         }
 
         if (!settlementConstructionValueCache.containsKey(constructionSkill)) {
@@ -210,7 +207,7 @@ implements Serializable {
     public Map<ConstructionStageInfo, Double> getNewConstructionStageProfits(
             ConstructionSite site, int constructionSkill) {
 
-        Map<ConstructionStageInfo, Double> result = new ConcurrentHashMap<ConstructionStageInfo, Double>();
+        Map<ConstructionStageInfo, Double> result = new HashMap<>();
 
         ConstructionStage lastStage = site.getCurrentConstructionStage();
         if (lastStage != null) {
@@ -240,7 +237,7 @@ implements Serializable {
     public Map<ConstructionStageInfo, Double> getConstructionStageProfit(String stageType, 
             int constructionSkill) {
 
-        Map<ConstructionStageInfo, Double> result = new ConcurrentHashMap<ConstructionStageInfo, Double>();
+        Map<ConstructionStageInfo, Double> result = new HashMap<>();
 
         List<ConstructionStageInfo> nextStages = ConstructionUtil.getConstructionStageInfoList(
                 stageType, constructionSkill);
@@ -265,7 +262,7 @@ implements Serializable {
         if ((allStageInfoValueCacheTime == null) || 
                 (MarsClock.getTimeDiff(currentTime, allStageInfoValueCacheTime) > 1000D)) {
             if (allStageInfoValueCache == null) {
-                allStageInfoValueCache = new ConcurrentHashMap<ConstructionStageInfoSkillKey, Double>();
+                allStageInfoValueCache = new HashMap<>();
             }
             allStageInfoValueCache.clear();
 
@@ -277,14 +274,14 @@ implements Serializable {
                         getConstructionStageValue(stageInfo, constructionSkill));
             }
 
-            allStageInfoValueCacheTime = (MarsClock) currentTime.clone();
+            allStageInfoValueCacheTime = new MarsClock(currentTime);
 
             // Display building construction values report to System.out for testing purposes.
 //            displayAllBuildingConstructionValues();
         }
         
         // Create result map with just construction stage infos and their values.
-        Map<ConstructionStageInfo, Double> result = new ConcurrentHashMap<ConstructionStageInfo, Double>(allStageInfoValueCache.size());
+        Map<ConstructionStageInfo, Double> result = new HashMap<>(allStageInfoValueCache.size());
         Iterator<ConstructionStageInfoSkillKey> j = allStageInfoValueCache.keySet().iterator();
         while (j.hasNext()) {
             ConstructionStageInfoSkillKey key = j.next();
@@ -307,10 +304,10 @@ implements Serializable {
         if ((stageInfoValueCacheTime == null) || 
                 (MarsClock.getTimeDiff(currentTime, stageInfoValueCacheTime) > 1000D)) {
             if (stageInfoValueCache == null) {
-                stageInfoValueCache = new ConcurrentHashMap<ConstructionStageInfoSkillKey, Double>();
+                stageInfoValueCache = new HashMap<>();
             }
             stageInfoValueCache.clear();
-            stageInfoValueCacheTime = (MarsClock) currentTime.clone();
+            stageInfoValueCacheTime = new MarsClock(currentTime);
         }
 
         ConstructionStageInfoSkillKey key = new ConstructionStageInfoSkillKey(stageInfo, constructionSkill);
@@ -359,9 +356,8 @@ implements Serializable {
         Iterator<Integer> j = resources.keySet().iterator();
         while (j.hasNext()) {
         	Integer resource = j.next();
-            Good resourceGood = GoodsUtil.getResourceGood(resource);
             double amount = resources.get(resource);
-            double value = manager.getGoodValuePerItem(resourceGood) * amount;
+            double value = manager.getGoodValuePoint(resource) * amount;
             cost += value;
         }
 
@@ -370,9 +366,8 @@ implements Serializable {
         Iterator<Integer> k = parts.keySet().iterator();
         while (k.hasNext()) {
         	Integer part = k.next();
-            Good partGood = GoodsUtil.getResourceGood(part);
             int number = parts.get(part);
-            double value = manager.getGoodValuePerItem(partGood) * number;
+            double value = manager.getGoodValuePoint(part) * number;
             cost += value;
         }
 
@@ -469,7 +464,7 @@ implements Serializable {
                     else {
                         // Check if any existing buildings have same frame stage and can be refit or refurbished 
                         // into new building.
-                        Iterator<Building> i = settlement.getBuildingManager().getACopyOfBuildings().iterator();
+                        Iterator<Building> i = settlement.getBuildingManager().getBuildingSet().iterator();
                         while (i.hasNext()) {
                             ConstructionStageInfo tempBuildingStage = ConstructionUtil.getConstructionStageInfo(
                                     i.next().getBuildingType());
@@ -496,23 +491,23 @@ implements Serializable {
         MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
 
         if (settlementConstructionValueCache == null) {
-            settlementConstructionValueCache = new ConcurrentHashMap<Integer, Double>();
+            settlementConstructionValueCache = new HashMap<>();
         }
         settlementConstructionValueCache.clear();
-        settlementConstructionValueCacheTime = (MarsClock) currentTime.clone();
+        settlementConstructionValueCacheTime = new MarsClock(currentTime);
 
         if (stageInfoValueCache == null) {
-            stageInfoValueCache = new ConcurrentHashMap<ConstructionStageInfoSkillKey, Double>();
+            stageInfoValueCache = new HashMap<>();
         }
         stageInfoValueCache.clear();
-        stageInfoValueCacheTime = (MarsClock) currentTime.clone();
+        stageInfoValueCacheTime = new MarsClock(currentTime);
 
         if (allStageInfoValueCache == null) {
-            allStageInfoValueCache = new ConcurrentHashMap<ConstructionStageInfoSkillKey, Double>();
+            allStageInfoValueCache = new HashMap<>();
         }
         allStageInfoValueCache.clear();
     }
-
+	
     /**
      * Prepare object for garbage collection.
      */
@@ -568,5 +563,16 @@ implements Serializable {
             
             return result;
         }
+        
+    	/**
+    	 * Gets the hash code for this object.
+    	 *
+    	 * @return hash code.
+    	 */
+    	@Override
+    	public int hashCode() {
+    		return super.hashCode();
+    	}
+
     }
 }

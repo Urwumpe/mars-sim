@@ -1,21 +1,42 @@
 <?xml version = "1.0" encoding = "UTF-8" standalone = "yes" ?>
 <!DOCTYPE vehicle-configuration [
-	<!ELEMENT vehicle-configuration (vehicle*, rover-name-list)>
-	<!ELEMENT vehicle (description?, drivetrain-efficiency, base-speed, 
-	empty-mass, crew-size?, cargo?, part-attachment?, sickbay?, lab?, 
+	<!ELEMENT vehicle-configuration (vehicle*)>
+	<!ELEMENT vehicle (description?, power-source, battery-module, fuel-cell-stack, drivetrain-efficiency, base-speed, base-power,
+	empty-mass, terrain-handling?, crew-size?, cargo?, part-attachment?, sickbay?, lab?,
 	airlock?, activity?)>
-	<!ATTLIST vehicle type CDATA #REQUIRED>
+	<!ATTLIST vehicle name CDATA #REQUIRED>
+
+	<!-- These are aligned with VehicleType enum-->
+	<!ATTLIST vehicle type (LUV|DELIVERY_DRONE|EXPLORER_ROVER|TRANSPORT_ROVER|CARGO_ROVER) #REQUIRED>
+
 	<!ATTLIST vehicle width CDATA #REQUIRED>
 	<!ATTLIST vehicle length CDATA #REQUIRED>
+	<!ATTLIST vehicle base-image CDATA #IMPLIED>
+
 	<!ELEMENT description (#PCDATA)>
+	
+	<!ELEMENT power-source EMPTY>
+	<!ATTLIST power-source type (FISSION_POWER_SOURCE|FUEL_POWER_SOURCE|THERMIONIC_NUCLEAR_POWER_SOURCE|SOLAR_POWER_SOURCE) #REQUIRED>
+	<!ATTLIST power-source fuel (NUCLEAR|METHANOL|METHANE|SOLAR) #REQUIRED>
+	<!ATTLIST power-source value CDATA #REQUIRED>
+ 
+
+	<!ELEMENT battery-module EMPTY>
+	<!ATTLIST battery-module number CDATA #REQUIRED>
+	<!ELEMENT fuel-cell-stack EMPTY>
+	<!ATTLIST fuel-cell-stack number CDATA #REQUIRED>
 	<!ELEMENT drivetrain-efficiency EMPTY>
 	<!ATTLIST drivetrain-efficiency value CDATA #REQUIRED>
 	<!ELEMENT base-speed EMPTY>
 	<!ATTLIST base-speed value CDATA #REQUIRED>
+	<!ELEMENT base-power EMPTY>
+	<!ATTLIST base-power value CDATA #REQUIRED>
 	<!ELEMENT empty-mass EMPTY>
 	<!ATTLIST empty-mass value CDATA #REQUIRED>
 	<!ELEMENT crew-size EMPTY>
 	<!ATTLIST crew-size value CDATA #REQUIRED>
+	<!ELEMENT terrain-handling EMPTY>
+	<!ATTLIST terrain-handling value CDATA #REQUIRED>
 	<!ELEMENT cargo (capacity*)>
 	<!ATTLIST cargo total-capacity CDATA #REQUIRED>
 	<!ELEMENT capacity EMPTY>
@@ -32,23 +53,20 @@
 	<!ATTLIST lab tech-level CDATA #REQUIRED>
 	<!ELEMENT tech-specialty EMPTY>
 	<!ATTLIST tech-specialty value CDATA #REQUIRED>
-	<!ELEMENT airlock EMPTY>
+	<!ELEMENT airlock (interior, exterior)>
 	<!ATTLIST airlock xloc CDATA #REQUIRED>
 	<!ATTLIST airlock yloc CDATA #REQUIRED>
-	<!ATTLIST airlock interior-xloc CDATA #REQUIRED>
-	<!ATTLIST airlock interior-yloc CDATA #REQUIRED>
-	<!ATTLIST airlock exterior-xloc CDATA #REQUIRED>
-	<!ATTLIST airlock exterior-yloc CDATA #REQUIRED>
+	<!ELEMENT interior EMPTY>
+	<!ATTLIST interior xloc CDATA #REQUIRED>
+	<!ATTLIST interior yloc CDATA #REQUIRED>
+	<!ELEMENT exterior EMPTY>
+	<!ATTLIST exterior xloc CDATA #REQUIRED>
+	<!ATTLIST exterior yloc CDATA #REQUIRED>
 	<!ELEMENT activity (activity-spot+)>
 	<!ELEMENT activity-spot EMPTY>
 	<!ATTLIST activity-spot type CDATA #REQUIRED>
 	<!ATTLIST activity-spot xloc CDATA #REQUIRED>
 	<!ATTLIST activity-spot yloc CDATA #REQUIRED>
-	
-	<!ELEMENT rover-name-list (rover-name*)>
-	<!ELEMENT rover-name EMPTY>
-	<!ATTLIST rover-name sponsor CDATA #REQUIRED>
-	<!ATTLIST rover-name value CDATA #REQUIRED>
 ]>
 
 <!--
@@ -61,116 +79,129 @@ http://www.nasa.gov/pdf/464826main_SEV_Concept_FactSheet.pdf
 3. Surface Mobility Technology Development: Pressurized Mars Rovers
 http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.121.575&rep=rep1&type=pdf
 
-4. For methane gas, 
-
-Specific energy is 55.5	MJ/kg, or 15,416 Wh/kg, or 15.416kWh / kg
-
+4. For methane gas,
+Specific energy is 55.5	MJ/kg, or 15,416 Wh/kg, or 15.416kWh/kg
 Energy density is 0.0364 MJ/L, 36.4 kJ/L or 10 Wh/L
- 
 Note : 1 MJ = 0.277778 kWh; 1 kWh = 3.6 MJ
- 
-5. Assume Solid Oxide Fuel Cell (SOFC) has 57% efficiency. 
- https://www.sciencedaily.com/releases/2012/05/120531165720.htm
- 
-6. According to Zubrin, it is estimated that a 1 tonne pressurized ground rover would require about 0.5 kg of
-methane/oxygen bipropellant to travel 1 km. Thus a 800 km round trip excursion would consume about 400 kg of
-propellant. 
-http://www.marspapers.org/paper/Zubrin_1991.pdf
 
- -->
- 
+5. Assume Solid Oxide Fuel Cell (SOFC) has 57% efficiency.
+https://www.sciencedaily.com/releases/2012/05/120531165720.htm
+
+6. According to Zubrin, it is estimated that a 1 tonne pressurized ground rover would require about 0.5 kg of
+methanol/oxygen bipropellant to travel 1 km. Thus a 800 km round trip excursion would consume about 400 kg of
+propellant.
+http://www.marspapers.org/paper/Zubrin_1991.pdf
+-->
+
 
 <vehicle-configuration>
-
-	<vehicle type="Explorer Rover" width="3.5" length="8.0">
+	<!-- The size of the rover [in m]. (required) -->
+	<vehicle name="Explorer Rover" type="EXPLORER_ROVER" width="3.5" length="8.0">
 		<!-- Note: the vehicle types used here must match those in message.properties -->
-		
-		<description>A rover for collecting rock samples from remote sites and ice prospecting.</description>
 
-		<!-- The efficiency of the vehicle's drivetrain. (kWh/km) (required) -->
+		<description>A rover for collecting rock samples from remote sites and ice prospecting.
+			The Explorer Rover is the only rover that has both a lab and a sick bay bed.</description>
+
+		<!-- The power source type for the vehicle (required) -->
 		<!-- Default: varied according to the type of vehicle -->
-		<drivetrain-efficiency value=".15" />
+		<!-- e.g. "Fission Power Source", "Fuel Power Source" -->
+		
+		<!-- The type of fuel that power source uses (required) -->
+		<!-- e.g. "Nuclear", "Methanol" -->
+		
+		<!-- The average value (could be in kW or kWh) provided by this power source (required) -->
+		<!-- e.g. "15.0" -->
+		<power-source type="FUEL_POWER_SOURCE" fuel="METHANOL" value="20.0"/>
+		
+		<!-- The number of battery modules for the vehicle [dimension-less].(required) -->
+		<!-- Default: varied according to the type of vehicle -->
+		<battery-module number="2" />
+		
+		<!-- The number of methanol fuel cell stacks for the vehicle [dimension-less].(required) -->
+		<!-- Default: varied according to the type of vehicle -->
+		<fuel-cell-stack number="4" />
+		
+		<!-- The efficiency of the vehicle's drivetrain [dimension-less]. (required) -->
+		<!-- Default: varied according to the type of vehicle -->
+		<drivetrain-efficiency value=".8" />
 
-		<!-- Base speed of rover (km/hr) (required) -->
+		<!-- Base speed of rover [km/hr](required) -->
 		<!-- Default: varies according to the type of vehicle -->
 		<base-speed value="30.0" />
-
-		<!-- Empty mass of rover (kg) (required) -->
+		
+		<!-- Average power exerted when operating at base speed under normal condition [kW](required) -->
+		<!-- Default: varies according to the type of vehicle -->
+		<base-power value="20.0" />
+		
+		<!-- Empty mass of rover [kg] (required) -->
 		<!-- Default: varies according to the type of vehicle  -->
-		<empty-mass value="2000.0" />
+		<empty-mass value="1100.0" />
 
+		<!-- How well does this vehicle handle terrain -->
+		<terrain-handling value="5.0"/>
+		
 		<!-- The crew size of an rover -->
 		<!-- Default: varies according to the type of vehicle -->
 		<crew-size value="4" />
-
+	
 		<!-- Cargo capacity list -->
 		<!-- See Rover.java for adding capacity for each resource -->
 		<!-- total-capacity: total cargo capacity of rover. (kg) -->
 		<!-- Default: varies according to the type of vehicle -->
-		<cargo total-capacity="2500.0">
+		<cargo total-capacity="2000.0">
 
-			<!-- If assuming a 10 sol excursion, each person would 
+			<!-- If assuming a 10 sol excursion, each person would
       			 consume the following : -->
 			<!--   Water : 30.0 kg -->
 			<!--    Food :  6.2 kg -->
 			<!-- Dessert :  3.0 kg -->
 			<!--  Oxygen :  8.4 kg -->
-
-			<!-- The methane cargo capacity of the rover (kg) -->
+			
 			<!-- Default: varies according to the type of vehicle -->
 			<!-- The H2 tank on Toyota Mirai has a 5 kg capacity http://www.mytoyotamirai.com/toyota-mirai-specifications/ -->
-			<capacity resource="methane" value="180.0" />
-
-			<!-- The oxygen cargo capacity of the rover (kg) -->
-			<!-- Default: varies according to the type of vehicle  -->
-			<capacity resource="oxygen" value="110.0" />
-
-			<!-- The oxygen cargo capacity of the rover (kg) -->
-			<!-- Default: varies according to the type of vehicle  -->
-			<capacity resource="nitrogen" value="110.0" />
+			<capacity resource="methanol" value="30.0" />
 			
-			<!-- The water cargo capacity of the rover (kg) -->
+			<!-- ratio of oxidizer to fuel is 1.5:1. Thus 300 kg methanol needs 450 kg oxygen -->
+			<!-- Assuming totalTripHours is 45 hrs, each person consumes .8 kg / 24.66 hrs * totalTripHours -> 1.65 kg -->
 			<!-- Default: varies according to the type of vehicle  -->
-			<capacity resource="water" value="400.0" />
+			<capacity resource="oxygen" value="60.0" />
 
-			<!-- The food cargo capacity of the rover (kg) -->
 			<!-- Default: varies according to the type of vehicle  -->
-			<capacity resource="food" value="256.0" />
+			<capacity resource="nitrogen" value="1.0" />
 
-			<!-- The dessert cargo capacity of the rover (kg) -->
+			<!-- Default: varies according to the type of vehicle  -->
+			<capacity resource="carbon dioxide" value="1.0" />
+
+			<!-- Default: varies according to the type of vehicle  -->
+			<capacity resource="water" value="100.0" />
+
+			<!-- Default: varies according to the type of vehicle  -->
+			<capacity resource="food" value="20.0" />
+
 			<!-- Default: varies according to the type of vehicle -->
-			<capacity resource="dessert" value="120.0" />
+			<!--<capacity resource="dessert" value="120.0" />-->
 
-			<!-- The rock samples cargo capacity of the rover (kg) -->
-			<!-- See resources.txt -->
 			<!-- Default: varies according to the type of vehicle -->
-			<!-- <capacity resource="Rock Samples" value="2000.0" /> -->
+			<capacity resource="rock samples" value="400.0" />
 
-			<!-- The ice cargo capacity of the rover (kg) -->
-			<!-- See resources.txt -->
 			<!-- Default: varies according to the type of vehicle -->
-			<!-- <capacity resource="Ice" value="2000.0" /> -->
+			<capacity resource="ice" value="400.0" />
 
-			<!-- The food waste capacity of the rover (kg) -->
 			<!-- Default: varies according to the type of vehicle  -->
-			<capacity resource="food waste" value="40.0" />
-			
-			<!-- The solid waste capacity of the rover (kg) -->
-			<!-- Default: varies according to the type of vehicle  -->
-			<capacity resource="solid waste" value="80.0" />	
+			<capacity resource="food waste" value="10.0" />
 
-			<!-- The toxic waste capacity of the rover (kg) -->
 			<!-- Default: varies according to the type of vehicle  -->
-			<capacity resource="toxic waste" value="40.0" />	
+			<capacity resource="solid waste" value="20.0" />
 
-			<!-- The grey water capacity of the rover (kg) -->
 			<!-- Default: varies according to the type of vehicle  -->
-			<capacity resource="grey water" value="240.0" />	
+			<capacity resource="toxic waste" value="2.0" />
 
-			<!-- The black water capacity of the rover (kg) -->
 			<!-- Default: varies according to the type of vehicle  -->
-			<capacity resource="black water" value="60.0" />	
-	
+			<capacity resource="grey water" value="20.0" />
+
+			<!-- Default: varies according to the type of vehicle  -->
+			<capacity resource="black water" value="5.0" />
+
 		</cargo>
 
 		<!-- Sickbay -->
@@ -190,9 +221,11 @@ http://www.marspapers.org/paper/Zubrin_1991.pdf
 		<!-- xloc, yloc: the relative X/Y location inside the airlock. -->
 		<!-- interior-xloc, interior-yloc: the relative X/Y location inside the vehicle. -->
 		<!-- exterior-xloc, exterior-yloc: the relative X/Y location outside the vehicle. -->
-		<airlock xloc="-1.25" yloc="0.0" interior-xloc="-.75" interior-yloc="0.0" exterior-xloc="-2.75"
-		exterior-yloc="0.0" />
-
+		<airlock xloc="-1.25" yloc="0.0">
+			<interior xloc="-0.75" yloc="0.0"/>
+			<exterior xloc="-2.75" yloc="0.0"/>
+	    </airlock>
+	    
 		<!-- Activity spots -->
 		<!-- Locations for people to perform various activities within the vehicle. -->
 		<activity>
@@ -206,32 +239,97 @@ http://www.marspapers.org/paper/Zubrin_1991.pdf
 
 	</vehicle>
 
-	<!-- Transport rover -->
-	<vehicle type="Transport Rover" width="3.5" length="9.5">
-		<description>A rover for transporting people from one settlement to another.</description>
-		<drivetrain-efficiency value=".18" />
-		<base-speed value="25.0" />
-		<empty-mass value="3000.0" />
-		<crew-size value="8" />
-		<cargo total-capacity="3500.0">
-			<capacity resource="methane" value="220.0" />
-			<capacity resource="oxygen" value="176.0" />
-			<capacity resource="nitrogen" value="176.0" />			
-			<capacity resource="water" value="800.0" />
-			<capacity resource="food" value="512.0" />
-			<capacity resource="dessert" value="240.0" />
+	<vehicle name="Long Range Explorer" type="EXPLORER_ROVER" width="3.5" length="8.0" base-image="long range explorer">
+		<description>A rover for collecting rock samples from remote sites and ice prospecting for long range.</description>
+		<power-source type="FUEL_POWER_SOURCE" fuel="METHANOL" value="15.0"/>		
+		<battery-module number="3" />
+		<fuel-cell-stack number="4" />
+		<drivetrain-efficiency value=".85" />
+		<base-speed value="30.0" />
+		<base-power value="15" />
+		<empty-mass value="1200.0" />
+		<terrain-handling value="6.0"/>
+		<crew-size value="4" />
+		<cargo total-capacity="2000.0">
+			<capacity resource="methanol" value="40.0" />
+			<capacity resource="oxygen" value="80.0" />
+			
+			<capacity resource="nitrogen" value="2.0" />
+			<capacity resource="carbon dioxide" value="2.0" />
+			
+			<capacity resource="water" value="200.0" />
+			<capacity resource="food" value="40.0" />
+			
+			<capacity resource="rock samples" value="400.0" />
+			<capacity resource="ice" value="400.0" />
+			
+			<capacity resource="food waste" value="8.0" />
+			<capacity resource="solid waste" value="40.0" />
+			<capacity resource="toxic waste" value="4.0" />
+			<capacity resource="grey water" value="40.0" />
+			<capacity resource="black water" value="10.0" />
+		</cargo>
 
-			<capacity resource="food waste" value="80.0" />
-			<capacity resource="solid waste" value="160.0" />
-			<capacity resource="toxic waste" value="80.0" />	
+		<sickbay tech-level="2" beds="1" />
+
+		<lab tech-level="1">
+			<!-- Science tech specialty -->
+			<tech-specialty value="Areology" />
+			<tech-specialty value="Biology" />
+		</lab>
+
+		<airlock xloc="-1.25" yloc="0.0">
+			<interior xloc="-0.75" yloc="0.0"/>
+			<exterior xloc="-2.75" yloc="0.0"/>
+	    </airlock>
+	    
+		<activity>
+			<activity-spot type="operator" xloc=".45" yloc="2.7" />
+			<activity-spot type="passenger" xloc="-.45" yloc="2.7" />
+			<activity-spot type="passenger" xloc=".45" yloc="1.7" />
+			<activity-spot type="passenger" xloc="-.45" yloc="1.7" />
+			<activity-spot type="sickbay" xloc="-.6" yloc="-.2" />
+			<activity-spot type="lab" xloc=".25" yloc=".3" />
+		</activity>
+	</vehicle>
+
+	<!-- Transport rover -->
+	<vehicle name="Transport Rover" type="TRANSPORT_ROVER" width="3.5" length="9.5">
+		<description>A rover for transporting people from one settlement to another
+			and can accommodate up to 8 people.</description>
+		<power-source type="FUEL_POWER_SOURCE" fuel="METHANOL" value="20.0"/>			
+		<battery-module number="4" />
+		<fuel-cell-stack number="5" />			
+		<drivetrain-efficiency value=".85" />
+		<base-speed value="25.0" />
+		<base-power value="20" />
+		<empty-mass value="1700.0" />
+		<terrain-handling value="2.5"/>
+		<crew-size value="8" />
+		<cargo total-capacity="4000.0">
+			<capacity resource="methanol" value="400.0" />
+			<capacity resource="oxygen" value="800.0" />
 			
-			<capacity resource="grey water" value="480.0" />
-			<capacity resource="black water" value="120.0" />
+			<capacity resource="nitrogen" value="16.0" />
+			<capacity resource="carbon dioxide" value="8.0" />
 			
+			<capacity resource="water" value="2500.0" />
+			<capacity resource="food" value="250.0" />
+			
+			<capacity resource="rock samples" value="400.0" />
+			<capacity resource="ice" value="400.0" />
+			
+			<capacity resource="food waste" value="16.0" />
+			<capacity resource="solid waste" value="80.0" />
+			<capacity resource="toxic waste" value="16.0" />
+			<capacity resource="grey water" value="200.0" />
+			<capacity resource="black water" value="50.0" />
 		</cargo>
 		<sickbay tech-level="3" beds="2" />
-		<airlock xloc="-1.25" yloc="0.0" interior-xloc="-.75" interior-yloc="0.0" exterior-xloc="-2.75"
-		exterior-yloc="0.0" />
+		<airlock xloc="-1.25" yloc="0.0">
+			<interior xloc="-0.75" yloc="0.0"/>
+			<exterior xloc="-2.75" yloc="0.0" />
+		</airlock>
 		<activity>
 			<activity-spot type="operator" xloc=".45" yloc="4.3" />
 			<activity-spot type="passenger" xloc="-.45" yloc="4.3" />
@@ -246,30 +344,42 @@ http://www.marspapers.org/paper/Zubrin_1991.pdf
 	</vehicle>
 
 	<!-- Cargo rover -->
-	<vehicle type="Cargo Rover" width="4.0" length="8.0">
-		<description>A rover for transporting cargo from one settlement to another.</description>
-		<drivetrain-efficiency value=".2" />
+	<vehicle name="Cargo Rover" type="CARGO_ROVER" width="4.0" length="8.0">
+		<description>A rover for transporting cargo from one settlement to another
+			and can have fit two people only to maximize cargo space.</description>
+		<power-source type="FUEL_POWER_SOURCE" fuel="METHANOL" value="20.0"/>
+		<battery-module number="5" />
+		<fuel-cell-stack number="6" />
+		<drivetrain-efficiency value=".9" />
 		<base-speed value="25.0" />
-		<empty-mass value="2500.0" />
+		<base-power value="20" />		
+		<empty-mass value="2000.0" />
+		<terrain-handling value="2.5"/>
 		<crew-size value="2" />
-		<cargo total-capacity="5000.0">
-			<capacity resource="methane" value="260.0" />
-			<capacity resource="oxygen" value="66.0" />
-			<capacity resource="nitrogen" value="66.0" />		
-			<capacity resource="water" value="200.0" />
-			<capacity resource="food" value="128.0" />
-			<capacity resource="dessert" value="60" />
-
-			<capacity resource="food waste" value="20.0" />
-			<capacity resource="solid waste" value="40.0" />
-			<capacity resource="toxic waste" value="20.0" />	
+		<cargo total-capacity="6000.0">
+			<capacity resource="methanol" value="400.0" />
+			<capacity resource="oxygen" value="800.0" />
 			
-			<capacity resource="grey water" value="120.0" />
-			<capacity resource="black water" value="30.0" />
+			<capacity resource="nitrogen" value="16.0" />
+			<capacity resource="carbon dioxide" value="8.0" />
+			
+			<capacity resource="water" value="2500.0" />
+			<capacity resource="food" value="250.0" />
+			
+			<capacity resource="rock samples" value="400.0" />
+			<capacity resource="ice" value="400.0" />
+			
+			<capacity resource="food waste" value="16.0" />
+			<capacity resource="solid waste" value="80.0" />
+			<capacity resource="toxic waste" value="16.0" />
+			<capacity resource="grey water" value="200.0" />
+			<capacity resource="black water" value="50.0" />
 		</cargo>
 		<sickbay tech-level="1" beds="1" />
-		<airlock xloc="-1.5" yloc="0.0" interior-xloc="-1.0" interior-yloc="0.0" exterior-xloc="-3.0"
-		exterior-yloc="0.0" />
+		<airlock xloc="-1.5" yloc="0.0">
+			<interior xloc="-1.0" yloc="0.0"/>
+			<exterior xloc="-3.0" yloc="0.0" />
+		</airlock>
 		<activity>
 			<activity-spot type="operator" xloc=".5" yloc="2.9" />
 			<activity-spot type="passenger" xloc="-.5" yloc="2.9" />
@@ -277,14 +387,25 @@ http://www.marspapers.org/paper/Zubrin_1991.pdf
 		</activity>
 	</vehicle>
 
-	<!-- Light Utility Vehicle -->
-	<vehicle type="Light Utility Vehicle" width="1.7" length="2.55">
+	<!-- Light Utility Vehicle
+		 See conceptual vehicles for Construction with Regolith https://ntrs.nasa.gov/api/citations/20170002067/downloads/20170002067.pdf
+	-->
+	<vehicle name="Light Utility Vehicle" type="LUV" width="1.7" length="2.55">
 		<description>A small, unpressurized, one crew utility vehicle with attachable parts.</description>
-		<drivetrain-efficiency value=".35" />
-		<base-speed value="30.0" />
-		<empty-mass value="300.0" />
+		<power-source type="FUEL_POWER_SOURCE" fuel="METHANOL" value="10.0"/>
+		<battery-module number="1" />
+		<fuel-cell-stack number="1" />
+		<drivetrain-efficiency value=".9" />
+		<base-speed value="20.0" />
+		<base-power value="10" />		
+		<empty-mass value="270.0" />
+		<terrain-handling value="10.0"/>
 		<crew-size value="1" />
-		<part-attachment number-slots="2">
+		<cargo total-capacity="300.0">
+			<capacity resource="methanol" value="10.0" />
+			<capacity resource="oxygen" value="15.0" />		
+		</cargo>
+		<part-attachment number-slots="3">
             <part name="bulldozer blade" />
 			<part name="pneumatic drill" />
 			<part name="backhoe" />
@@ -297,197 +418,21 @@ http://www.marspapers.org/paper/Zubrin_1991.pdf
 		</activity>
 	</vehicle>
 
-	<!-- remote controlled prospecting rover
-	<vehicle type="remote controlled prospector" width="1.5" length="2.5">
-		<description>used for automatic mineral prospecting</description>
-		<drivetrain-efficiency value="1.0" />
-		<base-speed value="12.0" />
-		<empty-mass value="250.0" />
+	<!-- Delivery Drone -->
+	<vehicle name="Delivery Drone" type="DELIVERY_DRONE" width="1.75" length="1.75">
+		<description>An unmanned aerial vehicle used for transport of light cargo between settlements</description>
+		<power-source type="FUEL_POWER_SOURCE" fuel="METHANOL" value="20.0"/>
+		<battery-module number="1" />
+		<fuel-cell-stack number="2" />
+		<drivetrain-efficiency value=".95" />
+		<base-speed value="100.0" />
+		<base-power value ="20" />		
+		<empty-mass value="160.0" />
 		<crew-size value="0" />
-		<cargo total-capacity="500.0">
-			<capacity resource="methane" value="100.0" />
+		<cargo total-capacity="600.0">
+			<capacity resource="methanol" value="200.0" />
+			<capacity resource="oxygen" value="300.0" />
+			<capacity resource="water" value="300.0" />			
 		</cargo>
-	</vehicle>-->
-<!--
-	<vehicle type="rc dirigible" width="5.0" length="15.0">
-		<description>
-			remote controlled lighter-than-air craft for use
-			in atmospheric research or as communications relay.
-			can only function in a certain range of temperature
-			and air pressure.
-		</description>
 	</vehicle>
--->
-	<!-- low mars orbit atmosphere space craft
-	<vehicle type="sounding rocket" width="0.5" length="3.0" >
-		<description>
-			a small rocket for atmospheric research
-			or for delivering payloads to surface
-			locations by hard landing
-		</description>
-		<drivetrain-efficiency value="1.0"/>
-		<base-speed value="10.0" />
-		<empty-mass value="200.0"/>
-		<crew-size value="0"/>
-		<cargo total-capacity="500.0">
-			<capacity resource="oxygen" value="150"/>
-			<capacity resource="hydrogen" value="150.0"/>
-		</cargo>
-		<part-attachment number-slots="1">
-			<part name="satellite dish"/>
-			<part name="algae tank"/>
-		</part-attachment>
-	</vehicle>
--->
-	<!-- List of rover names -->
-	<rover-name-list>
-	
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Huoxing" />  <!-- Chinese for "Mars" -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Zidan" />    <!-- Chinese for bullet -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Huojian" />  <!-- Chinese for rocket -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Bolang" />   <!-- Chinese for wave front -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Lingxian" /> <!-- Chinese for leading the way -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="guoLu" />    <!-- Chinese for passing through -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Youli" />    <!-- Chinese for traveling -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Changtu" />   <!-- Chinese for long journey" -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Hangcheng" /> <!-- Chinese for voyage -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Youke" />     <!-- Chinese for traveler -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="YouShan" />   <!-- Chinese for treking mountain -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Aoxiang" />   <!-- Chinese for soaring -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Piaofu" />    <!-- Chinese for hovering -->		
-		<rover-name sponsor="China National Space Administration (CNSA)" value="Gaofei" />    <!-- Chinese for flying up -->
-								
-		<rover-name sponsor="Canadian Space Agency (CSA)" value="Desert Pearl" />	
-		<rover-name sponsor="Canadian Space Agency (CSA)" value="Desert Rose" />
-		<rover-name sponsor="Canadian Space Agency (CSA)" value="Deimos Tide" />
-		<rover-name sponsor="Canadian Space Agency (CSA)" value="Desert Star" />
-		<rover-name sponsor="Canadian Space Agency (CSA)" value="Drift Wood" />
-		<rover-name sponsor="Canadian Space Agency (CSA)" value="Desertfarer" />
-		<rover-name sponsor="Canadian Space Agency (CSA)" value="Dream Chaser" />	
-		<rover-name sponsor="Canadian Space Agency (CSA)" value="Dune Drifter" />
-		<rover-name sponsor="Canadian Space Agency (CSA)" value="Dune Runner" />	
-		
-		
-		<rover-name sponsor="European Space Agency (ESA)" value="al-Mirrikh" /> <!-- Arabic/Persian for "Mars" -->
-		<rover-name sponsor="European Space Agency (ESA)" value="Areos Aster" /> <!-- Greek for "star of Ares" -->
-		<rover-name sponsor="European Space Agency (ESA)" value="Ariane" /> 
-		<rover-name sponsor="European Space Agency (ESA)" value="Beagle IV" />
-		<rover-name sponsor="European Space Agency (ESA)" value="Bedouin" />		
-		<rover-name sponsor="European Space Agency (ESA)" value="Blodstjarna" /> <!-- Viking for "Mars" (not certain) -->
-		<rover-name sponsor="European Space Agency (ESA)" value="Bahram" /> <!-- Ancient Persian for "Mars" -->
-		
-		<rover-name sponsor="European Space Agency (ESA)" value="Autobahn" />	<!-- German for Motorway  -->
-		<rover-name sponsor="European Space Agency (ESA)" value="Fahrzeug" />	<!-- German for vehicle -->
- 		<rover-name sponsor="European Space Agency (ESA)" value="Gaspedal" />	<!-- German for Accelerator  -->	
-		<rover-name sponsor="European Space Agency (ESA)" value="Gondel" />		<!-- German for gondola -->		
-		<rover-name sponsor="European Space Agency (ESA)" value="Kutsche" />	<!-- German for carriage -->		
- 		<rover-name sponsor="European Space Agency (ESA)" value="Schlitten" />	<!-- German for carriage -->	
-				
-		<rover-name sponsor="European Space Agency (ESA)" value="Nergal" />     <!-- Babylonian for "Mars" -->		
-		
-		<rover-name sponsor="European Space Agency (ESA)" value="Merih" />      <!-- Turkish for "Mars" -->	
-		<rover-name sponsor="European Space Agency (ESA)" value="Sakit" />      <!-- Ancient Turkish for "Mars" -->
-		
-		<rover-name sponsor="European Space Agency (ESA)" value="Voiture " />	<!-- French for vehicle -->		
-						
-				
-		<rover-name sponsor="Indian Space Research Organisation (ISRO)" value="Agni" /> <!-- Hindi for "fire" -->
-		<rover-name sponsor="Indian Space Research Organisation (ISRO)" value="Naag" /> <!-- Hindi for "snake" -->		
-		<rover-name sponsor="Indian Space Research Organisation (ISRO)" value="Angaraka" /> <!-- Mars in Jyotish astrology (alternate name) -->
-		<rover-name sponsor="Indian Space Research Organisation (ISRO)" value="Mangala" /> <!--  Sanskrit for "Mars" in Jyotish astrology -->
-		<rover-name sponsor="Indian Space Research Organisation (ISRO)" value="Rahu" /> <!-- Hindi for "Mars" (not certain) -->
-		<rover-name sponsor="Indian Space Research Organisation (ISRO)" value="Vayu" /> <!-- Hindi for "wind" -->
-		<rover-name sponsor="Indian Space Research Organisation (ISRO)" value="Prithvi" /> <!-- Hindi for "earth" -->
-		<rover-name sponsor="Indian Space Research Organisation (ISRO)" value="Reth" /> <!-- Hindi for "sand" -->
-		<rover-name sponsor="Indian Space Research Organisation (ISRO)" value="Vikram" /> <!-- a male Hindu/Sanskrit name for being valorous, wise, brave and strong as well as victorious-->
-	
-	
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Jyu-Sokosha" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Ha-Go" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Ke-To" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Ke-Nu" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Shinhoto" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Ro-Go" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="So-Ki" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="So-Da" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Ku-Se" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Ke-Ri" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Ho-To" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Ke-Ho" />										
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Chi-Ha" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Chi-He" />		
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Chi-To" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Chi-Ri" />
-		<rover-name sponsor="Japan Aerospace Exploration Agency (JAXA)" value="Shi-Ki" />		
-	 
-		<rover-name sponsor="Mars Society (MS)" value="Dusty Star" />
-		<rover-name sponsor="Mars Society (MS)" value="Dust Storm" />
-		<rover-name sponsor="Mars Society (MS)" value="Dust Sprite" />
-		<rover-name sponsor="Mars Society (MS)" value="Martian Escape" />		
-		<rover-name sponsor="Mars Society (MS)" value="Martian Cloud" />	
-		<rover-name sponsor="Mars Society (MS)" value="Ma'adim" /> <!-- Hebrew for "Mars" -->
-		<rover-name sponsor="Mars Society (MS)" value="Red Mariner" />
-		<rover-name sponsor="Mars Society (MS)" value="Red Moon" />
-		<rover-name sponsor="Mars Society (MS)" value="Ridge Runner" />		
-		<rover-name sponsor="Mars Society (MS)" value="Shooting Star" />
-		<rover-name sponsor="Mars Society (MS)" value="Sand Dancer" />
-		<rover-name sponsor="Mars Society (MS)" value="Spice Trader" />
-		<rover-name sponsor="Mars Society (MS)" value="Solitude" />
-		<rover-name sponsor="Mars Society (MS)" value="Sand Spirit" />		
-		<rover-name sponsor="Mars Society (MS)" value="Sand Crawler" />
-		<rover-name sponsor="Mars Society (MS)" value="Sojourner II" />
-		<rover-name sponsor="Mars Society (MS)" value="Spirit II" />
-		<rover-name sponsor="Mars Society (MS)" value="Sun Dancer" />
-		<rover-name sponsor="Mars Society (MS)" value="Wind Runner" />
-		<rover-name sponsor="Mars Society (MS)" value="Windstorm" />
-		
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Agartha" /> <!-- Agartha is a legendary city that is said to be located in the Earth's core -->			
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Atlanta" /> <!-- The meaning of Atlanta is secure, immovable -->
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Crater Crab" />		
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Desert Rat" /> 
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Firefly" />
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Fire Star" />	
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Fremen Wanderer" />			
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Liberty" />
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Loonie" /> 	
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Jetson" /> 
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Marina" /> 			
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Opportunity II" />
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Buggy" /> 	
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Gemini" /> 
-		<rover-name sponsor="National Aeronautics and Space Administration (NASA)" value="Mercury" /> 
-					
-		<rover-name sponsor="Roscosmos (RKA)" value="Chizhevsky" />
-		<rover-name sponsor="Roscosmos (RKA)" value="Lomonosov" />
-		<rover-name sponsor="Roscosmos (RKA)" value="Lvov" />		
-		<rover-name sponsor="Roscosmos (RKA)" value="Obruchev" />
-		<rover-name sponsor="Roscosmos (RKA)" value="Tatishchev" />
-		<rover-name sponsor="Roscosmos (RKA)" value="Vernadsky" />	
-		<rover-name sponsor="Roscosmos (RKA)" value="Chikhachyov" />
-		<rover-name sponsor="Roscosmos (RKA)" value="Dokuchaev" />
-		<rover-name sponsor="Roscosmos (RKA)" value="Karpinsky" />	
-		<rover-name sponsor="Roscosmos (RKA)" value="Middendorf" />
-		<rover-name sponsor="Roscosmos (RKA)" value="Shirshov" />
-		<rover-name sponsor="Roscosmos (RKA)" value="Shokalsky" />					
-		<rover-name sponsor="Roscosmos (RKA)" value="Tikhonov" />
-		<rover-name sponsor="Roscosmos (RKA)" value="Ivanov" />
-		<rover-name sponsor="Roscosmos (RKA)" value="Maleev" />
-									
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Desert Fox" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Gypsea" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Nomad" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Oasis" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Odyssey" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Osprey" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Drifter" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Princess" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Serenity" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Mobile A" />			
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Mobile B" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Mobile Z" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Boca" />
-		<rover-name sponsor="Space Exploration Technologies (SpaceX)" value="Ironman" />
-				
-	</rover-name-list>
-
 </vehicle-configuration>

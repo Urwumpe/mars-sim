@@ -1,37 +1,43 @@
-/**
+/*
  * Mars Simulation Project
  * Rover.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-06-05
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.vehicle;
 
-import java.awt.geom.Point2D;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.LifeSupportInterface;
 import org.mars_sim.msp.core.LocalAreaUtil;
-import org.mars_sim.msp.core.LogConsolidated;
+import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.air.AirComposition;
+import org.mars_sim.msp.core.data.UnitSet;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.PersonConfig;
 import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.mission.MissionType;
+import org.mars_sim.msp.core.person.ai.mission.Mission;
+import org.mars_sim.msp.core.person.ai.mission.RoverMission;
+import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
+import org.mars_sim.msp.core.person.ai.task.LoadingController;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.resource.AmountResource;
+import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Airlock;
-import org.mars_sim.msp.core.structure.CompositionOfAir;
 import org.mars_sim.msp.core.structure.Lab;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.building.function.SystemType;
 import org.mars_sim.msp.core.time.ClockPulse;
 
 /**
@@ -42,65 +48,89 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
-	
-	private static Logger logger = Logger.getLogger(Rover.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+
+	// default logger.
+	private static final SimLogger logger = SimLogger.getLogger(Rover.class.getName());
 
 	/** The fuel range modifier. */
 	public static final double FUEL_RANGE_FACTOR = 0.95;
-	/** The mission range modifier. */  
+	/** The mission range modifier. */
 	public static final double MISSION_RANGE_FACTOR = 1.9;
 	/** The reference small amount of resource. */
 	public static final double SMALL_AMOUNT = 0.1;
 	/** The amount of work time to perform maintenance (millisols) */
-	public static final double MAINTENANCE_WORK_TIME = 500D;
+	public static final double MAINTENANCE_WORK_TIME = 100D;
 
 	// Note: 34 kPa (5 psi) is chosen for the composition of oxygen inside a settlement at 58.8%.
 	/** Rate of change of temperature in degree celsius. */
-	private static final double RATE_OF_CHANGE_OF_C_PER_MILLISOL = 0.0005D; 
+	private static final double RATE_OF_CHANGE_OF_C_PER_MILLISOL = 0.0005D;
 	/** Rate of change of air pressure (kPa). */
-	private static final double RATE_OF_CHANGE_OF_kPa_PER_MILLISOL = 0.0005D; 
+	private static final double RATE_OF_CHANGE_OF_kPa_PER_MILLISOL = 0.0005D;
 	/** The factitious temperature flow [deg C per millisols] when connected to a settlement */
-	private static final double TEMPERATURE_FLOW_PER_MILLISOL = 0.01D; 
+	private static final double TEMPERATURE_FLOW_PER_MILLISOL = 0.01D;
 	/** The factitious air pressure flow [kPa per millisols] when connected to a settlement */
-	private static final double AIR_PRESSURE_FLOW_PER_MILLISOL = 0.01D; 
-	
+	private static final double AIR_PRESSURE_FLOW_PER_MILLISOL = 0.01D;
+
 	/** Normal air pressure (kPa). */
-	private static final double NORMAL_AIR_PRESSURE = 17; //20.7; //34.7D; 
+	private static final double NORMAL_AIR_PRESSURE = 17; //20.7; //34.7D;
 	/** Normal temperature (celsius). */
 	private static final double NORMAL_TEMP = 22.5D;
+
+	public static final int OXYGEN_ID = ResourceUtil.oxygenID;
+	public static final int NITROGEN_ID = ResourceUtil.nitrogenID;
+	public static final int CO2_ID = ResourceUtil.co2ID;
+	public static final int WATER_ID = ResourceUtil.waterID;
+//	public static final int METHANE_ID = ResourceUtil.methaneID;
+	public static final int METHANOL_ID = ResourceUtil.methanolID;
+	public static final int FOOD_ID = ResourceUtil.foodID;
+
+	public static final int FOOD_WASTE_ID = ResourceUtil.foodWasteID;
+	public static final int SOLID_WASTE_ID = ResourceUtil.solidWasteID;
+	public static final int TOXIC_WASTE_ID = ResourceUtil.toxicWasteID;
+	public static final int GREY_WATER_ID = ResourceUtil.greyWaterID;
+	public static final int BLACK_WATER_ID = ResourceUtil.blackWaterID;
+
+	public static final int ROCK_SAMPLES_ID = ResourceUtil.rockSamplesID;
+	public static final int ICE_ID = ResourceUtil.iceID;
+	
+	/** The ratio of the amount of oxygen inhaled to the amount of carbon dioxide expelled. */
+	private static final double GAS_RATIO;
+	/** The minimum required O2 partial pressure. At 11.94 kPa (1.732 psi) */
+	private static final double MIN_O2_PRESSURE;
+	
+	public static final AmountResource METHANOL_AR = ResourceUtil.methanolAR;
 	
 	// Data members
 	/** The rover's capacity for crew members. */
 	private int crewCapacity = 0;
 	/** The rover's capacity for robot crew members. */
 	private int robotCrewCapacity = 0;
-	
-	/** The minimum required O2 partial pressure. At 11.94 kPa (1.732 psi)  */
-	private double min_o2_pressure;
+
+	/** The capacity of O2 in this rover (kg)  */
+	private double oxygenCapacity;
+	/** The rover's internal air pressure. */
+	private double airPressure = 0; //NORMAL_AIR_PRESSURE;
+	/** The rover's internal temperature. */
+	private double temperature = 0; //NORMAL_TE
+	/** The rover's total crew internal volume. */
+	private double cabinAirVolume;
 	/** The full O2 partial pressure if at full tank. */
 	private double fullO2PartialPressure;
 	/** The nominal mass of O2 required to maintain the nominal partial pressure of 20.7 kPa (3.003 psi)  */
 	private double massO2NominalLimit;
 	/** The minimum mass of O2 required to maintain right above the safety limit of 11.94 kPa (1.732 psi)  */
 	private double massO2MinimumLimit;
-	/** The capacity of O2 in this rover (kg)  */
-	private double oxygenCapacity;
-	/** The rover's internal air pressure. */
-	private double airPressure = 0; //NORMAL_AIR_PRESSURE;
-	/** The rover's internal temperature. */
-	private double temperature = 0; //NORMAL_TEMP;
-	/** The rover's cargo capacity */
-	private double cargoCapacity = 0;
-	/** The rover's total crew internal volume. */
-	private double cabinAirVolume;
 
 	/** The rover's lab activity spots. */
-	private List<Point2D> labActivitySpots;
+	private List<LocalPosition> labActivitySpots;
 	/** The rover's sick bay activity spots. */
-	private List<Point2D> sickBayActivitySpots;
-	
+	private List<LocalPosition> sickBayActivitySpots;
+
+	/** The rover's occupants. */
+	private Set<Person> occupants;
+	/** The rover's robot occupants. */
+	private Set<Robot> robotOccupants;
+
 	/** The rover's airlock. */
 	private Airlock airlock;
 	/** The rover's lab. */
@@ -109,130 +139,102 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 	private SickBay sickbay;
 	/** The vehicle the rover is currently towing. */
 	private Vehicle towedVehicle;
+	/** The light utility vehicle currently docked at the rover. */
+	private LightUtilityVehicle luv;
 
+	static {
+		double o2Consumed = simulationConfig.getPersonConfig().getHighO2ConsumptionRate();
+		double cO2Expelled = simulationConfig.getPersonConfig().getCO2ExpelledRate();
+		GAS_RATIO = cO2Expelled/o2Consumed;
+		
+		MIN_O2_PRESSURE = simulationConfig.getPersonConfig().getMinSuitO2Pressure();
+	}
+	
 	/**
 	 * Constructs a Rover object at a given settlement
-	 * 
+	 *
 	 * @param name        the name of the rover
-	 * @param type the configuration type of the vehicle.
+	 * @param spec the configuration type of the vehicle.
 	 * @param settlement  the settlement the rover is parked at
 	 */
-	public Rover(String name, String type, Settlement settlement) {
+	public Rover(String name, VehicleSpec spec, Settlement settlement) {
 		// Use GroundVehicle constructor
-		super(name, type, settlement, MAINTENANCE_WORK_TIME);
+		super(name, spec, settlement, MAINTENANCE_WORK_TIME);
 
-		// Add scope to malfunction manager.
-
-		// if (config.hasLab(description))
-		// malfunctionManager.addScopeString("Laboratory");
-		// if (config.hasSickbay(description))
-		// malfunctionManager.addScopeString("Sickbay");
+		occupants = new UnitSet<>();
+		robotOccupants = new UnitSet<>();
 
 		// Set crew capacity
-		crewCapacity = vehicleConfig.getCrewSize(type);
+		crewCapacity = spec.getCrewSize();
 		robotCrewCapacity = crewCapacity;
-		// Get inventory object
-		Inventory inv = getInventory();
 
-		// Set total cargo capacity
-		cargoCapacity = vehicleConfig.getTotalCapacity(type);
-		// Set inventory total mass capacity.
-		inv.addGeneralCapacity(cargoCapacity);
-		
 		// Gets the estimated cabin compartment air volume.
-		cabinAirVolume = vehicleConfig.getEstimatedAirVolume(type);
+		cabinAirVolume =  .8 * spec.getLength() * spec.getWidth() * 2D;
+		oxygenCapacity = spec.getCargoCapacity(ResourceUtil.oxygenID);
 
-		oxygenCapacity = vehicleConfig.getCargoCapacity(type, LifeSupportInterface.OXYGEN);
-		min_o2_pressure = personConfig.getMinSuitO2Pressure();
-		fullO2PartialPressure = Math.round(CompositionOfAir.KPA_PER_ATM * oxygenCapacity / CompositionOfAir.O2_MOLAR_MASS 
-				* CompositionOfAir.R_GAS_CONSTANT / cabinAirVolume*1_000.0)/1_000.0;
-		massO2MinimumLimit = Math.round(min_o2_pressure / fullO2PartialPressure * oxygenCapacity*10_000.0)/10_000.0;
-		massO2NominalLimit =Math.round( NORMAL_AIR_PRESSURE / min_o2_pressure * massO2MinimumLimit*10_000.0)/10_000.0;
-		 
-//		logger.config(type + " : full tank O2 partial pressure is " + fullO2PartialPressure + " kPa");
-//		logger.config(type + " : minimum mass limit of O2 (above the safety limit) is " + massO2MinimumLimit  + " kg");
-//		logger.config(type + " : nomimal mass limit of O2 is " + massO2NominalLimit  + " kg");
+		fullO2PartialPressure = Math.round(AirComposition.getOxygenPressure(oxygenCapacity, cabinAirVolume)*1_000.0)/1_000.0;
+		massO2MinimumLimit = Math.round(MIN_O2_PRESSURE / fullO2PartialPressure * oxygenCapacity*10_000.0)/10_000.0;
+		massO2NominalLimit =Math.round( NORMAL_AIR_PRESSURE / MIN_O2_PRESSURE * massO2MinimumLimit*10_000.0)/10_000.0;
 		
-		// Set inventory resource capacities.
-		inv.addAmountResourceTypeCapacity(ResourceUtil.methaneID, vehicleConfig.getCargoCapacity(type, ResourceUtil.METHANE));
-		inv.addAmountResourceTypeCapacity(ResourceUtil.oxygenID, oxygenCapacity);
-		inv.addAmountResourceTypeCapacity(ResourceUtil.waterID, vehicleConfig.getCargoCapacity(type, LifeSupportInterface.WATER));
-		inv.addAmountResourceTypeCapacity(ResourceUtil.foodID, vehicleConfig.getCargoCapacity(type, LifeSupportInterface.FOOD));
-		inv.addAmountResourceTypeCapacity(ResourceUtil.rockSamplesID, vehicleConfig.getCargoCapacity(type, ResourceUtil.ROCK_SAMLES));
-		inv.addAmountResourceTypeCapacity(ResourceUtil.iceID, vehicleConfig.getCargoCapacity(type, ResourceUtil.ICE));
-		
-		inv.addAmountResourceTypeCapacity(ResourceUtil.foodWasteID,
-				vehicleConfig.getCargoCapacity(type, ResourceUtil.FOOD_WASTE));
-		inv.addAmountResourceTypeCapacity(ResourceUtil.solidWasteID,
-				vehicleConfig.getCargoCapacity(type, ResourceUtil.SOLID_WASTE));
-		inv.addAmountResourceTypeCapacity(ResourceUtil.toxicWasteID,
-				vehicleConfig.getCargoCapacity(type, ResourceUtil.TOXIC_WASTE));
-		inv.addAmountResourceTypeCapacity(ResourceUtil.blackWaterID,
-				vehicleConfig.getCargoCapacity(type, ResourceUtil.BLACK_WATER));
-		inv.addAmountResourceTypeCapacity(ResourceUtil.greyWaterID,
-				vehicleConfig.getCargoCapacity(type, ResourceUtil.GREY_WATER));
-
 		// Construct sick bay.
-		if (vehicleConfig.hasSickbay(type)) {
-			sickbay = new SickBay(this, vehicleConfig.getSickbayTechLevel(type),
-					vehicleConfig.getSickbayBeds(type));
+		if (spec.hasSickbay()) {
+			sickbay = new SickBay(this, spec.getSickbayTechLevel(),
+					spec.getSickbayBeds());
 
 			// Initialize sick bay activity spots.
-			sickBayActivitySpots = new ArrayList<Point2D>(vehicleConfig.getSickBayActivitySpots(type));
+			sickBayActivitySpots = spec.getSickBayActivitySpots();
 		}
 
 		// Construct lab.
-		if (vehicleConfig.hasLab(type)) {
-			lab = new MobileLaboratory(1, vehicleConfig.getLabTechLevel(type),
-					vehicleConfig.getLabTechSpecialties(type));
+		if (spec.hasLab()) {
+			lab = new MobileLaboratory(1, spec.getLabTechLevel(),
+					spec.getLabTechSpecialties());
 
 			// Initialize lab activity spots.
-			labActivitySpots = new ArrayList<Point2D>(vehicleConfig.getLabActivitySpots(type));
+			labActivitySpots = spec.getLabActivitySpots();
 		}
-		
-		// Set rover terrain modifier
-		if (type.equalsIgnoreCase(VehicleType.CARGO_ROVER.getName()))
-			setTerrainHandlingCapability(5D);
-		else if (type.equalsIgnoreCase(VehicleType.EXPLORER_ROVER.getName()))
-			setTerrainHandlingCapability(10D);
-		else if (type.equalsIgnoreCase(VehicleType.TRANSPORT_ROVER.getName()))
-			setTerrainHandlingCapability(7.5);
-		
-		// Create the rover's airlock.
-		double airlockXLoc = vehicleConfig.getAirlockXLocation(type);
-		double airlockYLoc = vehicleConfig.getAirlockYLocation(type);
-		double airlockInteriorXLoc = vehicleConfig.getAirlockInteriorXLocation(type);
-		double airlockInteriorYLoc = vehicleConfig.getAirlockInteriorYLocation(type);
-		double airlockExteriorXLoc = vehicleConfig.getAirlockExteriorXLocation(type);
-		double airlockExteriorYLoc = vehicleConfig.getAirlockExteriorYLocation(type);
 
-		try {
-			airlock = new VehicleAirlock(this, 2, airlockXLoc, airlockYLoc, airlockInteriorXLoc, airlockInteriorYLoc,
-					airlockExteriorXLoc, airlockExteriorYLoc);
-		} catch (Exception e) {
-			e.printStackTrace(System.err);
-		}
+		setTerrainHandlingCapability(spec.getTerrainHandling());
+
+		// Create the rover's airlock.
+		airlock = new VehicleAirlock(this, 2, spec.getAirlockLoc(), spec.getAirlockInteriorLoc(),
+										 spec.getAirlockExteriorLoc());
+		
+	}
+
+	/**
+	 * Sets the scope string.
+	 */
+	@Override
+	protected void setupScopeString() {
+		super.setupScopeString();
+		
+		malfunctionManager.addScopeString(SystemType.ROVER.getName());
 	}
 
 	/**
 	 * Sets the vehicle this rover is currently towing.
-	 * 
-	 * @param towedVehicle the vehicle being towed.
+	 *
+	 * @param towedVehicle the vehicle being towed by this rover.
 	 */
 	public void setTowedVehicle(Vehicle towedVehicle) {
 		if (this == towedVehicle)
 			throw new IllegalArgumentException("Rover cannot tow itself.");
+
 		if (towedVehicle != null) {
 			// if towedVehicle is not null, it means this rover has just hooked up for towing the towedVehicle
-			addStatus(StatusType.TOWING);
+			addSecondaryStatus(StatusType.TOWING);
 		}
+		else {
+			removeSecondaryStatus(StatusType.TOWING);
+		}
+
 		this.towedVehicle = towedVehicle;
-		//updatedTowedVehicleSettlementLocation();
 	}
 
 	/**
 	 * Gets the vehicle this rover is currently towing.
-	 * 
+	 *
 	 * @return towed vehicle.
 	 */
 	public Vehicle getTowedVehicle() {
@@ -241,159 +243,255 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 
 	/**
 	 * Is this rover towing another vehicle.
-	 * 
+	 *
 	 * @return true or false
 	 */
 	public boolean isTowingAVehicle() {
-		if (towedVehicle != null)
-			return true;
-		else
-			return false;
+        return towedVehicle != null;
 	}
 
 	/**
 	 * Gets the number of crewmembers the vehicle can carry.
-	 * 
+	 *
 	 * @return capacity
 	 */
 	public int getCrewCapacity() {
 		return crewCapacity;
 	}
 
+	/**
+	 * Gets the number of robot crewmembers the vehicle can carry.
+	 *
+	 * @return capacity
+	 */
 	public int getRobotCrewCapacity() {
 		return robotCrewCapacity;
 	}
 
 	/**
 	 * Gets the current number of crewmembers.
-	 * 
+	 *
 	 * @return number of crewmembers
 	 */
 	public int getCrewNum() {
-		return getInventory().getNumContainedPeople(); //getCrew().size();
-	}
-
-	public int getRobotCrewNum() {
-		return getInventory().getNumContainedRobots(); //return getRobotCrew().size();
+		if (!getCrew().isEmpty())
+			return occupants.size();
+		return 0;
 	}
 
 	/**
-	 * Gets a collection of the crewmembers.
-	 * 
-	 * @return crewmembers as Collection
+	 * Gets the current number of crewmembers.
+	 *
+	 * @return number of crewmembers
 	 */
-	public Collection<Person> getCrew() {
-		return getInventory().getContainedPeople();
-//		return CollectionUtils.getPerson(getInventory().getContainedUnits());
+	public int getRobotCrewNum() {
+		if (!getRobotCrew().isEmpty())
+			return robotOccupants.size();
+		return 0;
 	}
 
-	public Collection<Robot> getRobotCrew() {
-		return getInventory().getContainedRobots();
-//		return CollectionUtils.getRobot(getInventory().getContainedUnits());
+	/**
+	 * Gets a set of the robot crewmembers.
+	 *
+	 * @return robot crewmembers
+	 */
+	public Set<Person> getCrew() {
+		if (occupants == null || occupants.isEmpty())
+			return new UnitSet<>();
+		return occupants;
+	}
+
+	/**
+	 * Gets a set of the robot crewmembers.
+	 *
+	 * @return robot crewmembers
+	 */
+	public Set<Robot> getRobotCrew() {
+		if (robotOccupants == null || robotOccupants.isEmpty())
+			return new UnitSet<>();
+		return robotOccupants;
 	}
 
 	/**
 	 * Checks if person is a crewmember.
-	 * 
+	 *
 	 * @param person the person to check
 	 * @return true if person is a crewmember
 	 */
 	public boolean isCrewmember(Person person) {
-		return getInventory().containsUnit(person);
+		return occupants.contains(person);
 	}
 
 	/**
 	 * Checks if robot is a crewmember.
-	 * 
+	 *
 	 * @param robot the robot to check
 	 * @return true if robot is a crewmember
 	 */
 	public boolean isRobotCrewmember(Robot robot) {
-		return getInventory().containsUnit(robot);
+		return robotOccupants.contains(robot);
+	}
+
+	/**
+	 * Adds a person as crewmember
+	 *
+	 * @param person
+	 * @param true if the person can be added
+	 */
+	public boolean addPerson(Person person) {
+		if (!isCrewmember(person) && occupants.add(person)) {
+			person.setContainerUnit(this);
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Removes a person as crewmember
+	 *
+	 * @param person
+	 * @param true if the person can be removed
+	 */
+	public boolean removePerson(Person person) {
+		if (isCrewmember(person))
+			return occupants.remove(person);
+		return false;
+	}
+
+	/**
+	 * Adds a robot as crewmember
+	 *
+	 * @param robot
+	 * @param true if the robot can be added
+	 */
+	public boolean addRobot(Robot robot) {
+		if (!isRobotCrewmember(robot) && robotOccupants.add(robot)) {
+			robot.setContainerUnit(this);
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Removes a robot as crewmember
+	 *
+	 * @param robot
+	 * @param true if the robot can be removed
+	 */
+	public boolean removeRobot(Robot robot) {
+		if (isRobotCrewmember(robot))
+			return robotOccupants.remove(robot);
+		return false;
 	}
 
 	/**
 	 * Returns true if life support is working properly and is not out of oxygen or
 	 * water.
-	 * 
+	 *
 	 * @return true if life support is OK
 	 * @throws Exception if error checking life support.
 	 */
 	public boolean lifeSupportCheck() {
-		boolean result = true;
-		
-		Inventory inv = null;
-		
-		// TODO: need to draw the the hose connecting between the vehicle and the settlement to supply resources
-		
+		// Note: need to draw the the hose connecting between the vehicle and the settlement to supply resources
 		if (isPluggedIn()) {
 			if (haveStatusType(StatusType.TOWED) && !isInSettlement()) {
-				inv = getTowingVehicle().getInventory();
+
+				double o2 = getTowingVehicle().getAmountResourceStored(OXYGEN_ID);
+				if (o2 < SMALL_AMOUNT) {
+					logger.log(this, Level.WARNING, 60_000,
+						"No more oxygen.");
+					return false;
+				}
+
+				else if (o2 <= massO2MinimumLimit) {
+					logger.log(this, Level.WARNING, 60_000,
+							"Remaining oxygen was below the safety threshold ("
+									+ massO2MinimumLimit + " kg) ");
+					return false;
+				}
+
+				if (getTowingVehicle().getAmountResourceStored(WATER_ID) <= 0D) {
+					logger.log(this, Level.WARNING, 60_000,
+							"Ran out of water.");
+					return false;
+				}
 			}
-//			if (getSettlement() == null) {
-//				LogConsolidated.log(Level.SEVERE, 1_000, sourceName, "[" + this.getName() + "] " 
-//						+ getNickName() + "'s settlement is null");
-//			
-//				inv = getInventory();
-//			}
-			else
-				// Use the settlement's inventory
-				inv = getSettlement().getInventory();
+
+			else if (getSettlement() != null)  {
+
+				double o2 = getSettlement().getAmountResourceStored(OXYGEN_ID);
+				if (o2 < SMALL_AMOUNT) {
+					logger.log(this, Level.WARNING, 60_000,
+						"No more oxygen.");
+					return false;
+				}
+
+				else if (o2 <= massO2MinimumLimit) {
+					logger.log(this, Level.WARNING, 60_000,
+							"Remaining oxygen was below the safety threshold ("
+									+ massO2MinimumLimit + " kg) ");
+					return false;
+				}
+
+				if (getSettlement().getAmountResourceStored(WATER_ID) <= 0D) {
+					logger.log(this, Level.WARNING, 60_000,
+							"Ran out of water.");
+					return false;
+				}
+			}
+
 		}
-		else 
-			inv = getInventory();
-		
-		double o2 = inv.getAmountResourceStored(ResourceUtil.oxygenID, false);
-		if (o2 < SMALL_AMOUNT) {
-//			LogConsolidated.log(logger, Level.WARNING, 60_000, sourceName,
-//					"[" + this.getLocationTag().getLocale() + "] " 
-//							+ this.getName() + " had no more oxygen.");
-			result = false;
+		else {
+
+			double o2 = getAmountResourceStored(OXYGEN_ID);
+			if (o2 < SMALL_AMOUNT) {
+				logger.log(this, Level.WARNING, 60_000,
+					"No more oxygen.");
+				return false;
+			}
+
+			else if (o2 <= massO2MinimumLimit) {
+				logger.log(this, Level.WARNING, 60_000,
+						"Remaining oxygen was below the safety threshold ("
+								+ massO2MinimumLimit + " kg) ");
+				return false;
+			}
+
+			if (getAmountResourceStored(WATER_ID) <= 0D) {
+				logger.log(this, Level.WARNING, 60_000,
+						"Ran out of water.");
+				return false;
+			}
 		}
-		
-		else if (o2 <= massO2MinimumLimit) {
-			LogConsolidated.log(logger, Level.WARNING, 60_000, sourceName,
-					"[" + this.getLocationTag().getLocale() + "] " 
-							+ this.getName() + "'s remaining oxygen was below the safety threshold (" 
-							+ massO2MinimumLimit + " kg) ");
-			result = false;
-		}
-		
-		if (inv.getAmountResourceStored(ResourceUtil.waterID, false) <= 0D) {
-			LogConsolidated.log(logger, Level.WARNING, 60_000, sourceName,
-					"[" + this.getLocationTag().getLocale() + "] " 
-							+ this.getName() + " ran out of water.");
-			result = false;
-		}
-		
+
 //		if (malfunctionManager.getOxygenFlowModifier() < 100D)
 //			result = false;
 //		if (malfunctionManager.getWaterFlowModifier() < 100D)
 //			result = false;
 
 		double p = getAirPressure();
-		if (p > PhysicalCondition.MAXIMUM_AIR_PRESSURE || p <= min_o2_pressure) {
-			LogConsolidated.log(logger, Level.WARNING, 60_000, sourceName,
-					"[" + this.getName() + "] out-of-range O2 pressure at " + Math.round(p * 100.0D) / 100.0D 
+		if (p > PhysicalCondition.MAXIMUM_AIR_PRESSURE || p <= MIN_O2_PRESSURE) {
+			logger.log(this, Level.WARNING, 60_000,
+					"Out-of-range O2 pressure at " + Math.round(p * 100.0D) / 100.0D
 					+ " kPa detected.");
-			result = false;
+			return false;
 		}
-		
+
 		double t = getTemperature();
 		if (t < Settlement.life_support_value[0][4] - Settlement.SAFE_TEMPERATURE_RANGE
 				|| t > Settlement.life_support_value[1][4] + Settlement.SAFE_TEMPERATURE_RANGE) {
-				LogConsolidated.log(logger, Level.WARNING, 10_000, sourceName,
-					"[" + this.getName() + "] out-of-range overall temperature at " + Math.round(t * 100.0D) / 100.0D 
-						+ " " + Msg.getString("temperature.sign.degreeCelsius") + " detected.");		
-			result = false;
+			logger.log(this, Level.WARNING, 10_000,
+					"Out-of-range overall temperature at " + Math.round(t * 100.0D) / 100.0D
+						+ " " + Msg.getString("temperature.sign.degreeCelsius") + " detected.");
+			return false;
 		}
 
-		return result;
+		return true;
 	}
 
 	/**
 	 * Gets the number of people the life support can provide for.
-	 * 
+	 *
 	 * @return the capacity of the life support system
 	 */
 	public int getLifeSupportCapacity() {
@@ -402,158 +500,148 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 
 	/**
 	 * Is the rover connected to the settlement through hoses
-	 * 
+	 *
 	 * @return true if yes
 	 */
 	public boolean isPluggedIn() {
 		if (isInSettlement())
 			return true;
-		
-		if (haveStatusType(StatusType.GARAGED))
+
+		if (getPrimaryStatus() == StatusType.GARAGED)
 			return true;
-		
-		if (haveStatusType(StatusType.TOWED))
-			return true;
-		
-		return false;
-	}
-	
+
+        return haveStatusType(StatusType.TOWED);
+    }
+
 	/**
 	 * Gets oxygen from system.
-	 * 
-	 * @param amountRequested the amount of oxygen requested from system (kg)
-	 * @return the amount of oxgyen actually received from system (kg)
+	 *
+	 * @param oxygenTaken the amount of oxygen requested from system (kg)
+	 * @return the amount of oxygen actually received from system (kg)
 	 * @throws Exception if error providing oxygen.
 	 */
-	public double provideOxygen(double amountRequested) {
-		Inventory inv = null;
-		
-		// TODO: need to draw the the hose connecting between the vehicle and the settlement to supply resources
-		
+	public double provideOxygen(double oxygenTaken) {
+		// Future: Adopt calculateGasExchange() in CompositionOfAir 
+		// for retrieving O2 here
+		double lacking = 0;
+
+		Vehicle v = null;
+
+		// NOTE: need to draw the the hose connecting between the vehicle and the settlement to supply resources
 		if (isPluggedIn()) {
 			if (haveStatusType(StatusType.TOWED) && !isInSettlement()) {
-				inv = getTowingVehicle().getInventory();
+				v = getTowingVehicle();
+
+				lacking = v.retrieveAmountResource(OXYGEN_ID, oxygenTaken);
+				v.storeAmountResource(CO2_ID, GAS_RATIO * (oxygenTaken - lacking));
 			}
-				
-//			if (getSettlement() == null) {
-//				LogConsolidated.log(Level.SEVERE, 1_000, sourceName, "[" + this.getName() + "] " 
-//					+ getNickName() + "'s settlement is null");
-//		
-//				
-//				inv = getInventory();
-//			}
-			else
-				// Use the settlement's inventory
-				inv = getSettlement().getInventory();
+
+			else if (isInSettlement()) {
+				lacking = getSettlement().retrieveAmountResource(OXYGEN_ID, oxygenTaken);
+				getSettlement().storeAmountResource(CO2_ID, GAS_RATIO * (oxygenTaken - lacking));
+			}
 		}
-		else
-			inv = getInventory();
-		
-		double oxygenTaken = amountRequested;
-		double oxygenLeft = inv.getAmountResourceStored(ResourceUtil.oxygenID, false);
 
-		if (oxygenTaken > oxygenLeft)
-			oxygenTaken = oxygenLeft;
+		else {
 
-		getInventory().retrieveAmountResource(ResourceUtil.oxygenID, oxygenTaken);
-//		getInventory().addAmountDemandTotalRequest(ResourceUtil.oxygenID);
-//		getInventory().addAmountDemand(ResourceUtil.oxygenID, oxygenTaken);
+			lacking = retrieveAmountResource(OXYGEN_ID, oxygenTaken);
+			storeAmountResource(CO2_ID, GAS_RATIO * (oxygenTaken - lacking));
+		}
 
-//		return oxygenTaken * (malfunctionManager.getOxygenFlowModifier() / 100D);
-		return oxygenTaken;
+		return oxygenTaken - lacking; // * (malfunctionManager.getOxygenFlowModifier() / 100D);
 	}
 
 	/**
 	 * Gets water from system.
-	 * 
-	 * @param amountRequested the amount of water requested from system (kg)
+	 *
+	 * @param waterTaken the amount of water requested from system (kg)
 	 * @return the amount of water actually received from system (kg)
 	 * @throws Exception if error providing water.
 	 */
-	public double provideWater(double amountRequested) {
-		Inventory inv = null;
-		// TODO: need to draw the the hose connecting between the vehicle and the settlement to supply resources
-		
+	public double provideWater(double waterTaken) {
+//		double waterTaken = amountRequested;
+		double lacking = 0;
+
+		Vehicle v = null;
+
+		// Note: need to draw the the hose connecting between the vehicle and the settlement to supply resources
+
 		if (isPluggedIn()) {
 			if (haveStatusType(StatusType.TOWED) && !isInSettlement()) {
-				inv = getTowingVehicle().getInventory();
+				v = getTowingVehicle();
+
+				lacking = v.retrieveAmountResource(WATER_ID, waterTaken);
 			}
-//			if (getSettlement() == null) {
-//				LogConsolidated.log(Level.SEVERE, 1_000, sourceName, "[" + this.getName() + "] " 
-//					+ getNickName() + "'s settlement is null");
-//		
-//				inv = getInventory();
-//			}
-			else
-				// Use the settlement's inventory
-				inv = getSettlement().getInventory();
+
+			else if (isInSettlement()) {
+				lacking = getSettlement().retrieveAmountResource(WATER_ID, waterTaken);
+			}
 		}
-		else
-			inv = getInventory();
-		
-		double waterTaken = amountRequested;
-		double waterLeft = inv.getAmountResourceStored(ResourceUtil.waterID, false);
+		else {
 
-		if (waterTaken > waterLeft)
-			waterTaken = waterLeft;
+			lacking = retrieveAmountResource(WATER_ID, waterTaken);
+		}
 
-		getInventory().retrieveAmountResource(ResourceUtil.waterID, waterTaken);
-//		getInventory().addAmountDemandTotalRequest(ResourceUtil.waterID);
-//		getInventory().addAmountDemand(ResourceUtil.waterID, waterTaken);
-
-//		return waterTaken * (malfunctionManager.getWaterFlowModifier() / 100D);
-		return waterTaken;
+		return waterTaken - lacking; // * (malfunctionManager.getWaterFlowModifier() / 100D);
 	}
 
 	/**
 	 * Gets the air pressure of the life support system.
-	 * 
+	 *
 	 * @return air pressure (Pa)
 	 */
 	public double getAirPressure() {
-		// Based on some pre-calculation, 
+		// Based on some pre-calculation,
 		// To supply a partial oxygen pressure of 20.7 kPa, one needs at least 0.3107 kg O2
 
-		// With the minimum required O2 partial pressure of 11.94 kPa (1.732 psi), the minimum mass of O2 is 0.1792 kg 
-		
+		// With the minimum required O2 partial pressure of 11.94 kPa (1.732 psi), the minimum mass of O2 is 0.1792 kg
+
 		// Note : our target o2 partial pressure is now 17 kPa (not 20.7 kPa)
 		// To supply 17 kPa O2, need 0.2552 kg O2
 
-		double oxygenLeft = getInventory().getAmountResourceStored(ResourceUtil.oxygenID, false);
- 
+		double oxygenLeft = 0;
+
+		if (!isInSettlement()) {
+			if (getTowingVehicle() != null) {
+				oxygenLeft = getTowingVehicle().getAmountResourceStored(OXYGEN_ID);
+			}
+			else
+				oxygenLeft = getAmountResourceStored(OXYGEN_ID);
+		}
+		else {
+			oxygenLeft = getSettlement().getAmountResourceStored(OXYGEN_ID);
+		}
+
 		if (oxygenLeft < SMALL_AMOUNT) {
 			return 0;
 		}
-		
+
 		else if (oxygenLeft < massO2NominalLimit) {
 			// Assuming that we can maintain a constant oxygen partial pressure unless it falls below massO2NominalLimit
-			
-			double remainingMass = oxygenLeft;
-			double pp = CompositionOfAir.KPA_PER_ATM * remainingMass / CompositionOfAir.O2_MOLAR_MASS * CompositionOfAir.R_GAS_CONSTANT / cabinAirVolume;
-			LogConsolidated.log(logger, Level.WARNING, 60_000, sourceName,
-					"[" + this.getLocationTag().getLocale() + "] " 
-						+ this.getName() + " has " + Math.round(oxygenLeft*100.0)/100.0
+			double pp = AirComposition.getOxygenPressure(oxygenLeft, cabinAirVolume);
+			logger.log(this, Level.WARNING, 60_000,
+					Math.round(oxygenLeft*100.0)/100.0
 						+ " kg O2 left at partial pressure of " + Math.round(pp*100.0)/100.0 + " kPa.");
 			return pp;
 		}
 
 //		Note: the outside ambient air pressure is weather.getAirPressure(getCoordinates());
 
-		return NORMAL_AIR_PRESSURE;// * (malfunctionManager.getAirPressureModifier() / 100D);	
+		return NORMAL_AIR_PRESSURE;// * (malfunctionManager.getAirPressureModifier() / 100D);
 	}
 
 	/**
 	 * Gets the temperature of the life support system.
-	 * 
+	 *
 	 * @return temperature (degrees C)
 	 */
 	public double getTemperature() {
-		return temperature;	
+		return temperature;
 	}
 
 	/**
-	 * Plugs in the rover and adjust the temperature 
-	 * 
+	 * Plugs in the rover and adjust the temperature
+	 *
 	 * @param time
 	 */
 	public void plugInTemperature(double time) {
@@ -562,11 +650,11 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 			if (temperature > NORMAL_TEMP * 1.15 || temperature < NORMAL_TEMP * 0.85) {
 				// Internal air pumps of a rover maintains the air pressure
 				// TODO: need to model the power usage
-				
+
 				double p = 0;
-				if (haveStatusType(StatusType.GARAGED))
+				if (getPrimaryStatus() == StatusType.GARAGED)
 					p = getGarage().getCurrentTemperature();
-				else 
+				else
 					p = getSettlement().getTemperature();// * (malfunctionManager.getTemperatureModifier() / 100D);
 				double delta = temperature - p;
 				if (delta > 5)
@@ -575,33 +663,33 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 					delta = -5;
 
 				double result = temperature - delta * TEMPERATURE_FLOW_PER_MILLISOL * time;
-					
+
 				temperature = result;
 			}
 		}
 	}
-	
-	
+
+
 	/**
-	 * Unplugs the rover and adjust the temperature 
-	 * 
+	 * Unplugs the rover and adjust the temperature
+	 *
 	 * @param time
 	 */
 	public void plugOffTemperature(double time) {
 		if (temperature >= 0) {
-			// if no one is occupying the rover, can power it off 
-		
-			// TODO : will need to the internal air composition/pressure of a vehicle 
+			// if no one is occupying the rover, can power it off
+
+			// TODO : will need to the internal air composition/pressure of a vehicle
 			temperature -= RATE_OF_CHANGE_OF_C_PER_MILLISOL * time;
 			if (temperature < 0)
 				// but will use power to maintain the temperature at the minimum of zero deg C
-				temperature = 0;	
+				temperature = 0;
 		}
 	}
-	
+
 	/**
-	 * Adjust the air pressure of the rover
-	 * 
+	 * Adjusts the air pressure of the rover.
+	 *
 	 * @param time
 	 */
 	public void plugInAirPressure(double time) {
@@ -610,59 +698,58 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 			if (airPressure > NORMAL_AIR_PRESSURE * 1.15 || airPressure < NORMAL_AIR_PRESSURE * 0.85) {
 				// Internal heat pump of a rover maintains the air pressure
 				// TODO: need to model the power usage
-				
+
 				double p = 0;
-				if (haveStatusType(StatusType.GARAGED))
+				if (getPrimaryStatus() == StatusType.GARAGED)
 					p = getGarage().getCurrentAirPressure();
-				else 
-					p = getSettlement().getAirPressure();// * (malfunctionManager.getAirPressureModifier() / 100D);
-				
+				else
+					p = getSettlement().getAirPressure();
+
 				double delta = airPressure - p;
 				if (delta > 5)
 					delta = 5;
 				else if (delta < -5)
 					delta = -5;
-				
+
 				double result = airPressure - delta * AIR_PRESSURE_FLOW_PER_MILLISOL * time;
 				airPressure = result;
 			}
 		}
 	}
-		
+
 	public void plugOffAirPressure(double time) {
 		if (airPressure >= 0) {
-			// if no one is occupying the rover, can power it off 
-	
+			// if no one is occupying the rover, can power it off
+
 //			double nitrogenLeft = getInventory().getAmountResourceStored(ResourceUtil.nitrogenID, false);
-//			double oxygenLeft = getInventory().getAmountResourceStored(ResourceUtil.oxygenID, false);
-//			double co2Left = getInventory().getAmountResourceStored(ResourceUtil.oxygenID, false);
-//			double waterLeft = getInventory().getAmountResourceStored(ResourceUtil.waterID, false);
+//			double oxygenLeft = getInventory().getAmountResourceStored(OXYGEN, false);
+//			double co2Left = getInventory().getAmountResourceStored(CO2, false);
+//			double waterLeft = getInventory().getAmountResourceStored(WATER, false);
 //			double sum = nitrogenLeft + oxygenLeft + co2Left + waterLeft;
-			
+
 			double rate = RATE_OF_CHANGE_OF_kPa_PER_MILLISOL * time;
-			
-			// TODO : will need to the internal air composition/pressure of a vehicle 
-			airPressure -= rate;	
-			
+
+			// TODO : will need to the internal air composition/pressure of a vehicle
+			airPressure -= rate;
+
 			if (airPressure < 0)
-				airPressure = 0;	
+				airPressure = 0;
 		}
 	}
-	
+
 	/**
 	 * Gets the rover's airlock.
-	 * 
+	 *
 	 * @return rover's airlock
 	 */
 	public Airlock getAirlock() {
 		return airlock;
 	}
-	
+
 	/**
 	 * Perform time-related processes
-	 * 
-	 * @param time the amount of time passing (in millisols)
-	 * @throws exception if error during time.
+	 *
+	 * @param pulse the amount of clock pulse passing (in millisols)
 	 */
 	@Override
 	public boolean timePassing(ClockPulse pulse) {
@@ -670,37 +757,55 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 			return false;
 		}
 
-		airlock.timePassing(pulse.getElapsed());
-		
-		boolean onAMission = isOnAMission();
+		airlock.timePassing(pulse);
+
+		boolean onAMission = isOutsideOnMarsMission();
 		if (onAMission || isReservedForMission()) {
-			if (isInSettlement()) {
-				plugInTemperature(pulse.getElapsed());
-				plugInAirPressure(pulse.getElapsed());	
+
+			Mission mission = getMission();
+			if (mission != null) {
+				// This code feel wrong
+				Collection<Worker> members = mission.getMembers();
+				for (Worker m: members) {
+					if (m.getMission() == null) {
+						// Defensively set the mission in the case that the delivery bot is registered as a mission member
+						// but its mission is null
+						// Question: why would the mission be null for this member in the first place after loading from a saved sim
+						logger.info(this, m.getName() + " reregistered for " + mission + ".");
+						m.setMission(mission);
+					}
+				}
+
+				if (isInSettlement()) {
+					if (mission instanceof VehicleMission) {
+						LoadingController lp = ((VehicleMission)mission).getLoadingPlan();
+
+						if ((lp != null) && !lp.isCompleted()) {
+							double time = pulse.getElapsed();
+							double transferSpeed = 10; // Assume 10 kg per msol
+							double amountLoading = time * transferSpeed;
+
+							lp.backgroundLoad(amountLoading);
+						}
+					}
+
+					plugInTemperature(pulse.getElapsed());
+					plugInAirPressure(pulse.getElapsed());
+				}
 			}
-			
-			if (getInventory().getAmountResourceStored(getFuelType(), false) > GroundVehicle.LEAST_AMOUNT)
-				if (super.haveStatusType(StatusType.OUT_OF_FUEL))
-					super.removeStatus(StatusType.OUT_OF_FUEL);
-			
-//			String s = this + " is plugged in.  " +  + airPressure + " kPa  " + temperature + " C";
-//			if (!sCache.equals(s)) {
-//				sCache = s;
-//				logger.info(sCache);
-//			}
 		}
-		
+
 		else if (crewCapacity <= 0) {
 			plugOffTemperature(pulse.getElapsed());
 			plugOffAirPressure(pulse.getElapsed());
 		}
-		
+
 		return true;
 	}
 
 	/**
 	 * Gets a collection of people affected by this entity.
-	 * 
+	 *
 	 * @return people collection
 	 */
 	public Collection<Person> getAffectedPeople() {
@@ -719,7 +824,7 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 
 	/**
 	 * Gets a collection of robots affected by this entity.
-	 * 
+	 *
 	 * @return robots collection
 	 */
 	public Collection<Robot> getAffectedRobots() {
@@ -738,7 +843,7 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 
 	/**
 	 * Checks if the rover has a laboratory.
-	 * 
+	 *
 	 * @return true if lab.
 	 */
 	public boolean hasLab() {
@@ -747,7 +852,7 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 
 	/**
 	 * Gets the rover's laboratory
-	 * 
+	 *
 	 * @return lab
 	 */
 	public Lab getLab() {
@@ -756,16 +861,16 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 
 	/**
 	 * Gets a list of lab activity spots.
-	 * 
+	 *
 	 * @return list of activity spots as Point2D objects.
 	 */
-	public List<Point2D> getLabActivitySpots() {
+	public List<LocalPosition> getLabActivitySpots() {
 		return labActivitySpots;
 	}
 
 	/**
 	 * Checks if the rover has a sick bay.
-	 * 
+	 *
 	 * @return true if sick bay
 	 */
 	public boolean hasSickBay() {
@@ -774,7 +879,7 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 
 	/**
 	 * Gets the rover's sick bay.
-	 * 
+	 *
 	 * @return sick bay
 	 */
 	public SickBay getSickBay() {
@@ -783,48 +888,16 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 
 	/**
 	 * Gets a list of sick bay activity spots.
-	 * 
+	 *
 	 * @return list of activity spots as Point2D objects.
 	 */
-	public List<Point2D> getSickBayActivitySpots() {
+	public List<LocalPosition> getSickBayActivitySpots() {
 		return sickBayActivitySpots;
 	}
 
 	/**
-	 * Checks if a particular operator is appropriate for a vehicle.
-	 * 
-	 * @param operator the operator to check
-	 * @return true if appropriate operator for this vehicle.
-	 */
-	public boolean isAppropriateOperator(VehicleOperator operator) {
-		return (operator instanceof Person) && (getInventory().containsUnit((Unit) operator));
-	}
-
-	/**
-	 * Gets the resource type that this vehicle uses for fuel.
-	 * 
-	 * @return resource type as a string
-	 */
-	public int getFuelType() {
-//    	try {
-		return ResourceUtil.methaneID;
-//    	}
-//    	catch (Exception e) {
-//    		return null;
-//    	}
-	}
-
-	public AmountResource getFuelTypeAR() {
-		try {
-			return ResourceUtil.methaneAR;
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
-	/**
 	 * Sets unit's location coordinates
-	 * 
+	 *
 	 * @param newLocation the new location of the unit
 	 */
 	public void setCoordinates(Coordinates newLocation) {
@@ -836,58 +909,50 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 	}
 
 	/**
-	 * Gets the range of the vehicle
-	 * 
+	 * Gets the range of the vehicle.
+	 *
 	 * @return the range of the vehicle (in km)
 	 * @throws Exception if error getting range.
 	 */
-	public double getRange(MissionType missionType) {
-		// Note: multiply by 0.9 would account for the extra distance travelled in between sites 
-		double fuelRange = super.getRange(missionType) * FUEL_RANGE_FACTOR;
-		// Obtains the max mission range [in km] based on the type of mission
-		// Note: total route ~= mission radius * 2   
-		double missionRange = super.getMissionRange(missionType) * MISSION_RANGE_FACTOR;
-		
+	@Override
+	public double getRange() {
+		// Note: multiply by 0.95 would account for the extra distance travelled in between sites
+		double fuelRange = super.getRange() * FUEL_RANGE_FACTOR;
+
 		// Estimate the distance traveled per sol
 		double distancePerSol = getEstimatedTravelDistancePerSol();
-		
+
 		// Gets the life support resource margin
-		double margin = Vehicle.getLifeSupportRangeErrorMargin();
-		
+		double margin = getLifeSupportRangeErrorMargin();
+
 		// Check food capacity as range limit.
+		PersonConfig personConfig = SimulationConfig.instance().getPersonConfig();
 		double foodConsumptionRate = personConfig.getFoodConsumptionRate();
-		double foodCapacity = getInventory().getAmountResourceCapacity(ResourceUtil.foodID, false);
+		double foodCapacity = getAmountResourceCapacity(FOOD_ID);
 		double foodSols = foodCapacity / (foodConsumptionRate * crewCapacity);
 		double foodRange = distancePerSol * foodSols / margin;
 
 		// Check water capacity as range limit.
 		double waterConsumptionRate = personConfig.getWaterConsumptionRate();
-		double waterCapacity = getInventory().getAmountResourceCapacity(ResourceUtil.waterID, false);
+		double waterCapacity = getAmountResourceCapacity(WATER_ID);
 		double waterSols = waterCapacity / (waterConsumptionRate * crewCapacity);
 		double waterRange = distancePerSol * waterSols / margin;
 //    	if (waterRange < fuelRange) fuelRange = waterRange;
 
 		// Check oxygen capacity as range limit.
 		double oxygenConsumptionRate = personConfig.getNominalO2ConsumptionRate();
-		double oxygenCapacity = getInventory().getAmountResourceCapacity(ResourceUtil.oxygenID, false);
+		double oxygenCapacity = getAmountResourceCapacity(OXYGEN_ID);
 		double oxygenSols = oxygenCapacity / (oxygenConsumptionRate * crewCapacity);
 		double oxygenRange = distancePerSol * oxygenSols / margin;
-//    	if (oxygenRange < fuelRange) fuelRange = oxygenRange;
 
-		double max = Math.min(oxygenRange, Math.min(foodRange, Math.min(waterRange, Math.min(missionRange, fuelRange))));
+		double max = Math.min(oxygenRange, Math.min(foodRange, Math.min(waterRange, fuelRange)));
 
-//		String s0 = this + " - " + missionName + " \n";
-//		String s1 = String.format(" Radius : %5.0f km   Fuel : %5.0f km   Dist/sol : %5.0f km   Max : %5.0f km", 
-//				missionRange, fuelRange, distancePerSol, max);
-//		System.out.print(s0);
-//		System.out.println(s1);
-		
 		return max;
 	}
 
 	@Override
-	public void setParkedLocation(double xLocation, double yLocation, double facing) {
-		super.setParkedLocation(xLocation, yLocation, facing);
+	public void setParkedLocation(LocalPosition position, double facing) {
+		super.setParkedLocation(position, facing);
 
 		// Update towed vehicle locations.
 		updatedTowedVehicleSettlementLocation();
@@ -903,51 +968,69 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 			if (towedVehicle instanceof Rover) {
 				// Towed rovers should be located behind this rover with same facing.
 				double distance = (getLength() + towedVehicle.getLength()) / 2D;
-				double towedX = 0D;
-				double towedY = 0D - distance;
-				Point2D.Double towedLoc = LocalAreaUtil.getLocalRelativeLocation(towedX, towedY, this);
-				towedVehicle.setParkedLocation(towedLoc.getX(), towedLoc.getY(), getFacing());
+				LocalPosition towingPosition = new LocalPosition(0D, - distance);
+				LocalPosition towedLoc = LocalAreaUtil.getLocalRelativePosition(towingPosition, this);
+				towedVehicle.setParkedLocation(towedLoc, getFacing());
 			} else if (towedVehicle instanceof LightUtilityVehicle) {
 				// Towed light utility vehicles should be attached to back of the rover
 				// sideways and facing to the right.
 				double distance = (getLength() + towedVehicle.getWidth()) / 2D;
-				double towedX = 0D;
-				double towedY = 0D - distance;
-				Point2D.Double towedLoc = LocalAreaUtil.getLocalRelativeLocation(towedX, towedY, this);
-				towedVehicle.setParkedLocation(towedLoc.getX(), towedLoc.getY(), getFacing() + 90D);
+				LocalPosition towingPosition = new LocalPosition(0D, - distance);
+				LocalPosition towedLoc = LocalAreaUtil.getLocalRelativePosition(towingPosition, this);
+				towedVehicle.setParkedLocation(towedLoc, getFacing() + 90D);
 			}
 		}
-
 	}
 
-	@Override
-	public Collection<Unit> getUnitCrew() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	// public static double getLifeSupportRangeErrorMargin() {
-	// return life_support_range_error_margin;
-	// }
-
-	@Override
-	public String getNickName() {
-		return getName();
+	/**
+	 * Gets the time limit of the trip based on life support capacity.
+	 *
+	 * @param useBuffer use time buffer in estimation if true.
+	 * @return time (millisols) limit.
+	 */
+	public double getTotalTripTimeLimit(boolean useBuffer) {
+		return RoverMission.getTotalTripTimeLimit(this, getCrewCapacity(), useBuffer);
 	}
 	
-	
-	public double getCargoCapacity() {
-		return cargoCapacity;
+	/**
+	 * Gets the time limit of the trip based on life support capacity.
+	 * Called by ExplorationSitePanel.
+	 * 
+	 * @param number of members
+	 * @param useBuffer use time buffer in estimation if true.
+	 * @return time (millisols) limit.
+	 */
+	public double getTotalTripTimeLimit(int member, boolean useBuffer) {
+		return RoverMission.getTotalTripTimeLimit(this, member, useBuffer);
 	}
-	
+
+	public boolean setLUV(LightUtilityVehicle luv) {
+		if (!hasLUV()) {
+			this.luv = luv;
+			return true;
+		}
+		return false;
+	}
+
+	public LightUtilityVehicle getLUV() {
+		return luv;
+	}
+
+	public boolean hasLUV() {
+		return luv != null;
+	}
+
+	/**
+	 * Does this rover have a set of clothing
+	 */
+	public boolean hasGarment() {
+		return getItemResourceStored(ItemResourceUtil.garmentID) > 0;
+	}
+
 	@Override
 	public void destroy() {
 		super.destroy();
 
-		// vehicleConfig = null;
-		personConfig = null;
-		// inv = null;
-//		weather = null;
 		towedVehicle = null;
 
 		labActivitySpots = null;

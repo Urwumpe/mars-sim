@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MineralMapLayer.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-28
  * @author Scott Davis
  */
 
@@ -9,7 +9,7 @@ package org.mars_sim.msp.ui.swing.tool.map;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.MineralMap;
+import org.mars_sim.msp.core.environment.MineralMap;
 
 import java.awt.*;
 import java.awt.image.MemoryImageSource;
@@ -24,9 +24,7 @@ import java.util.logging.Logger;
  */
 public class MineralMapLayer implements MapLayer {
 
-//	private static String CLASS_NAME = "org.mars_sim.msp.ui.standard.tool.map.MineralMapLayer";
-//	private static Logger logger = Logger.getLogger(CLASS_NAME);
- 	private static Logger logger = Logger.getLogger(MineralMapLayer.class.getName());
+ 	private static final Logger logger = Logger.getLogger(MineralMapLayer.class.getName());
 	
 	// Domain members
 	private boolean updateLayer;
@@ -49,7 +47,7 @@ public class MineralMapLayer implements MapLayer {
 	 * @param displayComponent the display component.
 	 */
 	public MineralMapLayer(Component displayComponent) {
-		mineralMap = Simulation.instance().getMars().getSurfaceFeatures().getMineralMap();
+		mineralMap = Simulation.instance().getSurfaceFeatures().getMineralMap();
 		this.displayComponent = displayComponent;
 		mineralConcentrationArray = new int[Map.MAP_VIS_WIDTH * Map.MAP_VIS_HEIGHT];
 		updateMineralsDisplayed();
@@ -59,53 +57,52 @@ public class MineralMapLayer implements MapLayer {
 	 * Displays the layer on the map image.
 	 * 
 	 * @param mapCenter the location of the center of the map.
-	 * @param mapType   the type of map.
+	 * @param baseMap   the type of map.
 	 * @param g         graphics context of the map display.
 	 */
-	public void displayLayer(Coordinates mapCenter, String mapType, Graphics g) {
-		// the line below can create nullpointerexception if shutdown swiftly in eclipse
+	public void displayLayer(Coordinates mapCenter, Map baseMap, Graphics g) {
+		String mapType = baseMap.getType().getId();
 		if (!mapCenter.equals(mapCenterCache) || !mapType.equals(mapTypeCache) || updateLayer) {
-			mapCenterCache = new Coordinates(mapCenter);
+			mapCenterCache = mapCenter;
 			mapTypeCache = mapType;
 			updateLayer = false;
 
 			// Clear map concentration array.
 			Arrays.fill(mineralConcentrationArray, 0);
 
-			int centerX = 150;
-			int centerY = 150;
+			double centerX = Map.HALF_MAP_BOX;
+			double centerY = Map.HALF_MAP_BOX;
 
-			double rho = CannedMarsMap.PIXEL_RHO;
+			double rho = baseMap.getScale();
 
-			// MineralMap mineralMap =
-			// Simulation.instance().getMars().getSurfaceFeatures().getMineralMap();
 			java.util.Map<String, Color> mineralColors = getMineralColors();
 			updateMineralsDisplayed();
 
-			Coordinates location = new Coordinates(0D, 0D);
 			for (int x = 0; x < Map.MAP_VIS_WIDTH; x += 2) {
 				for (int y = 0; y < Map.MAP_VIS_HEIGHT; y += 2) {
-					mapCenter.convertRectToSpherical(x - centerX, y - centerY, rho, location);
+					Coordinates location = mapCenter.convertRectToSpherical(x - centerX, y - centerY, rho);
 					java.util.Map<String, Double> mineralConcentrations = mineralMap
 							.getAllMineralConcentrations(location);
-					if (mineralConcentrations.size() > 0) {
-						Iterator<String> i = mineralConcentrations.keySet().iterator();
-						while (i.hasNext()) {
-							String mineralType = i.next();
-							if (isMineralDisplayed(mineralType)) {
-								double concentration = mineralConcentrations.get(mineralType);
-								if (concentration > 0D) {
-									Color baseColor = mineralColors.get(mineralType);
-									int index = x + (y * Map.MAP_VIS_WIDTH);
-									addColorToMineralConcentrationArray(index, baseColor, concentration);
-									addColorToMineralConcentrationArray((index + 1), baseColor, concentration);
-									if (y < Map.MAP_VIS_HEIGHT - 1) {
-										int indexNextLine = x + ((y + 1) * Map.MAP_VIS_WIDTH);
-										addColorToMineralConcentrationArray(indexNextLine, baseColor, concentration);
-										addColorToMineralConcentrationArray((indexNextLine + 1), baseColor,
-												concentration);
-									}
-								}
+					if (mineralConcentrations.size() == 0) {
+						continue;
+					}
+					Iterator<String> i = mineralConcentrations.keySet().iterator();
+					while (i.hasNext()) {
+						String mineralType = i.next();
+						if (isMineralDisplayed(mineralType)) {
+							double concentration = mineralConcentrations.get(mineralType);
+							if (concentration <= 0) {
+								continue;
+							}
+							Color baseColor = mineralColors.get(mineralType);
+							int index = x + (y * Map.MAP_VIS_WIDTH);
+							addColorToMineralConcentrationArray(index, baseColor, concentration);
+							addColorToMineralConcentrationArray((index + 1), baseColor, concentration);
+							if (y < Map.MAP_VIS_HEIGHT - 1) {
+								int indexNextLine = x + ((y + 1) * Map.MAP_VIS_WIDTH);
+								addColorToMineralConcentrationArray(indexNextLine, baseColor, concentration);
+								addColorToMineralConcentrationArray((indexNextLine + 1), baseColor,
+										concentration);
 							}
 						}
 					}
@@ -122,6 +119,8 @@ public class MineralMapLayer implements MapLayer {
 				mt.waitForID(0);
 			} catch (InterruptedException e) {
 				logger.log(Level.SEVERE, "MineralMapLayer interrupted: " + e);
+				// Restore interrupted state
+			    Thread.currentThread().interrupt();
 			}
 		}
 
@@ -152,7 +151,7 @@ public class MineralMapLayer implements MapLayer {
 		// MineralMap mineralMap =
 		// Simulation.instance().getMars().getSurfaceFeatures().getMineralMap();
 		String[] mineralNames = mineralMap.getMineralTypeNames();
-		java.util.Map<String, Color> result = new HashMap<String, Color>(mineralNames.length);
+		java.util.Map<String, Color> result = new HashMap<>(mineralNames.length);
 		for (int x = 0; x < mineralNames.length; x++) {
 			String mineralTypeName = mineralMap.getMineralTypeNames()[x];
 			int mineralColor = Color.HSBtoRGB(((float) x / (float) mineralNames.length), 1F, 1F);
@@ -170,7 +169,7 @@ public class MineralMapLayer implements MapLayer {
 		String[] mineralNames = mineralMap.getMineralTypeNames();
 		Arrays.sort(mineralNames);
 		if (mineralsDisplayedMap == null)
-			mineralsDisplayedMap = new HashMap<String, Boolean>(mineralNames.length);
+			mineralsDisplayedMap = new HashMap<>(mineralNames.length);
 		String[] currentMineralNames = mineralsDisplayedMap.keySet().toArray(new String[mineralsDisplayedMap.size()]);
 		Arrays.sort(currentMineralNames);
 		if (!Arrays.equals(mineralNames, currentMineralNames)) {
@@ -204,5 +203,18 @@ public class MineralMapLayer implements MapLayer {
 			mineralsDisplayedMap.put(mineralType, displayed);
 			updateLayer = true;
 		}
+	}
+	
+	/**
+	 * Prepares object for garbage collection.
+	 */
+	public void destroy() {
+
+		displayComponent = null;
+		mineralConcentrationMap = null;
+		mapCenterCache = null;
+		mineralMap = null;
+		mineralsDisplayedMap.clear();
+		mineralsDisplayedMap = null;
 	}
 }

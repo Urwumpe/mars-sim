@@ -1,5 +1,7 @@
 package org.mars_sim.msp.core.resource;
 
+import static org.junit.Assert.assertThrows;
+
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -7,6 +9,7 @@ import java.util.Collection;
 import junit.framework.TestCase;
 
 import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.goods.GoodType;
 
 public class TestItemResource extends TestCase {
 
@@ -22,20 +25,20 @@ public class TestItemResource extends TestCase {
     @Override
     public void setUp() throws Exception {
         SimulationConfig.instance().loadConfig();
-        
-        // initialize 
-        //new ItemResource();
+
+        // initialize
        	ResourceUtil.getInstance();
         resources = ItemResourceUtil.getItemResources();
+        GoodType type = GoodType.TOOL;
         
-        hammer = ItemResourceUtil.createItemResource("hammer", 1, "a tool", 1.4D, 1);
-        socketWrench = ItemResourceUtil.createItemResource("socket wrench", 2, "another tool", .5D, 1);
-        pipeWrench = ItemResourceUtil.createItemResource("pipe wrench", 3, "and another tool", 2.5D, 1);
- 
+        hammer = ItemResourceUtil.createItemResource("hammer", 1, "a hand tool", type, 1.4D, 1);
+        socketWrench = ItemResourceUtil.createItemResource("socket wrench", 2, "a hand tool", type, .5D, 1);
+        pipeWrench = ItemResourceUtil.createItemResource("pipe wrench", 3, "a hand tool", type, 2.5D, 1);
+
         resources = Arrays.asList(hammer, socketWrench, pipeWrench);
-        
+
     }
-    
+
     public void testResourceMass() {
         double hammerMass = hammer.getMassPerItem();
         assertEquals(1.4D, hammerMass, 0D);
@@ -47,19 +50,14 @@ public class TestItemResource extends TestCase {
     }
 
     public void testFindItemResourceNegative() {
-        try {
+        Exception e = assertThrows(IllegalArgumentException.class, () -> {
         	ItemResourceUtil.findItemResource("test");
-            //fail("Should have thrown an exception");
-        }
-        catch (Exception e) {
-            // Expected.
-        }
+        });
+
+        assertEquals("No ItemResource called " + "test", e.getMessage());
     }
 
     public void testGetItemResourcesContents() {
-        //assertFalse(resources.contains(hammer));
-        //assertFalse(resources.contains(socketWrench));
-        //assertFalse(resources.contains(pipeWrench));
         assertTrue(resources.contains(hammer));
         assertTrue(resources.contains(socketWrench));
         assertTrue(resources.contains(pipeWrench));

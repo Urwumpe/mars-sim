@@ -1,17 +1,20 @@
-/**
+/*
  * Mars Simulation Project
  * ConstructionManager.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-06-07
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.construction;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.UnitEventType;
+import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -30,6 +33,9 @@ implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
+	
+	/** default logger. */
+	private static final SimLogger logger = SimLogger.getLogger(ConstructionManager.class.getName());
 
 	// Data members.
 	private Settlement settlement;
@@ -39,28 +45,33 @@ implements Serializable {
 	private SalvageValues salvageValues;
 	private List<ConstructedBuildingLogEntry> constructedBuildingLog;
 
+	private UnitManager unitManager = Simulation.instance().getUnitManager();
+	
 	/**
 	 * Constructor.
+	 * 
 	 * @param settlement the settlement.
 	 */
 	public ConstructionManager(Settlement settlement) {
 		this.settlement = settlement;
-		sites = new CopyOnWriteArrayList<ConstructionSite>();
+		sites = new ArrayList<>();
 		values = new ConstructionValues(settlement);
 		salvageValues = new SalvageValues(settlement);
-		constructedBuildingLog = new CopyOnWriteArrayList<ConstructedBuildingLogEntry>();
+		constructedBuildingLog = new ArrayList<>();
 	}
 
 	/**
 	 * Gets all construction sites at the settlement.
+	 * 
 	 * @return list of construction sites.
 	 */
 	public List<ConstructionSite> getConstructionSites() {
-		return new CopyOnWriteArrayList<ConstructionSite>(sites);
+		return new ArrayList<ConstructionSite>(sites);
 	}
 
 	/**
 	 * Returns the instance of all construction sites at the settlement.
+	 * 
 	 * @return list of construction sites.
 	 */
 	public List<ConstructionSite> getSites() {
@@ -70,10 +81,11 @@ implements Serializable {
 
 	/**
 	 * Gets construction sites needing a construction mission.
+	 * 
 	 * @return list of construction sites.
 	 */
 	public List<ConstructionSite> getConstructionSitesNeedingConstructionMission() {
-		List<ConstructionSite> result = new CopyOnWriteArrayList<ConstructionSite>();
+		List<ConstructionSite> result = new ArrayList<>();
 		Iterator<ConstructionSite> i = sites.iterator();
 		while (i.hasNext()) {
 			ConstructionSite site = i.next();
@@ -103,6 +115,7 @@ implements Serializable {
 
 	/**
 	 * Checks if the settlement has any construction materials needed for the stage.
+	 * 
 	 * @param stage the construction stage.
 	 * @return true if remaining materials available.
 	 */
@@ -115,7 +128,7 @@ implements Serializable {
 	    	Integer resource = i.next();
 	        double amountRequired = stage.getRemainingResources().get(resource);
 	        if (amountRequired > 0D) {
-	            double amountStored = settlement.getInventory().getAmountResourceStored(resource, false);
+	            double amountStored = settlement.getAmountResourceStored(resource);
 	            if (amountStored > 0D) {
 	                result = true;
 	            }
@@ -127,7 +140,7 @@ implements Serializable {
 	    	Integer part = j.next();
 	        int numRequired = stage.getRemainingParts().get(part);
 	        if (numRequired > 0) {
-	            int numStored = settlement.getInventory().getItemResourceNum(part);
+	            int numStored = settlement.getItemResourceStored(part);
 	            if (numStored > 0) {
 	                result = true;
 	            }
@@ -139,10 +152,11 @@ implements Serializable {
 
 	/**
 	 * Gets construction sites needing a salvage mission.
+	 * 
 	 * @return list of construction sites.
 	 */
 	public List<ConstructionSite> getConstructionSitesNeedingSalvageMission() {
-		List<ConstructionSite> result = new CopyOnWriteArrayList<ConstructionSite>();
+		List<ConstructionSite> result = new ArrayList<>();
 		Iterator<ConstructionSite> i = sites.iterator();
 		while (i.hasNext()) {
 			ConstructionSite site = i.next();
@@ -160,12 +174,17 @@ implements Serializable {
 
 	/**
 	 * Creates a new construction site.
+	 * 
 	 * @return newly created construction site.
 	 */
 	public ConstructionSite createNewConstructionSite() {
-		ConstructionSite result = new ConstructionSite(settlement);//, this);
+		ConstructionSite result = new ConstructionSite(settlement);
 		sites.add(result);
+    	unitManager.addUnit(result);
+    	
 		settlement.fireUnitUpdate(UnitEventType.START_CONSTRUCTION_SITE_EVENT, result);
+		logger.info(result, "Just created and registered to ConstructionManager.");
+		
 		return result;
 	}
 
@@ -175,6 +194,7 @@ implements Serializable {
 
 	/**
 	 * Removes a construction site.
+	 * 
 	 * @param site the construction site to remove.
 	 * @throws Exception if site doesn't exist.
 	 */
@@ -187,6 +207,7 @@ implements Serializable {
 
 	/**
 	 * Gets the construction values.
+	 * 
 	 * @return construction values.
 	 */
 	public ConstructionValues getConstructionValues() {
@@ -195,6 +216,7 @@ implements Serializable {
 
 	/**
 	 * Gets the salvage values.
+	 * 
 	 * @return salvage values.
 	 */
 	public SalvageValues getSalvageValues() {
@@ -203,6 +225,7 @@ implements Serializable {
 
 	/**
 	 * Adds a building log entry to the constructed buildings list.
+	 * 
 	 * @param buildingName the building name to add.
 	 * @param builtTime the time stamp that construction was finished.
 	 */
@@ -218,14 +241,16 @@ implements Serializable {
 
 	/**
 	 * Gets a log of all constructed buildings at the settlement.
+	 * 
 	 * @return list of ConstructedBuildingLogEntry
 	 */
 	public List<ConstructedBuildingLogEntry> getConstructedBuildingLog() {
-		return new CopyOnWriteArrayList<ConstructedBuildingLogEntry>(constructedBuildingLog);
+		return new ArrayList<>(constructedBuildingLog);
 	}
 
 	/**
 	 * Creates a new salvaging construction site to replace a building.
+	 * 
 	 * @param salvagedBuilding the building to be salvaged.
 	 * @return the construction site.
 	 * @throws Exception if error creating construction site.
@@ -243,7 +268,7 @@ implements Serializable {
 			while (i.hasNext()) {
 				Person occupant = i.next();
 				BuildingManager.removePersonFromBuilding(occupant, salvagedBuilding);
-				BuildingManager.addToRandomBuilding(occupant, buildingManager.getSettlement().getIdentifier());
+				BuildingManager.addToRandomBuilding(occupant, buildingManager.getSettlement());
 			}
 		}
 
@@ -254,14 +279,13 @@ implements Serializable {
 			while (i.hasNext()) {
 				Robot occupant = i.next();
 				BuildingManager.removeRobotFromBuilding(occupant, salvagedBuilding);
-				BuildingManager.addToRandomBuilding(occupant, buildingManager.getSettlement().getIdentifier());
+				BuildingManager.addToRandomBuilding(occupant, buildingManager.getSettlement());
 			}
 		}
 
 		// Add construction site.
 		ConstructionSite site = createNewConstructionSite();
-		site.setXLocation(salvagedBuilding.getXLocation());
-		site.setYLocation(salvagedBuilding.getYLocation());
+		site.setPosition(salvagedBuilding.getPosition());
 		site.setFacing(salvagedBuilding.getFacing());
 		ConstructionStageInfo buildingStageInfo = ConstructionUtil.getConstructionStageInfo(salvagedBuilding.getBuildingType());
 		if (buildingStageInfo != null) {
@@ -299,7 +323,7 @@ implements Serializable {
 	}
 
 	/**
-	 * Prepare object for garbage collection.
+	 * Prepares object for garbage collection.
 	 */
 	public void destroy() {
 		settlement = null;

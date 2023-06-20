@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * UnitType.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-06-05
  * @author stpa
  */
 
@@ -9,21 +9,27 @@ package org.mars_sim.msp.core;
 
 public enum UnitType {
 
-	SETTLEMENT ("UnitType.settlement"),
-	PERSON ("UnitType.person"),
-	VEHICLE ("UnitType.vehicle"),
-	EQUIPMENT ("UnitType.equipment"),
-	ROBOT ("UnitType.robot"),
-	BUILDING ("UnitType.building");
+	OUTER_SPACE		("UnitType.outerSpace"),
+	MARS			("UnitType.mars"),
+	MOON			("UnitType.moon"),
+	SETTLEMENT 		("UnitType.settlement"),
+	PERSON 			("UnitType.person"),
+	VEHICLE 		("UnitType.vehicle"),
+//	EQUIPMENT 		("UnitType.equipment"),
+	CONTAINER		("UnitType.container"),
+	EVA_SUIT 		("UnitType.evasuit"),
+	ROBOT 			("UnitType.robot"),
+	BUILDING 		("UnitType.building"),
+	CONSTRUCTION 	("UnitType.construction");
 
-	private String msgKey;
+	private String name;
 
 	/** hidden constructor. */
 	private UnitType(String msgKey) {
-		this.msgKey = msgKey;
+		this.name = Msg.getString(msgKey);
 	}
 
-	public String getMsgKey() {
-		return this.msgKey;
+	public String getName() {
+		return this.name;
 	}
 }

@@ -1,33 +1,32 @@
-/**
+/*
  * Mars Simulation Project
  * MasterClock.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-06
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.core.time;
 
-import java.io.File;
-import java.io.IOException;
 import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoField;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.ConcurrentModificationException;
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.Simulation.SaveType;
 import org.mars_sim.msp.core.SimulationConfig;
+import org.mars_sim.msp.core.logging.SimLogger;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
  * The MasterClock represents the simulated time clock on virtual Mars and
@@ -39,174 +38,170 @@ public class MasterClock implements Serializable {
 	static final long serialVersionUID = 1L;
 
 	/** Initialized logger. */
-	private static Logger logger = Logger.getLogger(MasterClock.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	private static final SimLogger logger = SimLogger.getLogger(MasterClock.class.getName());
+	/** The maximum speed allowed .*/
+	public static final int MAX_SPEED = 13;
+	/** The maximum time ratio allowed .*/
+	public static final int MAX_TIME_RATIO = (int)Math.pow(2, MAX_SPEED);
+	/** The Maximum number of pulses in the log .*/
+	private static final int MAX_PULSE_LOG = 30;
 	
-	private static final int FACTOR = 4;
-	public static final int MAX_SPEED = 10;
+	// Note: What is a reasonable jump in the observed real time to be allow for 
+	//       long simulation steps ? 15 seconds for debugging ? 
+	//       How should it trigger in the next pulse ? 
 	
+	/** The maximum allowable elapsed time [in ms] before action is taken. */
+	private static final long MAX_ELAPSED = 30000;
+
+	/** The maximum pulse time allowed in one frame for a task phase. */
+	private static final double MAX_PULSE_TIME = .25;
 	
-	/** The number of milliseconds for each millisols.  */	
+	/** The multiplier for reducing the width of a pulse. */
+	public static final double MULTIPLIER = 3;
+	/** The number of milliseconds for each millisol.  */
 	private static final double MILLISECONDS_PER_MILLISOL = MarsClock.SECONDS_PER_MILLISOL * 1000.0;
 
-	// Maximum number of pulses in the log
-	private static final int MAX_PULSE_LOG = 10;
-
-	// What is a reasonable jump in the observed real time
-	// Allow for long simulation steps. 15 seconds
-	// Note if debugging this triggers but the next pulse will reactivate
-	private static final long MAX_ELAPSED = 30000;
-	
-	// Data members
+	// Transient members
 	/** Runnable flag. */
-	private transient volatile boolean keepRunning = false;
+	private transient boolean keepRunning = false;
 	/** Pausing clock. */
-	private transient volatile boolean isPaused = false;
+	private transient boolean isPaused = false;
 	/** Flag for ending the simulation program. */
-	private transient volatile boolean exitProgram;
-	/** Flag for getting ready for autosaving. */
-//	private transient volatile boolean autosave;
-	/** Mode for saving a simulation. */
-	private transient volatile SaveType saveType = SaveType.NONE;
-	
-	/** Simulation time ratio. */
-	private volatile double targetTR = 0;
-	
-	private volatile int actualTR = 0;
-
-	/** Adjusted time between updates in seconds. */
-	private volatile double baseTBU_s = 0;
-
-	/** The time taken to execute one frame in the game loop */
-	private volatile long executionTime;	
+	private transient boolean exitProgram;
 	/** The last uptime in terms of number of pulses. */
 	private transient long tLast;
-	/** The cache for accumulating millisols up to a limit before sending out a clock pulse. */
-	private transient double timeCache;
-
-	/** The counts for ui pulses. */	
-	private transient int count;
-
+	/** The thread for running the clock listeners. */
+	private transient ExecutorService listenerExecutor;
+	/** Thread for main clock */
+	private transient ExecutorService clockExecutor;
+	/** A list of clock listener tasks. */
+	private transient Collection<ClockListenerTask> clockListenerTasks;
+	/** The clock pulse. */
+	private transient ClockPulse currentPulse;
+	
+	// Data members
+	/** Is pausing millisol in use. */
+	public boolean canPauseTime = false;
+	/** The user's preferred simulation time ratio. */
+	private int desiredTR = 0;
+	/** Sol day on the last fireEvent. */
+	private int lastSol = -1;
+	/** The last millisol integer on the last fireEvent. */
+	private int lastIntMillisol = 0;
+	/** The maximum wait time between pulses in terms of milli-seconds. */
+	private int maxWaitTimeBetweenPulses;
+	
+	/** The time taken to execute one frame in the game loop [in ms] */
+	private long executionTime;
+	/** Next Clock Pulse ID. Start on 1 as all Unit are primed as 0 for the last **/
+	private long nextPulseId = 1;
+	// Duration of last sleep
+	public long sleepTime;
 	// Records the real milli time when a pulse is execited
 	private long[] pulseLog = new long[MAX_PULSE_LOG];
 	
-	/** Is FXGL is in use. */
-	public boolean isFXGL = false;
-	/** Is pausing millisol in use. */
-	public boolean canPauseTime = false;
-	private double pausingMillisols;
-	
-	/** Next Clock Pulse ID. Start on 1 as all Unit are primed as 0 for the last **/
-	private long nextPulseId = 1;
-	
-	/** Mode for saving a simulation. */
-	private double tpfCache = 0;
+	/** The current simulation time ratio. */
+	private double actualTR = 0;
+	/** Number of millisols covered in the last pulse. */
+	private double lastPulseTime;
+	/** The minimum time span covered by each simulation pulse in millisols. */
+	private double minMilliSolPerPulse;
+	/** The maximum time span covered by each simulation pulse in millisols. */
+	private double maxMilliSolPerPulse;
+	/** The optimal time span covered by each simulation pulse in millisols. */
+	private double optMilliSolPerPulse;
 
-	/** The file to save or load the simulation. */
-	private transient volatile File file;
-	/** The thread for running the clock listeners. */
-	private transient ExecutorService clockExecutor;
-	
-	/** A list of clock listeners. */
-	private transient List<ClockListener> clockListeners;
-	/** A list of clock listener tasks. */
-	private transient List<ClockListenerTask> clockListenerTasks;
-	
+	/** The Martian Clock. */
+	private MarsTime marsTime;
 	/** The Martian Clock. */
 	private MarsClock marsClock;
 	/** A copy of the initial martian clock at the start of the sim. */
 	private MarsClock initialMarsTime;
 	/** The Earth Clock. */
-	private EarthClock earthClock;
+	private LocalDateTime earthTime;
 	/** The Uptime Timer. */
 	private UpTimer uptimer;
 	/** The thread for running the game loop. */
 	private ClockThreadTask clockThreadTask;
-	/** Sol day on the last fireEvent */
-	private int lastSol = -1;
-	// Number of MilliSols covered in the last pulse
-	private double marsMSol;
-	// Duration of last sleep
-	public long sleepTime;
 
-	private double minMilliSolPerPulse;
-
-	private double maxMilliSolPerPulse;
-
-	private double accuracyBias;
-
-	private int maxMilliSecPerPulse;
-
-
-
-	private static Simulation sim = Simulation.instance();
+	private SimulationConfig simulationConfig = SimulationConfig.instance();
 
 	/**
 	 * Constructor
-	 * 
-	 * @param isFXGL        true if FXGL is used for generating clock pulse
+	 *
 	 * @param userTimeRatio the time ratio defined by user
 	 * @throws Exception if clock could not be constructed.
 	 */
-	public MasterClock(boolean isFXGL, int userTimeRatio) {
-		this.isFXGL = isFXGL;
-		// logger.config("MasterClock's constructor is on " + Thread.currentThread().getName() + " Thread");
-		
-		// Gets an instance of the SimulationConfig singleton 
-		SimulationConfig simulationConfig = SimulationConfig.instance();
-
+	public MasterClock(int userTimeRatio) {
+	
 		// Create a martian clock
-		marsClock = new MarsClock(simulationConfig.getMarsStartDateTime());
+		marsClock = MarsClockFormat.fromDateString(simulationConfig.getMarsStartDateTime());
+		marsTime = MarsTimeFormat.fromDateString(simulationConfig.getMarsStartDateTime());
+
 		// Save a copy of the initial mars time
-		initialMarsTime = (MarsClock) marsClock.clone();
-		
+		initialMarsTime = new MarsClock(marsClock);
 
 		// Create an Earth clock
-		earthClock = new EarthClock(simulationConfig.getEarthStartDateTime());
+		earthTime = simulationConfig.getEarthStartDate();
 
 		// Create an Uptime Timer
 		uptimer = new UpTimer();
 
-		// Create listener list.
-		clockListeners = new CopyOnWriteArrayList<ClockListener>();
-		
 		// Calculate elapsedLast
 		timestampPulseStart();
 
-		// Check if FXGL is used
-		if (!isFXGL)
-			clockThreadTask = new ClockThreadTask();
+		// Create a dedicated thread for the Clock
+		clockThreadTask = new ClockThreadTask();
+		desiredTR = (int)simulationConfig.getTimeRatio();
 
-		logger.config("-----------------------------------------------------");
-		minMilliSolPerPulse = simulationConfig.getMinSimulatedPulse(); 
-		maxMilliSolPerPulse = simulationConfig.getMaxSimulatedPulse(); 
-		accuracyBias = simulationConfig.getAccuracyBias(); 
-		maxMilliSecPerPulse = simulationConfig.getDefaultPulsePeriod(); 
-		targetTR = simulationConfig.getTimeRatio(); 
+		minMilliSolPerPulse = simulationConfig.getMinSimulatedPulse();
+		maxMilliSolPerPulse = simulationConfig.getMaxSimulatedPulse();
 		
+		// Set the optimal width of a pulse
+		adjustOptimalPulseWidth();
+		
+		maxWaitTimeBetweenPulses = simulationConfig.getDefaultPulsePeriod();
+
 		// Safety check
 		if (minMilliSolPerPulse > maxMilliSolPerPulse) {
-			logger.severe("The min pulse msols is higher than the max.");
-			throw new IllegalStateException("The min MilliSol per pulse can not be higher than the max");
+			logger.severe("The min pulse millisol is higher than the max pule.");
 		}
 		
-		logger.config("         User Defined Time Ratio : " + targetTR + "x");
-		logger.config("       Min MSol per pulse (mSol) : " + minMilliSolPerPulse);
-		logger.config("       Max MSol per pulse (mSol) : " + maxMilliSolPerPulse);
-		logger.config(" Max Elapsed time between pulses : " + maxMilliSecPerPulse + "ms");
-		logger.config("                   Accuracy Bias : " + accuracyBias);
+		String WHITESPACES = "-----------------------------------------------------";
+		logger.config(WHITESPACES);
+		logger.config("                 Base time-ratio : " + desiredTR + "x");
+		logger.config("          Min millisol per pulse : " + minMilliSolPerPulse);
+		logger.config("      Optimal millisol per pulse : " + optMilliSolPerPulse);
+		logger.config("          Max millisol per pulse : " + maxMilliSolPerPulse);
+		logger.config(" Max elapsed time between pulses : " + maxWaitTimeBetweenPulses + " ms");
+		logger.config(WHITESPACES);
+	}
 
-		logger.config("-----------------------------------------------------");
+	/**
+	 * Adjusts the optimal pulse time according to the desire TR.
+	 */
+	private void adjustOptimalPulseWidth() {
+		// Re-evaluate the optimal width of a pulse
+		optMilliSolPerPulse = minMilliSolPerPulse 
+				+ ((maxMilliSolPerPulse - minMilliSolPerPulse) * desiredTR / MAX_TIME_RATIO);
 	}
 	
 	/**
-	 * Returns the Martian clock
+	 * Returns the Martian clock.
 	 *
 	 * @return Martian clock instance
 	 */
 	public MarsClock getMarsClock() {
 		return marsClock;
+	}
+
+	/**
+	 * Returns the current Martian time.
+	 *
+	 * @return Martian time
+	 */
+	public MarsTime getMarsTime() {
+		return marsTime;
 	}
 
 	/**
@@ -219,16 +214,16 @@ public class MasterClock implements Serializable {
 	}
 
 	/**
-	 * Returns the Earth clock
+	 * Returns the Earth date.
 	 *
-	 * @return Earth clock instance
+	 * @return Earth date
 	 */
-	public EarthClock getEarthClock() {
-		return earthClock;
+	public LocalDateTime getEarthTime() {
+		return earthTime;
 	}
 
 	/**
-	 * Returns uptime timer
+	 * Returns uptime timer.
 	 *
 	 * @return uptimer instance
 	 */
@@ -237,69 +232,61 @@ public class MasterClock implements Serializable {
 	}
 
 	/**
-	 * Adds a clock listener
-	 * 
+	 * Adds a clock listener. A minimum duration can be specified which throttles how many
+	 * pulses the listener receives. If the duration is set to zero then all Pulses are distributed.
+	 *
+	 * If the duration is positive then pulses will be skipped to ensure a pulse is not delivered any
+	 * quicker than the min duration. The delivered Pulse will have the full elapsed times including
+	 * the skipped Pulses.
+	 *
+	 *
 	 * @param newListener the listener to add.
+	 * @Param minDuration The minimum duration in milliseconds between pulses.
 	 */
-	public final void addClockListener(ClockListener newListener) {
-		// if listeners list does not exist, create one
-		if (clockListeners == null)
-			clockListeners = Collections.synchronizedList(new CopyOnWriteArrayList<ClockListener>());
-		// if the listeners list does not contain newListener, add it to the list
-		if (!clockListeners.contains(newListener))
-			clockListeners.add(newListener);
-		// will check if clockListenerTaskList already contain the newListener's task,
+	public final void addClockListener(ClockListener newListener, long minDuration) {
+		// Check if clockListenerTaskList already contain the newListener's task,
 		// if it doesn't, create one
-		addClockListenerTask(newListener);
+		if (clockListenerTasks == null)
+			clockListenerTasks = Collections.synchronizedSet(new HashSet<>());
+		if (!hasClockListenerTask(newListener)) {
+			clockListenerTasks.add(new ClockListenerTask(newListener, minDuration));
+		}
 	}
 
 	/**
-	 * Removes a clock listener
-	 * 
+	 * Removes a clock listener.
+	 *
 	 * @param oldListener the listener to remove.
 	 */
 	public final void removeClockListener(ClockListener oldListener) {
-//		if (clockListeners == null)
-//			clockListeners = Collections.synchronizedList(new CopyOnWriteArrayList<ClockListener>());
-		if (clockListeners != null && clockListeners.contains(oldListener))
-			clockListeners.remove(oldListener);
-//		 logger.config("just called clockListeners.remove(oldListener)");
-		// Check if clockListenerTaskList contain the newListener's task, if it does,
-		// delete it
 		ClockListenerTask task = retrieveClockListenerTask(oldListener);
-//		 logger.config("just get task");
-		if (task != null)
+		if (task != null) {
 			clockListenerTasks.remove(task);
+		}
 	}
 
 	/**
-	 * Adds a clock listener task
+	 * Does it have this clock listener ?
 	 *
-	 * @param newListener the clock listener task to add.
+	 * @param listener
+	 * @return
 	 */
-	public void addClockListenerTask(ClockListener listener) {
-		boolean hasIt = false;
-		if (clockListenerTasks == null)
-			clockListenerTasks = new CopyOnWriteArrayList<ClockListenerTask>();
+	private boolean hasClockListenerTask(ClockListener listener) {
 		Iterator<ClockListenerTask> i = clockListenerTasks.iterator();
 		while (i.hasNext()) {
 			ClockListenerTask c = i.next();
 			if (c.getClockListener().equals(listener))
-				hasIt = true;
+				return true;
 		}
-		if (!hasIt) {
-			ClockListenerTask clt = new ClockListenerTask(listener);
-			clockListenerTasks.add(clt);
-//			logger.config(clt.getClockListener().getClass().getSimpleName() + "'s clock listener added.");
-		}
+		return false;
 	}
 
 	/**
-	 * Retrieve the clock listener task instance, given its clock listener
-	 * 
+	 * Retrieves the clock listener task instance, given its clock listener.
+	 *
 	 * @param listener the clock listener
 	 */
-	public ClockListenerTask retrieveClockListenerTask(ClockListener listener) {	
+	private ClockListenerTask retrieveClockListenerTask(ClockListener listener) {
 		if (clockListenerTasks != null) {
 			Iterator<ClockListenerTask> i = clockListenerTasks.iterator();
 			while (i.hasNext()) {
@@ -312,61 +299,6 @@ public class MasterClock implements Serializable {
 	}
 
 	/**
-	 * Sets the load simulation flag and the file to load from.
-	 *
-	 * @param file the file to load from.
-	 */
-	public void loadSimulation(File file) {
-		this.setPaused(false, false);
-		this.file = file;
-	}
-
-	/**
-	 * Sets the save simulation flag and the file to save to.
-	 * 
-	 * @param file save to file or null if default file.
-	 */
-	public void setSaveSim(SaveType type, File file) {
-		saveType = type;
-		this.file = file;
-//		logger.config("setSaveSim(" + type + ", " + file + ");  saveType is " + saveType);
-	}
-
-//	/**
-//	 * Sets the value of autosave
-//	 * 
-//	 * @param value
-//	 */
-//	public void setAutosave(boolean value) {
-//		autosave = value;
-//	}
-
-//	/**
-//	 * Gets the value of autosave
-//	 * 
-//	 * @return autosave
-//	 */
-//	public boolean getAutosave() {
-//		return autosave;
-//	}
-
-	/**
-	 * Checks if in the process of saving a simulation.
-	 * 
-	 * @return true if saving simulation.
-	 */
-	public boolean isSavingSimulation() {
-		if (saveType == SaveType.NONE)
-			return false;
-		else
-			return true;
-	}
-
-	public void setSaveType() {
-		saveType = SaveType.NONE;
-	}
-	
-	/**
 	 * Sets the exit program flag.
 	 */
 	public void exitProgram() {
@@ -375,69 +307,64 @@ public class MasterClock implements Serializable {
 	}
 
 	/*
-	 * Gets the total number of pulses since the start of the sim
+	 * Gets the total number of pulses since the start of the sim.
 	 */
 	public long getTotalPulses() {
 		return nextPulseId;
 	}
 
 	/**
-	 * Resets the clock listener thread
+	 * Resets the clock listener thread.
 	 */
-	public void resetClockListeners() {
+	private void resetClockListeners() {
 		// If the clockListenerExecutor is not working, need to restart it
-//		LogConsolidated.log(Level.CONFIG, 0, sourceName, "The Clock Thread has died. Restarting...");
-		
+		logger.warning("The Clock Thread has died. Restarting...");
+
 		// Re-instantiate clockListenerExecutor
-		clockExecutor = Executors.newSingleThreadExecutor();
-		// Re-instantiate clockListeners
-		clockListeners = Collections.synchronizedList(new CopyOnWriteArrayList<ClockListener>());
+		if (listenerExecutor != null) {
+			listenerExecutor.shutdown();
+			listenerExecutor = null;
+		}
 
-		setupClockListenerTask();
-			
-		addClockListenerTask(sim);
-
-//		sim.restartClockExecutor();
+		// Restart executor, listener tasks are still in place
+		startClockListenerExecutor();
 	}
-	
-	
+
+
 	/**
-	 * Sets the simulation time ratio and adjust the value of time between update
-	 * (TBU)
-	 * 
+	 * Sets the preferred time ratio.
+	 *
 	 * @param ratio
 	 */
-	public void setTimeRatio(int ratio) {
-		if (ratio >= 0D && ratio <= Math.pow(2, MAX_SPEED) && targetTR != ratio) {
-
-			logger.config("Time-ratio : " + targetTR + "x -> " + (int)ratio + "x");
-				
-			targetTR = ratio;
+	public void setDesiredTR(int ratio) {
+		if (ratio > 0D && desiredTR != ratio) {
+			desiredTR = ratio;
+			logger.config("Time-ratio x" + desiredTR);
 		}
 	}
 
 	/**
-	 * Gets the simulation time ratio.
-	 * 
+	 * Gets the preferred time ratio. It stays at one value.
+	 *
 	 * @return ratio
 	 */
-	public double getTimeRatio() {
-		return targetTR;
+	public int getDesiredTR() {
+		return desiredTR;
 	}
 	
 	/**
-	 * Returns the instance of ClockThreadTask
-	 * 
-	 * @return ClockThreadTask
+	 * Gets the actual time ratio. The value varies over time.
+	 *
+	 * @return
 	 */
-	public ClockThreadTask getClockThreadTask() {
-		return clockThreadTask;
+	public double getActualTR() {
+		return actualTR;
 	}
 
 	/**
-	 * Runs master clock's thread using ThreadPoolExecutor
+	 * Runs master clock's thread using ThreadPoolExecutor.
 	 */
-	class ClockThreadTask implements Runnable, Serializable {
+	private class ClockThreadTask implements Runnable, Serializable {
 
 		private static final long serialVersionUID = 1L;
 
@@ -446,38 +373,39 @@ public class MasterClock implements Serializable {
 
 		@Override
 		public void run() {
-			
 			// Keep running until told not to by calling stop()
 			keepRunning = true;
 
-			if (sim.isDoneInitializing() && !isFXGL) {
+			if (!isPaused) {
+
 				while (keepRunning) {
 					long startTime = System.currentTimeMillis();
-					
+
 					// Call addTime() to increment time in EarthClock and MarsClock
 					if (addTime()) {
+
 						// If a can was applied then potentially adjust the sleep
 						executionTime = System.currentTimeMillis() - startTime;
-					
-						calculateSleepTime();
+						// Get the sleep time
+						calculateSleepTime();	
 					}
+					
 					else {
 						// If on pause or acceptablePulse is false
-//						logger.info("AddTime not accepted: lastPulse " + tLast);
-						sleepTime = maxMilliSecPerPulse;
+						sleepTime = maxWaitTimeBetweenPulses;
 					}
-					
+
 					// If still going then wait
 					if (keepRunning) {
 						if (sleepTime > MAX_ELAPSED) {
 							// This should not happen
-							logger.warning("Sleep too long: clipped to " + maxMilliSecPerPulse);
-							sleepTime = maxMilliSecPerPulse;
+							logger.warning("Sleep too long: clipped to " + maxWaitTimeBetweenPulses);
+							sleepTime = maxWaitTimeBetweenPulses;
 						}
 						if (sleepTime > 0) {
 							// Pause simulation to allow other threads to complete.
 							try {
-								Thread.sleep(sleepTime);;
+								Thread.sleep(sleepTime);
 							} catch (InterruptedException e) {
 								Thread.currentThread().interrupt();
 							}
@@ -486,284 +414,342 @@ public class MasterClock implements Serializable {
 
 					// Exit program if exitProgram flag is true.
 					if (exitProgram) {
-						AutosaveScheduler.cancel();
 						System.exit(0);
 					}
-					
-					// Check to see if the simulation should be saved at this point.
-					checkSave();
-					
+
 				} // end of while
 			} // if fxgl is not used
+
+			logger.warning("Clock Thread stopping");
+
 		} // end of run
 
-		private void calculateSleepTime() {
-			// Max number of pulses this environment can handle
-			double predictedMaxPulses = (double)maxMilliSecPerPulse/executionTime;
-			
-			// The Desired simulation period 
-			double desiredMSol = (maxMilliSecPerPulse * targetTR) / MILLISECONDS_PER_MILLISOL;
-			
-			// Most accurate simulation is with the pulse duration; will be highest rate
-			double mostAccurateRate = desiredMSol/minMilliSolPerPulse;
-			
-			// Least accurate is with the largest pulse duration; will be lower rate
-			double leastAccurateRate = desiredMSol/maxMilliSolPerPulse;
-			
-			// Lowest pulse rate can not be less than 1
-			double lowestPulseRate = Math.max(leastAccurateRate, 1D);
-			
-			// Highest pulse rate can not be higher than predicted max
-			double highestPulseRate = Math.min(mostAccurateRate, predictedMaxPulses);
-			
-			// Desired rate is between the low & high and use the accurancy to bias between the 2 limits
-			double newRate = lowestPulseRate + ((highestPulseRate - lowestPulseRate) * accuracyBias);
-			
-			// Sleep time allows for the execution time
-			sleepTime = (long)(maxMilliSecPerPulse/newRate) - executionTime;
-			
-			// What has happened?
-//			String msg = String.format("Sleep calcs d=%.2f msol, p=%.3f, l=%.3f, m=%.3f, r=%.3f, s=%d ms, e=%d ms",
-//				    desiredMSol, predictedMaxPulses, leastAccurateRate, mostAccurateRate, newRate, sleepTime,
-//				    executionTime);
-//		    logger.info(msg);
-		}
-	}
+	/**
+	 * Determines the sleep time for this frame.
+	 */
+	private void calculateSleepTime() {
+		// Get the desired millisols per second
+		double desiredMsolPerSecond = (actualTR + desiredTR) / 2 / MarsClock.SECONDS_PER_MILLISOL;
 
+		// Get the desired number of pulses
+		double desiredPulses = desiredMsolPerSecond / (optMilliSolPerPulse + lastPulseTime) * 2;
+		desiredPulses = Math.max(desiredPulses, 1D);
+		
+		// Get the milliseconds between each pulse
+		double milliSecondsPerPulse = 1000D / desiredPulses;
+
+		// Sleep time allows for the execution time
+		sleepTime = (long)(milliSecondsPerPulse - executionTime);
+
+		// Very useful but generates a LOT of log
+//		String msg = String.format("Sleep calcs desiredTR=%d, actualTR=%.2f, msol/sec=%.2f, pulse/sec=%.2f, ms/Pulse=%.2f, exection=%d ms, sleep=%d ms",
+//				desiredTR, actualTR, desiredMsolPerSecond, desiredPulses, milliSecondsPerPulse, executionTime, sleepTime);
+//	    logger.info(msg);
+	}
+}
+
+	/**
+	 * Sets the pause time for the Command Mode.
+	 *
+	 * @param value0
+	 * @param value1
+	 */
 	public void setCommandPause(boolean value0, double value1) {
 		// Check GameManager.mode == GameMode.COMMAND ?
 		canPauseTime = value0;
-		pausingMillisols = value1;
+		// Note: will need to re-implement the auto pause time for command mode
+		logger.info("Auto pause time: " + value1);
 	}
-	
-	/*
-	 * Add earth time and mars time.
-	 * @return Was teh pulse accepted?
+
+	/**
+	 * Adds earth time and mars time.
+	 *
+	 * @return true if the pulse was accepted
 	 */
 	private boolean addTime() {
 		boolean acceptablePulse = false;
-		
-		if (!isPaused) {	
+
+		if (!isPaused) {
 			// Find the new up time
 			long tnow = System.currentTimeMillis();
-		
+
 			// Calculate the elapsed time in milli-seconds
-			long realElaspedMilliSec = tnow - tLast;
+			long realElapsedMillisec = tnow - tLast;
 			
 			// Make sure there is not a big jump; suggest power save so skip it
-			if (realElaspedMilliSec > MAX_ELAPSED) {
+			if (realElapsedMillisec > MAX_ELAPSED) {
 				// Reset the elapsed clock to ignore this pulse
-				logger.warning("Elapsed real time " + realElaspedMilliSec + "ms is longer than max "
-			                   + MAX_ELAPSED + "ms; maybe power event?");
-				timestampPulseStart();
+				logger.warning("Elapsed real time is " + realElapsedMillisec + " ms, longer than the max time "
+			                   + MAX_ELAPSED + " ms.");
+				
+				// Reset lastPulseTime
+				lastPulseTime = optMilliSolPerPulse;
+				// Reset realElaspedMilliSec back to its default time ratio
+				realElapsedMillisec = (long) (optMilliSolPerPulse * MILLISECONDS_PER_MILLISOL / (int)simulationConfig.getTimeRatio());
 			}
+			
+			else if (realElapsedMillisec == 0.0) {
+				// At the start of the sim 
+				realElapsedMillisec = (long) (optMilliSolPerPulse * MILLISECONDS_PER_MILLISOL / desiredTR);
+				logger.warning("Zero elapsed real time. Resetting it back to " + realElapsedMillisec + " ms.");
+			}
+			
 			else {
-				// Get the time pulse length in millisols.
-				marsMSol = (realElaspedMilliSec * targetTR) / MILLISECONDS_PER_MILLISOL; 
-	
-				// Pulse must be less than the max and positive
-				if (marsMSol > 0) {
-					acceptablePulse = true;
-					if (marsMSol > maxMilliSecPerPulse) {
-						logger.warning("Proposed pulse " + marsMSol + " clipped to max " + maxMilliSecPerPulse);
-						marsMSol = maxMilliSecPerPulse;
-					}
-					else if (marsMSol < minMilliSolPerPulse) {
-						logger.warning("Proposed pulse " + marsMSol + " increased to min " + minMilliSolPerPulse);
-						marsMSol = minMilliSolPerPulse;			
-					}
-				}
+				// Adjust the actual TR
+				checkActualTR();
+				
+				// NOTE: actualTR is just the ratio of the simulation's pulse time to the real elapsed time 
+				
+				// Obtain the latest time pulse width in millisols.
+				lastPulseTime = (realElapsedMillisec * actualTR) / MILLISECONDS_PER_MILLISOL;
+				
+				// Adjust the time pulse
+				checkPulseWidth();
 			}
 
-			// Can we do something ?
-			if (acceptablePulse && keepRunning) {
-				// Elapsed time is acceptable
+			// Gets the timestamp for the pulse
+			timestampPulseStart();
+			
+			if (lastPulseTime > 0) {
+				acceptablePulse = true;
+			}
+			
+			// Elapsed time is acceptable
+			if (keepRunning && acceptablePulse) {
+				
 				// The time elapsed for the EarthClock aligned to adjusted Mars time
-				long earthMillisec = (long)(marsMSol * MILLISECONDS_PER_MILLISOL);
-				
+				long earthMillisec = (long)(lastPulseTime * MILLISECONDS_PER_MILLISOL);
+
 				// Calculate the actual rate for feedback
-				actualTR = (int) (earthMillisec / realElaspedMilliSec);
-				
-				if (!clockExecutor.isTerminated()
-					&& !clockExecutor.isShutdown()) {	
-					// Do the pulse
-					timestampPulseStart();
-					
-					uptimer.updateTime(realElaspedMilliSec);
-					
+				actualTR = (double)earthMillisec / realElapsedMillisec;
+
+				if (!listenerExecutor.isTerminated()
+					&& !listenerExecutor.isShutdown()) {
+
+					// Update the uptimer
+					uptimer.updateTime(optMilliSolPerPulse * MILLISECONDS_PER_MILLISOL / desiredTR);
+
 					// Add time to the Earth clock.
-					earthClock.addTime(earthMillisec);
-					
+					earthTime = earthTime.plus(earthMillisec, ChronoField.MILLI_OF_SECOND.getBaseUnit());
+
 					// Add time pulse to Mars clock.
-					marsClock.addTime(marsMSol);
-					
+					marsClock.addTime(lastPulseTime);
+					marsTime = marsTime.addTime(lastPulseTime);
+
 					// Run the clock listener tasks that are in other package
-					fireClockPulse(marsMSol);
+					fireClockPulse(lastPulseTime);
 				}
 				else {
 					// NOTE: when resuming from power saving, timePulse becomes zero
-					LogConsolidated.flog(Level.CONFIG, 0, sourceName, "The clockListenerExecutor has died. Restarting...");
+					logger.config("The clockListenerExecutor has died. Restarting...");
 					resetClockListeners();
 				}
 			}
 		}
 		return acceptablePulse;
 	}
-		   
+
 	/**
-	 * Checks if it is on pause or a saving process has been requested. Keeps track
-	 * of the time pulse
-	 * 
-	 * @return true if it's saving
+	 * Checks for the actual time ratio.
 	 */
-	private boolean checkSave() {
-
-		if (saveType != SaveType.NONE) {
-			try {
-				sim.saveSimulation(saveType, file);
-			} catch (NullPointerException e) {
-				logger.log(Level.SEVERE,
-						"NullPointerException. Could not save the simulation.", e);// as " + (file == null ? "null" : file.getPath()), e);
-				e.printStackTrace();	
-			} catch (IOException e) {
-				logger.log(Level.SEVERE,
-						"IOException. Could not save the simulation.", e);//  as " + (file == null ? "null" : file.getPath()), e);
-				e.printStackTrace();
-
-			} catch (Exception e) {
-				logger.log(Level.SEVERE,
-						"Exception. Could not save the simulation.", e);//  as " + (file == null ? "null" : file.getPath()), e1);
-				e.printStackTrace();
-			}
-			
-			// Reset saveType back to zero
-			saveType = SaveType.NONE;
-
-			return true;
+	private void checkActualTR() {
+		double tr = actualTR;
+		if (tr / desiredTR > 1.15) {
+			double diff = tr - desiredTR;
+			tr = tr - diff / 20;
 		}
-
-		else
-			return false;
+		
+		else if (tr / desiredTR < .85) {
+			double diff = desiredTR - tr;
+			tr = tr + diff / 20;
+		}
+		
+		actualTR = tr;
 	}
-
+	
 	/**
-	 * Looks at the clock listener list and checks if each listener has already had
-	 * a corresponding task in the clock listener task list.
+	 * Checks for the value of pulse width. Adjust the pulse width accordingly. Let 
+	 * it gradually catch up to the value of optMilliSolPerPulse.
 	 */
-	public void setupClockListenerTask() {
-		clockListeners.forEach(t -> {
-			// Check if it has a corresponding task or not, 
-			// if it doesn't, create a task for t
-			addClockListenerTask(t);
-		});
+	private void checkPulseWidth() {
+		double time = lastPulseTime;
+		if (time / maxMilliSolPerPulse > 1.15) {
+			logger.config(20_000, "Pulse width " + Math.round(time*1_000.0)/1_000.0
+					+ " clipped to a max of " + maxMilliSolPerPulse + ".");
+			time = maxMilliSolPerPulse;
+		}
+		else if (time / minMilliSolPerPulse < .85) {
+			logger.config(20_000, "Pulse width " + Math.round(time*1_000.0)/1_000.0
+					+ " increased to a minimum of " + minMilliSolPerPulse + ".");
+			time = minMilliSolPerPulse;
+		}
+		
+		if (time / optMilliSolPerPulse > 1.15) {
+			double diff = time - optMilliSolPerPulse;
+			time = time - diff / 20;
+		}
+		
+		else if (time / optMilliSolPerPulse < .85) {
+			double diff = optMilliSolPerPulse - time;
+			time = time + diff / 20;
+		}	
+		
+		// Update the pulse time for use in tasks
+		double oldPulseTime = Task.getStandardPulseTime();
+		double newPulseTime = Math.min(time/MULTIPLIER, MAX_PULSE_TIME);
+		if (newPulseTime != oldPulseTime) {
+			Task.setStandardPulseTime(newPulseTime);
+		}
+		
+		lastPulseTime = time;
 	}
-
-
+	
 	/**
 	 * Prepares clock listener tasks for setting up threads.
 	 */
 	public class ClockListenerTask implements Callable<String>{
-
-		private ClockPulse currentPulse;
+		private double msolsSkipped = 0;
+		private long lastPulseDelivered = 0;
 		private ClockListener listener;
+		private long minDuration;
 
 		public ClockListener getClockListener() {
 			return listener;
 		}
 
-		private ClockListenerTask(ClockListener listener) {
+		private ClockListenerTask(ClockListener listener, long minDuration) {
 			this.listener = listener;
+			this.minDuration = minDuration;
+			this.lastPulseDelivered = System.currentTimeMillis();
 		}
 
-		public void setCurrentPulse(ClockPulse pulse) {
-			this.currentPulse = pulse;
-		}
-		
 		@Override
-		//public void run() {
 		public String call() throws Exception {
-			if (sim.isDoneInitializing()) {
+			if (!isPaused) {
 				try {
-					// The most important job for CLockListener is to send a clock pulse to listener
-				
+					// The most important job for ClockListener is to send a clock pulse to listener
 					// gets updated.
-					listener.clockPulse(currentPulse);
-					timeCache += currentPulse.getElapsed();
-					count++;
-	
-					if (count > FACTOR) {
-						count = 0;
-						
-						// Note: on a typical PC, approximately one ui pulse is sent out each second
-						listener.uiPulse(timeCache);
-						timeCache = 0;
-	
+					ClockPulse activePulse = currentPulse;
+
+					// Handler is collapsing pulses so check the passed time
+					if (minDuration > 0) {
+						// Compare elapsed real time to the minimum
+						long timeNow = System.currentTimeMillis();
+						if ((timeNow - lastPulseDelivered) < minDuration) {
+							// Less than the minimum so record elapse and skip
+							msolsSkipped += currentPulse.getElapsed();
+							return "skip";
+						}
+
+						// Build new pulse to include skipped time
+						activePulse = currentPulse.addElapsed(msolsSkipped);
+
+						// Reset count
+						lastPulseDelivered = timeNow;
+						msolsSkipped = 0;
 					}
-	
-				} catch (ConcurrentModificationException e) {
-					e.printStackTrace();
+
+					// Call handler
+					listener.clockPulse(activePulse);
+				}
+				catch (Exception e) {
+					logger.log(Level.SEVERE, "Can't send out clock pulse: ", e);
 				}
 			}
 			return "done";
 		}
 	}
 
-	   /**
-     * Gets the simulation speed
-     * 
-     * @return
-     */
-    public int getActualRatio() {
-    	return actualTR;
-    }
-    
+	public long getNextPulse() {
+		return nextPulseId;
+	}
+
 	/**
-	 * Fires the clock pulse to each clock listener
-	 * 
+	 * Prints the new mission sol.
+	 */
+	private void printNewSol(int currentSol) {
+		logger.config(" - - - - - - - - - - - - - - Sol " 
+				+ currentSol
+				+ " - - - - - - - - - - - - - - ");
+	}
+	
+	/**
+	 * Fires the clock pulse to each clock listener.
+	 *
 	 * @param time
 	 */
-	public void fireClockPulse(double time) {
+	private void fireClockPulse(double time) {
 
+		int currentIntMillisol = marsClock.getMillisolInt();
+		// Checks if this pulse starts a new integer millisol
+		boolean isNewIntMillisol = lastIntMillisol != currentIntMillisol;
+		if (isNewIntMillisol) {
+			lastIntMillisol = currentIntMillisol;
+		}
+	
 		// Identify if it's a new Sol
 		int currentSol = marsClock.getMissionSol();
 		boolean isNewSol = ((lastSol >= 0) && (lastSol != currentSol));
-		lastSol  = currentSol;
-		
+		lastSol = currentSol;
+
+		// Print the current sol banner
+		if (isNewSol)
+			printNewSol(currentSol);
+
 		// Log the pulse
 		long newPulseId = nextPulseId++;
 		int logIndex = (int)(newPulseId % MAX_PULSE_LOG);
 		pulseLog[logIndex] = System.currentTimeMillis();
-		
-		ClockPulse pulse = new ClockPulse(sim, newPulseId, time, marsClock, earthClock, this, isNewSol);
+
+		currentPulse = new ClockPulse(newPulseId, time, marsClock, this, isNewSol, isNewIntMillisol);
+		// Note: for-loop may handle checked exceptions better than forEach()
+		// See https://stackoverflow.com/questions/16635398/java-8-iterable-foreach-vs-foreach-loop?rq=1
+
+		// May do it using for loop
+
+		// Note: Using .parallelStream().forEach() in a quad cpu machine would reduce TPS and unable to increase it beyond 512x
+		// Not using clockListenerTasks.forEach(s -> { }) for now
+
+		// Execute all listener concurrently and wait for all to complete before advancing
+		// Ensure that Settlements stay synch'ed and some don't get ahead of others as tasks queue
+		// May use parallelStream() after it's proven to be safe
+		Collections.synchronizedSet(new HashSet<>(clockListenerTasks)).stream().forEach(this::executeClockListenerTask);
+	}
+
+	/**
+	 * Executes the clock listener task.
+	 *
+	 * @param task
+	 */
+	public void executeClockListenerTask(ClockListenerTask task) {
+		Future<String> result = listenerExecutor.submit(task);
+
 		try {
-			clockListenerTasks.forEach(s -> {
-				s.setCurrentPulse(pulse);
-				Future<String> result = clockExecutor.submit(s);
-				// Wait for it to complete so the listeners doesn't get queued up if the MasterClock races ahead
-				try {
-					result.get();
-				} catch (ExecutionException e) {
-					logger.log(Level.SEVERE, "Problem in clock listener", e);
-					e.printStackTrace();
-				} catch (InterruptedException e) {
-					// Program closing down
-					Thread.currentThread().interrupt();
-				}
-			});
+			// Wait for it to complete so the listeners doesn't get queued up if the MasterClock races ahead
+			result.get();
+		} catch (ExecutionException ee) {
+			logger.log(Level.SEVERE, "ExecutionException. Problem with clock listener tasks: ", ee);
 		} catch (RejectedExecutionException ree) {
+			// Application shutting down
+			Thread.currentThread().interrupt();
 			// Executor is shutdown and cannot complete queued tasks
+			logger.log(Level.SEVERE, "RejectedExecutionException. Problem with clock listener tasks: ", ree);
+		} catch (InterruptedException ie) {
+			// Program closing down
+			Thread.currentThread().interrupt();
+			logger.log(Level.SEVERE, "InterruptedException. Problem with clock listener tasks: ", ie);
 		}
 	}
 
 	/**
-	 * Stop the clock
+	 * Stops the clock.
 	 */
 	public void stop() {
 		keepRunning = false;
 	}
 
 	/**
-	 * Restarts the clock
+	 * Restarts the clock.
 	 */
 	public void restart() {
 		keepRunning = true;
@@ -771,23 +757,57 @@ public class MasterClock implements Serializable {
 	}
 
 	/**
-	 * Timestamps the last pulse, used to calculate elapsed pulse time
+	 * Timestamps the last pulse, used to calculate elapsed pulse time.
 	 */
 	private void timestampPulseStart() {
 		tLast = System.currentTimeMillis();
 	}
 
 	/**
-	 * Starts the clock
+	 * Starts the clock.
 	 */
 	public void start() {
 		keepRunning = true;
+
+		startClockListenerExecutor();
+
+		if (clockExecutor == null) {
+			int num = 1; // Should only have 1 thread updating the time
+			logger.config("Setting up " + num + " thread(s) for clock executor.");
+			clockExecutor = Executors.newFixedThreadPool(num,
+					new ThreadFactoryBuilder().setNameFormat("masterclock-%d").build());
+		}
+		clockExecutor.execute(clockThreadTask);
+
 		timestampPulseStart();
 	}
 
-	
 	/**
-	 * Set if the simulation is paused or not.
+	 * Increases the speed / time ratio.
+	 */
+	public void increaseSpeed() {
+		int tr = desiredTR * 2;
+		if (tr > MAX_TIME_RATIO) {
+			return;
+		}
+		desiredTR = tr;
+		adjustOptimalPulseWidth();
+	}
+
+	/**
+	 * Decreases the speed / time ratio.
+	 */
+	public void decreaseSpeed() {
+		desiredTR /= 2;
+		if (desiredTR < 1) {
+			desiredTR = 1;
+		}
+		adjustOptimalPulseWidth();
+	}
+
+
+	/**
+	 * Sets if the simulation is paused or not.
 	 *
 	 * @param value the state to be set.
 	 * @param showPane true if the pane should be shown.
@@ -795,18 +815,12 @@ public class MasterClock implements Serializable {
 	public void setPaused(boolean value, boolean showPane) {
 		if (this.isPaused != value) {
 			this.isPaused = value;
-	
-			if (value) {
-				AutosaveScheduler.cancel();	
-				actualTR = 0; // Clear the actual rate
-			}
-			else {
-				AutosaveScheduler.start();
-				
+
+			if (!value) {
 				// Reset the last pulse time
 				timestampPulseStart();
 			}
-			
+
 			// Fire pause change to all clock listeners.
 			firePauseChange(value, showPane);
 		}
@@ -822,46 +836,44 @@ public class MasterClock implements Serializable {
 	}
 
 	/**
-	 * Send a pulse change event to all clock listeners.
-	 * 
+	 * Sends a pulse change event to all clock listeners.
+	 *
 	 * @param isPaused
 	 * @param showPane
 	 */
-	public void firePauseChange(boolean isPaused, boolean showPane) {
-
-		clockListeners.forEach(cl -> cl.pauseChange(isPaused, showPane));		 
+	private void firePauseChange(boolean isPaused, boolean showPane) {
+		if (clockListenerTasks != null) {
+			clockListenerTasks.forEach(cl -> cl.listener.pauseChange(isPaused, showPane));
+		}
 	}
 
 	/**
-	 * Starts clock listener thread pool executor
+	 * Starts clock listener thread pool executor.
 	 */
-	public void startClockListenerExecutor() {
-		if (clockExecutor == null)
-			clockExecutor = Executors.newSingleThreadExecutor(); //(ThreadPoolExecutor) Executors.newFixedThreadPool(1);
+	private void startClockListenerExecutor() {
+		if (listenerExecutor == null) {
+			int num = Math.min(1, Simulation.NUM_THREADS - simulationConfig.getUnusedCores());
+			if (num <= 0) num = 1;
+			logger.config("Setting up " + num + " thread(s) for clock listener.");
+			listenerExecutor = Executors.newFixedThreadPool(num,
+					new ThreadFactoryBuilder().setNameFormat("clockListener-%d").build());
+		}
 	}
 
 	/**
-	 * Shuts down clock listener thread pool executor
+	 * Shuts down clock listener thread pool executor.
 	 */
-	public void endClockListenerExecutor() {
+	public void shutdown() {
+		if (listenerExecutor != null)
+			listenerExecutor.shutdownNow();
 		if (clockExecutor != null)
 			clockExecutor.shutdownNow();
 	}
 
 
 	/**
-	 * Gets the clock listener executor. To be called by TransportWizard and ConstructionWizard
-	 * 
-	 * @return
-	 */
-	public ExecutorService getClockListenerExecutor() {
-		return clockExecutor;
-	}
-
-
-	/**
-	 * Gets the Frame per second
-	 * 
+	 * Gets the Frame per second.
+	 *
 	 * @return
 	 */
 	public double getFPS() {
@@ -870,106 +882,97 @@ public class MasterClock implements Serializable {
 	}
 
 	/**
-	 * Sends out a clock pulse if using FXGL
-	 * 
-	 * @param tpf
-	 */
-	public void onUpdate(double tpf) {
-		if (!isPaused) {
-			tpfCache += tpf;
-			if (tpfCache >= baseTBU_s) {
-				
-				addTime();
-				
-				// Set tpfCache back to zero
-				tpfCache = 0;
-			}
-
-			checkSave();
-
-			// Exit program if exitProgram flag is true.
-			if (exitProgram) {
-				AutosaveScheduler.cancel();
-				System.exit(0);
-			}
-		}
-	}
-
-	/**
-	 * Gets the sleep time in milliseconds
-	 * 
+	 * Gets the sleep time in milliseconds.
+	 *
 	 * @return
 	 */
 	public long getSleepTime() {
 		return sleepTime;
 	}
-	
+
 	/**
-	 * Gets the MilliSol covered in the last pulse
-	 * 
+	 * Gets the pulse width, namely, the millisols covered in the last pulse.
+	 *
 	 * @return
 	 */
 	public double getMarsPulseTime() {
-		return marsMSol;
+		return lastPulseTime;
 	}
-	
-	/** 
-	 * Gets the time [in microseconds] taken to execute one frame in the game loop 
-	 * 
+
+	/**
+	 * Gets the time [in microseconds] taken to execute one frame in the game loop.
+	 *
 	 * @return
 	 */
 	public long getExecutionTime() {
-		return executionTime;	
+		return executionTime;
 	}
 
-	
-	/**
-	 * Reloads instances after loading from a saved sim
-	 * 
-	 * @param clock
-	 */
-	public static void initializeInstances(Simulation s) {
-		sim = s;//Simulation.instance();
-	}
-	
-	/**
-	 * Prepare object for garbage collection.
-	 */
-	public void destroy() {
-		sim = null;
-		marsClock.destroy();
-		marsClock = null;
-		initialMarsTime = null;
-		earthClock.destroy();
-		earthClock = null;
-		uptimer = null;
-		clockThreadTask = null;
-		clockExecutor = null;
-		file = null;
-
-		clockListeners = null;
-		clockExecutor = null;
-	}
 
 	/**
-	 * How many pulses per second
+	 * Returns the current # pulses per second.
+	 *
 	 * @return
 	 */
-	public double getPulsesPerSecond() {
+	public double getCurrentPulsesPerSecond() {
 		double ticksPerSecond = 0;
+
+		// Make sure enough pulses have passed
+		if (nextPulseId >= 0) {
+			// Recent idx will be the previous pulse id but check it is not negative
+			int recentIdx = (int)((nextPulseId-1) % MAX_PULSE_LOG);
+			recentIdx = (recentIdx < 0 ? (MAX_PULSE_LOG-1) : recentIdx);
+
+			// Penultimate pulse id will be one before the recent
+			int penIdx = (int)((recentIdx-1) % MAX_PULSE_LOG);
+			penIdx = (penIdx < 0 ? (MAX_PULSE_LOG-1) : penIdx);
+			long elapsedMilli = (pulseLog[recentIdx] - pulseLog[penIdx]);
+			ticksPerSecond = 1000D/elapsedMilli;
+		}
+
+		return ticksPerSecond;
+	}
 	
+	/**
+	 * Returns the average # pulses per second.
+	 *
+	 * @return
+	 */
+	public double getAveragePulsesPerSecond() {
+		double ticksPerSecond = 0;
+
 		// Make sure enough pulses have passed
 		if (nextPulseId >= MAX_PULSE_LOG) {
 			// Recent idx will be the previous pulse id but check it is not negative
 			int recentIdx = (int)((nextPulseId-1) % MAX_PULSE_LOG);
 			recentIdx = (recentIdx < 0 ? (MAX_PULSE_LOG-1) : recentIdx);
-			
+
 			// Oldest id will be the next pulse as it will be overwrite on next tick
 			int oldestIdx = (int)(nextPulseId % MAX_PULSE_LOG);
-			long elaspsedMilli = (pulseLog[recentIdx] - pulseLog[oldestIdx]);
-			ticksPerSecond = (MAX_PULSE_LOG * 1000D)/elaspsedMilli;
+			long elapsedMilli = (pulseLog[recentIdx] - pulseLog[oldestIdx]);
+			ticksPerSecond = (MAX_PULSE_LOG * 1000D)/elapsedMilli;
 		}
-		
+
 		return ticksPerSecond;
+	}
+
+	/**
+	 * Gets the clock pulse.
+	 *
+	 * @return
+	 */
+	public ClockPulse getClockPulse() {
+		return currentPulse;
+	}
+
+	/**
+	 * Prepares object for garbage collection.
+	 */
+	public void destroy() {
+		marsClock = null;
+		initialMarsTime = null;
+		uptimer = null;
+		clockThreadTask = null;
+		listenerExecutor = null;
 	}
 }

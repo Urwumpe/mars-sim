@@ -1,17 +1,15 @@
-/**
+/*
  * Mars Simulation Project
  * RendezvousVehiclePanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-10-21
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -26,10 +24,6 @@ import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LifeSupportInterface;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
@@ -40,11 +34,11 @@ import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 /**
  * A wizard panel for selecting a mission rendezvous vehicle.
  */
+@SuppressWarnings("serial")
 class RendezvousVehiclePanel extends WizardPanel {
 
 	/** Wizard panel name. */
@@ -55,9 +49,8 @@ class RendezvousVehiclePanel extends WizardPanel {
 	private JTable vehicleTable;
 	private JLabel errorMessageLabel;
 	
-	private static MissionManager missionManager;
-	private static UnitManager unitManager = Simulation.instance().getUnitManager();
-	
+	private MissionManager missionManager;
+
 	/**
 	 * Constructor.
 	 * @param wizard the create mission wizard.
@@ -66,7 +59,7 @@ class RendezvousVehiclePanel extends WizardPanel {
 		// Use WizardPanel constructor.
 		super(wizard);
 		
-		missionManager = Simulation.instance().getMissionManager();
+		missionManager = getSimulation().getMissionManager();
 		 
 		// Set the layout.
 		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
@@ -75,9 +68,7 @@ class RendezvousVehiclePanel extends WizardPanel {
 		setBorder(new MarsPanelBorder());
 		
 		// Create the select vehicle label.
-		JLabel selectVehicleLabel = new JLabel("Select a rover to rescue/salvage.", JLabel.CENTER);
-		selectVehicleLabel.setFont(selectVehicleLabel.getFont().deriveFont(Font.BOLD));
-		selectVehicleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		JLabel selectVehicleLabel = createTitleLabel("Select a rover to rescue/salvage.");
 		add(selectVehicleLabel);
 		
 		// Create the vehicle panel.
@@ -95,7 +86,6 @@ class RendezvousVehiclePanel extends WizardPanel {
         
         // Create the vehicle table.
         vehicleTable = new JTable(vehicleTableModel);
-		TableStyle.setTableStyle(vehicleTable);
         vehicleTable.setDefaultRenderer(Object.class, new UnitTableCellRenderer(vehicleTableModel));
         vehicleTable.setRowSelectionAllowed(true);
         vehicleTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -123,10 +113,7 @@ class RendezvousVehiclePanel extends WizardPanel {
         vehicleScrollPane.setViewportView(vehicleTable);
 		
         // Create the error message label.
-		errorMessageLabel = new JLabel(" ", JLabel.CENTER);
-		errorMessageLabel.setFont(errorMessageLabel.getFont().deriveFont(Font.BOLD));
-		errorMessageLabel.setForeground(Color.RED);
-		errorMessageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		errorMessageLabel = createErrorLabel();
 		add(errorMessageLabel);
 		
 		// Add vertical glue.
@@ -205,8 +192,7 @@ class RendezvousVehiclePanel extends WizardPanel {
     		
             if (row < units.size()) {
             	Rover vehicle = (Rover) getUnit(row);
-            	Inventory inv = vehicle.getInventory();
-            	
+   	
             	try {
             		if (column == 0) 
             			result = vehicle.getName();
@@ -218,20 +204,20 @@ class RendezvousVehiclePanel extends WizardPanel {
             		else if (column == 2) 
             			result = vehicle.getCrewNum();
             		else if (column == 3) {
-            			AmountResource oxygen = ResourceUtil.findAmountResource(LifeSupportInterface.OXYGEN);
-            			result = (int) inv.getAmountResourceStored(oxygen, false);
+            			AmountResource oxygen = ResourceUtil.findAmountResource(ResourceUtil.OXYGEN);
+            			result = (int) vehicle.getAmountResourceStored(oxygen.getID());
             		}
                 	else if (column == 4) {
-                		AmountResource water = ResourceUtil.findAmountResource(LifeSupportInterface.WATER);
-                		result = (int) inv.getAmountResourceStored(water, false);
+                		AmountResource water = ResourceUtil.findAmountResource(ResourceUtil.WATER);
+                		result = (int) vehicle.getAmountResourceStored(water.getID());
                 	}
                 	else if (column == 5) { 
-                		AmountResource food = ResourceUtil.findAmountResource(LifeSupportInterface.FOOD);
-                		result = (int) inv.getAmountResourceStored(food, false);
+                		AmountResource food = ResourceUtil.findAmountResource(ResourceUtil.FOOD);
+                		result = (int) vehicle.getAmountResourceStored(food.getID());
                 	}
                 	else if (column == 6) { 
                 		AmountResource dessert = ResourceUtil.findAmountResource("Soymilk");
-                		result = (int) inv.getAmountResourceStored(dessert, false);
+                		result = (int) vehicle.getAmountResourceStored(dessert.getID());
                 	}
                 	else if (column == 7) {
                 		Vehicle rescueVehicle = getRescueVehicle(vehicle);
@@ -324,7 +310,7 @@ class RendezvousVehiclePanel extends WizardPanel {
     				Vehicle missionVehicle = getWizard().getMissionData().getRover();
     				Settlement startingSettlement = getWizard().getMissionData().getStartingSettlement();
     				double distance = startingSettlement.getCoordinates().getDistance(vehicle.getCoordinates()) * 2D;
-    				if (distance > missionVehicle.getRange(wizard.getMissionBean().getMissionType())) result = true;
+    				if (distance > missionVehicle.getRange()) result = true;
     			}
     			catch (Exception e) {}
     		}

@@ -1,127 +1,76 @@
-/**
+/*
  * Mars Simulation Project
  * ResupplyUtil.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-25
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.interplanetary.transport.resupply;
 
-import java.util.Iterator;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.UnitManager;
-import org.mars_sim.msp.core.interplanetary.transport.TransitState;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.SettlementConfig;
 import org.mars_sim.msp.core.time.MarsClock;
 
 /**
  * Utility class for resupply missions.
+ * Future: may reference the calculation of transit time at http://www.jpl.nasa.gov/edu/teach/activity/lets-go-to-mars-calculating-launch-windows/
  */
 public final class ResupplyUtil {
 
-    // Average transit time for resupply missions from Earth to Mars [in sols]
-    private static int averageTransitTime;
-    // TODO: implement calculation of transit time at http://www.jpl.nasa.gov/edu/teach/activity/lets-go-to-mars-calculating-launch-windows/
 
     public static int MAX_NUM_SOLS_PLANNED = 2007; // 669 * 3 = 2007
 
-    public static List<Resupply> resupplies;
-
     private static SimulationConfig simulationConfig = SimulationConfig.instance();
 	private static SettlementConfig settlementConfig = simulationConfig.getSettlementConfiguration();
-	private static ResupplyConfig resupplyConfig = simulationConfig.getResupplyConfiguration();
-	private static MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
-	private static UnitManager unitManager = Simulation.instance().getUnitManager();
+	
+    // Average transit time for resupply missions from Earth to Mars [in sols]
+    private static int averageTransitTime = simulationConfig.getAverageTransitTime();
+
+    
+    private static Simulation sim = Simulation.instance();
+	private static MarsClock currentTime = sim.getMasterClock().getMarsClock();
+	private static UnitManager unitManager = sim.getUnitManager();
     
 	/**
 	 * Private constructor for utility class.
 	 */
-	public ResupplyUtil() {
-		// Do nothing
-		averageTransitTime = simulationConfig.getAverageTransitTime();
+	private ResupplyUtil() {
+		// nothing
 	}
 
 	public static int getAverageTransitTime() {
 		return averageTransitTime;
 	}
 	
+
 	/**
-	 * Create the initial resupply missions from the configuration XML files.
-	 */
-	public static Resupply getResupply(String settlementName) {
-        Iterator<Resupply> i = resupplies.iterator();
-        while (i.hasNext()) {
-        	Resupply r = i.next();
-        	if (r.getSettlementName().equals(settlementName))
-        		return r;
-        }
-        return null;
-	}
-	        
-	/**
-	 * Create the initial resupply missions from the configuration XML files.
+	 * Creates the initial resupply missions from the configuration XML files.
 	 */
 	public static List<Resupply> loadInitialResupplyMissions() {
+		List<Resupply> resupplies = new ArrayList<>();
+			
+		for(Settlement settlement : unitManager.getSettlements()) {
+			String templateName = settlement.getTemplate();
 
-		if (resupplies == null)  {
-			resupplies = new CopyOnWriteArrayList<Resupply>();
+			// For each Settlement get the resupply scheduled defined by the SettlementTemplate
+			for(ResupplySchedule template : settlementConfig.getItem(templateName).getResupplyMissionTemplates()) {
+				MarsClock arrivalDate = new MarsClock(currentTime);
+				arrivalDate.addTime(template.getFirstArrival() * 1000D);
 
-	        Iterator<Settlement> i = unitManager.getSettlements().iterator();
-	        while (i.hasNext()) {
-	            Settlement settlement = i.next();
-	            String templateName = settlement.getTemplate();
+				// If the frequency is less than transport time also add the next ones
+				for(int cycle = 0; cycle < template.getActiveMissions(); cycle++) {
+					Resupply resupply = new Resupply(template, cycle+1, arrivalDate, settlement);
+					resupplies.add(resupply);
 
-	            Iterator<ResupplyMissionTemplate> j =
-	                settlementConfig.getSettlementTemplate(templateName).getResupplyMissionTemplates().iterator();
-	            while (j.hasNext()) {
-	                ResupplyMissionTemplate template = j.next();
-	                MarsClock arrivalDate = (MarsClock) currentTime.clone();
-	                arrivalDate.addTime(template.getArrivalTime() * 1000D);
-	                Resupply resupply = new Resupply(arrivalDate, settlement);
-
-	                // Determine launch date.
-	                MarsClock launchDate = (MarsClock) arrivalDate.clone();
-	                launchDate.addTime(-1D * averageTransitTime * 1000D);
-	                resupply.setLaunchDate(launchDate);
-
-	                // Set resupply state based on launch and arrival time.
-	                TransitState state = TransitState.PLANNED;
-	                if (MarsClock.getTimeDiff(currentTime, launchDate) >= 0D) {
-	                    state = TransitState.IN_TRANSIT;
-	                    if (MarsClock.getTimeDiff(currentTime, arrivalDate) >= 0D) {
-	                        state = TransitState.ARRIVED;
-	                    }
-	                }
-	                resupply.setTransitState(state);
-
-	                String resupplyName = template.getName();
-
-	                // Get new building types.
-	                resupply.setNewBuildings(resupplyConfig.getResupplyBuildings(resupplyName));
-
-	                // Get new vehicle types.
-	                resupply.setNewVehicles(resupplyConfig.getResupplyVehicleTypes(resupplyName));
-
-	                // Get new equipment types.
-	                resupply.setNewEquipment(resupplyConfig.getResupplyEquipment(resupplyName));
-
-	                // Get number of new immigrants.
-	                resupply.setNewImmigrantNum(resupplyConfig.getNumberOfResupplyImmigrants(resupplyName));
-
-	                // Get new resources map.
-	                resupply.setNewResources(resupplyConfig.getResupplyResources(resupplyName));
-
-	                // Get new parts map.
-	                resupply.setNewParts(resupplyConfig.getResupplyParts(resupplyName));
-
-	                resupplies.add(resupply);
-
-	            }
-	        }
+					arrivalDate = new MarsClock(arrivalDate);
+					arrivalDate.addTime(template.getFrequency() * 1000D);
+				}
+			}
 		}
 
         return resupplies;

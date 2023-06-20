@@ -1,9 +1,8 @@
-/**
+/*
  * Mars Simulation Project
  * OGGSoundClip.java
- * @version 3.1.2 2020-09-02
- * @author Lars Naesbye Christensen (complete rewrite for OGG)
- * Based on JOrbisPlayer example source
+ * @date 2021-08-28
+ * @author Lars Naesbye Christensen
  */
 
 package org.mars_sim.msp.ui.swing.sound;
@@ -24,8 +23,6 @@ import javax.sound.sampled.FloatControl;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.SourceDataLine;
 
-import org.mars_sim.msp.core.Simulation;
-
 import com.jcraft.jogg.Packet;
 import com.jcraft.jogg.Page;
 import com.jcraft.jogg.StreamState;
@@ -36,21 +33,21 @@ import com.jcraft.jorbis.DspState;
 import com.jcraft.jorbis.Info;
 
 /**
- * A class that creates a sound clip
+ * A class that creates a sound clip. A complete rewrite for OGG based on JOrbisPlayer example source
  */
 public class OGGSoundClip {
 
-	private static Logger logger = Logger.getLogger(OGGSoundClip.class.getName());
+	private static final Logger logger = Logger.getLogger(OGGSoundClip.class.getName());
 
-	private final int BUFSIZE = 4096 * 2;
-	private int convsize = BUFSIZE * 2;
+	private static final int BUFFER_SIZE = 4096 * 2;
+	
+	private int convsize = BUFFER_SIZE * 2;
 	private int rate;
 	private int channels;
 
 	private byte[] buffer = null;
 	private int bytes = 0;
 
-	private double balance = 0;
 	private double volume = .5f;
 
 	private boolean mute = false;
@@ -87,7 +84,7 @@ public class OGGSoundClip {
 
 		try {
 			if (music) {
-				File f = new File(Simulation.MUSIC_DIR, ref);
+				File f = new File(AudioPlayer.MUSIC_DIR, ref);
 				if (f.exists() && f.canRead()) {
 					InputStream targetStream = new FileInputStream(f);
 					init(targetStream);
@@ -98,8 +95,7 @@ public class OGGSoundClip {
 					.getResourceAsStream(SoundConstants.SOUNDS_ROOT_PATH + ref));
 			}
 		} catch (IOException e) {
-			// throw new IOException("Couldn't find: " + ref);
-			logger.log(Level.SEVERE, "Couldn't find: " + ref);
+			logger.log(Level.SEVERE, "Couldn't find: " + ref + ": " + e);
 		}
 	}
 
@@ -131,9 +127,6 @@ public class OGGSoundClip {
 	 * @param volume the volume
 	 */
 	public void determineGain(double volume) {
-		// System.out.println("OGGSoundClip's setGain() is on " +
-		// Thread.currentThread().getName());
-
 		if (volume > 1)
 			volume = 1;
 		else if (volume <= 0) {
@@ -144,8 +137,6 @@ public class OGGSoundClip {
 			paused = false;
 		
 		this.volume = volume;
-
-		// System.out.println("volume : " + volume);
 
 		if (outputLine == null) {
 			return;
@@ -178,10 +169,6 @@ public class OGGSoundClip {
 				double max = floatControl.getMaximum();
 				double min = floatControl.getMinimum();
 
-//				float range = max - min; float step = range/100f; 
-//				float num = gain/0.05f; float value = min + num * step;		 
-//				if (value < min) value = min; else if (value > max) value = max;
-
 				double value = (max - min / 2f) * volume + min / 2f;
 
 				if (value <= min / 2)
@@ -189,70 +176,33 @@ public class OGGSoundClip {
 				else
 					floatControl.setValue((float)value);
 
-				// System.out.println("max : " + max); // = 6.0206
-				// System.out.println("min : " + min); // = -80.0
-				// System.out.println("range : " + range);
-				// System.out.println("step : " + step);
-				// System.out.println("value : " + value);
 			} else {
 				// in case of some versions of linux in which MASTER_GAIN is not supported
 				logger.log(Level.SEVERE, "Please ensure sound driver is working. MasterGain not supported. ");
-//				disableSound();
 			}
 
 		} catch (IllegalArgumentException e) {
-			// TODO: how to resolve 'IllegalArgumentException: Master Gain not supported' in
-			// ubuntu ?
-			// e.printStackTrace();
+			// Note: how to resolve 'IllegalArgumentException: Master Gain not supported' in
 			logger.log(Level.SEVERE, "Please ensure sound interface is working. Speakers NOT detected. " + e);
-//			disableSound();
 		}
 
 	}
-
-
-	/**
-	 * Attempt to set the balance between the two speakers. -1.0 is full left speak,
-	 * 1.0 if full right speaker. Anywhere in between moves between the two
-	 * speakers. If the control is not supported this method has no effect
-	 *
-	 * @param balance The balance value
-	 */
-//	public void setBalance(double balance) {
-//		this.balance = balance;
-//
-//		if (outputLine == null) {
-//			return;
-//		}
-//
-//		try {
-//			FloatControl control = (FloatControl) outputLine.getControl(FloatControl.Type.BALANCE);
-//			control.setValue((float)balance);
-//		} catch (IllegalArgumentException e) {
-//			//logger.log(Level.SEVERE, "Sound balance not supported. " + e);
-//			// balance not supported
-//			//disableSound();
-//		}
-//	}
 
 	/**
 	 * Check the state of the playback
 	 *
 	 * @return True if the playback has been stopped
 	 */
-	boolean checkState() {
-		while (paused && (playerThread != null)) {
-			synchronized (playerThread) {
-				if (playerThread != null) {
-					try {
-						playerThread.wait();
-					} catch (InterruptedException e) {
-						// ignored
-					}
-				}
+	synchronized boolean checkState() {
+		while (paused && (playerThread != null)){
+	    	try {
+				name.wait();
+			} catch (InterruptedException e) {
+				// Restore interrupted state
+			    Thread.currentThread().interrupt();
 			}
-		}
-
+	    }
+		
 		return stopped();
 	}
 
@@ -260,7 +210,7 @@ public class OGGSoundClip {
 	 * Pause the playback
 	 */
 	 public void pause() { 
-		 paused = true; //oldGain = gain; determineGain(0); }
+		 paused = true; 
 	 }
 
 
@@ -278,19 +228,17 @@ public class OGGSoundClip {
 	 */
 	public void resume() {
 		if (!paused) {
-			loop();//play();
+			loop();
 			return;
 		}
 
 		paused = false;
 
-		synchronized (playerThread) {
-			if (playerThread != null) {
-				playerThread.notify();
+		if (playerThread != null) {
+			synchronized(this){
+				name.notifyAll();
 			}
 		}
-
-		// determineGain(oldGain);
 	}
 
 	/**
@@ -310,7 +258,6 @@ public class OGGSoundClip {
 	 */
 	private void init(InputStream in) throws IOException {
 		if (in == null) {
-			// throw new IOException("Couldn't find input source");
 			logger.log(Level.SEVERE, "Couldn't find the input source");
 			disableSound();
 		}
@@ -322,35 +269,34 @@ public class OGGSoundClip {
 	 * Play the clip once - for sound effects
 	 */
 	public void play() {
-		// System.out.println("OGGSoundClip's play() is on " +
-		// Thread.currentThread().getName());
 		stop();
 
 		try {
 			bitStream.reset();
 		} catch (IOException e) {
 			// ignore if no mark
-			logger.log(Level.SEVERE, "IOException in OGGSoundClip's play()", e.getMessage());
-			//disableSound();
+			logger.log(Level.SEVERE, "IOException in OGGSoundClip's play(). ", e);
 		}
 
 		playerThread = new Thread() {
 			public void run() {
 				 try {
 					 playStream(Thread.currentThread());
-				 } catch (Exception e) {
-					 e.printStackTrace();
-					 logger.log(Level.SEVERE, "Can't play the bit stream in play()", e.getMessage());
+				 } catch (Exception e) {	
+						playerThread = null;
+						
+					 if (AudioPlayer.isEffectMute()) {
+						 logger.log(Level.CONFIG, "The sound effect is muted.");
+					 }
+					 else
+						 logger.log(Level.SEVERE, "Can't play the bit stream in play(). ", e);
 				 }
 
 				try {
-
 					bitStream.reset();
 				} catch (IOException e) {
-					// e.printStackTrace();
 					logger.log(Level.SEVERE, "Trouble resetting the bit stream for the sound effect of " + name,
-							e.getMessage());
-//					disableSound();
+							e);
 				}
 			};
 		};
@@ -367,35 +313,32 @@ public class OGGSoundClip {
 		try {
 			bitStream.reset();
 		} catch (IOException e) {
-			logger.log(Level.SEVERE, "IOException in OGGSoundClip's loop()", e.getMessage());
-			//disableSound();
+			logger.log(Level.SEVERE, "IOException in OGGSoundClip's loop(). ", e);
 			// ignore if no mark
 		}
 
 		playerThread = new Thread() {
 			public void run() {
-				// while (playerThread == Thread.currentThread()) {
 				try {
 					playStream(Thread.currentThread());
 				} catch (Exception e) {
-					// logger.log(Level.SEVERE, "Troubleshooting audio : have you plugged in a
-					// speaker/headphone? "
-					// + "Please check your audio source.", e.getMessage());
-					// e.printStackTrace();
+					// Note: "Troubleshooting audio : have you plugged in a speaker/headphone? "
+					// + "Please check your audio source.", e);
 					playerThread = null;
-					logger.log(Level.SEVERE, "Can't play the bit stream in loop(). ", e.getMessage());
-//					disableSound();
+	
+					if (AudioPlayer.isMusicMute()) {
+						logger.log(Level.CONFIG, "The music is muted.");
+					}
+					else
+						logger.log(Level.SEVERE, "Can't play the bit stream in loop(). ", e);
 				}
 
 				try {
 					bitStream.reset();
 				} catch (IOException e) {
-					// e.printStackTrace();
 					logger.log(Level.SEVERE, "Trouble reseting the bit stream for the background track " + name,
-							e.getMessage());
-//					//disableSound();
+							e);
 				}
-				// }
 			};
 		};
 		playerThread.setDaemon(true);
@@ -403,12 +346,7 @@ public class OGGSoundClip {
 	}
 
 	public void disableSound() {
-//		if (MainDesktopPane.mainScene != null) {
-//			MainScene.disableSound();
-//		}
-//		else
-		AudioPlayer.disableSound();
-//		MainMenu.disableSound();
+		AudioPlayer.disableAudio();
 	}
 
 	/**
@@ -432,6 +370,8 @@ public class OGGSoundClip {
 			if (bitStream != null)
 				bitStream.close();
 		} catch (IOException e) {
+			logger.log(Level.SEVERE, "Cannot close the bitstream: " ,
+					e);
 		}
 	}
 
@@ -540,14 +480,13 @@ public class OGGSoundClip {
 
 			int eos = 0;
 
-			int index = oy.buffer(BUFSIZE);
+			int index = oy.buffer(BUFFER_SIZE);
 			buffer = oy.data;
 			try {
-				bytes = bitStream.read(buffer, index, BUFSIZE);
+				bytes = bitStream.read(buffer, index, BUFFER_SIZE);
 			} catch (Exception e) {
-				// throw new InternalException(e);
 				logger.log(Level.SEVERE, "Audio Troubleshooting : have a speaker/headphone been plugged in ? "
-						+ "Please check your audio source.", e.getMessage());
+						+ "Please check your audio source. ", e);
 			}
 
 			oy.wrote(bytes);
@@ -556,7 +495,7 @@ public class OGGSoundClip {
 				chained = false;
 			} else {
 				if (oy.pageout(og) != 1) {
-					if (bytes < BUFSIZE)
+					if (bytes < BUFFER_SIZE)
 						break;
 					// throw new InternalException("Input does not appear to be an Ogg bitstream.");
 					logger.log(Level.SEVERE, "Input does not appear to be an Ogg bitstream.");
@@ -569,9 +508,7 @@ public class OGGSoundClip {
 			vc.init();
 
 			if (os.pagein(og) < 0) {
-				// error; stream version mismatch perhaps
-				// throw new InternalException("Error reading first page of OGG bitstream
-				// data.");
+				// error stream version mismatch perhaps
 				logger.log(Level.SEVERE, "Error reading first page of OGG bitstream data.");
 			}
 
@@ -606,7 +543,6 @@ public class OGGSoundClip {
 							if (result == 0)
 								break;
 							if (result == -1) {
-								// throw new InternalException("Corrupt secondary header. Exiting.");
 								logger.log(Level.SEVERE, "Corrupt secondary header. Exiting.");
 							}
 							vi.synthesis_headerin(vc, op);
@@ -615,26 +551,24 @@ public class OGGSoundClip {
 					}
 				}
 
-				index = oy.buffer(BUFSIZE);
+				index = oy.buffer(BUFFER_SIZE);
 				buffer = oy.data;
 				
 				try {
-					bytes = bitStream.read(buffer, index, BUFSIZE);
+					bytes = bitStream.read(buffer, index, BUFFER_SIZE);
 				} catch (Exception e) {
 					// throw new InternalException(e);
 					// Note: when loading from a saved sim, the following log statement appears excessively
-//					logger.log(Level.SEVERE, "Exception in reading bitstream.", e.getMessage());
+//					logger.log(Level.SEVERE, "Exception in reading bitstream.", e);
 				}
 				
 				if (bytes == 0 && i < 2) {
-					// throw new InternalException("End of file before finding all Vorbis
-					// headers!");
 					logger.log(Level.SEVERE, "End of file before finding all Vorbis headers!");
 				}
 				oy.wrote(bytes);
 			}
 
-			convsize = BUFSIZE / vi.channels;
+			convsize = BUFFER_SIZE / vi.channels;
 
 			vd.synthesis_init(vi);
 			vb.init(vd);
@@ -653,19 +587,17 @@ public class OGGSoundClip {
 					int result = oy.pageout(og);
 					if (result == 0)
 						break; // need more data
-					if (result == -1) { // missing or corrupt data at this page
-						// position
-						// System.err.println("Corrupt or missing data in
-						// bitstream;
-						// continuing...");
+					if (result == -1) { 
+						// missing or corrupt data at this page position
+						// Corrupt or missing data in bitstream
 					} else {
 						os.pagein(og);
 
-						if (og.granulepos() == 0) { //
-							chained = true; //
-							eos = 1; //
-							break; //
-						} //
+						if (og.granulepos() == 0) {
+							chained = true;
+							eos = 1;
+							break;
+						}
 
 						while (true) {
 							if (checkState()) {
@@ -675,18 +607,13 @@ public class OGGSoundClip {
 							result = os.packetout(op);
 							if (result == 0)
 								break; // need more data
-							if (result == -1) { // missing or corrupt data at
-								// this page position
-								// no reason to complain; already complained
-								// above
-
-								// System.err.println("no reason to complain;
-								// already complained above");
+							if (result == -1) { 
+								// missing or corrupt data at this page position
 							} else {
 								// we have a packet. Decode it
 								int samples;
-								if (vb.synthesis(op) == 0) { // test for
-									// success!
+								if (vb.synthesis(op) == 0) { 
+									// test for success!
 									vd.synthesis_blockin(vb);
 								}
 								while ((samples = vd.synthesis_pcmout(_pcmf, _index)) > 0) {
@@ -695,7 +622,7 @@ public class OGGSoundClip {
 									}
 
 									float[][] pcmf = _pcmf[0];
-									int bout = (samples < convsize ? samples : convsize);
+									int bout = (Math.min(samples, convsize));
 
 									// convert doubles to 16 bit signed ints
 									// (host order) and
@@ -730,13 +657,13 @@ public class OGGSoundClip {
 				}
 
 				if (eos == 0) {
-					index = oy.buffer(BUFSIZE);
+					index = oy.buffer(BUFFER_SIZE);
 					buffer = oy.data;
 					try {
-						bytes = bitStream.read(buffer, index, BUFSIZE);
+						bytes = bitStream.read(buffer, index, BUFFER_SIZE);
 					} catch (Exception e) {
 						// throw new InternalException(e);
-						logger.log(Level.SEVERE, "Exception", e.getMessage());
+						logger.log(Level.SEVERE, "Can't read bit stream. ", e);
 					}
 					if (bytes == -1) {
 						break;
@@ -770,13 +697,7 @@ public class OGGSoundClip {
 			BooleanControl muteControl = (BooleanControl) outputLine.getControl(BooleanControl.Type.MUTE);
 			muteControl.setValue(mute);
 
-			 if (mute)
-				 paused = true;
-			 else
-				 paused = false;
-			 
-//			 if (!mute)
-//			 setGain(oldGain);
+            paused = mute;
 		}
 
 	}

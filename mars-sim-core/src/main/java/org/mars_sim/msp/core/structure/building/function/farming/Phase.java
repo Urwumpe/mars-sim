@@ -1,52 +1,33 @@
 /*
  * Mars Simulation Project
- * PhaseType.java
- * @version 3.1.2 2020-09-02
- * @author Manny Kung
+ * Phase.java
+ * @date 2023-05-06
+ * @author Barry Evans
  */
 
 package org.mars_sim.msp.core.structure.building.function.farming;
 
 import java.io.Serializable;
-import java.util.logging.Logger;
 
+/**
+ * Describes a phase in a Crop development
+ */
 public class Phase implements Serializable {
 
     /** default serial id. */
     private static final long serialVersionUID = 1L;
 
-	/** default logger. */
-	private static Logger logger = Logger.getLogger(Phase.class.getName());
-	
 	private PhaseType phaseType;
+	 /** The work needed [in sols] at this phase. */
 	private double workRequired;
 	private double percentGrowth;
-	private double harvestFactor;
 
-	public Phase(PhaseType phaseType, double percentGrowth) {
-		this.phaseType = phaseType;
-		this.percentGrowth = percentGrowth;
-	}
-	
 	public Phase(PhaseType phaseType, double workRequired, double percentGrowth) {
 		this.phaseType = phaseType;
 		this.workRequired = workRequired;
 		this.percentGrowth = percentGrowth;
 	}
-	
-	public void setHarvestFactor(double harvestFactor) {
-		this.harvestFactor = harvestFactor;
-		workRequired = harvestFactor * workRequired;
-	}
-	
-	public void setWorkRequired(double value) {
-		this.workRequired = value;
-	}
 
-	public void setPercentGrowth(double value) {
-		this.percentGrowth = value;
-	}
-	
 	public double getWorkRequired() {
 		return workRequired;
 	}
@@ -54,8 +35,13 @@ public class Phase implements Serializable {
 	public double getPercentGrowth() {
 		return percentGrowth;
 	}
-	
+
 	public PhaseType getPhaseType() {
 		return phaseType;
+	}
+
+	@Override
+	public String toString() {
+		return phaseType.name();
 	}
 }

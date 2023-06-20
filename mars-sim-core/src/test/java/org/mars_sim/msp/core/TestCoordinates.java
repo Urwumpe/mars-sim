@@ -2,8 +2,6 @@ package org.mars_sim.msp.core;
 
 import java.text.DecimalFormat;
 
-import org.mars_sim.msp.core.mars.Mars;
-
 import junit.framework.TestCase;
 
 /**
@@ -11,11 +9,11 @@ import junit.framework.TestCase;
  */
 public class TestCoordinates extends TestCase {
 	/* default logger. */
-//	private static Logger logger = Logger.getLogger(TestCoordinates.class.getName());
+//	private static final Logger logger = Logger.getLogger(TestCoordinates.class.getName());
 	
     private static final double ERROR_MARGIN_KM = .000000001D;
     private static final double ERROR_MARGIN_RAD = .00001D;
-    
+	
     /**
      * Test the getDistance method.
      */
@@ -25,7 +23,7 @@ public class TestCoordinates extends TestCase {
         
         // 1m east at equator.
         Coordinates loc1 = new Coordinates(Math.PI / 2D, Math.PI / 
-                Mars.MARS_CIRCUMFERENCE / 500D);
+                Coordinates.MARS_CIRCUMFERENCE / 500D);
         double dist1 = locInit.getDistance(loc1);
         double expected1 = .001D;
         double error1 = Math.abs(dist1 - expected1);
@@ -33,7 +31,7 @@ public class TestCoordinates extends TestCase {
         
         // 10cm east at equator.
         Coordinates loc2 = new Coordinates(Math.PI / 2D, Math.PI / 
-                Mars.MARS_CIRCUMFERENCE / 5000D);
+                Coordinates.MARS_CIRCUMFERENCE / 5000D);
         double dist2 = locInit.getDistance(loc2);
         double expected2 = .0001D;
         double error2 = Math.abs(dist2 - expected2);
@@ -41,7 +39,7 @@ public class TestCoordinates extends TestCase {
         
         // 1cm east at equator.
         Coordinates loc3 = new Coordinates(Math.PI / 2D, Math.PI / 
-                Mars.MARS_CIRCUMFERENCE / 50000D);
+                Coordinates.MARS_CIRCUMFERENCE / 50000D);
         double dist3 = locInit.getDistance(loc3);
         double expected3 = .00001D;
         double error3 = Math.abs(dist3 - expected3);
@@ -49,7 +47,7 @@ public class TestCoordinates extends TestCase {
         
         // 1mm east at equator.
         Coordinates loc4 = new Coordinates(Math.PI / 2D, Math.PI / 
-                Mars.MARS_CIRCUMFERENCE / 500000D);
+                Coordinates.MARS_CIRCUMFERENCE / 500000D);
         double dist4 = locInit.getDistance(loc4);
         double expected4 = .000001D;
         double error4 = Math.abs(dist4 - expected4);
@@ -58,27 +56,27 @@ public class TestCoordinates extends TestCase {
         // Antipode (180 degrees) position at equator.
         Coordinates loc5 = new Coordinates(Math.PI / 2D, Math.PI);
         double dist5 = locInit.getDistance(loc5);
-        double expected5 = Mars.MARS_CIRCUMFERENCE / 2D;
+        double expected5 = Coordinates.MARS_CIRCUMFERENCE / 2D;
         double error5 = Math.abs(dist5 - expected5);
         assertTrue(error5 < ERROR_MARGIN_KM);
         
         // 90 degrees east at equator.
         Coordinates loc6 = new Coordinates(Math.PI / 2D, Math.PI / 2D);
         double dist6 = locInit.getDistance(loc6);
-        double expected6 = Mars.MARS_CIRCUMFERENCE / 4D;
+        double expected6 = Coordinates.MARS_CIRCUMFERENCE / 4D;
         double error6 = Math.abs(dist6 - expected6);
         assertTrue(error6 < ERROR_MARGIN_KM);
         
         // 90 degrees west at equator.
         Coordinates loc7 = new Coordinates(Math.PI / 2D, 3D * Math.PI / 2D);
         double dist7 = locInit.getDistance(loc7);
-        double expected7 = Mars.MARS_CIRCUMFERENCE / 4D;
+        double expected7 = Coordinates.MARS_CIRCUMFERENCE / 4D;
         double error7 = Math.abs(dist7 - expected7);
         assertTrue(error7 < ERROR_MARGIN_KM);
         
         // 1mm west at equator.
         Coordinates loc8 = new Coordinates(Math.PI / 2D, (2D * Math.PI) - 
-                (Math.PI / Mars.MARS_CIRCUMFERENCE / 500000D));
+                (Math.PI / Coordinates.MARS_CIRCUMFERENCE / 500000D));
         double dist8 = locInit.getDistance(loc8);
         double expected8 = .000001D;
         double error8 = Math.abs(dist8 - expected8);
@@ -86,7 +84,7 @@ public class TestCoordinates extends TestCase {
         
         // 1mm north at equator.
         Coordinates loc9 = new Coordinates((Math.PI / 2D) - (Math.PI / 
-                Mars.MARS_CIRCUMFERENCE / 500000D), 0D);
+                Coordinates.MARS_CIRCUMFERENCE / 500000D), 0D);
         double dist9 = locInit.getDistance(loc9);
         double expected9 = .000001D;
         double error9 = Math.abs(dist9 - expected9);
@@ -94,7 +92,7 @@ public class TestCoordinates extends TestCase {
         
         // 1mm south at equator.
         Coordinates loc10 = new Coordinates((Math.PI / 2D) + (Math.PI / 
-                Mars.MARS_CIRCUMFERENCE / 500000D), 0D);
+                Coordinates.MARS_CIRCUMFERENCE / 500000D), 0D);
         double dist10 = locInit.getDistance(loc10);
         double expected10 = .000001D;
         double error10 = Math.abs(dist10 - expected10);
@@ -103,7 +101,7 @@ public class TestCoordinates extends TestCase {
         // 1mm south at north pole.
         Coordinates loc11Init = new Coordinates(0D, 0D);
         Coordinates loc11 = new Coordinates(Math.PI / 
-                Mars.MARS_CIRCUMFERENCE / 500000D, 0D);
+                Coordinates.MARS_CIRCUMFERENCE / 500000D, 0D);
         double dist11 = loc11Init.getDistance(loc11);
         double expected11 = .000001D;
         double error11 = Math.abs(dist11 - expected11);
@@ -136,7 +134,7 @@ public class TestCoordinates extends TestCase {
         Coordinates loc15Init = new Coordinates(0D, 0D);
         Coordinates loc15 = new Coordinates(Math.PI, 0D);
         double dist15 = loc15Init.getDistance(loc15);
-        double expected15 = Mars.MARS_CIRCUMFERENCE / 2D;
+        double expected15 = Coordinates.MARS_CIRCUMFERENCE / 2D;
         double error15 = Math.abs(dist15 - expected15);
         assertTrue(error15 < ERROR_MARGIN_KM);
     }
@@ -168,7 +166,7 @@ public class TestCoordinates extends TestCase {
         Direction direction4 = locInit.getDirectionToPoint(loc4);
         assertEquals(3D * Math.PI / 2D, direction4.getDirection());
         
-        double offset = Math.PI / Mars.MARS_CIRCUMFERENCE / 500D;
+        double offset = Math.PI / Coordinates.MARS_CIRCUMFERENCE / 500D;
         
         // Position north-east of initial.
         Coordinates loc5 = new Coordinates((Math.PI / 2D) - offset, offset);
@@ -215,7 +213,7 @@ public class TestCoordinates extends TestCase {
         
         Coordinates locInit = new Coordinates(Math.PI / 2D, 0D);
         double distance = 25D;
-        double angleDistance = distance / Mars.MARS_CIRCUMFERENCE * Math.PI * 2D;
+        double angleDistance = distance / Coordinates.MARS_CIRCUMFERENCE * Math.PI * 2D;
         double angleDistanceDiagonal = angleDistance * Math.sin(Math.PI / 4D);
         
         // Direction north.
@@ -225,7 +223,8 @@ public class TestCoordinates extends TestCase {
         double thetaError1 = Math.abs(loc1.getTheta() - 0D);
         assertTrue(phiError1 < ERROR_MARGIN_RAD);
         assertTrue(thetaError1 < ERROR_MARGIN_RAD);
-        
+
+    
         // Direction north-east.
         Direction direction2 = new Direction(Math.PI / 4D);
         Coordinates loc2 = locInit.getNewLocation(direction2, distance);
@@ -330,11 +329,7 @@ public class TestCoordinates extends TestCase {
         String latString01 = "17.23" + Msg.getString("direction.degreeSign") + " N";
         double lat01 = Math.round(Coordinates.parseLatitude2Phi(latString01)*100.0)/100.0;
         assertEquals(1.27, lat01);
-        
-//        String latString02 = "18.5" + Msg.getString("direction.degreeSign") + " S";
-//        double lat02 = Coordinates.parseLatitude2Phi(latString02);
-//        assertEquals(Math.PI, lat02);
-        
+               
         String latString3 = "90.0 N";
         double lat3 = Coordinates.parseLatitude2Phi(latString3);
         assertEquals(0D, lat3);
@@ -354,8 +349,11 @@ public class TestCoordinates extends TestCase {
         DecimalFormat format = new DecimalFormat();
         char decimalPoint = format.getDecimalFormatSymbols().getDecimalSeparator();
 //        String s2 = "  0" + decimalPoint + "00" + Msg.getString("direction.degreeSign") + " E";
-        String s2 = "0" + decimalPoint + "00" + Msg.getString("direction.degreeSign") + " E";
+        String s2 = "0" + decimalPoint + "0000 E";
         assertEquals(s2, lonString1);
+        
+//        String s3 = "0" + decimalPoint + "0001 E";
+//        assertNotEquals(s3, lonString1);
     }
     
     /**
@@ -368,7 +366,7 @@ public class TestCoordinates extends TestCase {
         DecimalFormat format = new DecimalFormat();
         char decimalPoint = format.getDecimalFormatSymbols().getDecimalSeparator();
 //        String s2 = " 90" + decimalPoint + "00" + Msg.getString("direction.degreeSign") + " E";
-        String s2 = "90" + decimalPoint + "00" + Msg.getString("direction.degreeSign") + " E";
+        String s2 = "90" + decimalPoint + "0000 E";
         assertEquals(s2, lonString1);
     }
     
@@ -381,7 +379,7 @@ public class TestCoordinates extends TestCase {
         String latString1 = loc1.getFormattedLatitudeString();
         DecimalFormat format = new DecimalFormat();
         char decimalPoint = format.getDecimalFormatSymbols().getDecimalSeparator();
-        String s2 = "90"+ decimalPoint + "00" + Msg.getString("direction.degreeSign") + " N";
+        String s2 = "90"+ decimalPoint + "0000 N";
         assertEquals(s2, latString1);
     }
 }

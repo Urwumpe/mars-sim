@@ -1,38 +1,33 @@
+/*
+ * Mars Simulation Project
+ * ChatCommand.java
+ * @date 2022-06-20
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public abstract class ChatCommand implements Comparable<ChatCommand> {
 
 	public static final String COMMAND_GROUP = "Common";
 
-	//Width of a Person value
-	public static final int PERSON_WIDTH = 22;
-
-	// Width of a Job vlaue
-	public static final int JOB_WIDTH = 16;
-
-	// Width of a Role value
-	public static final int ROLE_WIDTH = 30;
-
-	// Width of a Task value
-	public static final int TASK_WIDTH = 30;
-
-	// Width of a Bot name
-	public static final int BOT_WIDTH = 15;
-	
 	private String shortCommand;
 	private String longCommand;
 	private String commandGroup;
 	private String description;
 	private String introduction = null;
 	private List<String> arguments = null;
+	private Set<ConversationRole> roles = new HashSet<>();
 
 	private boolean interactive = false;
 
-	public ChatCommand(String commandGroup, String shortCommand, String longCommand, String description) {
+	protected ChatCommand(String commandGroup, String shortCommand, String longCommand, String description) {
 		super();
 		this.commandGroup = commandGroup;
 		this.shortCommand = shortCommand;
@@ -42,6 +37,7 @@ public abstract class ChatCommand implements Comparable<ChatCommand> {
 
 	/**
 	 * This processes input from a user.
+	 * 
 	 * @param context
 	 * @param input 
 	 * @return Has the input been accepted and understood
@@ -50,6 +46,7 @@ public abstract class ChatCommand implements Comparable<ChatCommand> {
 
 	/**
 	 * What is the short command?
+	 * 
 	 * @return
 	 */
 	public String getShortCommand() {
@@ -57,7 +54,8 @@ public abstract class ChatCommand implements Comparable<ChatCommand> {
 	}
 	
 	/**
-	 * The keyword that triggers the execution of this command
+	 * The keyword that triggers the execution of this command.
+	 * 
 	 * @return
 	 */
 	public String getLongCommand() {
@@ -65,7 +63,8 @@ public abstract class ChatCommand implements Comparable<ChatCommand> {
 	}
 
 	/**
-	 * A description abouve the command; used for help
+	 * A description about the command; used for help.
+	 * 
 	 * @return
 	 */
 	public String getDescription() {
@@ -74,6 +73,7 @@ public abstract class ChatCommand implements Comparable<ChatCommand> {
 	
 	/**
 	 * The command group this is held in.
+	 * 
 	 * @return
 	 */
 	public String getCommandGroup() {
@@ -99,9 +99,12 @@ public abstract class ChatCommand implements Comparable<ChatCommand> {
 
 	/**
 	 * Any fix arguments for the command. These are used in the AutoComplete operation.
+	 * This should be Overridden by subclasses if they what to return a dynamic list of options. 
+	 * A static list of optinos can be specified in {@link #setArguments(List)}
+	 * @param context Current context
 	 * @return
 	 */
-	public List<String> getArguments() {
+	protected List<String> getArguments(Conversation context) {
 		return arguments;
 	}
 
@@ -121,10 +124,17 @@ public abstract class ChatCommand implements Comparable<ChatCommand> {
 	 */
 	public List<String> getAutoComplete(Conversation context, String parameter) {
 		List<String> result;
-		if (arguments != null) {
-			result = arguments.stream()
-					.filter(n -> n.startsWith(parameter))
-					.collect(Collectors.toList());
+		List<String> activeArgs = getArguments(context);
+		if (activeArgs != null) {
+			if (parameter != null) {
+				String match = parameter.toLowerCase();
+				result = activeArgs.stream()
+						.filter(n -> n.toLowerCase().startsWith(match))
+						.collect(Collectors.toList());
+			}
+			else {
+				result = activeArgs;
+			}
 		}
 		else {
 			result = Collections.emptyList();
@@ -150,6 +160,19 @@ public abstract class ChatCommand implements Comparable<ChatCommand> {
 		
 	}
 	
+	/**
+	 * User must should have at least one of these roles to use this Command.
+	 * @return
+	 */
+	public Set<ConversationRole> getRequiredRoles() {
+		return roles;
+	}
+
+
+	protected void addRequiredRole(ConversationRole newRole) {
+		roles.add(newRole);
+	}
+
 	/**
 	 * Sort on keyword.
 	 */

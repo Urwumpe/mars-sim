@@ -1,70 +1,77 @@
-/**
+/*
  * Mars Simulation Project
  * Crew.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-29
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Crew implements Serializable {
+import org.mars_sim.msp.core.configuration.UserConfigurable;
 
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
 
-    //private static Logger logger = Logger.getLogger(Crew.class.getName());
+/**
+ * This class represents a pre-defiend Crew of people who can be assigned to Settlments.
+ */
+public class Crew implements UserConfigurable {
 
 	private String name;
-    private String crewName;
-	private String destination;
+	private String description = "";
 	
 	private List<Member> team = new ArrayList<>();
+
+	private boolean bundled;
 	
-	public Crew(String name) {
-		this.name = name;	
+	public Crew(String name, String description, boolean bundled) {
+		this.name = name;
+		this.description = description;
+		this.bundled = bundled;
 	}
 
-	public void setCrewName(String value) {
-		crewName = value;
+	@Override
+	public String getDescription() {
+		return description;
 	}
-	
-	public String getCrewName() {
-		return crewName;
-	} 
 	
 	public void addMember(Member m) {
 		team.add(m);
 	}
 
-	//public void add(Set<Member> members) {
-	//	team = members;
-	//}
-	
-	//public void add(List<Member> members) {
-	//	members = members;
-	//}
-	
-	//public Set<Member> getTeam() {
-	//	return team;
-	//}
-
 	public List<Member> getTeam() {
 		return team;
 	}
 
+	@Override
 	public String getName() {
 		return name;
 	}
-
-	public void setDestination(String value) {
-		destination = value;
-		// TODO: set destination for all members 
+	
+	/**
+	 * Gets the number of people configured for the simulation.
+	 * 
+	 * @param crewID the type of crew (Alpha or Beta)
+	 * @return number of people.
+	 * @throws Exception if error in XML parsing.
+	 */
+	public int getNumberOfConfiguredPeople() {
+		return team.size();
 	}
 	
-	public String getDestination() {
-		return destination;
+	@Override
+	public String toString() {
+		return name;
 	}
+
+	/**
+//	 * Is this crew bundled with the code base 
+ * 
+	 * @return
+	 */
+	@Override
+	public boolean isBundled() {
+		return bundled;
+	}
+
 }

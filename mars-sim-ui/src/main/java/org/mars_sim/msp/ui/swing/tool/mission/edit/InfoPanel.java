@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * InfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-10-21
  * @author Scott Davis
  */
 
@@ -17,28 +17,31 @@ import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
+import javax.swing.JButton;
 import javax.swing.JInternalFrame;
+import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.mission.CollectResourcesMission;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionMember;
-import org.mars_sim.msp.core.person.ai.mission.MissionPhase;
+import org.mars_sim.msp.core.person.ai.mission.NavPoint;
 import org.mars_sim.msp.core.person.ai.mission.RoverMission;
-import org.mars_sim.msp.core.person.ai.mission.TravelMission;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
+import org.mars_sim.msp.core.project.Stage;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.Rover;
@@ -46,11 +49,6 @@ import org.mars_sim.msp.ui.swing.JComboBoxMW;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.text.WebTextField;
 
 /**
  * The mission info panel for the edit mission dialog.
@@ -64,22 +62,19 @@ public class InfoPanel extends JPanel {
 	final static String ACTION_CONTINUE = "End EVA and Continue to Next Site";
 	/** action text. */
 	final static String ACTION_HOME = "Return to Home Settlement and End Mission";
-	/** action text. */
-	final static String ACTION_NEAREST = "Go to Nearest Settlement and End Mission";
 	
 	// Data members.
 	protected Mission mission;
-	protected JInternalFrame parent;
+	protected JInternalFrame frame;
 	protected MainDesktopPane desktop;	
 	
-	protected WebTextField descriptionField;
+	protected JTextField descriptionField;
 	protected JComboBoxMW<?> actionDropDown;
-	protected DefaultListModel<MissionMember> memberListModel;
-	protected JList<MissionMember> memberList;
-	protected WebButton addMembersButton;
-	protected WebButton removeMembersButton;
-	
-	private static UnitManager unitManager = Simulation.instance().getUnitManager();
+	protected DefaultListModel<Worker> memberListModel;
+	protected JList<Worker> memberList;
+	protected JButton addMembersButton;
+	protected JButton removeMembersButton;
+
 	
 	/**
 	 * Constructor.
@@ -90,7 +85,7 @@ public class InfoPanel extends JPanel {
 		
 		// Data members
 		this.mission = mission;
-		this.parent = parent;
+		this.frame = parent;
 		this.desktop = desktop;
 		
 		// Sets the layout.
@@ -100,59 +95,59 @@ public class InfoPanel extends JPanel {
 		setBorder(new MarsPanelBorder());
 		
 		// Create the description panel.
-		WebPanel descriptionPane = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+		JPanel descriptionPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		descriptionPane.setAlignmentX(Component.LEFT_ALIGNMENT);
 		add(descriptionPane);
 		
 		// Create the description label.
-		WebLabel descriptionLabel = new WebLabel("Description: ");
+		JLabel descriptionLabel = new JLabel("Name: ");
 		descriptionPane.add(descriptionLabel);
 		
 		// Create the description text field.
-		descriptionField = new WebTextField(mission.getDescription(), 20);
+		descriptionField = new JTextField(mission.getName(), 20);
 		descriptionPane.add(descriptionField);
 		
 		// Create the action panel.
-		WebPanel actionPane = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+		JPanel actionPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		actionPane.setAlignmentX(Component.LEFT_ALIGNMENT);
 		add(actionPane);
 		
 		// Create the action label.
-		WebLabel actionLabel = new WebLabel("Action: ");
+		JLabel actionLabel = new JLabel("Action: ");
 		actionPane.add(actionLabel);
 		
 		// Create the action drop down box.
-		actionDropDown = new JComboBoxMW<String>(getActions(mission));
+		actionDropDown = new JComboBoxMW<>(getActions(mission));
 		actionDropDown.setEnabled(actionDropDown.getItemCount() > 1);
 		actionPane.add(actionDropDown);
 		
 		// Create the members panel.
-		WebPanel membersPane = new WebPanel(new BorderLayout());
+		JPanel membersPane = new JPanel(new BorderLayout());
 		membersPane.setBorder(MainDesktopPane.newEmptyBorder());
 		membersPane.setAlignmentX(Component.LEFT_ALIGNMENT);
 		add(membersPane);
 		
 		// Create the members label.
-		WebLabel membersLabel = new WebLabel("Members: ");
-		membersLabel.setVerticalAlignment(WebLabel.TOP);
+		JLabel membersLabel = new JLabel("Members: ");
+		membersLabel.setVerticalAlignment(JLabel.TOP);
 		membersPane.add(membersLabel, BorderLayout.WEST);
 		
 		// Create the member list panel.
-		WebPanel memberListPane = new WebPanel(new BorderLayout(0, 0));
+		JPanel memberListPane = new JPanel(new BorderLayout(0, 0));
 		membersPane.add(memberListPane, BorderLayout.CENTER);
 		
         // Create scroll panel for member list.
-        WebScrollPane memberScrollPane = new WebScrollPane();
+        JScrollPane memberScrollPane = new JScrollPane();
         memberScrollPane.setPreferredSize(new Dimension(100, 100));
         memberListPane.add(memberScrollPane, BorderLayout.CENTER);
         
         // Create member list model
-        memberListModel = new DefaultListModel<MissionMember>();
-        Iterator<MissionMember> i = mission.getMembers().iterator();
+        memberListModel = new DefaultListModel<Worker>();
+        Iterator<Worker> i = mission.getMembers().iterator();
         while (i.hasNext()) memberListModel.addElement(i.next());
         
         // Create member list
-        memberList = new JList<MissionMember>(memberListModel);
+        memberList = new JList<Worker>(memberListModel);
         memberList.addListSelectionListener(
         		new ListSelectionListener() {
         			@Override
@@ -165,11 +160,11 @@ public class InfoPanel extends JPanel {
         memberScrollPane.setViewportView(memberList);
         
         // Create the member button panel.
-        WebPanel memberButtonPane = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+        JPanel memberButtonPane = new JPanel(new FlowLayout(FlowLayout.CENTER));
         memberListPane.add(memberButtonPane, BorderLayout.SOUTH);
         
         // Create the add members button.
-        addMembersButton = new WebButton("Add Members");
+        addMembersButton = new JButton("Add Members");
         addMembersButton.setEnabled(canAddMembers());
         addMembersButton.addActionListener(
         		new ActionListener() {
@@ -181,7 +176,7 @@ public class InfoPanel extends JPanel {
         memberButtonPane.add(addMembersButton);
         
         // Create the remove members button.
-        removeMembersButton = new WebButton("Remove Members");
+        removeMembersButton = new JButton("Remove Members");
         removeMembersButton.setEnabled(false);
         removeMembersButton.addActionListener(
         		new ActionListener() {
@@ -208,7 +203,7 @@ public class InfoPanel extends JPanel {
 	 * Open the add members dialog.
 	 */
 	private void addMembers() {
-		new AddMembersDialog(parent, desktop, mission, memberListModel, getAvailableMembers());
+		new AddMembersDialog(frame, desktop, mission, memberListModel, getAvailableMembers());
 		addMembersButton.setEnabled(canAddMembers());
 	}
 	
@@ -236,36 +231,26 @@ public class InfoPanel extends JPanel {
 		Vector<String> actions = new Vector<String>();
 		actions.add(ACTION_NONE);
 		
-		MissionPhase phase = mission.getPhase();
+		// MissionPhase phase = mission.getPhase();
 		
-		// Check if continue action can be added.
-		if (phase.equals(CollectResourcesMission.COLLECT_RESOURCES)) {
-			CollectResourcesMission collectResourcesMission = (CollectResourcesMission) mission;
-			if (collectResourcesMission.getNumCollectionSites() > collectResourcesMission.getNumCollectionSitesVisited())
-				actions.add(ACTION_CONTINUE);
-		}
+		// // Check if continue action can be added.
+		// if (phase.equals(CollectResourcesMission.COLLECT_RESOURCES)) {
+		// 	CollectResourcesMission collectResourcesMission = (CollectResourcesMission) mission;
+		// 	if (collectResourcesMission.getNumEVASites() > collectResourcesMission.getNumEVASitesVisited())
+		// 		actions.add(ACTION_CONTINUE);
+		// }
 		
-		// Check if go home action can be added.
-		if (mission instanceof TravelMission) {
-			TravelMission travelMission = (TravelMission) mission;
-			int nextNavpointIndex = travelMission.getNextNavpointIndex();
-			if ((nextNavpointIndex > -1) && (nextNavpointIndex < (travelMission.getNumberOfNavpoints() - 1))) {
-				if (!mission.getPhase().equals(VehicleMission.EMBARKING))
+		if (mission instanceof VehicleMission vm) {
+			// Check if go home action can be added.
+			if (mission.getStage() == Stage.ACTIVE) {
+				NavPoint currentNavPoint = vm.getCurrentDestination();
+				List<NavPoint> route = vm.getNavpoints();
+
+				// If the current destination is the last one then already on the way home
+				if (!route.isEmpty() && !route.get(route.size()-1).equals(currentNavPoint)) {
 					actions.add(ACTION_HOME);
-			}
-		}
-		
-		// Check if nearest settlement action can be added.
-		if (mission instanceof VehicleMission) {
-			VehicleMission vehicleMission = (VehicleMission) mission;
-			try {
-				Settlement closestSettlement = vehicleMission.findClosestSettlement();
-				if ((closestSettlement != null) && !closestSettlement.equals(vehicleMission.getAssociatedSettlement())) {
-					if (!mission.getPhase().equals(VehicleMission.EMBARKING))
-						actions.add(ACTION_NEAREST);
 				}
 			}
-			catch (Exception e) {}
 		}
 		
 		return actions;
@@ -275,17 +260,16 @@ public class InfoPanel extends JPanel {
 	 * Gets a collection of people and robots available to be added to the mission.
 	 * @return collection of available members.
 	 */
-	private Collection<MissionMember> getAvailableMembers() {
-		Collection<MissionMember> result = new ConcurrentLinkedQueue<MissionMember>();
+	private Collection<Worker> getAvailableMembers() {
+		Collection<Worker> result = new ConcurrentLinkedQueue<>();
 	
 		// Add people and robots in the settlement or rover.
 		if (mission instanceof RoverMission) {
 			Rover rover = ((RoverMission) mission).getRover();
-			MissionPhase phase = mission.getPhase();
-			Collection<MissionMember> membersAtLocation = new ArrayList<MissionMember>();
+			Stage phase = mission.getStage();
+			Collection<Worker> membersAtLocation = new ArrayList<>();
 			if (rover != null) {
-				if (phase.equals(RoverMission.EMBARKING) || 
-						phase.equals(RoverMission.DISEMBARKING)) {
+				if (phase == Stage.PREPARATION) {
 					// Add available people and robots at the local settlement.
 					Settlement settlement = rover.getSettlement();
 					if (settlement != null) {
@@ -301,9 +285,9 @@ public class InfoPanel extends JPanel {
 			}
 			
 			// Add people.
-			Iterator<MissionMember> i = membersAtLocation.iterator();
+			Iterator<Worker> i = membersAtLocation.iterator();
 			while (i.hasNext()) {
-				MissionMember member = i.next();
+				Worker member = i.next();
 				if (!memberListModel.contains(member)) {
 				    result.add(member);
 				}
@@ -333,6 +317,7 @@ public class InfoPanel extends JPanel {
 		}
 		
 		// Add people and robots who are outside at this location as well.
+		UnitManager unitManager = desktop.getSimulation().getUnitManager();
 		Coordinates missionLocation = mission.getCurrentMissionLocation();
 		Iterator<Person> i = unitManager.getPeople().iterator();
 		while (i.hasNext()) {
@@ -362,7 +347,7 @@ public class InfoPanel extends JPanel {
 	}
 	
 	public JInternalFrame getParent() {
-		return parent;
+		return frame;
 	}
 	
 	

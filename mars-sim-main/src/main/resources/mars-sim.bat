@@ -1,6 +1,6 @@
-:: Please replace the [$CURRENT_VERSION] with the correct build version in your jarfile 
-:: e.g. [$CURRENT_VERSION] as 3.1.2 or a build number such as 5348
+:: This batch file will run the command "java -jar ./[$VERSION_OR_BUILD]_swing_java17.jar new" 
+:: Ensure you replace the [$VERSION_OR_BUILD] with the correct version (such as 3.5.0) or build number (such as 7882) in the jarfile
 @echo off
-call java -jar ./[$CURRENT_VERSION]_swing_java14.jar new
+call java -jar ./3.5.0_swing_java17.jar new
 echo Exit Code = %ERRORLEVEL%
 if "%ERRORLEVEL%" == "1" exit /B 1

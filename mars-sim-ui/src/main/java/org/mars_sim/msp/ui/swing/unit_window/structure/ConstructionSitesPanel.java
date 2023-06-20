@@ -1,17 +1,14 @@
-/**
+/*
  * Mars Simulation Project
  * ConstructionSitesPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-09
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
-import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
-import java.text.DecimalFormat;
 import java.util.Iterator;
 import java.util.List;
 
@@ -29,13 +26,18 @@ import org.mars_sim.msp.core.structure.construction.ConstructionSite;
 import org.mars_sim.msp.core.structure.construction.ConstructionStage;
 import org.mars_sim.msp.core.structure.construction.ConstructionStageInfo;
 import org.mars_sim.msp.core.structure.construction.ConstructionVehicleType;
+import org.mars_sim.msp.core.tool.Conversion;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
+import org.mars_sim.msp.ui.swing.StyleManager;
 
 /**
  * A panel displaying a list of construction sites at a settlement.
  */
+@SuppressWarnings("serial")
 public class ConstructionSitesPanel extends JPanel {
   
+	private static final int MAX = 65;
+	
     // Data members
     private ConstructionManager manager;
     private List<ConstructionSite> sitesCache;
@@ -53,18 +55,11 @@ public class ConstructionSitesPanel extends JPanel {
         this.manager = manager;
         
         setLayout(new BorderLayout());
-        setBorder(new MarsPanelBorder());
-        
-        JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        add(titlePanel, BorderLayout.NORTH);
-        
-        JLabel titleLabel = new JLabel("Construction Sites");
-		titleLabel.setFont(new Font("Serif", Font.BOLD, 16));
-        titlePanel.add(titleLabel);
-        
+
+        setBorder(StyleManager.createLabelBorder("Construction Sites"));
+        		
         // Create scroll panel for sites list pane.
         sitesScrollPane = new JScrollPane();
-        sitesScrollPane.setPreferredSize(new Dimension(200, 75));
         sitesScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         add(sitesScrollPane, BorderLayout.CENTER);  
         
@@ -80,7 +75,7 @@ public class ConstructionSitesPanel extends JPanel {
         // Create the site panels.
         sitesCache = manager.getConstructionSites();
         Iterator<ConstructionSite> i = sitesCache.iterator();
-        while (i.hasNext()) sitesListPane.add(new ConstructionSitePanel(i.next()));
+        while (i.hasNext()) sitesListPane.add(new ConstructionPanel(i.next()));
     }
     
     /**
@@ -96,7 +91,7 @@ public class ConstructionSitesPanel extends JPanel {
             while (i.hasNext()) {
                 ConstructionSite site = i.next();
                 if (!sitesCache.contains(site)) 
-                    sitesListPane.add(new ConstructionSitePanel(site));
+                    sitesListPane.add(new ConstructionPanel(site));
             }
             
             // Remove site panels for old sites.
@@ -104,7 +99,7 @@ public class ConstructionSitesPanel extends JPanel {
             while (j.hasNext()) {
                 ConstructionSite site = j.next();
                 if (!sites.contains(site)) {
-                    ConstructionSitePanel panel = getConstructionSitePanel(site);
+                    ConstructionPanel panel = getConstructionSitePanel(site);
                     if (panel != null) sitesListPane.remove(panel);
                 }
             }
@@ -119,7 +114,7 @@ public class ConstructionSitesPanel extends JPanel {
         // Update all site panels.
         Iterator<ConstructionSite> i = sites.iterator();
         while (i.hasNext()) {
-            ConstructionSitePanel panel = getConstructionSitePanel(i.next());
+            ConstructionPanel panel = getConstructionSitePanel(i.next());
             if (panel != null) panel.update();
         }
     }
@@ -129,13 +124,13 @@ public class ConstructionSitesPanel extends JPanel {
      * @param site the construction site.
      * @return construction site panel or null if none found.
      */
-    private ConstructionSitePanel getConstructionSitePanel(ConstructionSite site) {
-        ConstructionSitePanel result = null;
+    private ConstructionPanel getConstructionSitePanel(ConstructionSite site) {
+        ConstructionPanel result = null;
         
         for (int x = 0; x < sitesListPane.getComponentCount(); x++) {
             Component component = sitesListPane.getComponent(x);
-            if (component instanceof ConstructionSitePanel) {
-                ConstructionSitePanel panel = (ConstructionSitePanel) component;
+            if (component instanceof ConstructionPanel) {
+                ConstructionPanel panel = (ConstructionPanel) component;
                 if (panel.getConstructionSite().equals(site)) result = panel;
             }
         }
@@ -146,7 +141,7 @@ public class ConstructionSitesPanel extends JPanel {
     /**
      * A panel displaying information about a particular construction site.
      */
-    private static class ConstructionSitePanel extends JPanel {
+    private static class ConstructionPanel extends JPanel {
         
         /** default serial id. */
         private static final long serialVersionUID = 1L;
@@ -160,7 +155,7 @@ public class ConstructionSitesPanel extends JPanel {
          * Constructor.
          * @param site the construction site.
          */
-        private ConstructionSitePanel(ConstructionSite site) {
+        private ConstructionPanel(ConstructionSite site) {
             // Use JPanel constructor
             super();
             
@@ -169,18 +164,19 @@ public class ConstructionSitesPanel extends JPanel {
             
             // Set the layout.
             setLayout(new BorderLayout(5, 5));
-            
+
             // Set border
-//            setBorder(new MarsPanelBorder());
-            
+            setBorder(new MarsPanelBorder());
+
             // Create the status panel.
-            statusLabel = new JLabel("Status: ", JLabel.LEFT);
+            statusLabel = new JLabel(" ", JLabel.LEFT);
             add(statusLabel, BorderLayout.NORTH);
             
             // Create the progress bar panel.
-            JPanel progressBarPanel = new JPanel();
+            JPanel progressBarPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+//            progressBarPanel.setSize(200, 25);
             add(progressBarPanel, BorderLayout.CENTER);
-            
+                        
             // Prepare work progress bar.
             JProgressBar workBar = new JProgressBar();
             workBarModel = workBar.getModel();
@@ -211,7 +207,7 @@ public class ConstructionSitesPanel extends JPanel {
             String statusString = getStatusString();
             
             // Make sure status label isn't too long.
-            if (statusString.length() > 31) statusString = statusString.substring(0, 31) + "...";
+            if (statusString.length() > MAX) statusString = statusString.substring(0, MAX) + "...";
             
             // Set the text in the status label.
             statusLabel.setText(statusString);
@@ -238,19 +234,22 @@ public class ConstructionSitesPanel extends JPanel {
             String statusString = "";
             ConstructionStage stage = site.getCurrentConstructionStage();
             if (stage != null) {
-                if (site.isUndergoingConstruction()) statusString = "Status: constructing " + 
-                        stage.getInfo().getName();
-                else if (site.isUndergoingSalvage()) statusString = "Status: salvaging " + 
-                        stage.getInfo().getName();
+            	String name = Conversion.capitalize(stage.getInfo().getName());
+                if (site.isUndergoingConstruction()) 
+                	statusString = " Constructing " +  name;
+                else if (site.isUndergoingSalvage()) 
+                	statusString = " Salvaging " + name;
                 else if (site.hasUnfinishedStage()) {
-                    if (stage.isSalvaging()) statusString = "Status: salvaging " + 
-                            stage.getInfo().getName() + " unfinished";
-                    else statusString = "Status: constructing " + 
-                            stage.getInfo().getName() + " unfinished";
+                    if (stage.isSalvaging()) 
+                    	statusString = " Salvaging " + name + " (Unfinished)";
+                    else 
+                    	statusString = " Constructing " + name + " (Unfinished)";
                 }
-                else statusString = "Status: " + stage.getInfo().getName() + " completed";
+                else 
+                	statusString = " " + name + " (Completed)";
             }
-            else statusString = "No construction";
+            else 
+            	statusString = "No Construction";
             
             return statusString;
         }
@@ -268,10 +267,9 @@ public class ConstructionSitesPanel extends JPanel {
                 result.append("Stage Type: ").append(info.getType()).append("<br>");
                 if (stage.isSalvaging()) result.append("Work Type: salvage<br>");
                 else result.append("Work Type: Construction<br>");
-                DecimalFormat formatter = new DecimalFormat("0.0");
-                String requiredWorkTime = formatter.format(stage.getRequiredWorkTime() / 1000D);
+                String requiredWorkTime = StyleManager.DECIMAL_PLACES1.format(stage.getRequiredWorkTime() / 1000D);
                 result.append("Work Time Required: ").append(requiredWorkTime).append(" Sols<br>");
-                String completedWorkTime = formatter.format(stage.getCompletedWorkTime() / 1000D);
+                String completedWorkTime = StyleManager.DECIMAL_PLACES1.format(stage.getCompletedWorkTime() / 1000D);
                 result.append("Work Time Completed: ").append(completedWorkTime).append(" Sols<br>");
                 result.append("Architect Construction Skill Required: ").append(info.getArchitectConstructionSkill()).append("<br>");
                 

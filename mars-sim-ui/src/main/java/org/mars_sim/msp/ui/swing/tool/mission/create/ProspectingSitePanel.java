@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ProspectingSitePanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
@@ -13,27 +13,29 @@ import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.map.*;
 
-import com.alee.laf.label.WebLabel;
-
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
+import java.util.logging.Logger;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JLabel;
 
 /**
  * A wizard panel for the ice or regolith prospecting site.
  */
+@SuppressWarnings("serial")
 class ProspectingSitePanel extends WizardPanel {
 
+	private static final Logger logger = Logger.getLogger(ProspectingSitePanel.class.getName());
+	
 	// Wizard panel name.
-	private final static String NAME = "Prospecting Site";
+	private static final String NAME = "Prospecting Site";
 	
 	// Range modifier.
-	private final static double RANGE_MODIFIER = .95D;
-	private final static double MAX_RANGE = 2500D;
+	private static final double RANGE_MODIFIER = .95D;
 	
 	// Data members.
 	private MapPanel mapPane;
@@ -41,11 +43,12 @@ class ProspectingSitePanel extends WizardPanel {
 	private NavpointEditLayer navLayer;
 	private boolean navSelected;
 	private IntPoint navOffset;
-	private WebLabel locationLabel;
+	private JLabel locationLabel;
 	private int pixelRange;
 	
 	/**
-	 * Constructor
+	 * Constructor.
+	 * 
 	 * @param wizard the create mission wizard.
 	 */
 	ProspectingSitePanel(CreateMissionWizard wizard) {
@@ -58,22 +61,28 @@ class ProspectingSitePanel extends WizardPanel {
 		// Set the border.
 		setBorder(new MarsPanelBorder());
 		
+		// Create a vertical strut to add some UI space.
+		add(Box.createVerticalStrut(10));
+		
 		// Create the title label.
 		String resource = "";
 		MissionType type = getWizard().getMissionData().getMissionType();
-		if (MissionType.COLLECT_ICE == type) resource = "ice";
-		else if (MissionType.COLLECT_REGOLITH == type) resource = "regolith";
-		WebLabel titleLabel = new WebLabel("Choose " + resource + " collection site.");
-		titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD));
-		titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		if (MissionType.COLLECT_ICE == type) resource = "Ice";
+		else if (MissionType.COLLECT_REGOLITH == type) resource = "Regolith";
+		JLabel titleLabel = createTitleLabel("Choose Your " + resource + " Collection Site : ");
 		add(titleLabel);
+		
+		// Create a vertical strut to add some UI space.
+		add(Box.createVerticalStrut(10));
 		
 		// Create the map panel.
 		mapPane = new MapPanel(wizard.getDesktop(), 200L);
+		
 		mapPane.addMapLayer(new UnitIconMapLayer(mapPane), 0);
 		mapPane.addMapLayer(new UnitLabelMapLayer(), 1);
 		mapPane.addMapLayer(ellipseLayer = new EllipseLayer(Color.GREEN), 2);
 		mapPane.addMapLayer(navLayer = new NavpointEditLayer(mapPane, false), 3);
+		
 		mapPane.addMouseListener(new NavpointMouseListener());
 		mapPane.addMouseMotionListener(new NavpointMouseMotionListener());
 		mapPane.setMaximumSize(mapPane.getPreferredSize());
@@ -81,7 +90,7 @@ class ProspectingSitePanel extends WizardPanel {
 		add(mapPane);
 		
 		// Create the location label.
-		locationLabel = new WebLabel("Location: ", WebLabel.CENTER);
+		locationLabel = new JLabel("Location: ", JLabel.CENTER);
 		locationLabel.setFont(locationLabel.getFont().deriveFont(Font.BOLD));
 		locationLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(locationLabel);
@@ -90,7 +99,7 @@ class ProspectingSitePanel extends WizardPanel {
 		add(Box.createVerticalStrut(10));
 		
 		// Create the instruction label.
-		WebLabel instructionLabel = new WebLabel("Drag navpoint flag to desired " + resource + 
+		JLabel instructionLabel = new JLabel("Drag navpoint flag to desired " + resource + 
 				" collection site.");
 		instructionLabel.setFont(instructionLabel.getFont().deriveFont(Font.BOLD));
 		instructionLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -102,6 +111,7 @@ class ProspectingSitePanel extends WizardPanel {
 	
 	/**
 	 * Gets the wizard panel name.
+	 * 
 	 * @return panel name.
 	 */
 	String getPanelName() {
@@ -110,12 +120,13 @@ class ProspectingSitePanel extends WizardPanel {
 
 	/**
 	 * Commits changes from this wizard panel.
+	 * 
 	 * @return true if changes can be committed.
 	 */
 	boolean commitChanges() {
 		IntPoint navpointPixel = navLayer.getNavpointPosition(0);
-		Coordinates navpoint = getCenterCoords().convertRectToSpherical(navpointPixel.getiX() - 150, 
-				navpointPixel.getiY() - 150, CannedMarsMap.PIXEL_RHO);
+		Coordinates navpoint = getCenterCoords().convertRectToSpherical(navpointPixel.getiX() - Map.HALF_MAP_BOX, 
+				navpointPixel.getiY() - Map.HALF_MAP_BOX, mapPane.getMap().getScale());
 		MissionType type = getWizard().getMissionData().getMissionType();
 		if (MissionType.COLLECT_ICE == type) 
 			getWizard().getMissionData().setIceCollectionSite(navpoint);
@@ -125,7 +136,7 @@ class ProspectingSitePanel extends WizardPanel {
 	}
 
 	/**
-	 * Clear information on the wizard panel.
+	 * Clears information on the wizard panel.
 	 */
 	void clearInfo() {
 		getWizard().setButtons(false);
@@ -137,27 +148,27 @@ class ProspectingSitePanel extends WizardPanel {
 	 */
 	void updatePanel() {
 		try {
-			//double range = (getWizard().getMissionData().getRover().getRange() * RANGE_MODIFIER) / 2D;
-			double range = getWizard().getMissionData().getRover().getRange(wizard.getMissionBean().getMissionType()) * RANGE_MODIFIER;
-			if (range > MAX_RANGE)
-				range = MAX_RANGE;
-			range = range / 2D;
-			pixelRange = convertRadiusToMapPixels(range);
-			ellipseLayer.setEllipseDetails(new IntPoint(150, 150), new IntPoint(150, 150), (pixelRange * 2));
-			IntPoint initialNavpointPos = new IntPoint(150, 150 - (pixelRange / 2));
+			
+			pixelRange = convertRadiusToMapPixels(getRoverRange());
+			
+			ellipseLayer.setEllipseDetails(new IntPoint(Map.HALF_MAP_BOX, Map.HALF_MAP_BOX), new IntPoint(Map.HALF_MAP_BOX, Map.HALF_MAP_BOX), (pixelRange * 2));
+			IntPoint initialNavpointPos = new IntPoint(Map.HALF_MAP_BOX, Map.HALF_MAP_BOX - (pixelRange / 2));
 			navLayer.addNavpointPosition(initialNavpointPos);
 			Coordinates initialNavpoint = getCenterCoords().convertRectToSpherical(0, (-1 * (pixelRange / 2)), 
-			        CannedMarsMap.PIXEL_RHO);
+										mapPane.getMap().getScale());
 			locationLabel.setText("Location: " + initialNavpoint.getFormattedString());
-			mapPane.showMap(getCenterCoords());
+			mapPane.showMap(initialNavpoint);
 		}
-		catch (Exception e) {}
+		catch (Exception e) {
+			logger.severe("updatePanel encounters an exception in ProspectingSitePanel.");
+		}
 		
 		getWizard().setButtons(true);
 	}
 	
 	/**
 	 * Gets the center coordinates.
+	 * 
 	 * @return center coordinates.
 	 */
 	private Coordinates getCenterCoords() {
@@ -166,11 +177,23 @@ class ProspectingSitePanel extends WizardPanel {
 	
 	/**
 	 * Converts radius (km) into pixel range on map.
+	 * 
 	 * @param radius the radius (km).
 	 * @return pixel radius.
 	 */
 	private int convertRadiusToMapPixels(double radius) {
-		return MapUtils.getPixelDistance(radius, SurfMarsMap.TYPE);
+		return MapUtils.getPixelDistance(radius, mapPane.getMap());
+	}
+	
+	/**
+	 * Gets the mission rover range.
+	 * 
+	 * @return range (km)
+	 * @throws Exception if error getting mission rover.
+	 */
+	private double getRoverRange() {
+		double range = getWizard().getMissionData().getRover().getRange() * RANGE_MODIFIER;
+		return range / 2D;
 	}
 	
 	/**
@@ -235,8 +258,8 @@ class ProspectingSitePanel extends WizardPanel {
 				if (withinBounds(displayPos)) {
 					navLayer.setNavpointPosition(0, displayPos);
 					Coordinates center = getWizard().getMissionData().getStartingSettlement().getCoordinates();
-					Coordinates navpoint = center.convertRectToSpherical(displayPos.getiX() - 150, 
-					        displayPos.getiY() - 150, CannedMarsMap.PIXEL_RHO);
+					Coordinates navpoint = center.convertRectToSpherical(displayPos.getiX() - Map.HALF_MAP_BOX, 
+					        displayPos.getiY() - Map.HALF_MAP_BOX, mapPane.getMap().getScale());
 					locationLabel.setText("Location: " + navpoint.getFormattedString());
 				
 					mapPane.repaint();
@@ -245,20 +268,25 @@ class ProspectingSitePanel extends WizardPanel {
 		}
 		
 		/**
-		 * Checks if mouse location is within range boundaries and edge of map display. 
+		 * Checks if mouse location is within range boundaries and edge of map display.
+		 * 
 		 * @param position the mouse location.
 		 * @return true if within boundaries.
 		 */
 		private boolean withinBounds(IntPoint position) {
-			boolean result = true;
 			
-			if (!navLayer.withinDisplayEdges(position)) result = false;
+			if (!navLayer.withinDisplayEdges(position)) 
+				return false;
 			
-			int radius = (int) Math.round(Math.sqrt(Math.pow(150D - position.getX(), 2D) + 
-			        Math.pow(150D - position.getY(), 2D)));
-			if (radius > pixelRange) result = false;
+			pixelRange = convertRadiusToMapPixels(getRoverRange());
 			
-			return result;
+            int radius = (int) Math.round(Math.sqrt(Math.pow(Map.HALF_MAP_BOX - position.getX(), 2D) +
+			        Math.pow(Map.HALF_MAP_BOX - position.getY(), 2D)));
+            
+			if (radius > pixelRange) 
+				return false;
+			else
+				return true;
 		}
 	}
 }

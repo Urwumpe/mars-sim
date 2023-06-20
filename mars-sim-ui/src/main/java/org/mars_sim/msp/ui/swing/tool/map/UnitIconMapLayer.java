@@ -1,20 +1,23 @@
-/**
+/*
  * Mars Simulation Project
  * UnitIconMapLayer.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-04-28
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.map;
 
+import java.awt.Component;
+import java.awt.Graphics;
+
+import javax.swing.Icon;
+
+import org.mars_sim.mapdata.MapMetaData;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.IntPoint;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfo;
 import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfoFactory;
-
-import javax.swing.*;
-import java.awt.*;
 
 /**
  * The UnitMapLayer is a graphics layer to display unit icons.
@@ -32,26 +35,21 @@ public class UnitIconMapLayer extends UnitMapLayer {
 	 * 
 	 * @param unit      the unit to display.
 	 * @param mapCenter the location center of the map.
-	 * @param mapType   the type of map.
+	 * @param baseMap   the type of map.
 	 * @param g         the graphics context.
 	 */
-	protected void displayUnit(Unit unit, Coordinates mapCenter, String mapType, Graphics g) {
+	protected void displayUnit(Unit unit, Coordinates mapCenter, Map baseMap, Graphics g) {
 
-		IntPoint location = MapUtils.getRectPosition(unit.getCoordinates(), mapCenter, mapType);
+		IntPoint location = MapUtils.getRectPosition(unit.getCoordinates(), mapCenter, baseMap);
 		UnitDisplayInfo displayInfo = UnitDisplayInfoFactory.getUnitDisplayInfo(unit);
 
-		IntPoint imageLocation = getUnitDrawLocation(location, displayInfo.getSurfMapIcon(unit));
+		IntPoint imageLocation = getUnitDrawLocation(location, displayInfo.getMapIcon(unit, baseMap.getType()));
 		int locX = imageLocation.getiX();
 		int locY = imageLocation.getiY();
 
 		if (!(displayInfo.isMapBlink(unit) && getBlinkFlag())) {
-			Icon displayIcon = null;
-			if (TopoMarsMap.TYPE.equals(mapType))
-				displayIcon = displayInfo.getTopoMapIcon(unit);
-			else if (GeologyMarsMap.TYPE.equals(mapType))
-				displayIcon = displayInfo.getGeologyMapIcon(unit);
-			else
-				displayIcon = displayInfo.getSurfMapIcon(unit);
+			MapMetaData mapType = baseMap.getType();
+			Icon displayIcon = displayInfo.getMapIcon(unit, mapType);	
 			if (g != null)
 				displayIcon.paintIcon(displayComponent, g, locX, locY);
 		}

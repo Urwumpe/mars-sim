@@ -1,43 +1,38 @@
-/**
+/*
  * Mars Simulation Project
  * LifeSupport.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import org.mars_sim.msp.core.SimulationConfig;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.mars_sim.msp.core.air.AirComposition;
+import org.mars_sim.msp.core.data.UnitSet;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
-
-import java.io.Serializable;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * The LifeSupport class is a building function for life support and managing
  * inhabitants.
  */
-public class LifeSupport extends Function implements Serializable {
+public class LifeSupport extends Function {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(LifeSupport.class.getName());
-
-//	private DecimalFormat fmt = new DecimalFormat("#.#######");
-
-	private static final FunctionType THE_FUNCTION = FunctionType.LIFE_SUPPORT;
+	private static final Logger logger = Logger.getLogger(LifeSupport.class.getName());
 
 	// Data members
 	private int occupantCapacity;
@@ -49,88 +44,67 @@ public class LifeSupport extends Function implements Serializable {
 
 	private Collection<Person> occupants;
 
+	private AirComposition air;
+
 	/**
 	 * Constructor.
 	 * 
 	 * @param building the building this function is for.
+	 * @param spec Defiens the Life support capability
 	 */
-	public LifeSupport(Building building) {
-		// Call Function constructor.
-		super(THE_FUNCTION, building);
+	public LifeSupport(Building building, FunctionSpec spec) {
+		super(FunctionType.LIFE_SUPPORT, spec, building);
 
-		occupants = new ConcurrentLinkedQueue<Person>();
+		occupants = new UnitSet<>();
 
-		// Set occupant capacity.
-		occupantCapacity = buildingConfig.getLifeSupportCapacity(building.getBuildingType());
-
-		powerRequired = buildingConfig.getLifeSupportPowerRequirement(building.getBuildingType());
+		this.occupantCapacity = spec.getCapacity();
+		this.powerRequired = spec.getDoubleProperty(BuildingConfig.POWER_REQUIRED);
 
 		length = building.getLength();
 		width = building.getWidth();
 		floorArea = length * width;
 
-	}
-
-	/**
-	 * Alternate constructor (for use by Mock Building in Unit testing) with given
-	 * occupant capacity and power required
-	 * 
-	 * @param building         the building this function is for.
-	 * @param occupantCapacity the number of occupants this building can hold.
-	 * @param powerRequired    the power required (kW)
-	 */
-	public LifeSupport(Building building, int occupantCapacity, double powerRequired) {
-		// Use Function constructor
-		super(THE_FUNCTION, building);
-
-		occupants = new ConcurrentLinkedQueue<Person>();
-
-		this.occupantCapacity = occupantCapacity;
-		this.powerRequired = powerRequired;
-
-		length = building.getLength();
-		width = building.getWidth();
-		floorArea = length * width;
+		double t = AirComposition.C_TO_K + building.getCurrentTemperature();
+		double vol = building.getVolumeInLiter(); // 1 Cubic Meter = 1,000 Liters
+		air = new AirComposition(t, vol);
 	}
 
 	/**
 	 * Gets the value of the function for a named building.
 	 * 
-	 * @param buildingName the building name.
+	 * @param buildingType the building type.
 	 * @param newBuilding  true if adding a new building.
 	 * @param settlement   the settlement.
 	 * @return value (VP) of building function.
 	 * @throws Exception if error getting function value.
 	 */
-	public static double getFunctionValue(String buildingName, boolean newBuilding, Settlement settlement) {
+	public static double getFunctionValue(String buildingType, boolean newBuilding, Settlement settlement) {
 
 		// Demand is 2 occupant capacity for every inhabitant.
 		double demand = settlement.getNumCitizens() * 2D;
 
 		double supply = 0D;
 		boolean removedBuilding = false;
-		Iterator<Building> i = settlement.getBuildingManager().getBuildings(THE_FUNCTION).iterator();
+		Iterator<Building> i = settlement.getBuildingManager().getBuildings(FunctionType.LIFE_SUPPORT).iterator();
 		while (i.hasNext()) {
 			Building building = i.next();
-			if (!newBuilding && building.getBuildingType().equalsIgnoreCase(buildingName) && !removedBuilding) {
+			if (!newBuilding && building.getBuildingType().equalsIgnoreCase(buildingType) && !removedBuilding) {
 				removedBuilding = true;
 			} else {
-				LifeSupport lsFunction = building.getLifeSupport();
 				double wearModifier = (building.getMalfunctionManager().getWearCondition() / 100D) * .75D + .25D;
-				supply += lsFunction.occupantCapacity * wearModifier;
+				supply += building.getLifeSupport().occupantCapacity * wearModifier;
 			}
 		}
 
 		double occupantCapacityValue = demand / (supply + 1D);
 
-		BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
-		double occupantCapacity = config.getLifeSupportCapacity(buildingName);
+		FunctionSpec spec = buildingConfig.getFunctionSpec(buildingType, FunctionType.LIFE_SUPPORT);
+		int occupantCapacity = spec.getCapacity();
 
 		double result = occupantCapacity * occupantCapacityValue;
 
 		// Subtract power usage cost per sol.
-		double power = config.getLifeSupportPowerRequirement(buildingName);
-//		double hoursInSol = MarsClock.convertMillisolsToSeconds(1000D) / 60D / 60D;
+		double power = spec.getDoubleProperty(BuildingConfig.POWER_REQUIRED);
 		double powerPerSol = power * MarsClock.HOURS_PER_MILLISOL * 1000D;
 		double powerValue = powerPerSol * settlement.getPowerGrid().getPowerValue() / 1000D;
 		result -= powerValue;
@@ -166,10 +140,7 @@ public class LifeSupport extends Function implements Serializable {
 	 */
 	public int getAvailableOccupancy() {
 		int available = occupantCapacity - getOccupantNumber();
-		if (available > 0)
-			return available;
-		else
-			return 0;
+        return Math.max(available, 0);
 	}
 
 	/**
@@ -187,7 +158,7 @@ public class LifeSupport extends Function implements Serializable {
 	 * @return collection of occupants
 	 */
 	public Collection<Person> getOccupants() {
-		return new ConcurrentLinkedQueue<Person>(occupants);
+		return occupants;
 	}
 
 	/**
@@ -200,13 +171,12 @@ public class LifeSupport extends Function implements Serializable {
 	public void addPerson(Person person) {
 		if (!occupants.contains(person)) {
 			// Remove person from any other inhabitable building in the settlement.
-			Iterator<Building> i = building.getBuildingManager().getBuildings().iterator(); 
+			Iterator<Building> i = building.getBuildingManager().getBuildingSet().iterator(); 
 			while (i.hasNext()) {
 				Building building = i.next();
-				if (building.hasFunction(THE_FUNCTION)) {
+				if (building.hasFunction(FunctionType.LIFE_SUPPORT)) {
 					// remove this person from the old building first
 					BuildingManager.removePersonFromBuilding(person, building);
-//					building.getLifeSupport().removePerson(person);
 				}
 			}
 			
@@ -241,12 +211,12 @@ public class LifeSupport extends Function implements Serializable {
 	public boolean timePassing(ClockPulse pulse) {
 		boolean valid = isValid(pulse);
 		if (valid) {
-			if (occupants != null && occupants.size() > 0) {
+			if (occupants != null && !occupants.isEmpty()) {
 				// Make sure all occupants are actually in settlement inventory.
 				// If not, remove them as occupants.
 				Iterator<Person> i = occupants.iterator();
 				while (i.hasNext()) {
-					if (!building.getInventory().containsUnit(i.next()))
+					if (!building.getSettlement().containsPerson(i.next()))
 						i.remove();
 				}
 			}
@@ -264,13 +234,23 @@ public class LifeSupport extends Function implements Serializable {
 				if (occupants != null) {
 					Iterator<Person> j = getOccupants().iterator();
 					while (j.hasNext()) {
-						PhysicalCondition condition = j.next().getPhysicalCondition();
-						condition.setStress(condition.getStress() + stressModifier);
+						j.next().getPhysicalCondition().addStress(stressModifier);
 					}
 				}
 			}
+
+			// Update Air
+			air.timePassing(building, pulse);
 		}
 		return valid;
+	}
+
+	/**
+	 * Get details about the composition of the air
+	 * @return
+	 */
+	public AirComposition getAir() {
+		return air;
 	}
 
 	/**
@@ -278,8 +258,9 @@ public class LifeSupport extends Function implements Serializable {
 	 * 
 	 * @return power (kW)
 	 */
+	@Override
 	public double getFullPowerRequired() {
-		return powerRequired; // + heating.getFullPowerRequired());
+		return powerRequired;
 	}
 
 	@Override
@@ -294,4 +275,5 @@ public class LifeSupport extends Function implements Serializable {
 		occupants.clear();
 		occupants = null;
 	}
+
 }

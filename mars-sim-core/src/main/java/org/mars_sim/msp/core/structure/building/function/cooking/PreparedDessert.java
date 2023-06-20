@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * PreparedDessert.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-30
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.structure.building.function.cooking;
@@ -19,24 +19,18 @@ public class PreparedDessert implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	// private static Logger logger = Logger.getLogger(PreparedDessert.class.getName());
+	// private static final Logger logger = Logger.getLogger(PreparedDessert.class.getName());
 
 	/**
 	 * The time (millisols) between when the dessert is made and when it expires.
 	 */
-	private static final double SHELF_LIFE = 150D;
+	private static final double SHELF_LIFE = 500D;
 
 	// Data members
 	private double quality;
-
 	private double dryMass;
 
 	private String name;
-
-	private String producerName;
-	// private String consumerName;
-	
-	private PreparingDessert kitchen;
 
 	private MarsClock expirationTime;
 
@@ -46,23 +40,13 @@ public class PreparedDessert implements Serializable {
 	 * @param quality      the quality of the dessert
 	 * @param creationTime the time the dessert was cooked.
 	 */
-	public PreparedDessert(String name, double quality, double dryMass, MarsClock creationTime, String producerName,
-			PreparingDessert kitchen) {
+	public PreparedDessert(String name, double quality, double dryMass, MarsClock creationTime) {
 		this.quality = quality;
 		this.name = name;
 		this.dryMass = dryMass;
-		expirationTime = (MarsClock) creationTime.clone();
+		expirationTime = new MarsClock(creationTime);
 		expirationTime.addTime(SHELF_LIFE);
-		this.producerName = producerName;
-		this.kitchen = kitchen;
 	}
-
-//	public PreparedDessert(PreparedDessert preparedDessert, String consumerName) {
-//		this.quality = preparedDessert.quality;
-//		this.name = preparedDessert.name;
-//		this.expirationTime = preparedDessert.expirationTime;
-//		this.consumerName = consumerName;
-//	}
 
 	/**
 	 * Gets the name of the dessert.
@@ -99,9 +83,4 @@ public class PreparedDessert implements Serializable {
 	public MarsClock getExpirationTime() {
 		return expirationTime;
 	}
-
-//	public void setConsumerName(String consumerName) {
-//		this.consumerName = consumerName; 
-//	}
-	 
 }

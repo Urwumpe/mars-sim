@@ -1,4 +1,14 @@
+/**
+ * Mars Simulation Project
+ * ConsoleApp.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat;
+
+import java.util.HashSet;
+import java.util.Set;
 
 import org.beryx.textio.TextIO;
 import org.beryx.textio.TextIoFactory;
@@ -18,7 +28,9 @@ public class ConsoleApp {
 			channel = new StreamChannel(System.in, System.out);
 		}
 		
-        Conversation conversation = new Conversation(channel, new TopLevel(), null);
+		Set<ConversationRole> roles = new HashSet<>();
+		roles.add(ConversationRole.ADMIN);
+        Conversation conversation = new Conversation(channel, new TopLevel(), roles, null);
         conversation.interact();
         
     }

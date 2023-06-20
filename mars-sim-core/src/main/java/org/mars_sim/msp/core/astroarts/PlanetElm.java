@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PlanetElm.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -9,7 +9,6 @@
  * PlanetElm Class
  */
 package org.mars_sim.msp.core.astroarts;
-import org.mars_sim.msp.core.astroarts.UdMath;
 
 class PlanetElm {
 	double L;		/* M+peri+node */

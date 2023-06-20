@@ -1,13 +1,15 @@
 /**
  * Mars Simulation Project
  * MonitorModel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.ui.swing.tool.monitor;
 
 import javax.swing.table.TableModel;
+
+import org.mars_sim.msp.core.structure.Settlement;
 
 /**
  * This defines a table model for use in the Monitor tool.
@@ -48,4 +50,17 @@ interface MonitorModel extends TableModel {
 	 * Gets the model count string.
 	 */
 	public String getCountString();
+
+	/**
+	 * Set the Settlement as a filter
+	 * @param filter Settlement
+	 * @return 
+	 */
+	public boolean setSettlementFilter(Settlement filter);
+
+	/**
+	 * Set whether the changes to the Entities should be monitor for change.
+	 * @param activate 
+	 */
+    public void setMonitorEntites(boolean activate);
 }

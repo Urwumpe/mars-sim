@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * StructureMapLayer.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.settlement;
@@ -16,11 +16,9 @@ import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import org.apache.batik.gvt.GraphicsNode;
 import org.mars_sim.msp.core.LocalAreaUtil;
@@ -37,7 +35,7 @@ import org.mars_sim.msp.ui.swing.tool.svg.SVGMapUtil;
  */
 public class StructureMapLayer implements SettlementMapLayer {
 	// default logger.
-	private static final Logger logger = Logger.getLogger(StructureMapLayer.class.getName());
+//	private static final Logger logger = Logger.getLogger(StructureMapLayer.class.getName());
 
     // Static members
     private static final Color BUILDING_COLOR = Color.GREEN;
@@ -62,7 +60,6 @@ public class StructureMapLayer implements SettlementMapLayer {
     private final static BasicStroke THICK_DASHES = new BasicStroke(10.0f,
   	      BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 50.0f, dash, 0.0f);
  
-    
     // Data members
     private boolean selected = false;
     
@@ -70,47 +67,16 @@ public class StructureMapLayer implements SettlementMapLayer {
     private SettlementMapPanel mapPanel;
     private Map<Double, Map<BuildingKey, BufferedImage>> svgImageCache;
 
-//	private Building building;
-
     /**
-     * Constructor
+     * Constructor 1
+     * 
      * @param mapPanel the settlement map panel.
      */
     public StructureMapLayer(SettlementMapPanel mapPanel) {
 
         // Initialize data members.
         this.mapPanel = mapPanel;
-        svgImageCache = new HashMap<Double, Map<BuildingKey, BufferedImage>>(21);
-
-        // Set Apache Batik library system property so that it doesn't output:
-        // "Graphics2D from BufferedImage lacks BUFFERED_IMAGE hint" in system err.
-        System.setProperty("org.apache.batik.warn_destination", "false"); //$NON-NLS-1$ //$NON-NLS-2$
-    }
-    
-	// Add this constructor for loading an svg image
-	// for the selected building in unit window's building tab
-    public StructureMapLayer(SettlementMapPanel mapPanel, Building building) {
-
-//    	this.building = building;
-//    	System.out.println("StructureMapLayer : building is "+ building);
-        // Initialize data members.
-        this.mapPanel = mapPanel;
-        svgImageCache = new HashMap<Double, Map<BuildingKey, BufferedImage>>(21);
-
-        // Set Apache Batik library system property so that it doesn't output:
-        // "Graphics2D from BufferedImage lacks BUFFERED_IMAGE hint" in system err.
-        System.setProperty("org.apache.batik.warn_destination", "false"); //$NON-NLS-1$ //$NON-NLS-2$
-    }
-
-    public StructureMapLayer() {
-
-        // Initialize data members.
-
-        svgImageCache = new HashMap<Double, Map<BuildingKey, BufferedImage>>(21);
-
-        // Set Apache Batik library system property so that it doesn't output:
-        // "Graphics2D from BufferedImage lacks BUFFERED_IMAGE hint" in system err.
-        System.setProperty("org.apache.batik.warn_destination", "false"); //$NON-NLS-1$ //$NON-NLS-2$
+        svgImageCache = new HashMap<Double, Map<BuildingKey, BufferedImage>>();
     }
 
     @Override
@@ -121,14 +87,10 @@ public class StructureMapLayer implements SettlementMapLayer {
     	Graphics2D g2d0 = g2d;
     	// value of scale came from paintComponent() in SettlementMapPanel.java
         this.scale = scale;
-//        this.building = building;
 
         // Save original graphics transforms.
         AffineTransform saveTransform = g2d.getTransform();
 
-        // Get the map center point.
-        //double mapCenterX = mapWidth / 2D;
-        //double mapCenterY = mapHeight / 2D;
 
         // Translate map from settlement center point.
         g2d.translate(mapWidth / 2D + (xPos * scale), mapHeight / 2D + (yPos * scale));
@@ -136,17 +98,13 @@ public class StructureMapLayer implements SettlementMapLayer {
         // Rotate map from North.
         g2d.rotate(rotation, 0D - (xPos * scale), 0D - (yPos * scale));
 
-        //2014-11-05 Added adjustScaleFactor()
         // discard the old scale value, compute a new value of scale.
-    	//System.out.println("StructureMapLayer.java : displayLayer() : building is " + building);
         if (building != null) {
         	// Displaying a svg image for one single building
 	        double width = building.getWidth();
 	        double length = building.getLength();
 	        scale = adjustScaleFactor(width, length);
         	drawOneBuilding(building, g2d0);
-	    	//System.out.println("StructureMapLayer.java : displayLayer() : width is "+ width);
-	      	//System.out.println("StructureMapLayer.java : displayLayer() : length is "+ length);
         }
 
         else {  // Displaying svg images of all buildings in the entire settlement
@@ -187,7 +145,7 @@ public class StructureMapLayer implements SettlementMapLayer {
      */
     private void drawBuildings(Graphics2D g2d, Settlement settlement) {
         if (settlement != null) {
-            Iterator<Building> i = new ArrayList<>(settlement.getBuildingManager().getBuildings()).iterator();
+            Iterator<Building> i = settlement.getBuildingManager().getBuildingSet().iterator();
             while (i.hasNext()) drawBuilding(i.next(), g2d);
         }
     }
@@ -200,14 +158,11 @@ public class StructureMapLayer implements SettlementMapLayer {
     public void drawBuilding(Building building, Graphics2D g2d) {
 
     	// Check if it's drawing the mouse-picked building 
-    	if (building.equals(mapPanel.getSelectedBuilding()))
-   			selected = true;
-    	else
-    		selected = false;
+        selected = building.equals(mapPanel.getSelectedBuilding());
     	
         // Use SVG image for building if available.
-    	if (building.getBuildingType() == null)
-    		logger.info("StructureMapLayer : " + building);
+//   		logger.info("StructureMapLayer : " + building.getBuildingType());
+   		
         GraphicsNode svg = SVGMapUtil.getBuildingSVG(building.getBuildingType().toLowerCase());
         if (svg != null) {
 
@@ -231,6 +186,7 @@ public class StructureMapLayer implements SettlementMapLayer {
 
     /**
      * Draw all of the construction sites in the settlement.
+     * 
      * @param g2d the graphics context.
      * @param settlement the settlement.
      */
@@ -246,6 +202,7 @@ public class StructureMapLayer implements SettlementMapLayer {
 
     /**
      * Draws a construction site on the map.
+     * 
      * @param site the construction site.
      * @param g2d the graphics context.
      */
@@ -253,17 +210,16 @@ public class StructureMapLayer implements SettlementMapLayer {
         // Use SVG image for construction site if available.
         GraphicsNode svg = null;
         ConstructionStage stage = site.getCurrentConstructionStage();
-        //System.out.println("stage is " + stage.toString());
+        String stageName = null;
         if (stage != null) {
-            svg = SVGMapUtil.getConstructionSiteSVG(stage.getInfo().getName().toLowerCase());
+            stageName = stage.getInfo().getName().toLowerCase();
+            svg = SVGMapUtil.getConstructionSiteSVG(stageName);
         }
         
         if (svg != null) {
             // Determine construction site pattern SVG image if available.
             GraphicsNode patternSVG = SVGMapUtil
-                    .getConstructionSitePatternSVG(
-                            stage.getInfo().getName().toLowerCase()
-                            );
+                    .getConstructionSitePatternSVG(stageName);
 
             drawSVGStructure(
                     g2d, site.getXLocation(), site.getYLocation(),
@@ -305,6 +261,7 @@ public class StructureMapLayer implements SettlementMapLayer {
 
     /**
      * Draws a building connector.
+     * 
      * @param connector the building connector.
      * @param g2d the graphics context.
      */
@@ -412,16 +369,22 @@ public class StructureMapLayer implements SettlementMapLayer {
         drawStructure(false, g2d, xLoc, yLoc, width, length, facing, null, null, color);
     }
 
-	//2014-11-04 Added adjustScaleFactor() to maximize the display size of
-    // the SVG Image of all buildings.
-	public double adjustScaleFactor(double x, double y)  {
+
+    /**
+     * Adjusts the scale factor for displaying the size of the SVG Image of all buildings.
+     * 
+     * @param x
+     * @param y
+     * @return
+     */
+    public double adjustScaleFactor(double x, double y)  {
 		double largerValue = 0;
-		if (x >= y ) largerValue = x;
-		else largerValue = y;
+        largerValue = Math.max(x, y);
 		scale = 100.0/largerValue * 0.9;
 
 		return scale;
 	}
+    
     /**
      * Draws a structure on the map.
      * @param isSVG true if using a SVG image.

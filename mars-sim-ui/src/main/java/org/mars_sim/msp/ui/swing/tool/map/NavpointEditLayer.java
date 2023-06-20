@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * NavpointEditLayer.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-28
  * @author Scott Davis
  */
 
@@ -28,8 +28,8 @@ import org.mars_sim.msp.ui.swing.ImageLoader;
 public class NavpointEditLayer implements MapLayer {
 
 	// Static members
-	private static final String BLUE_ICON_NAME = "FlagBlue";
-	private static final String GREEN_ICON_NAME = "FlagGreen";
+	private static final String BLUE_ICON_NAME = "map/flag_blue";
+	private static final String GREEN_ICON_NAME = "map/flag_green";
 	private static final Font FONT = new Font("SansSerif", Font.PLAIN, 9);
 	
 	// Domain members.
@@ -49,8 +49,8 @@ public class NavpointEditLayer implements MapLayer {
 	public NavpointEditLayer(Component displayComponent, boolean drawNavNumbers) {
 		this.displayComponent = displayComponent;
 		navpointPositions = new ArrayList<IntPoint>();
-		navpointIconColor = ImageLoader.getIcon(BLUE_ICON_NAME);
-		navpointIconSelected = ImageLoader.getIcon(GREEN_ICON_NAME);
+		navpointIconColor = ImageLoader.getIconByName(BLUE_ICON_NAME);
+		navpointIconSelected = ImageLoader.getIconByName(GREEN_ICON_NAME);
 		selectedNavpoint = -1;
 		this.drawNavNumbers = drawNavNumbers;
 	}
@@ -155,10 +155,11 @@ public class NavpointEditLayer implements MapLayer {
 	 * Displays the layer on the map image.
 	 * 
 	 * @param mapCenter the location of the center of the map.
-	 * @param mapType   the type of map.
+	 * @param baseMap   the type of map.
 	 * @param g         graphics context of the map display.
 	 */
-	public void displayLayer(Coordinates mapCenter, String mapType, Graphics g) {
+	@Override
+	public void displayLayer(Coordinates mapCenter, Map baseMap, Graphics g) {
 
 		Graphics2D g2d = (Graphics2D) g;
 		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);

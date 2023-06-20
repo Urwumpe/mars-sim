@@ -14,13 +14,11 @@ import java.util.Map;
 
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
-import org.mars_sim.msp.core.resource.AmountResource;
-import org.mars_sim.msp.core.resource.ItemResource;
+import org.mars_sim.msp.core.goods.GoodType;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.Part;
-import org.mars_sim.msp.core.resource.PhaseType;
 import org.mars_sim.msp.core.resource.ResourceUtil;
-import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.MockSettlement;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 
 import junit.framework.TestCase;
@@ -29,6 +27,8 @@ import junit.framework.TestCase;
  * Test case for the ConstructionStage class.
  */
 public class ConstructionStageTest extends TestCase {
+
+    private static final String SMALL_HAMMER = "small hammer";
 
     // Data members
     private ConstructionStageInfo foundationInfo;
@@ -39,16 +39,17 @@ public class ConstructionStageTest extends TestCase {
         SimulationConfig.instance().loadConfig();
         Simulation.instance().testRun();
 
+        Part smallHammer = (Part) ItemResourceUtil.findItemResource(SMALL_HAMMER);
         Map<Integer, Integer> parts = new HashMap<Integer, Integer>(1);
-        parts.put(ItemResourceUtil.smallHammerAR.getID(), 1);
-        
+        parts.put(smallHammer.getID(), 1);
+
         Map<Integer, Double> resources = new HashMap<Integer, Double>(1);
         resources.put(ResourceUtil.methaneAR.getID(), 1D);
-        
+
         List<ConstructionVehicleType> vehicles =
             new ArrayList<ConstructionVehicleType>(1);
         List<Integer> attachments = new ArrayList<Integer>(1);
-        attachments.add(new Part("attachment part", 2, "test resource description", 1D, 1).getID());
+        attachments.add(new Part("attachment part", 2, "test resource description", GoodType.UTILITY, 1D, 1).getID());
         vehicles.add(new ConstructionVehicleType("Light Utility Vehicle", LightUtilityVehicle.class,
                 attachments));
 
@@ -62,7 +63,7 @@ public class ConstructionStageTest extends TestCase {
      * .construction.ConstructionStage.ConstructionStage(ConstructionStageInfo)'
      */
     public void testConstructionStage() {
-        ConstructionSite site = new ConstructionSite(Settlement.createConstructionStage());
+        ConstructionSite site = new ConstructionSite(new MockSettlement());
         ConstructionStage stage = new ConstructionStage(foundationInfo, site);
         assertNotNull(stage);
     }
@@ -72,7 +73,7 @@ public class ConstructionStageTest extends TestCase {
      * .construction.ConstructionStage.getInfo()'
      */
     public void testGetInfo() {
-        ConstructionSite site = new ConstructionSite(Settlement.createConstructionStage());
+        ConstructionSite site = new ConstructionSite(new MockSettlement());
         ConstructionStage stage = new ConstructionStage(foundationInfo, site);
         assertEquals(foundationInfo, stage.getInfo());
     }
@@ -82,7 +83,7 @@ public class ConstructionStageTest extends TestCase {
      * .construction.ConstructionStage.getCompletedWorkTime()'
      */
     public void testGetCompletedWorkTime() {
-        ConstructionSite site = new ConstructionSite(Settlement.createConstructionStage());
+        ConstructionSite site = new ConstructionSite(new MockSettlement());
         ConstructionStage stage = new ConstructionStage(foundationInfo, site);
         assertEquals(0D, stage.getCompletedWorkTime());
     }
@@ -92,7 +93,7 @@ public class ConstructionStageTest extends TestCase {
      * .construction.ConstructionStage.addWorkTime(double)'
      */
     public void testAddWorkTime() {
-        ConstructionSite site = new ConstructionSite(Settlement.createConstructionStage());
+        ConstructionSite site = new ConstructionSite(new MockSettlement());
         ConstructionStage stage = new ConstructionStage(foundationInfo, site);
         stage.addWorkTime(5000D);
         assertEquals(5000D, stage.getCompletedWorkTime());
@@ -107,7 +108,7 @@ public class ConstructionStageTest extends TestCase {
      * .construction.ConstructionStage.isComplete()'
      */
     public void testIsComplete() {
-        ConstructionSite site = new ConstructionSite(Settlement.createConstructionStage());
+        ConstructionSite site = new ConstructionSite(new MockSettlement());
         ConstructionStage stage = new ConstructionStage(foundationInfo, site);
         stage.addWorkTime(5000D);
         assertFalse(stage.isComplete());

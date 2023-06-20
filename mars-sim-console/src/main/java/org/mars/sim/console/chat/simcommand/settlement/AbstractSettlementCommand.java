@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * AbstractSettlementCommand.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand.settlement;
 
 import org.mars.sim.console.chat.ChatCommand;
@@ -15,7 +22,7 @@ public abstract class AbstractSettlementCommand extends ChatCommand {
 	}
 
 	/**
-	 * Execute this command. This will identify the target Settlement for the current ChatCommand in
+	 * Executes this command. This will identify the target Settlement for the current ChatCommand in
 	 * the Conversation.
 	 */
 	@Override
@@ -27,7 +34,8 @@ public abstract class AbstractSettlementCommand extends ChatCommand {
 	}
 
 	/**
-	 * Execute the command for the target Settlement.
+	 * Executes the command for the target Settlement.
+	 * 
 	 * @param context
 	 * @param input
 	 * @param settlement

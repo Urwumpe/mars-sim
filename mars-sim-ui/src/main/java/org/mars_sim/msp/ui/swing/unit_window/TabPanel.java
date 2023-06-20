@@ -1,48 +1,58 @@
-/**
+/*
  * Mars Simulation Project
  * TabPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-10
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.ui.swing.unit_window;
 
 import java.awt.BorderLayout;
-import java.awt.Dimension;
+import java.awt.FlowLayout;
 
 import javax.swing.BoxLayout;
 import javax.swing.Icon;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
+import javax.swing.SwingConstants;
 import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.StyleManager;
 
 @SuppressWarnings("serial")
 public abstract class TabPanel extends JScrollPane {
 
-	protected String tabTitle;
-	protected String tabToolTip;
-	
-	protected Icon tabIcon;
-	
-	protected JPanel viewPanel;
-	protected JPanel topContentPanel;
-	protected JPanel centerContentPanel;
-	
-	protected Unit unit;
-	protected MainDesktopPane desktop;
+	// Default values for any top level Spring panel holding values
+	protected static final int INITY_DEFAULT = 5;
+	protected static final int INITX_DEFAULT = 75;
+	protected static final int INITX_DEFAULT_1 = 135;
+	protected static final int YPAD_DEFAULT = 1;
+	protected static final int XPAD_DEFAULT = 5;
 
-	protected static MissionManager missionManager = Simulation.instance().getMissionManager();
-
+	
+	private boolean isUIDone = false;
+	
+	private String description;
+	private String tabTitle;
+	private String tabToolTip;
+	
+	private transient Icon tabIcon;
+	
+	// These can be made private once all tabs converted
+	private JPanel topContentPanel;
+	private JPanel centerContentPanel;
+	
+	private Unit unit;
+	private MainDesktopPane desktop;
+	
 	/**
-	 * Constructor
+	 * Constructor.
 	 *
 	 * @param tabTitle   the title to be displayed in the tab (may be null).
 	 * @param tabIcon    the icon to be displayed in the tab (may be null).
@@ -50,36 +60,58 @@ public abstract class TabPanel extends JScrollPane {
 	 * @param unit       the unit to display.
 	 * @param desktop    the main desktop.
 	 */
-	public TabPanel(String tabTitle, Icon tabIcon, String tabToolTip, Unit unit, MainDesktopPane desktop) {
+	protected TabPanel(String tabTitle, Icon tabIcon, String tabToolTip, Unit unit, MainDesktopPane desktop) {
+		this((tabTitle != null) ? tabTitle : tabToolTip, tabTitle, tabIcon, tabToolTip, desktop);
+
+		this.unit = unit;
+	}
+	
+	
+	/**
+	 * Constructor.
+	 *
+	 * @param tabTitle   the title to be displayed in the tab (may be null).
+	 * @param tabIcon    the icon to be displayed in the tab (may be null).
+	 * @param tabToolTip the tool tip to be displayed in the icon (may be null).
+	 * @param desktop    the main desktop.
+	 */
+	protected TabPanel(String tabTitle, Icon tabIcon, String tabToolTip, MainDesktopPane desktop) {
+		this((tabTitle != null) ? tabTitle : tabToolTip, tabTitle, tabIcon, tabToolTip, desktop);
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @param tabTitle   the title to be displayed in the tab (may be null).
+	 * @param description A longer descriptive title displayed at the top of the panel.
+	 * @param tabIcon    the icon to be displayed in the tab (may be null).
+	 * @param tabToolTip the tool tip to be displayed in the icon (may be null).
+	 * @param desktop    the main desktop.
+	 */
+	protected TabPanel(String tabTitle, String description, Icon tabIcon, String tabToolTip, MainDesktopPane desktop) {
 
 		// Use JScrollPane constructor
 		super();
 
 		// Initialize data members
 		this.tabTitle = tabTitle;
+		this.description = description;
 		this.tabIcon = tabIcon;
 		this.tabToolTip = tabToolTip;
-		this.unit = unit;
 		this.desktop = desktop;
-
-		if (unit instanceof Person) {
-			this.setMaximumSize(new Dimension(UnitWindow.WIDTH - 30, UnitWindow.HEIGHT - 140));
-			this.setPreferredSize(new Dimension(UnitWindow.WIDTH - 30, UnitWindow.HEIGHT - 140));
-		}
-		else {
-			this.setMaximumSize(new Dimension(UnitWindow.WIDTH - 30, UnitWindow.HEIGHT - 90));
-			this.setPreferredSize(new Dimension(UnitWindow.WIDTH - 30, UnitWindow.HEIGHT - 90));
-		}
 		
 		// Create the view panel
-		viewPanel = new JPanel(new BorderLayout(0, 0));
+		JPanel viewPanel = new JPanel(new BorderLayout(0, 0));
 		createViewport();
 		setViewportView(viewPanel);
 		createVerticalScrollBar();
 		setVerticalScrollBarPolicy(VERTICAL_SCROLLBAR_ALWAYS);
 
+		// Ideally yes
+		//setHorizontalScrollBarPolicy(HORIZONTAL_SCROLLBAR_NEVER);
+
 		JScrollBar vertical = getVerticalScrollBar();
-		vertical.setValue(0);//vertical.getMinimum());
+		vertical.setValue(0);
 		
 		// Create top content panel
 		topContentPanel = new JPanel();
@@ -87,20 +119,53 @@ public abstract class TabPanel extends JScrollPane {
 		topContentPanel.setBorder(MainDesktopPane.newEmptyBorder());
 		viewPanel.add(topContentPanel, BorderLayout.NORTH);
 
-//		Border border = new MarsPanelBorder();
 		Border margin = new EmptyBorder(5,5,5,5);
 		
 		// Create center content panel
 		centerContentPanel = new JPanel(new BorderLayout(0, 10));
-//		centerContentPanel.setBorder(new CompoundBorder(border, margin));
 		centerContentPanel.setBorder(margin);
 		viewPanel.add(centerContentPanel, BorderLayout.CENTER);
-
-		// setBorder(new DropShadowBorder(Color.BLACK, 0, 11, .2f, 16,false, true, true,
-		// true));
 	}
 
-//	public abstract void initializeUI();
+ 	public boolean isUIDone() {
+		return isUIDone;
+	}
+	
+	public void initializeUI() {
+		if (!isUIDone) {
+			// Create label in top panel
+			String topLabel = (description != null ? description : getTabTitle());
+			JLabel titleLabel = new JLabel(topLabel, SwingConstants.CENTER);
+			StyleManager.applyHeading(titleLabel);
+			
+			JPanel labelPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+			labelPanel.add(titleLabel);
+			topContentPanel.add(labelPanel);
+			
+			buildUI(centerContentPanel);
+			
+			isUIDone = true;
+		}	
+	}
+	
+	/**
+	 * Builds the UI element using the 3 components.
+	 * 
+	 * @param centerContentPanel
+	 */
+	protected void buildUI(JPanel centerContentPanel) {
+		throw new UnsupportedOperationException("Build UI not implemented yet");
+	}
+
+	/**
+	 * Adds a standard titled border.
+	 * 
+	 * @param panel
+	 * @param title The title to display
+	 */
+	protected void addBorder(JComponent panel, String title) {
+		panel.setBorder(StyleManager.createLabelBorder(title));
+	}
 	
 	/**
 	 * Gets the tab title.
@@ -132,21 +197,16 @@ public abstract class TabPanel extends JScrollPane {
 	/**
 	 * Updates the info on this panel.
 	 */
-	public abstract void update();
+	public void update() {
+		// No updated required
+	}
 
-	/**
-	 * Updates the info on this panel.
-	 */
-	public void updateUI() {
-		super.updateUI();
-	};
-	
 	/**
 	 * Gets the main desktop.
 	 * 
 	 * @return desktop.
 	 */
-	public MainDesktopPane getDesktop() {
+	protected MainDesktopPane getDesktop() {
 		return desktop;
 	}
 
@@ -155,14 +215,20 @@ public abstract class TabPanel extends JScrollPane {
 	 * 
 	 * @return unit.
 	 */
-	public Unit getUnit() {
+	protected Unit getUnit() {
 		return unit;
 	}
 	
-	public abstract void initializeUI();
+	/**
+	 * Gets the simulation being monitored.
+	 * 
+	 * @return
+	 */
+	protected Simulation getSimulation() {
+		return desktop.getSimulation();
+	}
 	
-	public abstract boolean isUIDone();
-	
+
 	@Override
 	public  String toString() {
 		return tabTitle;
@@ -173,12 +239,10 @@ public abstract class TabPanel extends JScrollPane {
 	 */
 	public void destroy() {
 		tabIcon = null;
-		viewPanel = null;
 		topContentPanel = null;
 		centerContentPanel = null;
 		unit = null;
 		desktop = null;
-		missionManager = null;
-		
 	}
+
 }

@@ -1,94 +1,89 @@
-/**
+/*
  * Mars Simulation Project
  * Storage.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-30
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import java.io.Serializable;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
+import java.util.Map.Entry;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LogConsolidated;
+import org.mars_sim.msp.core.equipment.EquipmentInventory;
+import org.mars_sim.msp.core.equipment.ResourceHolder;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingException;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
 
 /**
  * The storage class is a building function for storing resources and units.
  */
-public class Storage extends Function implements Serializable {
+public class Storage extends Function {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
-	/* default logger. */
-	private static Logger logger = Logger.getLogger(Storage.class.getName());
-	// private static org.apache.log4j.Logger log4j = LogManager.getLogger(Storage.class);
-	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-			logger.getName().length());
 
-	private Map<Integer, Double> resourceCapacities;
+	/** default logger. */
+	private static SimLogger logger = SimLogger.getLogger(Storage.class.getName());
 	
-	private static final FunctionType FUNCTION = FunctionType.STORAGE;
+	/** The capacities of each resource. */
+	private Map<Integer, Double> resourceCapacities;
+
 
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param building the building the function is for.
+	 * @param spec Spec of the Storage capability
 	 * @throws BuildingException if function cannot be constructed.
 	 */
-	public Storage(Building building) {
+	public Storage(Building building, FunctionSpec spec) {
 		// Use Function constructor.
-		super(FunctionType.STORAGE, building);
+		super(FunctionType.STORAGE, spec, building);
 
-		Inventory inv = building.getInventory();
 		// Get capacity for each resource.
 		resourceCapacities = buildingConfig.getStorageCapacities(building.getBuildingType());
 
-		// Initialize resource capacities for this building.
-		Set<Integer> capSet = resourceCapacities.keySet();
-		for (Integer ar : capSet) {
-			double capacity = resourceCapacities.get(ar);
-			// Note : A capacity of a resource in a settlement is the sum of the capacity of
-			// the same resource
-			// in all buildings of that settlement
-			inv.addAmountResourceTypeCapacity(ar, capacity);
-		}
+		// Note: Storing a resource in a building is equivalent to storing it in a settlement.
 
-		double stockCapacity = buildingConfig.getStockCapacity(building.getBuildingType());
-		inv.addGeneralCapacity(stockCapacity);
+		// Get the owner of this building 
+		Settlement owner = building.getSettlement();
+		// Set up equipment inventory
+		EquipmentInventory inv = owner.getEquipmentInventory();
+		
+		// Set the specific capacities of resources from this building.
+		inv.setResourceCapacityMap(resourceCapacities, true);
+		
+		// Get the stock/general/cargo capacity
+		double stockCapacity = spec.getCapacity();
+		// Add the stock/general/cargo capacity to this building.
+		inv.addCargoCapacity(stockCapacity);
 
-		// Initialize stock capacities for all resource
-//		 for (AmountResource ar : ResourceUtil.getInstance().getAmountResources()) {
-//			 if (!building.getBuildingType().toLowerCase().contains("storage bin"))
-//				 inv.addAmountResourceTypeCapacity(ar, stockCapacity);
-//		 }
-
-		// Fill up initial resources for this building.
+		// Account for the initial specific resources available for each building
 		Map<Integer, Double> initialResources = buildingConfig.getInitialResources(building.getBuildingType());
-		Set<Integer> initialSet = initialResources.keySet();
-		for (Integer ar : initialSet) {
-			double initialAmount = initialResources.get(ar);
-			double remainingCap = inv.getAmountResourceRemainingCapacity(ar, true, false);
-
-			if (initialAmount > remainingCap)
-				initialAmount = remainingCap;
-			inv.addAmountResourceTypeCapacity(ar, initialAmount);
-			inv.storeAmountResource(ar, initialAmount, true);
+		// Add initial resources to this building.
+		for (Entry<Integer, Double> i : initialResources.entrySet()) {
+			double initialAmount = i.getValue();
+			int resourceId = i.getKey();
+			// Stores this resource in this building.
+			double excess = inv.storeAmountResource(resourceId, initialAmount);
+			if (excess > 0D) {
+				String resourceName = ResourceUtil.findAmountResourceName(resourceId);
+				logger.warning(building, "Only " + (initialAmount - excess) + " kg " + resourceName + " stored. Lacking "
+						+ excess + " kg in storage space.");
+			}
 		}
-
 	}
 
 	/**
 	 * Gets the value of the function for a named building.
-	 * 
+	 *
 	 * @param buildingName the building name.
 	 * @param newBuilding  true if adding a new building.
 	 * @param settlement   the settlement.
@@ -121,9 +116,8 @@ public class Storage extends Function implements Serializable {
 					existingStorage = 0D;
 			}
 
-//			Good resourceGood = GoodsUtil.getResourceGood(ResourceUtil.findIDbyAmountResourceName(resource.getName()));
-			double resourceValue = settlement.getGoodsManager().getGoodValuePerItem(resource);
-			double resourceStored = settlement.getInventory().getAmountResourceStored(resource, false);
+			double resourceValue = settlement.getGoodsManager().getGoodValuePoint(resource);
+			double resourceStored = settlement.getAmountResourceStored(resource);
 			double resourceDemand = resourceValue * (resourceStored + 1D);
 
 			double currentStorageDemand = resourceDemand - existingStorage;
@@ -132,10 +126,7 @@ public class Storage extends Function implements Serializable {
 
 			// Determine amount of this building's resource storage is useful to the
 			// settlement.
-			double buildingStorageNeeded = storageAmount;
-			if (currentStorageDemand < storageAmount) {
-				buildingStorageNeeded = currentStorageDemand;
-			}
+			double buildingStorageNeeded = Math.min(currentStorageDemand, storageAmount);
 
 			double storageValue = buildingStorageNeeded / 1000D;
 
@@ -146,9 +137,8 @@ public class Storage extends Function implements Serializable {
 	}
 
 	/**
-	 * Gets a map of the resources this building is capable of storing and their
-	 * amounts in kg.
-	 * 
+	 * Gets a map of the resource capacities this building is capable of storing in kg.
+	 *
 	 * @return Map of resource keys and amount Double values.
 	 */
 	public Map<Integer, Double> getResourceStorageCapacity() {
@@ -160,7 +150,7 @@ public class Storage extends Function implements Serializable {
 		// Remove excess amount resources that can no longer be stored.
 		removeResources();
 		// Remove storage capacity from settlement.
-		removeStorageCapacity();			
+		removeStorageCapacity();
 	}
 
 	public void removeResources() {
@@ -169,151 +159,140 @@ public class Storage extends Function implements Serializable {
 		while (i.hasNext()) {
 			Integer resource = i.next();
 			double storageCapacityAmount = resourceCapacities.get(resource);
-			Inventory inv = getBuilding().getSettlementInventory();
-			double totalStorageCapacityAmount = inv.getAmountResourceCapacity(resource, false);
+			double totalStorageCapacityAmount = getBuilding().getSettlement().getAmountResourceCapacity(resource);
 			double remainingStorageCapacityAmount = totalStorageCapacityAmount - storageCapacityAmount;
-			double totalStoredAmount = inv.getAmountResourceStored(resource, false);
+			double totalStoredAmount = getBuilding().getSettlement().getAmountResourceStored(resource);
 			if (remainingStorageCapacityAmount < totalStoredAmount) {
 				double resourceAmountRemoved = totalStoredAmount - remainingStorageCapacityAmount;
-				inv.retrieveAmountResource(resource, resourceAmountRemoved);
+				getBuilding().getSettlement().retrieveAmountResource(resource, resourceAmountRemoved);
 			}
 		}
 	}
-	
+
 	public void removeStorageCapacity() {
 		// Remove storage capacity from settlement.
 		Iterator<Integer> j = resourceCapacities.keySet().iterator();
 		while (j.hasNext()) {
 			Integer resource = j.next();
 			double storageCapacityAmount = resourceCapacities.get(resource);
-			Inventory inv = getBuilding().getSettlementInventory();
-			inv.removeAmountResourceTypeCapacity(resource, storageCapacityAmount);
+			getBuilding().getSettlement().getEquipmentInventory().removeCapacity(resource, storageCapacityAmount);
 		}
 	}
-	
+
 	@Override
 	public double getMaintenanceTime() {
 		return 10D;
 	}
 
 
-	/**
-	 * Stores a resource
-	 * 
-	 * @param amount
-	 * @param ar
-	 * @param inv
-	 * @return true if all mounts is being stored properly
-	 */
-	public static boolean storeAnResource(double amount, AmountResource ar, Inventory inv) {
-		return storeAnResource(amount, ar, inv, "");
-	}
+//	/**
+//	 * Stores a resource.
+//	 *
+//	 * @param amount
+//	 * @param ar
+//	 * @param inv
+//	 * @return true if all mounts is being stored properly
+//	 */
+//	public static boolean storeAnResource(double amount, AmountResource ar, ResourceHolder rh) {
+//		return storeAnResource(amount, ar, rh, "");
+//	}
+//
+//	/**
+//	 * Stores a resource.
+//	 *
+//	 * @param amount
+//	 * @param ar     {@link AmountResource}
+//	 * @param inv    {@link Inventory}
+//	 * @param method the name of the calling java method
+//	 * @return true if all amounts is being stored properly
+//	 */
+//	public static boolean storeAnResource(double amount, AmountResource ar, ResourceHolder rh, String method) {
+//		return storeAnResource(amount, ar.getID(), rh, method);
+//	}
+//
+//	/**
+//	 * Stores a resource.
+//	 *
+//	 * @param name
+//	 * @param Amount
+//	 * @param inv
+//	 * @return true if all amounts is being stored properly
+//	 */
+//	public static boolean storeAnResource(double amount, String name, ResourceHolder rh) {
+//		return storeAnResource(amount, ResourceUtil.findIDbyAmountResourceName(name), rh, "");
+//	}
 
 	/**
-	 * Stores a resource
-	 * 
+	 * Stores a resource.
+	 *
 	 * @param amount
 	 * @param ar     {@link AmountResource}
 	 * @param inv    {@link Inventory}
 	 * @param method the name of the calling java method
-	 * @return true if all mounts is being stored properly
+	 * @return true if it is being stored properly
 	 */
-	public static boolean storeAnResource(double amount, AmountResource ar, Inventory inv, String method) {
-		return storeAnResource(amount, ar.getID(), inv, method);
-	}
-
-	/**
-	 * Stores a resource
-	 * 
-	 * @param name
-	 * @param Amount
-	 * @param inv
-	 * @return true if all mounts is being stored properly
-	 */
-	public static boolean storeAnResource(double amount, String name, Inventory inv) {
-		return storeAnResource(amount, ResourceUtil.findIDbyAmountResourceName(name), inv, "");
-	}
-
-	/**
-	 * Stores a resource
-	 * 
-	 * @param amount
-	 * @param ar     {@link AmountResource}
-	 * @param inv    {@link Inventory}
-	 * @param method the name of the calling java method
-	 * @return true if all mounts is being stored properly
-	 */
-	public static boolean storeAnResource(double amount, int id, Inventory inv, String method) {
+	public static boolean storeAnResource(double amount, int id, ResourceHolder rh, String method) {
 		boolean result = false;
 
 		if (amount > 0) {
-			try {
-				double remainingCapacity = inv.getAmountResourceRemainingCapacity(id, true, false);
-				// double stored = inv.getAmountResourceStored(ar, false);
-				if (remainingCapacity < 0.00001) {
-					result = false;
-					// TODO: increase VP of barrel/bag/gas canister for storage to prompt for
-					// manufacturing them
-					
-					// Vent or drain 1% of resource
-					double ventAmount = 0.01 * inv.getAmountResourceCapacity(id, false);
-					inv.retrieveAmountResource(id, ventAmount);
-//					LogConsolidated.log(Level.WARNING, 10_000, sourceName + "::" + method, 
-//							"[" + inv.getOwner()
-//				    		+ "] No more room to store " + Math.round(amount*100.0)/100.0 + " kg of "
-//				    		+ ResourceUtil.findAmountResourceName(id) + ". Venting ", null);
-					
-					// Adjust the grey water filtering rate
-					if (id == ResourceUtil.greyWaterID && inv.getOwner() instanceof Settlement) {
-						Settlement s = (Settlement)(inv.getOwner());
-						s.increaseGreyWaterFilteringRate();
-						double r = s.getGreyWaterFilteringRate();
-						LogConsolidated.flog(Level.WARNING, 10_000, sourceName + "::" + method, 
-								"[" + s
-					    		+ "] Updated the grey water filtering rate to " + Math.round(r*100.0)/100.0 + ".");
-					}
-				}
-
-				else if (remainingCapacity < amount) {
-					// double stored = inv.getAmountResourceStored(ar, false);
-					// if the remaining capacity is smaller than the harvested amount, set remaining
-					// capacity to full
-					if (!method.equals(""))
-						method = " at " + method;
-				    LogConsolidated.flog(Level.SEVERE, 30_000, sourceName + method, 
-				    		"[" + inv.getOwner()
-				    		+ "] The storage capacity for " 
-				    		+ ResourceUtil.findAmountResourceName(id) + " has been reached. Only "
-					    	+ Math.round(remainingCapacity*10000.0)/10000.0 
-					    	+ " kg can be stored."  
-					    	//+ " (Remaining capacity : " + Math.round(remainingCapacity*100.0)/100.0
-					    	//+ " (Stored : " + Math.round(stored*100.0)/100.0
-					    	//+ ")"
-				    	);	
-					amount = remainingCapacity;
-					inv.storeAmountResource(id, amount, true);
-//					inv.addAmountSupply(id, amount);
-					result = false;
-				}
-
-				else {
-					inv.storeAmountResource(id, amount, true);
-//					inv.addAmountSupply(id, amount);
-					result = true;
-				}
-
-			} catch (Exception e) {
-				e.printStackTrace(System.err);
-				LogConsolidated.flog(Level.SEVERE, 10_000, sourceName,
-						"[" + inv.getOwner()
-			    		+ "] Issues with (int) storeAnResource on " + ResourceUtil.findAmountResourceName(id) + " : " + e.getMessage(), e);
+			
+			double excess = rh.storeAmountResource(id, amount);
+			
+			if (excess == 0.0) {
+				return true;
 			}
-		} else {
+			else if (excess > 0) {
+				logger.log(rh.getHolder(), Level.INFO, 60_000, method
+		    		+ "Storage full for "
+		    		+ ResourceUtil.findAmountResourceName(id) 
+		    		+ ". To store: "
+			    	+ Math.round(amount*10000.0)/10000.0
+			    	+ " kg"
+		    		+ ". Stored: "
+			    	+ Math.round((amount-excess)*10000.0)/10000.0
+			    	+ " kg"
+			    	);
+				
+				return false;
+			} 
+
+//			try {
+//				double remainingCapacity = rh.getAmountResourceRemainingCapacity(id);
+//
+//				if (remainingCapacity < amount) {
+////					// TODO: how to increase VP of barrel/bag/gas canister for storage to prompt for
+////					// manufacturing more of them
+//
+//					if (!method.equals(""))
+//						method = " at " + method;
+//					logger.log(rh.getHolder(), Level.SEVERE, 30_000, method
+//				    		+ "The storage capacity for "
+//				    		+ ResourceUtil.findAmountResourceName(id) + " has been reached. Only "
+//					    	+ Math.round(remainingCapacity*10000.0)/10000.0
+//					    	+ " kg can be stored."
+//				    	);
+//					rh.storeAmountResource(id, remainingCapacity);
+//
+//					result = false;
+//				}
+//
+//				else {
+//					rh.storeAmountResource(id, amount);
+//					result = true;
+//				}
+//
+//			} catch (Exception e) {
+//				logger.log(rh.getHolder(), Level.SEVERE, 10_000,
+//						"Issues with storeAmountResource on " + ResourceUtil.findAmountResourceName(id) + " : ", e);
+//			}
+		}
+		
+		else {
 			result = false;
 			if (!method.equals(""))
 				method = " at " + method;
-			LogConsolidated.flog(Level.SEVERE, 10_000, sourceName, "[" + inv.getOwner()
-    		+ "] Attempting to store non-positive amount of "
+				logger.log(rh.getHolder(), Level.SEVERE, 10_000,
+					"Attempting to store non-positive amount of "
 					+ ResourceUtil.findAmountResourceName(id) + method);
 		}
 
@@ -321,89 +300,62 @@ public class Storage extends Function implements Serializable {
 	}
 
 	/**
-	 * Retrieves a resource or test if a resource is available
-	 * 
-	 * @param name
-	 * @param requestedAmount
-	 * @param inv
-	 * @param isRetrieving
-	 * @return true if the full amount can be retrieved.
-	 */
-	public static boolean retrieveAnResource(double requestedAmount, String name, Inventory inv, boolean isRetrieving) {
-		return retrieveAnResource(requestedAmount, ResourceUtil.findIDbyAmountResourceName(name), inv, isRetrieving);
-	}
-
-	/**
-	 * Retrieves a resource or test if a resource is available
-	 * 
+	 * Retrieves a resource or test if a resource is available.
+	 *
 	 * @param requestedAmount
 	 * @param ar
 	 * @param inv
 	 * @param isRetrieving
 	 * @return true if the full amount can be retrieved.
 	 */
-	public static boolean retrieveAnResource(double requestedAmount, AmountResource ar, Inventory inv, boolean isRetrieving) {
-		return retrieveAnResource(requestedAmount, ar.getID(), inv, isRetrieving);
+	public static boolean retrieveAnResource(double requestedAmount, AmountResource ar, ResourceHolder rh, boolean isRetrieving) {
+		return retrieveAnResource(requestedAmount, ar.getID(), rh, isRetrieving);
 	}
 
 	/**
-	 * Retrieves a resource or test if a resource is available
-	 * 
+	 * Retrieves a resource or test if a resource is available.
+	 *
 	 * @param requestedAmount
 	 * @param id
 	 * @param inv
 	 * @param isRetrieving
 	 * @return true if the 'full' amount can be retrieved.
 	 */
-	public static boolean retrieveAnResource(double amount, int id, Inventory inv, boolean isRetrieving) {
+	public static boolean retrieveAnResource(double amount, int id, ResourceHolder rh, boolean isRetrieving) {
 		boolean result = false;
 		if (amount > 0) {
 			try {
-				double amountStored = inv.getAmountResourceStored(id, false);
-//				inv.addAmountDemandTotalRequest(id);
+				double amountStored = rh.getAmountResourceStored(id);
 
 				if (amountStored < 0.00001) {
 					result = false;
-					if (id == ResourceUtil.greyWaterID && inv.getOwner() instanceof Settlement) {
-						Settlement s = (Settlement)(inv.getOwner());
-						// Adjust the grey water filtering rate
-						s.decreaseGreyWaterFilteringRate();
-						double r = s.getGreyWaterFilteringRate();
-						LogConsolidated.flog(Level.WARNING, 1_000, sourceName, 
-								"[" + s
-					    		+ "] Updated the new grey water filtering rate to " + Math.round(r*100.0)/100.0 + ".");
-					}
-				
+
 				} else if (amountStored < amount) {
 					amount = amountStored;
 					if (isRetrieving) {
-						inv.retrieveAmountResource(id, amount);
-//						inv.addAmountDemand(id, amount);
+						rh.retrieveAmountResource(id, amount);
 					}
-					LogConsolidated.flog(Level.WARNING, 30_000, sourceName,
-							"[" + inv.getOwner()
-				    		+ "] ran out of "
+					logger.log(rh.getHolder(), Level.WARNING, 30_000,
+							"Ran out of "
 							+ ResourceUtil.findAmountResourceName(id) + "."
 							);
 					result = false;
-				
+
 				} else {
 					if (isRetrieving) {
-						inv.retrieveAmountResource(id, amount);
-//						inv.addAmountDemand(id, amount);
+						rh.retrieveAmountResource(id, amount);
 					}
 					result = true;
 				}
 			} catch (Exception e) {
-				e.printStackTrace(System.err);
-				LogConsolidated.flog(Level.SEVERE, 10_000, sourceName, "[" + inv.getOwner()
-	    		+ "] Issues with retrieveAnResource(ar) on "
+				logger.log(rh.getHolder(), Level.SEVERE, 10_000,
+						"Issues with retrieveAnResource(ar) on "
 						+ ResourceUtil.findAmountResourceName(id) + " : " + e.getMessage(), e);
 			}
 		} else {
 			result = false;
-			LogConsolidated.flog(Level.SEVERE, 10_000, sourceName, "[" + inv.getOwner()
-    		+ "] Attempting to retrieve non-positive amount of "
+			logger.log(rh.getHolder(), Level.SEVERE, 10_000,
+					"Attempting to retrieve non-positive amount of "
 					+ ResourceUtil.findAmountResourceName(id));
 		}
 

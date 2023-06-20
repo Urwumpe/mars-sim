@@ -1,27 +1,23 @@
-/**
+/*
  * Mars Simulation Project
  * PlayHoloGame.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-18
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.Set;
 
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
+import org.mars_sim.msp.core.structure.building.function.Computation;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
@@ -30,16 +26,13 @@ import org.mars_sim.msp.core.vehicle.Rover;
  * This task lowers the stress and may increase or decrease fatigue. The
  * duration of the task is by default chosen randomly, up to 100 millisols.
  */
-public class PlayHoloGame extends Task implements Serializable {
+public class PlayHoloGame extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(PlayHoloGame.class.getName());
-
-	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-			logger.getName().length());
+	private static final SimLogger logger = SimLogger.getLogger(PlayHoloGame.class.getName());
 
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.playHoloGame"); //$NON-NLS-1$
@@ -48,31 +41,38 @@ public class PlayHoloGame extends Task implements Serializable {
 	private static final TaskPhase PLAYING_A_HOLO_GAME = new TaskPhase(Msg.getString("Task.phase.playHoloGame")); //$NON-NLS-1$
 
 	private static final TaskPhase SETTING_UP_SCENES = new TaskPhase(Msg.getString("Task.phase.settingUpScenes")); //$NON-NLS-1$
-
-	// Static members
+    		
 	/** The stress modified per millisol. */
 	private static final double STRESS_MODIFIER = -.3D;
-
+	
+	// Data members
+    /** Computing Units needed per millisol. */		
+	private double computingNeeded;
+	/** The seed value. */
+    private double seed = RandomUtil.getRandomDouble(.005, 0.05);
+	
+	private final double TOTAL_COMPUTING_NEEDED;
+	
 	/**
 	 * Constructor.
 	 * 
 	 * @param person the person to perform the task
 	 */
 	public PlayHoloGame(Person person) {
-		super(NAME, person, false, false, STRESS_MODIFIER, true, 10D + RandomUtil.getRandomDouble(10D));
-
+		super(NAME, person, false, false, STRESS_MODIFIER, RandomUtil.getRandomInt(10, 20));
+		
+		TOTAL_COMPUTING_NEEDED = getDuration() * seed;
+		computingNeeded = TOTAL_COMPUTING_NEEDED;
+		
 		// If during person's work shift, only relax for short period.
-		int millisols = marsClock.getMillisolInt();
-		boolean isShiftHour = person.getTaskSchedule().isShiftHour(millisols);
+		boolean isShiftHour = person.isOnDuty();
 		if (isShiftHour) {
 			setDuration(5D);
 		}
 
-		// If person is in a settlement, try to find a place to relax.
-		boolean walkSite = false;
-		
 		if (person.isInSettlement()) {
-			
+			// If person is in a settlement, try to find a place to relax.
+			boolean walkSite = false;
 			int rand = RandomUtil.getRandomInt(3);
 			
 			if (rand == 0) {
@@ -82,17 +82,6 @@ public class PlayHoloGame extends Task implements Serializable {
 					walkToActivitySpotInBuilding(gym, FunctionType.EXERCISE, true);
 					walkSite = true;
 				}
-				else {
-					// Go back to his quarters
-					Building quarters = person.getQuarters();
-					if (quarters != null) {
-						walkToBed(quarters, person, true);
-						walkSite = true;
-					}
-					else 
-						// Walk to random location.
-						walkToRandomLocation(true);
-				}
 			}
 			
 			else if (rand == 1 || rand == 2) {
@@ -101,20 +90,10 @@ public class PlayHoloGame extends Task implements Serializable {
 					walkToActivitySpotInBuilding(rec, FunctionType.RECREATION, true);
 					walkSite = true;
 				}
-				else {
-					// Go back to his quarters
-					Building quarters = person.getQuarters();
-					if (quarters != null) {
-						walkToBed(quarters, person, true);
-						walkSite = true;
-					}
-					else 
-						// Walk to random location.
-						walkToRandomLocation(true);
-				}
 			}
 			
-			else {
+			// Still not got a destination
+			if (!walkSite) {
 				// Go back to his quarters
 				Building quarters = person.getQuarters();
 				if (quarters != null) {
@@ -126,14 +105,12 @@ public class PlayHoloGame extends Task implements Serializable {
 					walkToRandomLocation(true);
 			}
 		}
-
-		if (!walkSite) {
-			if (person.isInVehicle()) {
-				// If person is in rover, walk to passenger activity spot.
-				if (person.getVehicle() instanceof Rover) {
-					walkToPassengerActivitySpotInRover((Rover) person.getVehicle(), true);
-				}
-			} else {
+		else {
+			// If person is in rover, walk to passenger activity spot.
+			if (person.getVehicle() instanceof Rover) {
+				walkToPassengerActivitySpotInRover((Rover) person.getVehicle(), true);
+			}
+			else {
 				// Walk to random location.
 				walkToRandomLocation(true);
 			}
@@ -145,19 +122,9 @@ public class PlayHoloGame extends Task implements Serializable {
 
 		setPhase(SETTING_UP_SCENES);
 
-		LogConsolidated.log(logger, Level.FINE, 3_000, sourceName, "[" + person.getLocationTag().getLocale() + "] "
-				+ person + " was setting up hologames to play in " + person.getLocationTag().getImmediateLocation());
-		
+		logger.fine(person, "Setting up hologames to play.");
 	}
 
-//	public PlayHoloGame(Robot robot) {
-//		super(NAME, robot, false, false, STRESS_MODIFIER, true, 10D + RandomUtil.getRandomDouble(20D));
-//	}
-
-	@Override
-	public FunctionType getLivingFunction() {
-		return FunctionType.LIVING_ACCOMMODATIONS;// RECREATION;
-	}
 
 	@Override
 	protected double performMappedPhase(double time) {
@@ -179,12 +146,60 @@ public class PlayHoloGame extends Task implements Serializable {
 	 * @return the amount of time (millisol) left after performing the phase.
 	 */
 	private double playingPhase(double time) {
-
-//		if (isDone()) {
-//			LogConsolidated.log(Level.INFO, 0, sourceName, "[" + person.getLocationTag().getLocale() + "] "
-//					+ person + " was done playing hologames in " + person.getLocationTag().getImmediateLocation());
-//		}
+		double remainingTime = 0;
 		
+		if (isDone()) {
+			endTask();
+			return time;
+		}
+		
+		if (!person.getPhysicalCondition().isNominallyFit()) {
+			endTask();
+		}
+		
+		int msol = marsClock.getMillisolInt();       
+        boolean successful = false; 
+        
+        if (computingNeeded > 0) {
+        	double workPerMillisol = 0; 
+ 
+        	if (computingNeeded <= seed) {
+        		workPerMillisol = time * computingNeeded;
+        	}
+        	else {
+        		workPerMillisol = time * seed * RandomUtil.getRandomDouble(.9, 1.1);
+        	}
+
+        	// Submit request for computing resources
+        	Computation center = person.getAssociatedSettlement().getBuildingManager()
+        			.getMostFreeComputingNode(workPerMillisol, msol + 1, (int)(msol + getDuration()));
+        	if (center != null) {
+        		if (computingNeeded <= seed)
+        			successful = center.scheduleTask(workPerMillisol, msol + 1, msol + 2);
+        		else
+        			successful = center.scheduleTask(workPerMillisol, msol + 1, (int)(msol + getDuration()));
+        	}
+	    	else
+	    		logger.warning(person, 30_000L, "No computing centers available for " + NAME + ".");
+        	
+        	if (successful) {
+        		if (computingNeeded <= seed)
+        			computingNeeded = computingNeeded - workPerMillisol;
+        		else
+        			computingNeeded = computingNeeded - workPerMillisol * getDuration();
+        		if (computingNeeded < 0) {
+        			computingNeeded = 0; 
+        		}
+          	}
+	    	else {
+	    		logger.warning(person, 30_000L, "No computing resources for " + NAME + ".");
+	    	}
+        }
+        else if (computingNeeded <= 0) {
+        	// this task has ended
+        	endTask();
+        }
+        
 		// Either +ve or -ve
 		double rand = RandomUtil.getRandomInt(1);
 		if (rand == 0)
@@ -192,23 +207,16 @@ public class PlayHoloGame extends Task implements Serializable {
 
 		 // Probability affected by the person's stress and fatigue.
         PhysicalCondition condition = person.getPhysicalCondition();
-        double fatigue = condition.getFatigue();
-        double hunger = condition.getHunger();
+		// May either increase or reduce a person's fatigue level
+		condition.increaseFatigue(2 * time * rand);
+        // Reduce person's stress
+        condition.reduceStress(2 * time);
         
-        if (hunger > 1000) {
-        	endTask();
-        	return 0;
-        }
-        
-		// Reduce stress but may increase or reduce a person's fatigue level
-		double newFatigue = fatigue - (2D * time * rand);
-		if (newFatigue < 0D) {
-			newFatigue = 0D;
+        if (condition.getHunger() > 666 || condition.getFatigue() > 666) {
+	        endTask();
 		}
-		
-		condition.setFatigue(newFatigue);
-
-		return 0D;
+        
+		return remainingTime;
 	}
 
 	/**
@@ -218,18 +226,40 @@ public class PlayHoloGame extends Task implements Serializable {
 	 * @return the amount of time (millisol) left after performing the phase.
 	 */
 	private double settingUpPhase(double time) {
-		// TODO: add codes for selecting a particular type of game
+		double remainingTime = 0;
 		
-//		LogConsolidated.log(Level.INFO, 3_000, sourceName, "[" + person.getLocationTag().getLocale() + "] "
-//				+ person + " was setting up hologames to play in " + person.getLocationTag().getImmediateLocation());
-//		
-		setPhase(PLAYING_A_HOLO_GAME);
-		return time * .8D;
-	}
+		boolean successful = false; 
+		int msol = marsClock.getMillisolInt();
+		
+		if (computingNeeded > 0) {
+	      	double workPerMillisol = time * seed;
 
-	@Override
-	protected void addExperience(double time) {
-		// This task adds no experience.
+        	// Submit request for computing resources
+        	Computation center = person.getAssociatedSettlement().getBuildingManager()
+        			.getMostFreeComputingNode(workPerMillisol, msol + 1, msol + 2);
+        	if (center != null) {
+                successful = center.scheduleTask(workPerMillisol, msol + 1, msol + 2);
+        	}
+	    	else
+	    		logger.warning(person, 30_000L, "Can't set up for " + NAME + ".");
+        	
+        	if (successful) {
+        		computingNeeded = computingNeeded - workPerMillisol;
+        		if (computingNeeded < 0) {
+        			computingNeeded = 0; 
+        		}
+          	}
+	    	else {
+	    		logger.warning(person, 30_000L, "Can't set up for " + NAME + ".");
+	    	}
+		}
+		
+		if (getTimeCompleted() > getDuration() * .05) {
+			// If it has spent 5% of its time
+			setPhase(PLAYING_A_HOLO_GAME);
+		}
+		
+		return remainingTime;
 	}
 
 	/**
@@ -245,7 +275,7 @@ public class PlayHoloGame extends Task implements Serializable {
 
 		if (person.isInSettlement()) {
 			BuildingManager manager = person.getSettlement().getBuildingManager();
-			List<Building> recreationBuildings = manager.getBuildings(FunctionType.RECREATION);
+			Set<Building> recreationBuildings = manager.getBuildingSet(FunctionType.RECREATION);
 			recreationBuildings = BuildingManager.getNonMalfunctioningBuildings(recreationBuildings);
 			recreationBuildings = BuildingManager.getLeastCrowdedBuildings(recreationBuildings);
 
@@ -258,35 +288,4 @@ public class PlayHoloGame extends Task implements Serializable {
 
 		return result;
 	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		return 0;
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(0);
-		return results;
-	}
-
-//	/**
-//	 * Reloads instances after loading from a saved sim
-//	 * 
-//	 * @param {@link MasterClock}
-//	 * @param {{@link MarsClock}
-//	 */
-//	public static void initializeInstances(MasterClock c0, MarsClock c1) {
-//		masterClock = c0;
-//		marsClock = c1;
-//	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
-//		sim = null;
-//		marsClock = null;
-//		masterClock = null;
-	}
-
 }

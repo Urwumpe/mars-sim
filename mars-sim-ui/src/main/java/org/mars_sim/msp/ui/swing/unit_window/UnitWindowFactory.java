@@ -1,26 +1,24 @@
-/**
+/*
  * Mars Simulation Project
  * UnitWindowFactory.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-06-07
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.ui.swing.unit_window;
 
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.equipment.Equipment;
+import org.mars_sim.msp.core.equipment.EVASuit;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.unit_window.equipment.EquipmentWindow;
-import org.mars_sim.msp.ui.swing.unit_window.person.PersonWindow;
-import org.mars_sim.msp.ui.swing.unit_window.person.RobotWindow;
+import org.mars_sim.msp.ui.swing.unit_window.equipment.EquipmentUnitWindow;
+import org.mars_sim.msp.ui.swing.unit_window.person.PersonUnitWindow;
+import org.mars_sim.msp.ui.swing.unit_window.robot.RobotUnitWindow;
 import org.mars_sim.msp.ui.swing.unit_window.structure.SettlementUnitWindow;
-import org.mars_sim.msp.ui.swing.unit_window.structure.building.BuildingWindow;
-import org.mars_sim.msp.ui.swing.unit_window.vehicle.VehicleWindow;
+import org.mars_sim.msp.ui.swing.unit_window.structure.building.BuildingUnitWindow;
+import org.mars_sim.msp.ui.swing.unit_window.vehicle.VehicleUnitWindow;
 
 /**
  * The UnitWindowFactory is a factory for creating unit windows for units.
@@ -41,12 +39,23 @@ public class UnitWindowFactory {
      */
     public static UnitWindow getUnitWindow(Unit unit, MainDesktopPane desktop) {
 
-        if (unit instanceof Person) return new PersonWindow(desktop, (Person) unit);
-        else if (unit instanceof Robot) return new RobotWindow(desktop, (Robot) unit);
-        else if (unit instanceof Vehicle) return new VehicleWindow(desktop, (Vehicle) unit);
-        else if (unit instanceof Settlement) return new SettlementUnitWindow(desktop, unit);
-        else if (unit instanceof Building) return new BuildingWindow(desktop, (Building) unit);
-        else if (unit instanceof Equipment) return new EquipmentWindow(desktop, (Equipment) unit);
-        else return null;
+        switch (unit.getUnitType()) {
+        case PERSON:
+            return new PersonUnitWindow(desktop, (Person) unit);
+        case ROBOT:
+            return new RobotUnitWindow(desktop, (Robot) unit);
+        case VEHICLE:
+            return new VehicleUnitWindow(desktop, (Vehicle) unit);
+        case SETTLEMENT:
+            return new SettlementUnitWindow(desktop, unit);
+        case BUILDING:
+            return new BuildingUnitWindow(desktop, (Building) unit);
+        case EVA_SUIT:
+            return new EquipmentUnitWindow(desktop, (EVASuit) unit);
+//        case CONSTRUCTION:
+//            return new ConstructionSiteWindow(desktop, (ConstructionSite) unit);  
+        default:
+            return null;
+        }
     }
 }

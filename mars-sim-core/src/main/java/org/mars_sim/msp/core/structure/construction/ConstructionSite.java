@@ -1,30 +1,33 @@
 /**
  * Mars Simulation Project
  * ConstructionSite.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-06-07
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.structure.construction;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import org.mars_sim.msp.core.BoundedObject;
+import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.LocalBoundedObject;
+import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.UnitManager;
-import org.mars_sim.msp.core.person.ai.mission.MissionMember;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.logging.SimLogger;
+import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
+import org.mars_sim.msp.core.person.ai.mission.MissionPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.Structure;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.vehicle.GroundVehicle;
 
 /**
@@ -32,11 +35,14 @@ import org.mars_sim.msp.core.vehicle.GroundVehicle;
  */
 public class ConstructionSite
 extends Structure
-implements Serializable, LocalBoundedObject {
+implements  LocalBoundedObject {
 
     /** default serial id. */
     private static final long serialVersionUID = 1L;
 
+	// default logger.
+	private static final SimLogger logger = SimLogger.getLogger(ConstructionSite.class.getName());
+	
     // Construction site events.
     public static final String START_UNDERGOING_CONSTRUCTION_EVENT = "start undergoing construction";
     public static final String END_UNDERGOING_CONSTRUCTION_EVENT = "end undergoing construction";
@@ -46,31 +52,25 @@ implements Serializable, LocalBoundedObject {
     public static final String REMOVE_CONSTRUCTION_STAGE_EVENT = "removing construction stage";
     public static final String CREATE_BUILDING_EVENT = "creating new building";
     public static final String REMOVE_BUILDING_EVENT = "removing old building";
-	
-    /** The unit count for this settlement. */
-	private static int uniqueCount = Unit.FIRST_SITE_UNIT_ID;
 
     // Data members
-	/** Unique identifier for this site. */
-	private int identifier;
+    private boolean undergoingConstruction;
+    private boolean undergoingSalvage;
+    private boolean manual;
+    private boolean isSitePicked;
+    private boolean isMousePickedUp;
+    
 	/** construction skill for this site. */
     private int constructionSkill;
 
     private double width;
     private double length;
-    private double xLocation;
-    private double yLocation;
+    private LocalPosition position;
     private double facing;
-
-    private boolean undergoingConstruction;
-    private boolean undergoingSalvage;
-    private boolean manual, isSitePicked;
-    
-    private boolean isMousePickedUp;
 
     private transient List<ConstructionListener> listeners;
 
-    private Collection<MissionMember> members;
+    private Collection<Worker> members;
     private List<GroundVehicle> vehicles;
 
     private ConstructionStage foundationStage;
@@ -80,55 +80,27 @@ implements Serializable, LocalBoundedObject {
     private Settlement settlement;
     private ConstructionStageInfo stageInfo;
 
-	private static UnitManager unitManager = Simulation.instance().getUnitManager();
-
-	/**
-	 * Must be synchronised to prevent duplicate ids being assigned via different
-	 * threads.
-	 * 
-	 * @return
-	 */
-	private static synchronized int getNextIdentifier() {
-		return uniqueCount++;
-	}
-	
-	/**
-	 * Get the unique identifier for this settlement
-	 * 
-	 * @return Identifier
-	 */
-	public int getIdentifier() {
-		return identifier;
-	}
-	
-	public void incrementID() {
-		// Gets the identifier
-		this.identifier = getNextIdentifier();
-	}
-	
+    private MissionPhase phase;
+    
     /**
-     * Constructor
+     * Constructor.
      */
-    public ConstructionSite(Settlement settlement) {// , ConstructionManager constructionManager) {
-    	super("A construction site", settlement.getCoordinates());
-
+    public ConstructionSite(Settlement settlement) {
+    	super("A Construction Site", settlement.getCoordinates());
+    	
     	this.constructionManager = settlement.getConstructionManager();
     	this.settlement = settlement;
 
-    	// Add this site to the lookup map
-    	unitManager.addSiteID(this);
-    	
     	width = 0D;
         length = 0D;
-        xLocation = 0D;
-        yLocation = 0D;
+        position = LocalPosition.DEFAULT_POSITION;
         facing = 0D;
         foundationStage = null;
         frameStage = null;
         buildingStage = null;
         undergoingConstruction = false;
         undergoingSalvage = false;
-        listeners = Collections.synchronizedList(new ArrayList<ConstructionListener>());
+        listeners = Collections.synchronizedList(new ArrayList<>());
     }
 
     @Override
@@ -158,31 +130,14 @@ implements Serializable, LocalBoundedObject {
     }
 
     @Override
-    public double getXLocation() {
-        return xLocation;
+    public LocalPosition getPosition() {
+    	return position;
     }
-
-    /**
-     * Sets the X location of the construction site.
-     * @param xLocation x location in meters from center of settlement (West: positive, East: negative).
-     */
-    public void setXLocation(double xLocation) {
-        this.xLocation = xLocation;
-    }
-
-    @Override
-    public double getYLocation() {
-        return yLocation;
-    }
-
-    /**
-     * Sets the Y location of the construction site.
-     * @param yLocation y location in meters from center of settlement (North: positive, South: negative).
-     */
-    public void setYLocation(double yLocation) {
-        this.yLocation = yLocation;
-    }
-
+    
+	public void setPosition(LocalPosition position2) {
+		this.position = position2;
+	}
+	
     @Override
     public double getFacing() {
         return facing;
@@ -198,6 +153,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Checks if all construction is complete at the site.
+     * 
      * @return true if construction is complete.
      */
     public boolean isAllConstructionComplete() {
@@ -207,6 +163,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Checks if all salvage is complete at the site.
+     * 
      * @return true if salvage is complete.
      */
     public boolean isAllSalvageComplete() {
@@ -219,6 +176,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Checks if site is currently undergoing construction.
+     * 
      * @return true if undergoing construction.
      */
     public boolean isUndergoingConstruction() {
@@ -227,6 +185,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Checks if site is currently undergoing salvage.
+     * 
      * @return true if undergoing salvage.
      */
     public boolean isUndergoingSalvage() {
@@ -235,6 +194,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Sets if site is currently undergoing construction.
+     * 
      * @param undergoingConstruction true if undergoing construction.
      */
     public void setUndergoingConstruction(boolean undergoingConstruction) {
@@ -245,6 +205,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Sets if site is currently undergoing salvage.
+     * 
      * @param undergoingSalvage true if undergoing salvage.
      */
     public void setUndergoingSalvage(boolean undergoingSalvage) {
@@ -255,6 +216,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Gets the current construction stage at the site.
+     * 
      * @return construction stage.
      */
     public ConstructionStage getCurrentConstructionStage() {
@@ -269,6 +231,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Gets the next construction stage type.
+     * 
      * @return next construction stage type or null if none.
      */
     public String getNextStageType() {
@@ -284,6 +247,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Adds a new construction stage to the site.
+     * 
      * @param stage the new construction stage.
      * @throws Exception if error adding construction stage.
      */
@@ -313,6 +277,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Updates the width and length dimensions to a construction stage.
+     * 
      * @param stage the construction stage.
      */
     private void updateDimensions(ConstructionStage stage) {
@@ -347,7 +312,8 @@ implements Serializable, LocalBoundedObject {
     }
 
     /**
-     * Remove a salvaged stage from the construction site.
+     * Removes a salvaged stage from the construction site.
+     * 
      * @param stage the salvaged construction stage.
      * @throws Exception if error removing the stage.
      */
@@ -369,6 +335,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Removes the current salvaged construction stage.
+     * 
      * @throws Exception if error removing salvaged construction stage.
      */
     public void removeSalvagedStage() {
@@ -383,6 +350,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Creates a new building from the construction site.
+     * 
      * @param manager the settlement's building manager.
      * @return newly constructed building.
      * @throws Exception if error constructing building.
@@ -395,14 +363,18 @@ implements Serializable, LocalBoundedObject {
         int id = manager.getNextTemplateID();
         String buildingType = buildingStage.getInfo().getName();
         String uniqueName = manager.getBuildingNickName(buildingType);
-
-        Building newBuilding = new Building(id, buildingType, uniqueName, width, length,
-                xLocation, yLocation, facing, settlement.getBuildingManager());
+        
+        int zone = 0;
+        
+        Building newBuilding = new Building(id, zone, buildingType, uniqueName,
+        		new BoundedObject(position, width, length, facing),
+                settlement.getBuildingManager());
+        
         manager.addBuilding(newBuilding, true);
 
         // Record completed building name.
         constructionManager = settlement.getConstructionManager();
-        MarsClock timeStamp = (MarsClock) Simulation.instance().getMasterClock().getMarsClock().clone();
+        MarsClock timeStamp = new MarsClock(Simulation.instance().getMasterClock().getMarsClock());
         constructionManager.addConstructedBuildingLogEntry(buildingStage.getInfo().getName(), timeStamp);
 
         // Clear construction value cache.
@@ -416,6 +388,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Gets the building name the site will construct.
+     * 
      * @return building name or null if undetermined.
      */
     public String getBuildingName() {
@@ -425,6 +398,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Checks if the site's current stage is unfinished.
+     * 
      * @return true if stage unfinished.
      */
     public boolean hasUnfinishedStage() {
@@ -434,6 +408,7 @@ implements Serializable, LocalBoundedObject {
 
     /**
      * Checks if this site contains a given stage.
+     * 
      * @param stage the stage info.
      * @return true if contains stage.
      */
@@ -449,27 +424,30 @@ implements Serializable, LocalBoundedObject {
     }
 
     /**
-     * Adds a listener
+     * Adds a listener.
+     * 
      * @param newListener the listener to add.
      */
     public final void addConstructionListener(ConstructionListener newListener) {
         if (listeners == null)
-            listeners = Collections.synchronizedList(new ArrayList<ConstructionListener>());
+            listeners = Collections.synchronizedList(new ArrayList<>());
         if (!listeners.contains(newListener)) listeners.add(newListener);
     }
 
     /**
-     * Removes a listener
+     * Removes a listener.
+     * 
      * @param oldListener the listener to remove.
      */
     public final void removeConstructionListener(ConstructionListener oldListener) {
         if (listeners == null)
-            listeners = Collections.synchronizedList(new ArrayList<ConstructionListener>());
+            listeners = Collections.synchronizedList(new ArrayList<>());
         if (listeners.contains(oldListener)) listeners.remove(oldListener);
     }
 
     /**
-     * Fire a construction update event.
+     * Fires a construction update event.
+     * 
      * @param updateType the update type.
      */
     final void fireConstructionUpdate(String updateType) {
@@ -477,13 +455,14 @@ implements Serializable, LocalBoundedObject {
     }
 
     /**
-     * Fire a construction update event.
+     * Fires a construction update event.
+     * 
      * @param updateType the update type.
      * @param target the event target or null if none.
      */
     final void fireConstructionUpdate(String updateType, Object target) {
         if (listeners == null)
-            listeners = Collections.synchronizedList(new ArrayList<ConstructionListener>());
+            listeners = Collections.synchronizedList(new ArrayList<>());
         synchronized(listeners) {
             Iterator<ConstructionListener> i = listeners.iterator();
             while (i.hasNext()) i.next().constructionUpdate(
@@ -491,28 +470,35 @@ implements Serializable, LocalBoundedObject {
         }
     }
 
-    @Override
-    public String toString() {
-        StringBuilder result = new StringBuilder("Site");
-
-        ConstructionStage stage = getCurrentConstructionStage();
-        if (stage != null) {
-            result.append(": ").append(stage.getInfo().getName());
-            if (undergoingConstruction) result.append(" - Under Construction");
-            else if (undergoingSalvage) result.append(" - Under Salvage");
-            else if (hasUnfinishedStage()) {
-                if (stage.isSalvaging()) result.append(" - Salvage Unfinished");
-                else result.append(" - Construction Unfinished");
-            }
-        }
-
-        return result.toString();
-    }
+    /**
+     * Relocates the construction site by changing its coordinates.
+     */
+	public void relocateSite() {
+		Coordinates coord = getCoordinates();
+		BuildingConstructionMission.positionNewSite(this);
+		logger.info(this, "Manually relocated by player from " 
+				+ coord.getFormattedString() + " to "
+				+ getCoordinates().getFormattedString());
+	}
 
     public ConstructionManager getConstructionManager() {
     	return constructionManager;
     }
 
+	/**
+	 * Gets the associated settlement this unit is with
+	 *
+	 * @return the associated settlement
+	 */
+	public Settlement getAssociatedSettlement() {
+		return settlement;
+	}
+
+	/**
+	 * Gets the settlement this unit is with.
+	 *
+	 * @return the settlement
+	 */
     public Settlement getSettlement() {
     	return settlement;
     }
@@ -525,7 +511,7 @@ implements Serializable, LocalBoundedObject {
     	return constructionSkill;
     }
 
-	public void setMembers(Collection<MissionMember> members) {
+	public void setMembers(Collection<Worker> members) {
 		this.members = members;
 	}
 
@@ -533,7 +519,7 @@ implements Serializable, LocalBoundedObject {
 		this.vehicles = vehicles;
 	}
 
-	public Collection<MissionMember> getMembers() {
+	public Collection<Worker> getMembers() {
 		return members;
 	}
 
@@ -558,7 +544,7 @@ implements Serializable, LocalBoundedObject {
 	}
 
 	// for triggering the alertDialog()
-	public boolean getSitePicked() {
+	public boolean isSitePicked() {
 		return isSitePicked;
 	}
 
@@ -574,21 +560,59 @@ implements Serializable, LocalBoundedObject {
 		isMousePickedUp = value;
 	}
 
+	@Override
+	public UnitType getUnitType() {
+		return UnitType.CONSTRUCTION;
+	}
+
 	/**
-	 * Reloads instances after loading from a saved sim
-	 * 
-	 * @param {@link MasterClock}
-	 * @param {{@link MarsClock}
+	 * Is this unit inside a settlement ?
+	 *
+	 * @return true if the unit is inside a settlement
 	 */
-	public static void justReloaded(UnitManager u) {
-		unitManager = u;
+	@Override
+	public boolean isInSettlement() {
+		return false;
+	}
+
+	@Override
+    public String toString() {
+		StringBuilder result = new StringBuilder("Site");
+
+		ConstructionStage stage = getCurrentConstructionStage();
+		if (stage != null) {
+			result.append(": ").append(stage.getInfo().getName());
+			if (undergoingConstruction) result.append(" - Under Construction");
+			else if (undergoingSalvage) result.append(" - Under Salvage");
+			else if (hasUnfinishedStage()) {
+				if (stage.isSalvaging()) result.append(" - Salvage Unfinished");
+				else result.append(" - Construction Unfinished");
+			}
+		}
+
+		return result.toString();
+	}
+	
+	public void setPhase(MissionPhase phase) {
+		this.phase = phase;
+	}
+	
+	public MissionPhase getPhase() {
+		return phase;
 	}
 	
 	/**
-	 * Reset uniqueCount to the current number of building
+	 * Prepares object for garbage collection.
 	 */
-	public static void reinitializeIdentifierCount() {
-		uniqueCount = unitManager.getSitesNum() + Unit.FIRST_SITE_UNIT_ID;
-	} 
-	
+	public void destroy() {
+		position = null;
+	    members = null;
+	    vehicles = null;
+	    foundationStage = null;
+	    frameStage = null;
+	    buildingStage = null;
+	    constructionManager = null;
+	    settlement = null;
+	    stageInfo = null;
+	}
 }

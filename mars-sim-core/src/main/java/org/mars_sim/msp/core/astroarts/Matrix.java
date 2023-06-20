@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Matrix.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -9,7 +9,6 @@
  * Matrix (3x3)
  */
 package org.mars_sim.msp.core.astroarts;
-import org.mars_sim.msp.core.astroarts.ATime;
 
 public class Matrix {
 	public double fA11, fA12, fA13;
@@ -189,8 +188,8 @@ public class Matrix {
 	/**
 	 * Create Precession Matrix
 	 */
-	static final double fGeneralPrec = 360.0/25920;
-	static final double fPrecLimit = 30.0;
+	static final double FGeneralPrec = 360.0/25920;
+	static final double FPrecLimit = 30.0;
 	public static Matrix PrecMatrix(double fOldEpoch, double fNewEpoch) {
 		double fJd = 0.0;
 		boolean	bSwapEpoch = false;
@@ -201,7 +200,7 @@ public class Matrix {
 							  0.0, 0.0, 1.0);
 		}
 		double fT = (fOldEpoch - Astro.JD2000) / 36525.0;
-		if (fT < -fPrecLimit || fPrecLimit < fT) {
+		if (fT < -FPrecLimit || FPrecLimit < fT) {
 			bSwapEpoch = true;
 			double fTmp = fNewEpoch;
 			fNewEpoch = fOldEpoch;
@@ -212,15 +211,15 @@ public class Matrix {
 		double fT2 = fT * fT;
 		double ftt, ft;
 		ftt = ft = (fNewEpoch - fOldEpoch) / 36525.0;
-		if (ftt < -fPrecLimit) {
+		if (ftt < -FPrecLimit) {
 			bOuterNewcomb = true;
-			ft = -fPrecLimit;
-			fJd = -fPrecLimit * 36525.0 + Astro.JD2000;
+			ft = -FPrecLimit;
+			fJd = -FPrecLimit * 36525.0 + Astro.JD2000;
 		}
-		if (fPrecLimit < ftt) {
+		if (FPrecLimit < ftt) {
 			bOuterNewcomb = true;
-			ft = fPrecLimit;
-			fJd =  fPrecLimit * 36525.0 + Astro.JD2000;
+			ft = FPrecLimit;
+			fJd =  FPrecLimit * 36525.0 + Astro.JD2000;
 		}
 		
 		double ft2 = ft * ft;
@@ -244,12 +243,12 @@ public class Matrix {
 		
 		if (bOuterNewcomb) {
 			double fDjd;
-			if (ftt < -fPrecLimit) {
-				fDjd = (fNewEpoch - fOldEpoch) + fPrecLimit * 36525.0;
+			if (ftt < -FPrecLimit) {
+				fDjd = (fNewEpoch - fOldEpoch) + FPrecLimit * 36525.0;
 			} else {
-				fDjd = (fNewEpoch - fOldEpoch) - fPrecLimit * 36525.0;
+				fDjd = (fNewEpoch - fOldEpoch) - FPrecLimit * 36525.0;
 			}
-			double fPrecPrm = -fDjd / 365.24 * fGeneralPrec * Math.PI / 180.0;
+			double fPrecPrm = -fDjd / 365.24 * FGeneralPrec * Math.PI / 180.0;
 			double fEps = ATime.getEp(fJd);
 			mtx1 = RotateX(fEps);
 			mtx2 = RotateZ(fPrecPrm);

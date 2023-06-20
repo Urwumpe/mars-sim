@@ -1,35 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="https://maven.apache.org/POM/4.0.0" xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://maven.apache.org/POM/4.0.0 https://maven.apache.org/maven-v4_0_0.xsd">
 	<!-- ************************************************************************************************* -->
 	<!-- * General Section * -->
 	<!-- ************************************************************************************************* -->
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>com.github</groupId>
+	<groupId>com.github.mars-sim</groupId>
 	<artifactId>mars-sim</artifactId>
 	<packaging>pom</packaging>
-	<version>3.1.2</version>
+	<version>pre-3.6.0</version>
 	<name>mars-sim</name>
 	<url>https://github.com/mars-sim/mars-sim</url>
 	<inceptionYear>2009</inceptionYear>
 	<properties>
-		<release>11</release>
-		<project.version>3.1.2</project.version>
-		<junit.version>4.13.1</junit.version>
+		<release>17</release>
+		<project.version>3.5.0</project.version>
+		<fxgl.version>11.17</fxgl.version>
+		<junit-jupiter.version>5.9.3</junit-jupiter.version>
+        <!-- optional : if we want to use a junit4 specific version -->
+        <junit.version>4.13.2</junit.version>
 		<timestamp>${maven.build.timestamp}</timestamp>
 		<maven.build.timestamp.format>yyyy-MM-dd HH:mm</maven.build.timestamp.format>
-		<!-- Set file encoding to UTF-8. See http://stackoverflow.com/questions/3017695/how-to-configure-encoding-in-maven#3018152 -->
+		<!-- Set file encoding to UTF-8. See https://stackoverflow.com/questions/3017695/how-to-configure-encoding-in-maven#3018152 -->
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<!-- springboot.version>1.3.5.RELEASE</springboot.version -->
-		<!-- mapstruct.version>1.1.0.Final</mapstruct.version -->
+		<libgdx.version>1.10.0</libgdx.version>
 		<lwjgl.version>3.2.3</lwjgl.version>
-		<kotlin.version>1.4.10</kotlin.version>
-  <sonar.organization>bevans2000mars</sonar.organization>
-  <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-  <sonar.java.source>11</sonar.java.source>
-
+		<kotlin.version>1.7.22</kotlin.version>
+		<!--  TextIO needs 1.8 -->
+		<slf4j.version>2.0.7</slf4j.version>
+		<commons-cli.version>1.5.0</commons-cli.version>
+		<commons-io.version>2.11.0</commons-io.version>
+		<commons-lang3.version>3.12.0</commons-lang3.version>
+		<commons-math3.version>3.6.1</commons-math3.version>	
+  		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
+  		<sonar.java.source>17</sonar.java.source>
+  		<native.maven.plugin.version>0.9.22</native.maven.plugin.version>
 	</properties>
-
+	<dependencies>
+		<!-- Needed by graalvm -->
+		<dependency>
+			<groupId>org.junit.platform</groupId>
+			<artifactId>junit-platform-launcher</artifactId>
+			<version>1.9.3</version>
+			<scope>test</scope>
+		</dependency>		
+		<!-- https://stackoverflow.com/questions/41635164/is-junit5-backward-compatible-to-junit4 -->
+        <!--JUnit Jupiter Engine to depend on the JUnit5 engine and JUnit 5 API -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit-jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+		<!-- Incorporate junit-vintage to cover junit4 tests -->
+        <!--JUnit Jupiter Engine to depend on the JUnit4 engine and JUnit 4 API  -->
+        <dependency>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
+            <version>${junit-jupiter.version}</version>
+        </dependency>
+        <!-- Optional : override the JUnit 4 API version provided by junit-vintage-engine -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 	<!-- ************************************************************************************************* -->
 	<!-- * Developers Section * -->
 	<!-- ************************************************************************************************* -->
@@ -68,35 +105,33 @@
 				<role>developer</role>
 			</roles>
 			<timezone>0</timezone>
-		</developer>		
+		</developer>
 	</developers>
-	
+
 	<!-- ************************************************************************************************* -->
 	<!-- * Module Section * -->
 	<!-- ************************************************************************************************* -->
 	<modules>
-		<!--module>mars-sim-android</module -->
-		<module>mars-sim-core</module>
-		<module>mars-sim-headless</module>
-		<module>mars-sim-main</module>
 		<module>mars-sim-mapdata</module>
-		<!-- module>mars-sim-network</module-->
-		<!--module>mars-sim-service</module-->
+		<module>mars-sim-core</module>
 		<module>mars-sim-ui</module>
-		<!--module>mars-sim-javafx</module-->
-		<!--module>mars-sim-lwjgl</module-->
-    	<!--module>mars-sim-libgdx</module-->
+		<!--module>mars-sim-fxgl</module-->
 		<module>mars-sim-console</module>
+		<module>mars-sim-main</module>
+		<module>mars-sim-headless</module>
+		<!--module>mars-sim-base</module-->
 	</modules>
+  
 	<!-- ************************************************************************************************* -->
 	<!-- * Build Section * -->
 	<!-- ************************************************************************************************* -->
 	<build>
 		<pluginManagement>
 			<plugins>
-			<!-- https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-maven-plugin -->
+				
+				<!-- https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-maven-plugin -->
 				<plugin>
-					<groupId>org.jetbrains.kotlin</groupId>				
+					<groupId>org.jetbrains.kotlin</groupId>
 					<artifactId>kotlin-maven-plugin</artifactId>
 					<version>${kotlin.version}</version>
 					<executions>
@@ -130,12 +165,30 @@
 		                </execution>
 					</executions>
 					<dependencies>
+						<!-- https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-stdlib-common
+						<dependency>
+						    <groupId>org.jetbrains.kotlin</groupId>
+						    <artifactId>kotlin-stdlib-common</artifactId>
+						    <version>${kotlin.version}</version>
+						</dependency-->
 						<dependency>
 							<groupId>org.jetbrains.kotlin</groupId>
 							<artifactId>kotlin-stdlib</artifactId>
 							<version>${kotlin.version}</version>
 						</dependency>
-					</dependencies>					
+						<!-- https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-compiler -->
+						<dependency>
+						    <groupId>org.jetbrains.kotlin</groupId>
+						    <artifactId>kotlin-compiler</artifactId>
+						    <version>${kotlin.version}</version>
+						</dependency>
+						<!-- https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-scripting-compiler -->
+						<dependency>
+						    <groupId>org.jetbrains.kotlin</groupId>
+						    <artifactId>kotlin-scripting-compiler</artifactId>
+						    <version>${kotlin.version}</version>
+						</dependency>
+					</dependencies>
 					<!--dependencies>
 						<dependency>
 							<groupId>org.jetbrains.kotlin</groupId>
@@ -145,25 +198,24 @@
 					</dependencies-->
 				</plugin>
 				<plugin>
-				<!--https://mvnrepository.com/artifact/com.github.spotbugs/spotbugs-maven-plugin -->
+				<!-- https://mvnrepository.com/artifact/com.github.spotbugs/spotbugs-maven-plugin -->
 				  <groupId>com.github.spotbugs</groupId>
 				  <artifactId>spotbugs-maven-plugin</artifactId>
-				  <version>4.0.4</version>
-				  <!--version>3.1.12.2</version-->
+				  <version>4.7.3.4</version>
 				  <dependencies>
-				    <!-- https://spotbugs.github.io/ -->
+				    <!-- https://github.com/spotbugs/spotbugs -->
 				    <dependency>
 				      <groupId>com.github.spotbugs</groupId>
 				      <artifactId>spotbugs</artifactId>
-				      <version>4.0.4</version>
+				      <version>4.7.3</version>
 				    </dependency>
 				  </dependencies>
-				</plugin>			
+				</plugin>
 				<!--  https://mvnrepository.com/artifact/org.codehaus.mojo/versions-maven-plugin -->
 				<plugin>
 				    <groupId>org.codehaus.mojo</groupId>
 				    <artifactId>versions-maven-plugin</artifactId>
-				    <version>2.7</version>
+				    <version>2.15.0</version>
 				    <configuration>
 				        <generateBackupPoms>false</generateBackupPoms>
 				    </configuration>
@@ -172,7 +224,7 @@
 				<plugin>
 				    <groupId>org.apache.maven.plugins</groupId>
 				    <artifactId>maven-surefire-plugin</artifactId>
-				    <version>3.0.0-M5</version>
+				    <version>3.1.0</version>
 				    <configuration>
 				        <argLine>
 				            --illegal-access=permit
@@ -183,7 +235,7 @@
 				<plugin>
 				    <groupId>org.apache.maven.plugins</groupId>
 				    <artifactId>maven-failsafe-plugin</artifactId>
-				    <version>3.0.0-M5</version>
+				    <version>3.1.0</version>
 				    <configuration>
 				        <argLine>
 				            --illegal-access=permit
@@ -194,7 +246,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-compiler-plugin</artifactId>
-					<version>3.8.0</version>
+					<version>3.11.0</version>
 					<configuration>
 						<release>${release}</release>
 						<compilerArgs>
@@ -204,7 +256,7 @@
 						</compilerArgs>
 						<showWarnings>false</showWarnings>
                         <showDeprecation>false</showDeprecation>
-						<verbose>false</verbose>			          
+						<verbose>false</verbose>
 					</configuration>
 					<!-- see https://www.baeldung.com/kotlin-maven-java-project -->
 					<!-- see https://kotlinlang.org/docs/reference/using-maven.html -->
@@ -229,13 +281,13 @@
 		                    <phase>test-compile</phase>
 		                    <goals> <goal>testCompile</goal> </goals>
 		                </execution>
-	            	</executions>				
+	            	</executions>
 				</plugin>
 
 				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-deploy-plugin : 33KB-->
 				<plugin>
 					<artifactId>maven-deploy-plugin</artifactId>
-					<version>3.0.0-M1</version>
+					<version>3.1.1</version>
 					<executions>
 						<execution>
 							<id>default-deploy</id>
@@ -250,14 +302,15 @@
 						<dependency>
 						    <groupId>org.apache.maven.wagon</groupId>
 						    <artifactId>wagon-ssh</artifactId>
-						    <version>3.4.1</version>
+						    <version>3.5.3</version>
 						</dependency>
 					</dependencies>
 				</plugin>
 				<plugin>
+				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-war-plugin -->
 					<groupId>org.apache.maven.plugins</groupId>
 			        <artifactId>maven-war-plugin</artifactId>
-			        <version>3.3.1</version>
+			        <version>3.3.2</version>
 			        <configuration>
 						<archive>
 							<manifest>
@@ -265,7 +318,7 @@
 							</manifest>
 						</archive>
 			        </configuration>
-				</plugin>     
+				</plugin>
 			</plugins>
 		</pluginManagement>
 	</build>
@@ -279,7 +332,7 @@
 				<!-- See https://maven.apache.org/plugins/maven-dependency-plugin/usage.html -->
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
-				<version>3.1.1</version>
+				<version>3.5.0</version>
 				<configuration>
 					<outputDirectory>
 						${project.build.directory}
@@ -289,14 +342,25 @@
 			<plugin>
                 <groupId>org.sonarsource.scanner.maven</groupId>
                 <artifactId>sonar-maven-plugin</artifactId>
-                <version>3.7.0.1746</version>
+                <version>3.9.1.2184</version>
             </plugin>
 		</plugins>
 	</reporting>
+	
 	<!-- ************************************************************************************************* -->
 	<!-- * Repository Section * -->
 	<!-- ************************************************************************************************* -->
 	<repositories>
+		<repository>
+	        <id>maven-central-repo</id>
+	        <url>https://repo1.maven.org/maven2</url>
+	        <releases>
+                <enabled>true</enabled>
+            </releases>
+	        <snapshots>
+	            <enabled>true</enabled>
+	        </snapshots>
+	    </repository>
 		<repository>
 			<id>mars-sim</id>
 			<name>Mars-sim Project Maven Repository</name>
@@ -319,9 +383,15 @@
 			<url>https://oss.sonatype.org/content/repositories/releases</url>
 		</pluginRepository>
 		<pluginRepository>
-			<id>jcenter</id>
-			<url>https://jcenter.bintray.com/</url>
-		</pluginRepository>
-
+	        <id>graalvm-native-build-tools-snapshots</id>
+	        <name>GraalVM native-build-tools Snapshots</name>
+	        <url>https://raw.githubusercontent.com/graalvm/native-build-tools/snapshots</url>
+	        <releases>
+	            <enabled>false</enabled>
+	        </releases>
+	        <snapshots>
+	            <enabled>true</enabled>
+	        </snapshots>
+		</pluginRepository>		
 	</pluginRepositories>
 </project>

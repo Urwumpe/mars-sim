@@ -1,16 +1,14 @@
-/**
+/*
  * Mars Simulation Project
  * TradeGoodsPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-10-21
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.text.ParseException;
@@ -19,6 +17,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 
 import javax.swing.JButton;
 import javax.swing.JFormattedTextField;
@@ -33,27 +32,24 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.text.NumberFormatter;
 
-import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.equipment.Bag;
-import org.mars_sim.msp.core.equipment.Barrel;
 import org.mars_sim.msp.core.equipment.ContainerUtil;
-import org.mars_sim.msp.core.equipment.EquipmentFactory;
-import org.mars_sim.msp.core.equipment.GasCanister;
-import org.mars_sim.msp.core.person.ai.mission.TradeUtil;
+import org.mars_sim.msp.core.equipment.EquipmentType;
+import org.mars_sim.msp.core.goods.CommerceUtil;
+import org.mars_sim.msp.core.goods.Good;
+import org.mars_sim.msp.core.goods.GoodCategory;
+import org.mars_sim.msp.core.goods.GoodsUtil;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.PhaseType;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.structure.goods.Good;
-import org.mars_sim.msp.core.structure.goods.GoodType;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 @SuppressWarnings("serial")
 class TradeGoodsPanel extends WizardPanel {
-
+	/** default logger. */
+	private static SimLogger logger = SimLogger.getLogger(TradeGoodsPanel.class.getName());
+	
 	private boolean buyGoods;
 	private JLabel errorMessageLabel;
 	private JTable goodsTable;
@@ -86,8 +82,7 @@ class TradeGoodsPanel extends WizardPanel {
 		// Create title label.
 		String tradeString = "sold";
 		if (buyGoods) tradeString = "bought";
-		JLabel titleLabel = new JLabel("Choose good amounts to be " + tradeString + ".", JLabel.CENTER);
-		titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD));
+		JLabel titleLabel = createTitleLabel("Choose good amounts to be " + tradeString + ".");
 		add(titleLabel, BorderLayout.NORTH);
 
 		// Create available goods panel.
@@ -104,7 +99,7 @@ class TradeGoodsPanel extends WizardPanel {
 		availableGoodsPane.add(goodsScrollPane, BorderLayout.CENTER);
 		goodsTableModel = new GoodsTableModel();
 		goodsTable = new JTable(goodsTableModel);
-		TableStyle.setTableStyle(goodsTable);
+		goodsTable.setAutoCreateRowSorter(true);
 		goodsTable.setRowSelectionAllowed(true);
 		goodsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		goodsTable.getSelectionModel().addListSelectionListener(
@@ -185,7 +180,7 @@ class TradeGoodsPanel extends WizardPanel {
 							Good good = goodsTableModel.goodsList.get(selectedGoodIndex);
 							int currentAmount = goodsTableModel.goodsMap.get(good);
 							if (amount <= currentAmount) {
-								if (good.getCategory() == GoodType.VEHICLE && 
+								if (good.getCategory() == GoodCategory.VEHICLE && 
 										((amount > 1) || tradeTableModel.hasTradedVehicle())) {
 									errorMessageLabel.setText("Only one vehicle can be traded.");
 								}
@@ -219,6 +214,7 @@ class TradeGoodsPanel extends WizardPanel {
 		tradedGoodsPane.add(tradeScrollPane, BorderLayout.CENTER);
 		tradeTableModel = new TradeTableModel();
 		tradeTable = new JTable(tradeTableModel);
+		tradeTable.setAutoCreateRowSorter(true);
 		tradeTable.setRowSelectionAllowed(true);
 		tradeTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		tradeTable.getSelectionModel().addListSelectionListener(
@@ -236,8 +232,7 @@ class TradeGoodsPanel extends WizardPanel {
 		tradeScrollPane.setViewportView(tradeTable);
 
 		// Create the message label.
-		errorMessageLabel = new JLabel(" ", JLabel.CENTER);
-		errorMessageLabel.setForeground(Color.RED);
+		errorMessageLabel = createErrorLabel();
 		add(errorMessageLabel, BorderLayout.SOUTH);
 	}
 
@@ -254,22 +249,24 @@ class TradeGoodsPanel extends WizardPanel {
 
 	/**
 	 * Commits changes from this wizard panel.
-	 * @retun true if changes can be committed.
+	 * 
+	 * @return true if changes can be committed.
 	 */
 	boolean commitChanges() {
 		boolean result = false;
 		try {
+			MissionDataBean missionData = getWizard().getMissionData();
+			
 			// Check if enough containers in trade goods.
-			if (hasEnoughContainers()) {
+			if (hasEnoughContainers(missionData.getStartingSettlement())) {
 				// Set buy/sell goods.
-				MissionDataBean missionData = getWizard().getMissionData();
 				if (buyGoods) missionData.setBuyGoods(tradeTableModel.getTradeGoods());
 				else missionData.setSellGoods(tradeTableModel.getTradeGoods());
 				result = true;
 			}
 		}
 		catch (Exception e) {
-			e.printStackTrace(System.err);
+			logger.log(Level.SEVERE, "Issues with getting the goods from tradeTableModel: " + e.getMessage());
 		}
 		return result;
 	}
@@ -279,33 +276,31 @@ class TradeGoodsPanel extends WizardPanel {
 	 * @return true if enough containers
 	 * @throws Exception if error checking containers.
 	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private boolean hasEnoughContainers() {
+	private boolean hasEnoughContainers(Settlement settlement) {
 		boolean result = true;
 
-		Map<Class, Integer> containerMap = new HashMap<Class, Integer>(3);
-		containerMap.put(Bag.class, getNumberOfTradedContainers(Bag.class));
-		containerMap.put(Barrel.class, getNumberOfTradedContainers(Barrel.class));
-		containerMap.put(GasCanister.class, getNumberOfTradedContainers(GasCanister.class));
+		Map<EquipmentType, Integer> containerMap = new HashMap<>(3);
+		containerMap.put(EquipmentType.BAG, getNumberOfTradedContainers(EquipmentType.BAG));
+		containerMap.put(EquipmentType.BARREL, getNumberOfTradedContainers(EquipmentType.BARREL));
+		containerMap.put(EquipmentType.GAS_CANISTER, getNumberOfTradedContainers(EquipmentType.GAS_CANISTER));
 
 		Map<Good, Integer> tradeGoods = tradeTableModel.getTradeGoods();
 
 		Iterator<Good> i = tradeGoods.keySet().iterator();
 		while (i.hasNext()) {
 			Good good = i.next();
-			if (good.getCategory() == GoodType.AMOUNT_RESOURCE) {
+			if (good.getCategory() == GoodCategory.AMOUNT_RESOURCE) {
 				AmountResource resource = ResourceUtil.findAmountResource(good.getID());
 				PhaseType phase = resource.getPhase();
-				Class containerType = ContainerUtil.getContainerTypeNeeded(phase);
+				EquipmentType containerType = ContainerUtil.getContainerTypeNeeded(phase);
 				int containerNum = containerMap.get(containerType);
-				Unit container = EquipmentFactory.createEquipment(containerType, new Coordinates(0, 0), true);
-				double capacity = container.getInventory().getAmountResourceCapacity(resource, false);
+				double capacity = ContainerUtil.getContainerCapacity(containerType);
 				double totalCapacity = containerNum * capacity;
 				double resourceAmount = tradeGoods.get(good);
 				if (resourceAmount > totalCapacity) {
 					double neededCapacity = resourceAmount - totalCapacity;
 					int neededContainerNum = (int) Math.ceil(neededCapacity / capacity);
-					String containerName = container.getName().toLowerCase();
+					String containerName = containerType.getName().toLowerCase();
 					if (neededContainerNum > 1) containerName = containerName + "s";
 					errorMessageLabel.setText(neededContainerNum + " " + containerName + " needed to hold " + resource.getName());
 					result = false;
@@ -317,6 +312,7 @@ class TradeGoodsPanel extends WizardPanel {
 					containerMap.put(containerType, remainingContainerNum);
 				}
 			}
+			// May consider using container for item in future
 		}
 
 		return result;
@@ -327,7 +323,7 @@ class TradeGoodsPanel extends WizardPanel {
 	 * @param containerType the container class.
 	 * @return number of containers.
 	 */
-	private <T extends Unit> int getNumberOfTradedContainers(Class<T> containerType) {
+	private int getNumberOfTradedContainers(EquipmentType containerType) {
 		int result = 0;
 		Good containerGood = GoodsUtil.getEquipmentGood(containerType);
 		Map<Good, Integer> tradeGoods = tradeTableModel.getTradeGoods();
@@ -442,12 +438,12 @@ class TradeGoodsPanel extends WizardPanel {
 			while (i.hasNext()) {
 				Good good = i.next();
 				try {
-					int amount = (int) TradeUtil.getNumInInventory(good, settlement.getInventory());
+					int amount = (int) CommerceUtil.getNumInInventory(good, settlement);
 					if (checkForVehicle(good)) amount--;
 					goodsMap.put(good, amount);
 				}
 				catch (Exception e) {
-					e.printStackTrace(System.err);
+					logger.log(Level.SEVERE, "Issues with updating the goods map: " + e.getMessage());
 				}
 			}
 			fireTableDataChanged();
@@ -461,7 +457,7 @@ class TradeGoodsPanel extends WizardPanel {
 		private boolean checkForVehicle(Good good) {
 			boolean result = false;
 
-			if (!buyGoods && good.getCategory() == GoodType.VEHICLE) {
+			if (!buyGoods && good.getCategory() == GoodCategory.VEHICLE) {
 				String missionRoverName = getWizard().getMissionData().getRover().getDescription();
 				if (good.getName().equalsIgnoreCase(missionRoverName)) result = true;
 			}
@@ -629,7 +625,7 @@ class TradeGoodsPanel extends WizardPanel {
 			boolean result = false;
 			Iterator<Good> i = tradeList.iterator();
 			while (i.hasNext()) {
-				if (i.next().getCategory() == GoodType.VEHICLE) result = true;
+				if (i.next().getCategory() == GoodCategory.VEHICLE) result = true;
 			}
 			return result;
 		}

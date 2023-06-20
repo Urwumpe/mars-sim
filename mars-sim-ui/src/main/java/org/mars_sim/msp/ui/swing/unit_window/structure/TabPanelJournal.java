@@ -1,20 +1,17 @@
 /**
  * Mars Simulation Project
  * TabPanelJournal.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
 
 import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Image;
 import java.awt.Toolkit;
 import java.net.URL;
 
-import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
 
@@ -37,11 +34,7 @@ public class TabPanelJournal
 extends TabPanel {
 	
 	// Data members
-	/** Is UI constructed. */
-	private boolean uiDone = false;
-	
 	private Settlement settlement;
-
 
 	/**
 	 * Constructor.
@@ -60,31 +53,16 @@ extends TabPanel {
 		this.settlement = settlement;
 
 	}
-	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
-		
-		// Create label panel.
-		JPanel labelPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(labelPanel);
 
-		// Create title label.
-		JLabel label = new JLabel(Msg.getString("TabPanelJournal.label"), JLabel.CENTER); //$NON-NLS-1$
-		label.setFont(new Font("Serif", Font.BOLD, 16));
-		labelPanel.add(label);
+	@Override
+	protected void buildUI(JPanel content) {
 
-		
 		JPanel centerPanel = new JPanel(new BorderLayout());
 		centerPanel.setBorder(new MarsPanelBorder());
-		centerContentPanel.add(centerPanel, BorderLayout.CENTER);
+		content.add(centerPanel, BorderLayout.CENTER);
 		
 		JournalArea textArea = new JournalArea();
 		centerPanel.add(textArea);
-		
 	}
 
 	class JournalArea extends JTextArea  {
@@ -126,17 +104,5 @@ extends TabPanel {
 			  super.paint(g);  
 		  }
 		}
-		 
-	@Override
-	public void update() {
-		if (!uiDone)
-			initializeUI();
-	}
 
-	/**
-	 * Prepare object for garbage collection.
-	 */
-	public void destroy() {
-//		settlement = null;
-	}
 }

@@ -1,38 +1,32 @@
 /**
  * Mars Simulation Project
  * PowerStorage.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
 
-import java.io.Serializable;
 import java.util.Iterator;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.LogConsolidated;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.structure.PowerGrid;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingException;
+import org.mars_sim.msp.core.structure.building.FunctionSpec;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * The PowerStorage class is a building function depicting the interworking of a grid battery for energy storage.
  */
-public class PowerStorage
-extends Function
-implements Serializable {
+public class PowerStorage extends Function {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(PowerStorage.class.getName());
-	
-    private static String sourceName = logger.getName();
+	private static final SimLogger logger = SimLogger.getLogger(PowerStorage.class.getName());
 
 	public static double HOURS_PER_MILLISOL = 0.0247 ; //MarsClock.SECONDS_IN_MILLISOL / 3600D;
 	
@@ -41,6 +35,11 @@ implements Serializable {
 	public static final double BATTERY_MAX_VOLTAGE = 375D;
 	
 	public static final double PERCENT_BATTERY_RECONDITIONING_PER_CYCLE = .1; // [in %]
+
+	/**
+	 * This is Building.xml property for the Power storage functino to control discharge
+	 */
+	private static final String DISCHARGE_RATE = "discharge-rate";
 
 	/** The number of cells per modules of the battery. */
 	private static int cellsPerModule = 104; // 3.6 V * 104 = 374.4 V 
@@ -66,7 +65,7 @@ implements Serializable {
 	private double r_total; // R_total = R of each cell * # of cells * # of modules 
 	
 	/**The maximum continuous discharge rate (within the safety limit) of this battery. */
-	private double C_rating = 1D;
+	private double C_rating = 2D;
 	
 	/** The health of the battery. */
 	private double health = 1D; 	
@@ -97,14 +96,6 @@ implements Serializable {
 	 * It varies with SOC and discharge/charge current.
 	 */
 	private double terminalVoltage; 
-
-	/*
-	 * The minimum allowable voltage. It is this voltage that generally 
-	 * defines the “empty” state of the battery
-	 */
-	//private double cutoffVoltage; 
-
-	//private double selfDischargeRate;
 	
 	private double time;
 	
@@ -116,34 +107,27 @@ implements Serializable {
 	/**
 	 * Constructor.
 	 * @param building the building with the function.
+	 * @param spec Specification of Function
 	 * @throws BuildingException if error parsing configuration.
 	 */
-	public PowerStorage(Building building) {
+	public PowerStorage(Building building, FunctionSpec spec) {
 		// Call Function constructor.
-		super(FunctionType.POWER_STORAGE, building);
+		super(FunctionType.POWER_STORAGE, spec, building);
 		
-		max_kWh_nameplate = buildingConfig.getPowerStorageCapacity(building.getBuildingType());
+		max_kWh_nameplate = spec.getCapacity();
 		
 		currentMaxCap = max_kWh_nameplate;
 
-		if (currentMaxCap == 20)
-			numModules = 19;
-		else if (currentMaxCap == 40) // inflatable greenhouse, ...
-			numModules = 38;
-		else if (currentMaxCap == 80) // large greenhouse & MD1 only
-			numModules = 80;
-		else if (currentMaxCap == 120) // MD4
-			numModules = 120;
-		else if (currentMaxCap == 400) // Small Battery Array
-			numModules = 380;
+		numModules = (int)(currentMaxCap * .9);
 
 		r_total = r_cell * numModules * cellsPerModule;
 		
 		ampHours = 1000D * currentMaxCap/SECONDARY_LINE_VOLTAGE; 
 
+		C_rating = spec.getDoubleProperty(DISCHARGE_RATE);	
+
 		// At the start of sim, set to a random value		
-		kWhStored = RandomUtil.getRandomDouble(max_kWh_nameplate);		
-		//logger.info("initial kWattHoursStored is " + kWattHoursStored);
+		kWhStored = .5 * max_kWh_nameplate + RandomUtil.getRandomDouble(.5 * max_kWh_nameplate);		
 		
 		// update batteryVoltage
 		updateVoltage();
@@ -152,32 +136,31 @@ implements Serializable {
 
 	/**
 	 * Gets the value of the function for a named building.
-	 * @param buildingName the building name.
+	 * @param type the building type.
 	 * @param newBuilding true if adding a new building.
 	 * @param settlement the settlement.
 	 * @return value (VP) of building function.
 	 * @throws Exception if error getting function value.
 	 */
-	public static double getFunctionValue(String buildingName, boolean newBuilding, Settlement settlement) {
+	public static double getFunctionValue(String type, boolean newBuilding, Settlement settlement) {
 
 		PowerGrid grid = settlement.getPowerGrid();
 
-		double hrInSol = 1000D * PowerGrid.HOURS_PER_MILLISOL;//MarsClock.convertMillisolsToSeconds(1000D) / 60D / 60D;
+		double hrInSol = 1000D * PowerGrid.HOURS_PER_MILLISOL;
 		double demand = grid.getRequiredPower() * hrInSol;
 
 		double supply = 0D;
 		Iterator<Building> iStore = settlement.getBuildingManager().getBuildings(FunctionType.POWER_STORAGE).iterator();
 		while (iStore.hasNext()) {
 			Building building = iStore.next();
-			PowerStorage store = building.getPowerStorage();//(PowerStorage) building.getFunction(PowerStorage.FUNCTION);
+			PowerStorage store = building.getPowerStorage();
 			double wearModifier = (building.getMalfunctionManager().getWearCondition() / 100D) * .75D + .25D;
 			supply += store.currentMaxCap * wearModifier;
 		}
 
 		double existingPowerStorageValue = demand / (supply + 1D);
 
-		//BuildingConfig config = SimulationConfig.instance().getBuildingConfiguration();
-		double powerStorage = buildingConfig.getPowerStorageCapacity(buildingName);
+		double powerStorage = buildingConfig.getFunctionSpec(type, FunctionType.POWER_STORAGE).getCapacity();
 
 		double value = powerStorage * existingPowerStorageValue / hrInSol;
 		if (value > 10D) value = 10D;
@@ -212,7 +195,6 @@ implements Serializable {
 				int rand = RandomUtil.getRandomInt((int)kWh);		
 				if (rand == 0) {
 					needRecondition = true;
-					//System.out.println("Start reconditioning. kWh : " + kWh);	
 			        // recondition once and lock it for the rest of the sol
 			        locked = true;
 				}
@@ -254,7 +236,6 @@ implements Serializable {
 	 * Updates the terminal voltage of the battery
 	 */
 	private void updateVoltage() {
-		//r_total = r_cell * cellsPerModule * numModules;
     	terminalVoltage = kWhStored / ampHours * 1000D;
     	if (terminalVoltage > BATTERY_MAX_VOLTAGE)
     		terminalVoltage = BATTERY_MAX_VOLTAGE;
@@ -274,12 +255,7 @@ implements Serializable {
 	private void reconditionBattery() {
 		health = health * (1 + PERCENT_BATTERY_RECONDITIONING_PER_CYCLE/100D);
 		
-		LogConsolidated.log(logger, Level.INFO, 3000, sourceName, 
-				"the grid battery for "
-				//"r_total is " + Math.round(r_total*10D)/10D 
-				+ building.getNickName() + " in " + building.getSettlement()
-				+ " has just been reconditioned."
-				, null);
+		logger.info(building, "The grid battery has just been reconditioned.");
 	}
 	
 	
@@ -307,12 +283,6 @@ implements Serializable {
 	
 	@Override
 	public double getFullPowerRequired() {
-		double delta = kWhStored - kWhCache;
-		if (delta > 0 && time > 0) {
-			kWhCache = kWhStored;
-			return delta/time/HOURS_PER_MILLISOL; 
-		}
-		else
 			return 0;
 	}
 

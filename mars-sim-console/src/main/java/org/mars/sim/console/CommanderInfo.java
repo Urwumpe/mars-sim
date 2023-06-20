@@ -1,17 +1,8 @@
 /*
- * Copyright 2017 the original author or authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Mars Simulation Project
+ * CommanderInfo.java
+ * @date 2021-11-29
+ * @author Manny Kung
  */
 package org.mars.sim.console;
 
@@ -55,7 +46,7 @@ public class CommanderInfo implements BiConsumer<TextIO, RunnerData> {
     }
 
     private final Contact contact = new Contact();
-    
+
     private final List<Runnable> operations = new ArrayList<>();
 
     public static void main(String[] args) {
@@ -80,7 +71,7 @@ public class CommanderInfo implements BiConsumer<TextIO, RunnerData> {
         String backKeyStroke = "ctrl U";
         boolean registered = terminal.registerHandler(backKeyStroke, t -> new ReadHandlerData(ABORT));
         if(registered) {
-            terminal.println("During data entry you can press '" + backKeyStroke + "' to go back to the previous field.\n");
+            terminal.println("During the data entry, you can press '" + backKeyStroke + "' to go back to the previous field.\n");
         }
         int step = 0;
         while(step < operations.size()) {

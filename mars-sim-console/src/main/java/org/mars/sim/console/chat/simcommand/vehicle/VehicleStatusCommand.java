@@ -1,10 +1,20 @@
+/*
+ * Mars Simulation Project
+ * VehicleStatusCommand.java
+ * @date 2022-08-24
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand.vehicle;
 
 import org.mars.sim.console.chat.ChatCommand;
 import org.mars.sim.console.chat.Conversation;
+import org.mars.sim.console.chat.simcommand.CommandHelper;
 import org.mars.sim.console.chat.simcommand.StructuredResponse;
+import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
@@ -17,7 +27,7 @@ public class VehicleStatusCommand extends ChatCommand {
 	public static final ChatCommand STATUS = new VehicleStatusCommand();
 
 	private VehicleStatusCommand() {
-		super(VehicleChat.VEHICLE_GROUP, "st", "status", "What are the vehicle specs.");
+		super(VehicleChat.VEHICLE_GROUP, "sts", "status", "What's the status of the vehicle.");
 	}
 
 	/** 
@@ -35,22 +45,26 @@ public class VehicleStatusCommand extends ChatCommand {
 
 		buffer.appendLabeledString("Status", source.printStatusTypes());
 		buffer.appendLabeledString("Settlement", source.getAssociatedSettlement().getName());
-		buffer.appendLabeledString("Location", source.getImmediateLocation());
-		buffer.appendLabeledString("Locale", source.getLocale());
+		buffer.appendLabeledString("Location", source.getCoordinates().getFormattedString());
+		buffer.appendLabeledString("Speed", String.format(CommandHelper.KMPH_FORMAT, source.getSpeed()));
 		buffer.appendLabeledString("Reserved",
 					(source.isReservedForMission() ? "Yes" : "No"));
-
-		// TODO Why it this not on the Vehicle ????
-		Mission m = context.getSim().getMissionManager().getMissionForVehicle(source);
+		Worker operator = source.getOperator();
+		if (operator != null) {
+			buffer.appendLabeledString("Operator", operator.getName());
+		}
+		
+		Mission m = source.getMission();
 		if (m != null) {
 			buffer.appendLabeledString("Mission", m.getName());
-			buffer.appendLabeledString("Mission Lead", m.getStartingMember().getName());
+			buffer.appendLabeledString("Mission Phase", m.getPhaseDescription());
+			buffer.appendLabeledString("Mission Lead", m.getStartingPerson().getName());
 
 			if (m instanceof VehicleMission) {
-				double dist = Math.round(((VehicleMission) m).getProposedRouteTotalDistance() * 10.0) / 10.0;
-				double trav = Math.round(((VehicleMission) m).getActualTotalDistanceTravelled() * 10.0) / 10.0;
-				buffer.appendLabeledString("Proposed Dist.", (dist + " km"));
-				buffer.appendLabeledString("Travelled", (trav + " km"));
+				double dist = ((VehicleMission) m).getDistanceProposed();
+				double trav = ((VehicleMission) m).getTotalDistanceTravelled();
+				buffer.appendLabeledString("Proposed Dist.", String.format(CommandHelper.KM_FORMAT, dist));
+				buffer.appendLabeledString("Travelled", String.format(CommandHelper.KM_FORMAT, trav));
 			}
 		} 
 
@@ -61,6 +75,11 @@ public class VehicleStatusCommand extends ChatCommand {
 			buffer.appendLabeledString("Towing", ((Rover) source).getTowedVehicle().getName());
 		}
 
+		// Maintenance details
+		MalfunctionManager mm = source.getMalfunctionManager();
+		buffer.appendLabeledString("Active since maint.", String.format(CommandHelper.MILLISOL_FORMAT, mm.getEffectiveTimeSinceLastMaintenance()));
+		buffer.appendLabeledString("Odometer", String.format(CommandHelper.KM_FORMAT, source.getOdometerMileage()));
+		
 		context.println(buffer.getOutput());
 		return true;
 	}

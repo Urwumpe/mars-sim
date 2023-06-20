@@ -1,10 +1,9 @@
-/**
+/*
  * Mars Simulation Project
- * TradeMissionCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * MiningMissionCustomInfoPanel.java
+ * @date 2022-10-01
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.ui.swing.tool.mission;
 
 import java.awt.BorderLayout;
@@ -16,39 +15,41 @@ import java.awt.event.ActionListener;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
 
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.mars.SurfaceFeatures;
+import org.mars_sim.msp.core.environment.SurfaceFeatures;
 import org.mars_sim.msp.core.person.ai.mission.Mining;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
 import org.mars_sim.msp.core.person.ai.mission.MissionEventType;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.tool.Conversion;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
 
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
-
 /**
  * A panel for displaying mining mission information.
  */
+@SuppressWarnings("serial")
 public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 
 	// Data members
 	private Mining mission;
 	private MainDesktopPane desktop;
-	private WebButton luvButton;
+	private JButton luvButton;
 	private ConcentrationTableModel concentrationTableModel;
 	private ExcavationTableModel excavationTableModel;
 
-	private SurfaceFeatures surfaceFeatures = Simulation.instance().getMars().getSurfaceFeatures();
+	private SurfaceFeatures surfaceFeatures;
 	
 	/**
 	 * Constructor
@@ -64,69 +65,72 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 
 		// Initialize data members.
 		this.desktop = desktop;
+		surfaceFeatures = desktop.getSimulation().getSurfaceFeatures();
 
 		// Create LUV panel.
-		WebPanel luvPane = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+		JPanel luvPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		add(luvPane, BorderLayout.NORTH);
 
 		// Create LUV label.
-		WebLabel luvLabel = new WebLabel("Light Utility Vehicle: ");
+		JLabel luvLabel = new JLabel("Light Utility Vehicle: ");
 		luvPane.add(luvLabel);
 
 		// Create LUV button.
-		luvButton = new WebButton("   ");
+		luvButton = new JButton("   ");
 		luvButton.setVisible(false);
 		luvButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				// Open window for light utility vehicle.
 				LightUtilityVehicle luv = mission.getLightUtilityVehicle();
 				if (luv != null)
-					getDesktop().openUnitWindow(luv, false);
+					getDesktop().showDetails(luv);
 			}
 		});
 		luvPane.add(luvButton);
 
 		// Create center panel.
-		WebPanel centerPane = new WebPanel(new GridLayout(2, 1));
+		JPanel centerPane = new JPanel(new GridLayout(2, 1));
 		add(centerPane, BorderLayout.CENTER);
 
 		// Create concentration panel.
-		WebPanel concentrationPane = new WebPanel(new BorderLayout());
+		JPanel concentrationPane = new JPanel(new BorderLayout());
+		concentrationPane.setBorder(BorderFactory.createTitledBorder("Mineral Concentrations  "));
 		centerPane.add(concentrationPane);
 
-		// Create concentration label.
-		WebButton concentrationLabel = new WebButton("Mineral Concentrations at Site:");
-		concentrationPane.add(concentrationLabel, BorderLayout.NORTH);
-
 		// Create concentration scroll panel.
-		WebScrollPane concentrationScrollPane = new WebScrollPane();
+		JScrollPane concentrationScrollPane = new JScrollPane();
 		concentrationScrollPane.setPreferredSize(new Dimension(-1, -1));
 		concentrationPane.add(concentrationScrollPane, BorderLayout.CENTER);
 
 		// Create concentration table.
 		concentrationTableModel = new ConcentrationTableModel();
-		WebTable concentrationTable = new WebTable(concentrationTableModel);
-		concentrationTable.setDefaultRenderer(Double.class, new NumberCellRenderer(1));
+		JTable concentrationTable = new JTable(concentrationTableModel);
+		concentrationTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2));
 		concentrationScrollPane.setViewportView(concentrationTable);
 
+		DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+		centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+		concentrationTable.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
+		concentrationTable.getColumnModel().getColumn(2).setCellRenderer(centerRenderer);
+		
 		// Create excavation panel.
-		WebPanel excavationPane = new WebPanel(new BorderLayout());
+		JPanel excavationPane = new JPanel(new BorderLayout());
+		excavationPane.setBorder(BorderFactory.createTitledBorder("Minerals Excavated - Aboard Vehicle  "));
 		centerPane.add(excavationPane);
 
-		// Create excavation label.
-		WebLabel excavationLabel = new WebLabel("Minerals Excavated at Site:");
-		excavationPane.add(excavationLabel, BorderLayout.NORTH);
-
 		// Create excavation scroll panel.
-		WebScrollPane excavationScrollPane = new WebScrollPane();
+		JScrollPane excavationScrollPane = new JScrollPane();
 		excavationScrollPane.setPreferredSize(new Dimension(-1, -1));
 		excavationPane.add(excavationScrollPane, BorderLayout.CENTER);
 
-		// Create excavation tabel.
+		// Create excavation table.
 		excavationTableModel = new ExcavationTableModel();
-		WebTable excavationTable = new WebTable(excavationTableModel);
+		JTable excavationTable = new JTable(excavationTableModel);
 		excavationTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2));
 		excavationScrollPane.setViewportView(excavationTable);
+		
+		centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+		excavationTable.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
 	}
 
 	/**
@@ -181,8 +185,8 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 			super();
 
 			// Initialize concentration maps.
-			estimatedConcentrationMap = new HashMap<String, Double>();
-			actualConcentrationMap = new HashMap<String, Double>();
+			estimatedConcentrationMap = new HashMap<>();
+			actualConcentrationMap = new HashMap<>();
 		}
 
 		/**
@@ -239,12 +243,12 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 					.toArray(new String[estimatedConcentrationMap.size()]);
 			if ((row >= 0) && (row < minerals.length)) {
 				if (column == 0) {
-					result = minerals[row];
+					result = Conversion.capitalize(minerals[row]);
 				} else if (column == 1) {
-					result = estimatedConcentrationMap.get(minerals[row]);
+					result = Math.round(estimatedConcentrationMap.get(minerals[row]) * 100.0)/100.0;
 				} else if (column == 2) {
 					if (actualConcentrationMap.containsKey(minerals[row])) {
-						result = actualConcentrationMap.get(minerals[row]);
+						result = Math.round(actualConcentrationMap.get(minerals[row]) * 100.0)/100.0;
 					} else {
 						result = Double.valueOf(0D);
 					}
@@ -260,7 +264,7 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 		private void updateTable() {
 			if (mission.getMiningSite() != null) {
 				estimatedConcentrationMap = mission.getMiningSite().getEstimatedMineralConcentrations();
-				actualConcentrationMap = Simulation.instance().getMars().getSurfaceFeatures().getMineralMap()
+				actualConcentrationMap = surfaceFeatures.getMineralMap()
 						.getAllMineralConcentrations(mission.getMiningSite().getLocation());
 			} else {
 				estimatedConcentrationMap.clear();
@@ -286,7 +290,7 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 			super();
 
 			// Initialize excavation map.
-			excavationMap = new HashMap<AmountResource, Double>();
+			excavationMap = new HashMap<>();
 		}
 
 		/**
@@ -312,7 +316,7 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 			if (columnIndex == 0)
 				return "Mineral";
 			else
-				return "Excavated (kg)";
+				return "Excavated [kg]";
 		}
 
 		@Override
@@ -338,9 +342,9 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 			AmountResource[] minerals = excavationMap.keySet().toArray(new AmountResource[excavationMap.size()]);
 			if ((row >= 0) && (row < minerals.length)) {
 				if (column == 0)
-					result = minerals[row];
+					result = Conversion.capitalize(minerals[row].getName());
 				else
-					result = excavationMap.get(minerals[row]);
+					result = Math.round(excavationMap.get(minerals[row]) * 100.0)/100.0;
 			}
 
 			return result;

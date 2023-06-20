@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * StormTrackingWindow.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -21,10 +21,6 @@ import javax.swing.event.InternalFrameListener;
 
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-
-//import javafx.embed.swing.SwingNode;
-//import javafx.scene.layout.Pane;
-//import javafx.stage.Stage;
 
 /**
  * The window for tracking storms.

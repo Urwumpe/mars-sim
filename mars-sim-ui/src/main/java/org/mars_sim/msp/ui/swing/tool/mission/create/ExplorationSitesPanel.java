@@ -1,54 +1,68 @@
-/**
+/*
  * Mars Simulation Project
  * ExplorationSitesPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-06-09
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
-import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Direction;
-import org.mars_sim.msp.core.IntPoint;
-import org.mars_sim.msp.core.person.ai.mission.CollectResourcesMission;
-import org.mars_sim.msp.core.person.ai.mission.Exploration;
-import org.mars_sim.msp.core.vehicle.Rover;
-import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.map.*;
-
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Logger;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableCellRenderer;
 
-import java.awt.*;
-import java.awt.event.*;
-import java.util.ArrayList;
-import java.util.List;
+import org.mars_sim.msp.core.Coordinates;
+import org.mars_sim.msp.core.Direction;
+import org.mars_sim.msp.core.IntPoint;
+import org.mars_sim.msp.core.vehicle.Rover;
+import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.MarsPanelBorder;
+import org.mars_sim.msp.ui.swing.tool.map.EllipseLayer;
+import org.mars_sim.msp.ui.swing.tool.map.Map;
+import org.mars_sim.msp.ui.swing.tool.map.MapPanel;
+import org.mars_sim.msp.ui.swing.tool.map.MapUtils;
+import org.mars_sim.msp.ui.swing.tool.map.MineralMapLayer;
+import org.mars_sim.msp.ui.swing.tool.map.NavpointEditLayer;
+import org.mars_sim.msp.ui.swing.tool.map.UnitIconMapLayer;
+import org.mars_sim.msp.ui.swing.tool.map.UnitLabelMapLayer;
 
 /**
  * This is a wizard panel for selecting exploration sites for the mission.
  */
+@SuppressWarnings("serial")
 class ExplorationSitesPanel extends WizardPanel {
 
+	private static final Logger logger = Logger.getLogger(ExplorationSitesPanel.class.getName());
+	
 	/** Wizard panel name. */
-	private final static String NAME = "Exploration Sites";
+	private static final String NAME = "Exploration Sites";
 
 	/** Range modifier. */
-	private final static double RANGE_MODIFIER = .95D;
-//	private final static double MAX_RANGE = 2500D;
+	private static final double RANGE_MODIFIER = .95D;
 
+	private static final int STANDARD_TIME_PER_SITE = 250;
+	
 	// Data members.
 	private MapPanel mapPane;
 	private EllipseLayer ellipseLayer;
@@ -56,8 +70,8 @@ class ExplorationSitesPanel extends WizardPanel {
 	private MineralMapLayer mineralLayer;
 
 	private IntPoint navOffset;
-	private WebPanel siteListPane;
-	private WebButton addButton;
+	private JPanel siteListPane;
+	private JButton addButton;
 
 	private MainDesktopPane desktop;
 
@@ -85,32 +99,32 @@ class ExplorationSitesPanel extends WizardPanel {
 		setBorder(new MarsPanelBorder());
 
 		// Creates the title label.
-		WebLabel titleLabel = new WebLabel("Choose the exploration sites.");
-		titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD));
-		titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		JLabel titleLabel = createTitleLabel("Choose the exploration sites.");
 		add(titleLabel);
 
 		// Add a vertical strut
 		add(Box.createVerticalStrut(3));
 
 		// Create the center panel.
-		WebPanel centerPane = new WebPanel(new BorderLayout(0, 0));
+		JPanel centerPane = new JPanel(new BorderLayout(0, 0));
 		centerPane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		centerPane.setMaximumSize(new Dimension(Short.MAX_VALUE, 350));
 		add(centerPane);
 
 		// Create the map main panel.
-		WebPanel mapMainPane = new WebPanel(new BorderLayout(0, 0));
+		JPanel mapMainPane = new JPanel(new BorderLayout(0, 0));
 		centerPane.add(mapMainPane, BorderLayout.WEST);
 
 		// Create the map panel.
 		mapPane = new MapPanel(desktop, 200L);
 		mineralLayer = new MineralMapLayer(mapPane);
+		
 		mapPane.addMapLayer(mineralLayer, 0);
 		mapPane.addMapLayer(new UnitIconMapLayer(mapPane), 1);
 		mapPane.addMapLayer(new UnitLabelMapLayer(), 2);
 		mapPane.addMapLayer(ellipseLayer = new EllipseLayer(Color.GREEN), 3);
 		mapPane.addMapLayer(navLayer = new NavpointEditLayer(mapPane, true), 4);
+		
 		mapPane.setBorder(new MarsPanelBorder());
 		mapPane.addMouseListener(new NavpointMouseListener());
 		mapPane.addMouseMotionListener(new NavpointMouseMotionListener());
@@ -118,50 +132,48 @@ class ExplorationSitesPanel extends WizardPanel {
 		mapMainPane.add(mapPane, BorderLayout.NORTH);
 
 		// Create the instruction label panel.
-		WebPanel instructionLabelPane = new WebPanel(new GridLayout(2, 1, 0, 0));
+		JPanel instructionLabelPane = new JPanel(new GridLayout(2, 1, 0, 0));
 		mapMainPane.add(instructionLabelPane, BorderLayout.SOUTH);
 
 		// Create the instruction labels.
-		WebLabel instructionLabel1 = new WebLabel(" Note 1: drag the navpoint flag to a desired site.", WebLabel.LEFT);
-		instructionLabel1.setFont(instructionLabel1.getFont().deriveFont(Font.BOLD));
+		JLabel instructionLabel1 = new JLabel(" Note 1: drag the navpoint flag to a desired site.", JLabel.LEFT);
 		instructionLabelPane.add(instructionLabel1);
 
-		WebLabel instructionLabel2 = new WebLabel(" Note 2: click 'Add Site' button for a new site.", WebLabel.LEFT);
-		instructionLabel2.setFont(instructionLabel2.getFont().deriveFont(Font.BOLD));
+		JLabel instructionLabel2 = new JLabel(" Note 2: click 'Add Site' button for a new site.", JLabel.LEFT);
 		instructionLabelPane.add(instructionLabel2);
 
 		// Create the site panel.
-		WebPanel sitePane = new WebPanel(new BorderLayout(0, 0));
+		JPanel sitePane = new JPanel(new BorderLayout(0, 0));
 		sitePane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		sitePane.setMaximumSize(new Dimension(Short.MAX_VALUE, 300));
 		centerPane.add(sitePane, BorderLayout.CENTER);
 
 		// Create scroll panel for site list.
-		WebScrollPane siteScrollPane = new WebScrollPane();
+		JScrollPane siteScrollPane = new JScrollPane();
 		sitePane.add(siteScrollPane, BorderLayout.CENTER);
 
 		// Create the site list main panel.
-		WebPanel siteListMainPane = new WebPanel(new BorderLayout(0, 0));
+		JPanel siteListMainPane = new JPanel(new BorderLayout(0, 0));
 		siteScrollPane.setViewportView(siteListMainPane);
 
 		// Create the site list panel.
-		siteListPane = new WebPanel();
+		siteListPane = new JPanel();
 		siteListPane.setLayout(new BoxLayout(siteListPane, BoxLayout.Y_AXIS));
 		siteListMainPane.add(siteListPane, BorderLayout.NORTH);
 
 		// Create the add button panel.
-		WebPanel addButtonPane = new WebPanel(new FlowLayout());
+		JPanel addButtonPane = new JPanel(new FlowLayout());
 		sitePane.add(addButtonPane, BorderLayout.SOUTH);
 
 		// Create the add button.
-		addButton = new WebButton("Add Site");
+		addButton = new JButton("Add Site");
 		addButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				// Add a new exploration site to the mission.
 				SitePanel sitePane = new SitePanel(siteListPane.getComponentCount(), getNewSiteLocation());
 				siteListPane.add(sitePane);
 				navLayer.addNavpointPosition(
-						MapUtils.getRectPosition(sitePane.getSite(), getCenterCoords(), SurfMarsMap.TYPE));
+						MapUtils.getRectPosition(sitePane.getSite(), getCenterCoords(), mapPane.getMap()));
 				mapPane.repaint();
 				addButton.setEnabled(canAddMoreSites());
 				validate();
@@ -170,29 +182,27 @@ class ExplorationSitesPanel extends WizardPanel {
 		addButtonPane.add(addButton);
 
 		// Create bottom panel.
-		WebPanel bottomPane = new WebPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+		JPanel bottomPane = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
 		bottomPane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(bottomPane);
 
 		// Create mineral legend panel.
-		WebPanel mineralLegendPane = new WebPanel(new BorderLayout(0, 0));
+		JPanel mineralLegendPane = new JPanel(new BorderLayout(0, 0));
 		bottomPane.add(mineralLegendPane);
 
 		// Create mineral legend label.
-		WebLabel mineralLegendLabel = new WebLabel("Mineral Legend", WebLabel.CENTER);
-		mineralLegendLabel.setFont(mineralLegendLabel.getFont().deriveFont(Font.ITALIC));
+		JLabel mineralLegendLabel = new JLabel("Mineral Legend", JLabel.CENTER);
 		mineralLegendPane.add(mineralLegendLabel, BorderLayout.NORTH);
 
 		// Create mineral legend scroll panel.
-		WebScrollPane mineralLegendScrollPane = new WebScrollPane();
+		JScrollPane mineralLegendScrollPane = new JScrollPane();
 		mineralLegendPane.add(mineralLegendScrollPane, BorderLayout.CENTER);
 
 		// Create mineral legend table model.
 		MineralTableModel mineralTableModel = new MineralTableModel();
 
 		// Create mineral legend table.
-		WebTable mineralLegendTable = new WebTable(mineralTableModel);
-		TableStyle.setTableStyle(mineralLegendTable);
+		JTable mineralLegendTable = new JTable(mineralTableModel);
 		
 		mineralLegendTable.setAutoCreateRowSorter(true);
 		mineralLegendTable.setPreferredScrollableViewportSize(new Dimension(300, 120));
@@ -236,17 +246,22 @@ class ExplorationSitesPanel extends WizardPanel {
 	 * Updates the wizard panel information.
 	 */
 	void updatePanel() {
-		range = getRange();
-		missionTimeLimit = getMissionTimeLimit();
-		timePerSite = getTimePerSite();
-
-		Coordinates startingSite = getCenterCoords().getNewLocation(new Direction(0D), range / 4D);
-		SitePanel startingSitePane = new SitePanel(0, startingSite);
-		siteListPane.add(startingSitePane);
-		navLayer.addNavpointPosition(
-				MapUtils.getRectPosition(startingSitePane.getSite(), getCenterCoords(), SurfMarsMap.TYPE));
-		mapPane.showMap(getCenterCoords());
-		addButton.setEnabled(canAddMoreSites());
+		try {
+			range = getRange();
+			missionTimeLimit = getMissionTimeLimit();
+			timePerSite = getTimePerSite();
+	
+			Coordinates startingSite = getCenterCoords().getNewLocation(new Direction(0D), range / 4D);
+			SitePanel startingSitePane = new SitePanel(0, startingSite);
+			siteListPane.add(startingSitePane);
+			navLayer.addNavpointPosition(
+					MapUtils.getRectPosition(startingSitePane.getSite(), getCenterCoords(), mapPane.getMap()));
+	//		mapPane.setCenterCoords(startingSite);
+			mapPane.showMap(startingSite);
+			addButton.setEnabled(canAddMoreSites());
+		} catch (Exception e) {
+			logger.severe("updatePanel encounters an exception in ExplorationSitesPanel.");
+		}
 		getWizard().setButtons(true);
 	}
 
@@ -297,9 +312,7 @@ class ExplorationSitesPanel extends WizardPanel {
 	 */
 	private double getRange() {
 		// Use range modifier.
-		double range = getWizard().getMissionData().getRover().getRange(Exploration.missionType) * RANGE_MODIFIER;
-//		if (range > MAX_RANGE)
-//			range = MAX_RANGE;
+		double range = getWizard().getMissionData().getRover().getRange() * RANGE_MODIFIER;
 		return range;
 	}
 
@@ -312,7 +325,7 @@ class ExplorationSitesPanel extends WizardPanel {
 		Rover rover = getWizard().getMissionData().getRover();
 		int memberNum = getWizard().getMissionData().getMixedMembers().size();
 		try {
-			return CollectResourcesMission.getTotalTripTimeLimit(rover, memberNum, true);
+			return rover.getTotalTripTimeLimit(memberNum, true);
 		} catch (Exception e) {
 			return 0D;
 		}
@@ -324,7 +337,7 @@ class ExplorationSitesPanel extends WizardPanel {
 	 * @return time (millisols)
 	 */
 	private double getTimePerSite() {
-		return Exploration.EXPLORING_SITE_TIME;
+		return STANDARD_TIME_PER_SITE;
 	}
 
 	/**
@@ -396,7 +409,7 @@ class ExplorationSitesPanel extends WizardPanel {
 			SitePanel sitePane = (SitePanel) siteListPane.getComponent(x);
 			sitePane.setSiteNum(x);
 			navLayer.addNavpointPosition(
-					MapUtils.getRectPosition(sitePane.getSite(), getCenterCoords(), SurfMarsMap.TYPE));
+					MapUtils.getRectPosition(sitePane.getSite(), getCenterCoords(), mapPane.getMap()));
 		}
 		mapPane.repaint();
 	}
@@ -436,15 +449,15 @@ class ExplorationSitesPanel extends WizardPanel {
 	/**
 	 * Inner class for an exploration site panel.
 	 */
-	private class SitePanel extends WebPanel {
+	private class SitePanel extends JPanel {
 
 		/** default serial id. */
 		private static final long serialVersionUID = 1L;
 		// Private members.
 		private Coordinates site;
 		private int siteNum;
-		private WebLabel siteNumLabel;
-		private WebLabel siteLocationLabel;
+		private JLabel siteNumLabel;
+		private JLabel siteLocationLabel;
 
 		/**
 		 * Constructor.
@@ -453,7 +466,7 @@ class ExplorationSitesPanel extends WizardPanel {
 		 * @param site    the exploration site coordinates.
 		 */
 		SitePanel(int siteNum, Coordinates site) {
-			// Use WebPanel constructor.
+			// Use JPanel constructor.
 			super();
 
 			// Initialize data members.
@@ -467,16 +480,16 @@ class ExplorationSitesPanel extends WizardPanel {
 			setBorder(new MarsPanelBorder());
 
 			// Create the site number label.
-			siteNumLabel = new WebLabel(" Site " + (siteNum + 1));
+			siteNumLabel = new JLabel(" Site " + (siteNum + 1));
 			add(siteNumLabel);
 
 			// Create the site location label.
-			siteLocationLabel = new WebLabel(site.getFormattedString());
+			siteLocationLabel = new JLabel(site.getFormattedString());
 			add(siteLocationLabel);
 
 			if (siteNum > 0) {
 				// Create the remove button.
-				WebButton removeButton = new WebButton("Remove");
+				JButton removeButton = new JButton("Remove");
 				removeButton.addActionListener(new ActionListener() {
 					public void actionPerformed(ActionEvent e) {
 						// Remove this site panel from the site list.
@@ -488,7 +501,7 @@ class ExplorationSitesPanel extends WizardPanel {
 				});
 				add(removeButton);
 			} else
-				add(new WebPanel());
+				add(new JPanel());
 		}
 
 		/**
@@ -550,9 +563,9 @@ class ExplorationSitesPanel extends WizardPanel {
 				navOffset = determineOffset(event.getX(), event.getY());
 
 				IntPoint prevNavpoint = MapUtils.getRectPosition(getPreviousNavpoint(), getCenterCoords(),
-						SurfMarsMap.TYPE);
+						mapPane.getMap());
 				IntPoint nextNavpoint = MapUtils.getRectPosition(getNextNavpoint(), getCenterCoords(),
-						SurfMarsMap.TYPE);
+						mapPane.getMap());
 				int radiusPixels = convertDistanceToMapPixels(getRadius());
 
 				ellipseLayer.setEllipseDetails(prevNavpoint, nextNavpoint, radiusPixels);
@@ -597,7 +610,7 @@ class ExplorationSitesPanel extends WizardPanel {
 		 * @return pixel range.
 		 */
 		private int convertDistanceToMapPixels(double distance) {
-			return MapUtils.getPixelDistance(distance, SurfMarsMap.TYPE);
+			return MapUtils.getPixelDistance(distance, mapPane.getMap());
 		}
 
 		/**
@@ -630,8 +643,9 @@ class ExplorationSitesPanel extends WizardPanel {
 				int displayY = event.getPoint().y + navOffset.getiY();
 				IntPoint displayPos = new IntPoint(displayX, displayY);
 				Coordinates center = getWizard().getMissionData().getStartingSettlement().getCoordinates();
-				Coordinates navpoint = center.convertRectToSpherical(displayPos.getiX() - 150, displayPos.getiY() - 150,
-						CannedMarsMap.PIXEL_RHO);
+				Coordinates navpoint = center.convertRectToSpherical(displayPos.getiX() - Map.HALF_MAP_BOX, 
+						displayPos.getiY() - Map.HALF_MAP_BOX,
+						mapPane.getMap().getScale());
 
 				// Only drag navpoint flag if within ellipse range bounds.
 				if (withinBounds(displayPos, navpoint)) {
@@ -652,10 +666,8 @@ class ExplorationSitesPanel extends WizardPanel {
 		 * @return true if within boundaries.
 		 */
 		private boolean withinBounds(IntPoint position, Coordinates location) {
-			boolean result = true;
-			if (!navLayer.withinDisplayEdges(position))
-				result = false;
-			if (getRemainingRange(false) < getDistanceDiff(location))
+			boolean result = navLayer.withinDisplayEdges(position);
+            if (getRemainingRange(false) < getDistanceDiff(location))
 				result = false;
 			return result;
 		}
@@ -757,7 +769,7 @@ class ExplorationSitesPanel extends WizardPanel {
 			if (row < getRowCount()) {
 				String mineralName = mineralNames.get(row);
 				if (column == 0) {
-					return Conversion.capitalize(mineralName);
+					return mineralName;
 				} else if (column == 1) {
 					return mineralColors.get(mineralName);
 				} else
@@ -777,7 +789,7 @@ class ExplorationSitesPanel extends WizardPanel {
 
 			if ((value != null) && (value instanceof Color)) {
 				Color color = (Color) value;
-				WebPanel colorPanel = new WebPanel();
+				JPanel colorPanel = new JPanel();
 				colorPanel.setOpaque(true);
 				colorPanel.setBackground(color);
 				return colorPanel;

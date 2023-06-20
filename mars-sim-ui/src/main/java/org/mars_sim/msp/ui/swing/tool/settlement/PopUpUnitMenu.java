@@ -1,273 +1,358 @@
-/**
+/*
  * Mars Simulation Project
  * PopUpUnitMenu.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-11-28
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.ui.swing.tool.settlement;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.MouseInfo;
-import java.awt.Point;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowFocusListener;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-import javax.swing.BorderFactory;
-import javax.swing.UIManager;
-import javax.swing.plaf.BorderUIResource;
-import javax.swing.plaf.UIResource;
+import javax.swing.JDialog;
+import javax.swing.JInternalFrame;
+import javax.swing.JLabel;
+import javax.swing.JMenuItem;
+import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
+import javax.swing.WindowConstants;
+import javax.swing.border.Border;
+import javax.swing.border.CompoundBorder;
+import javax.swing.border.EmptyBorder;
 
+import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.structure.construction.ConstructionManager;
+import org.mars_sim.msp.core.structure.construction.ConstructionSite;
+import org.mars_sim.msp.core.vehicle.GroundVehicle;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ComponentMover;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MainWindow;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
-import org.mars_sim.msp.ui.swing.tool.LineBreakPanel;
+import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.unit_window.UnitWindow;
-import org.mars_sim.msp.ui.swing.unit_window.structure.building.BuildingPanel;
+import org.mars_sim.msp.ui.swing.unit_window.structure.ConstructionSitesPanel;
+import org.mars_sim.msp.ui.swing.utils.SwingHelper;
 
-import com.alee.laf.desktoppane.WebInternalFrame;
-import com.alee.laf.menu.WebMenuItem;
-import com.alee.laf.menu.WebPopupMenu;
-import com.alee.laf.window.WebDialog;
-import com.alee.managers.style.StyleId;
 
-public class PopUpUnitMenu extends WebPopupMenu {
+public class PopUpUnitMenu extends JPopupMenu {
 
 	private static final long serialVersionUID = 1L;
+	
+	// default logger.
+	private static final SimLogger logger = SimLogger.getLogger(PopUpUnitMenu.class.getName());
 	
 	public static final int WIDTH_0 = 350;
 
 	public static final int WIDTH_1 = WIDTH_0;
 	public static final int HEIGHT_1 = 300;
-	
-	public static final int WIDTH_2 = UnitWindow.WIDTH - 136;
-	public static final int HEIGHT_2 = UnitWindow.HEIGHT - 133;
-	
-	private WebMenuItem itemOne, itemTwo, itemThree;
-    private Unit unit;
-    private Settlement settlement;
-	private MainDesktopPane desktop;
-	
+
+	public static final int WIDTH_2 = UnitWindow.WIDTH - 130;
+	public static final int HEIGHT_2 = UnitWindow.HEIGHT - 70;
+
+	private static Map<Integer, JInternalFrame> panels = new ConcurrentHashMap<>();
+
     public PopUpUnitMenu(final SettlementWindow swindow, final Unit unit){
-    	this.unit = unit;
-    	desktop = swindow.getDesktop();
-    	this.settlement = swindow.getMapPanel().getSettlement();
-      
-//       	setOpaque(false);
-       	
-//        UIResource res = new BorderUIResource.LineBorderUIResource(Color.orange);
-//        UIManager.put("PopupMenu.border", res);
-//        //force to the Heavyweight Component or able for AWT Components
-//        this.setLightWeightPopupEnabled(false); 
-             
-    	itemOne = new WebMenuItem(Msg.getString("PopUpUnitMenu.itemOne"));
-        itemTwo = new WebMenuItem(Msg.getString("PopUpUnitMenu.itemTwo"));  
-        itemThree = new WebMenuItem(Msg.getString("PopUpUnitMenu.itemThree"));
-        itemOne.setForeground(new Color(139,69,19));
-        itemTwo.setForeground(new Color(139,69,19));
-        itemThree.setForeground(new Color(139,69,19));
-        
-        if (unit instanceof Person) {
-        	add(itemTwo);
-        	buildItemTwo(unit);
-        }
-        
-        else if (unit instanceof Vehicle) {
-        	add(itemOne);
-        	add(itemTwo);
-        	add(itemThree);
-        	buildItemOne(unit);
-            buildItemTwo(unit);
-            buildItemThree(unit);
-        }
-        else {
-            add(itemOne);
-        	add(itemTwo);
-        	buildItemOne(unit);
-            buildItemTwo(unit);
-        }
+    	MainDesktopPane desktop = swindow.getDesktop();
 
-     // Determine what the GraphicsDevice can support.
-//        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-//        GraphicsDevice gd = ge.getDefaultScreenDevice();
-//        boolean isPerPixelTranslucencySupported = 
-//            gd.isWindowTranslucencySupported(PERPIXEL_TRANSLUCENT);
-//
-//        //If translucent windows aren't supported, exit.
-//        if (!isPerPixelTranslucencySupported) {
-//            System.out.println(
-//                "Per-pixel translucency is not supported");
-//                System.exit(0);
-//        }
+    	switch (unit.getUnitType()) {
+			case PERSON:
+        		add(buildDetailsItem(unit, desktop));
+				break;
+        	
+			case VEHICLE: 
+				add(buildDescriptionitem(unit, desktop));
+				add(buildDetailsItem(unit, desktop));
+				add(buildVehicleRelocate(unit));
+				break;
 
+        	case BUILDING:
+				add(buildDescriptionitem(unit, desktop));
+				add(buildDetailsItem(unit, desktop));
+				break;
+
+        	// Note: for construction sites
+			case CONSTRUCTION:
+				add(buildDescriptionitem(unit, desktop));
+				add(buildDetailsItem(unit, desktop));
+				add(relocateSite((ConstructionSite)unit));
+				add(rotateSite((ConstructionSite)unit));
+				add(confirmSite((ConstructionSite)unit));
+				break;
+
+			default:
+				add(buildDetailsItem(unit, desktop));
+				break;
+        }
     }
-       
-	
-    public void buildItemOne(final Unit unit) {
-    	
-        itemOne.addActionListener(new ActionListener() {
-       	 
-            public void actionPerformed(ActionEvent e) {
-            	final WebDialog<?> d = new WebDialog<>(StyleId.dialogTransparent);//.dialogDecorated);
-         	
+
+
+    /**
+     * Builds item one.
+     *
+     * @param unit
+     */
+    private JMenuItem buildDescriptionitem(final Unit unit, final MainDesktopPane desktop) {
+        
+		JMenuItem descriptionItem = new JMenuItem(Msg.getString("PopUpUnitMenu.description"));
+
+        descriptionItem.setForeground(new Color(139,69,19));
+        descriptionItem.addActionListener(e -> {
+
 	           	setOpaque(false);
 		        setBackground(new Color(0,0,0,128));
-//		        
-		        d.setForeground(Color.WHITE); // orange font
-                d.setFont(new Font("Arial", Font.BOLD, 14));
-                
-		        d.setUndecorated(true);
-            	d.setOpacity(0.75f);
-		        d.setBackground(new Color(0,0,0,128));
-		        
-                String description;
-                String type;
-                String name;
-                
-                if (unit instanceof Vehicle) {
+
+                String description = null;
+                String type = null;
+                String name = null;
+
+                if (unit.getUnitType() == UnitType.VEHICLE) {
                 	Vehicle vehicle = (Vehicle) unit;
-                	description = vehicle.getDescription(vehicle.getVehicleType());
-                	type = Conversion.capitalize(vehicle.getVehicleType());
-                	name = Conversion.capitalize(vehicle.getName());
+                	description = vehicle.getDescription();
+                	type = vehicle.getVehicleType().getName();
+                	name = vehicle.getName();
                 }
-                else {
+                else if (unit.getUnitType() == UnitType.BUILDING) {
                 	Building building = (Building) unit;
                 	description = building.getDescription();
                 	type = building.getBuildingType();
                 	name = building.getNickName();
                 }
-//                d.setMaximumSize(new Dimension(F_WIDTH, D_HEIGHT));
-//    			d.setPreferredSize(new Dimension(F_WIDTH, D_HEIGHT));
-				d.setSize(WIDTH_1, HEIGHT_1); 
-//			    d.setSize(350, 300); // undecorated 301, 348 ; decorated : 303, 373
-				
-		        d.setResizable(false);
-	        
-			    UnitInfoPanel b = new UnitInfoPanel(desktop);
-//		        b.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
-		        
-			    b.init(name, type, description);		
+                else if (unit.getUnitType() == UnitType.CONSTRUCTION) {
+                	ConstructionSite site = (ConstructionSite) unit;
+                	description = site.getStageInfo().getName();
+                	type = site.getStageInfo().getType();
+                	name = site.getName();
+                }
+                else
+                	return;
+
+				UnitInfoPanel b = new UnitInfoPanel(desktop);
+
+			    b.init(name, type, description);
 	           	b.setOpaque(false);
 		        b.setBackground(new Color(0,0,0,128));
-		        
-			    d.add(b);
-            	
-            	// Make the buildingPanel to appear at the mouse cursor
-                Point location = MouseInfo.getPointerInfo().getLocation();
-                d.setLocation(location); 
-                
-                d.setVisible(true); 
-				d.addWindowFocusListener(new WindowFocusListener() {            
-				    public void windowLostFocus(WindowEvent e) {
-				    	d.dispose();
-				    }            
-				    public void windowGainedFocus(WindowEvent e) {
-				    }
-				});	
-				
+
+				final JDialog d = SwingHelper.createPoupWindow(b, WIDTH_1, HEIGHT_1, 0, 0);
+
+				d.setForeground(Color.WHITE); // orange font
+                d.setFont(new Font("Arial", Font.BOLD, 14));
+
+            	d.setOpacity(0.75f);
+		        d.setBackground(new Color(0,0,0,128));
+                d.setVisible(true);
+
                 // Make panel drag-able
-			    ComponentMover mover = new ComponentMover(d, desktop);//d.getContentPane());
-			    mover.registerComponent(b);	
-	
+			    ComponentMover mover = new ComponentMover(d, desktop);
+			    mover.registerComponent(b);
+
              }
-        });
+        );
+
+		return descriptionItem;
     }
-     
-    
-    public void buildItemTwo(final Unit unit) {
-        itemTwo.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
+
 	
-	            if (unit instanceof Vehicle
-	            		|| unit instanceof Person
-	            		|| unit instanceof Robot) {
-	            	desktop.openUnitWindow(unit, false);
+    /**
+     * Builds item two.
+     *
+     * @param unit
+     * @param mainDesktopPane
+     */
+    private JMenuItem buildDetailsItem(final Unit unit, final MainDesktopPane desktop) {
+		JMenuItem detailsItem = new JMenuItem(Msg.getString("PopUpUnitMenu.details"));
+
+        detailsItem.setForeground(new Color(139,69,19));
+        detailsItem.addActionListener(e -> {
+	            if (unit.getUnitType() == UnitType.VEHICLE
+	            		|| unit.getUnitType() == UnitType.PERSON
+		            	|| unit.getUnitType() == UnitType.BUILDING	
+	            		|| unit.getUnitType() == UnitType.ROBOT) {
+	            	desktop.showDetails(unit);
 	            }
 	            
-	            else {
-                	Building building = (Building) unit;
-	 
-					final BuildingPanel buildingPanel = new BuildingPanel(true, "Building Detail", building, desktop);      
-//		    		buildingPanel.setOpaque(false);
-//	                buildingPanel.setBackground(new Color(0,0,0,150));
-//	                buildingPanel.setTheme(true);
-         		       
-//	                final WebDialog<?> d = new WebDialog();//StyleId.dialogDecorated);
-	                final WebInternalFrame d = new WebInternalFrame(StyleId.internalframe);
-	                
-	                d.setIconifiable(false);
-	                d.setClosable(true);
-	        		d.setFrameIcon(MainWindow.getLanderIcon());
-
-	                d.add(buildingPanel);
-	                
-	    			d.setMaximumSize(new Dimension(WIDTH_2, HEIGHT_2));
-	    			d.setPreferredSize(new Dimension(WIDTH_2, HEIGHT_2));
-					d.setSize(WIDTH_2, HEIGHT_2); // undecorated: 300, 335; decorated: 310, 370
-					d.setLayout(new FlowLayout()); 
-	
-	            	// Make the buildingPanel to appear at the mouse cursor
-	                Point location = MouseInfo.getPointerInfo().getLocation();
-	                d.setLocation(location); 
-	                
-					// Create compound border
-//					Border border = new MarsPanelBorder();
-//					Border margin = new EmptyBorder(5,5,5,5);
-//					d.getRootPane().setBorder(new CompoundBorder(border, margin));//BorderFactory.createLineBorder(Color.orange));
-	
-//				    d.addWindowFocusListener(new WindowFocusListener() {            
-//						public void windowLostFocus(WindowEvent e) {
-//					    	//JWindow w = (JWindow) e.getSource();
-//					    	d.dispose();
-//					    	//w.dispose();
-//						}            
-//						public void windowGainedFocus(WindowEvent e) {
-//						}
-//					});
-				    
-	                // Make panel drag-able
-//	        		ComponentMover mover = new ComponentMover();
-//	        		mover.registerComponent(d);
-	                
-	                desktop.add(d);
-	                
-					d.setVisible(true);
+	            // TODO Why is this not a dedicated class ?
+	            else if (unit.getUnitType() == UnitType.CONSTRUCTION) {
+	            	buildConstructionWindow(unit, desktop);
 	            }
-	         }
 	    });
- 
+
+		return detailsItem;
+    }
+
+    private void buildConstructionWindow(final Unit unit, final MainDesktopPane desktop) {
+    	int newID = unit.getIdentifier();
+
+    	if (!panels.isEmpty()) {
+        	Iterator<Integer> i = panels.keySet().iterator();
+			while (i.hasNext()) {
+				int oldID = i.next();
+				JInternalFrame f = panels.get(oldID);
+        		if (newID == oldID && (f.isShowing() || f.isVisible())) {
+        			f.dispose();
+        			panels.remove(oldID);
+        		}
+        	}
+    	}
+    	
+       	ConstructionSite site = (ConstructionSite) unit;
+
+       	ConstructionManager manager = site.getAssociatedSettlement().getConstructionManager();
+       	
+		final ConstructionSitesPanel sitePanel = new ConstructionSitesPanel(manager);
+
+        JInternalFrame d = new JInternalFrame(
+        		unit.getSettlement().getName() + " - " + site,
+        		true,  //resizable
+                false, //not closable
+                true, //not maximizable
+                false); //iconifiable);
+
+        d.setIconifiable(false);
+        d.setClosable(true);
+		d.setFrameIcon(MainWindow.getLanderIcon());
+		d.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+
+		JPanel panel = new JPanel(new BorderLayout(1, 1));
+		panel.setBorder(new MarsPanelBorder());
+		panel.setBorder(new EmptyBorder(1, 1, 1, 1));
+
+		panel.add(sitePanel, BorderLayout.CENTER);
+
+		String phase = site.getPhase().getName();
+		JLabel label = new JLabel("Mission Phase : " + phase, JLabel.CENTER);
+		
+		panel.add(label, BorderLayout.SOUTH);
+		
+		d.add(panel);
+		desktop.add(d);
+
+		d.setMaximumSize(new Dimension(WIDTH_2, HEIGHT_2));
+		d.setPreferredSize(new Dimension(WIDTH_2, HEIGHT_2));
+		d.setSize(WIDTH_2, HEIGHT_2); // undecorated: 300, 335; decorated: 310, 370
+		d.setLayout(new FlowLayout());
+
+		// Create compound border
+		Border border = new MarsPanelBorder();
+		Border margin = new EmptyBorder(1,1,1,1);
+		d.getRootPane().setBorder(new CompoundBorder(border, margin));
+
+        // Save this panel into the map
+        panels.put(site.getIdentifier(), d);
+
+        d.setVisible(true);
     }
     
-	public void buildItemThree(final Unit unit) {
-	        itemThree.addActionListener(new ActionListener() {
-	            public void actionPerformed(ActionEvent e) {
-	            	//if (unit instanceof Vehicle) {
-		            Vehicle vehicle = (Vehicle) unit;
-		            vehicle.findNewParkingLoc();
-		    		repaint();
-	            }
-	        });
+    /**
+     * Builds item three
+     *
+     * @param unit
+     */
+	private JMenuItem buildVehicleRelocate(Unit unit) {
+		JMenuItem relocateItem = new JMenuItem(Msg.getString("PopUpUnitMenu.relocate"));
+
+        relocateItem.setForeground(new Color(139,69,19));
+        relocateItem.addActionListener(e -> {
+	            ((Vehicle) unit).relocateVehicle();
+	    		repaint();
+        });
+
+		return relocateItem;
 	}
-    
+	
+    /**
+     * Builds item four.
+     *
+     * @param unit
+     */
+	private JMenuItem relocateSite(ConstructionSite site) {
+		JMenuItem relocateItem = new JMenuItem(Msg.getString("PopUpUnitMenu.relocate"));
+
+		List<GroundVehicle> vehicles = site.getVehicles();
+		
+        relocateItem.setForeground(new Color(139,69,19));
+        relocateItem.addActionListener(e -> {
+        		site.relocateSite();
+        		
+        		if (vehicles != null && !vehicles.isEmpty()) {
+	        		Coordinates coord = site.getCoordinates();
+	        		for (Vehicle v: vehicles) {
+	        			v.setCoordinates(coord);
+	        		}
+        		}
+	    		repaint();
+        });
+
+		return relocateItem;
+	}
+	
+	/**
+     * Builds item five.
+     *
+     * @param unit
+     */
+	private JMenuItem rotateSite(ConstructionSite site) {
+		JMenuItem rotateItem = new JMenuItem(Msg.getString("PopUpUnitMenu.rotate"));
+
+		rotateItem.setForeground(new Color(139,69,19));
+		rotateItem.addActionListener(e -> {
+			int siteAngle = (int) site.getFacing();
+			siteAngle += 90;
+			if (siteAngle >= 360)
+				siteAngle = 0;
+			site.setFacing(siteAngle);
+			logger.info(site, "Just set facing to " + (int)Math.round(siteAngle) + ".");
+			repaint();
+        });
+
+		return rotateItem;
+	}
+	
+	/**
+     * Builds item six.
+     *
+     * @param unit
+     */
+	private JMenuItem confirmSite(ConstructionSite site) {
+		JMenuItem confirmItem = new JMenuItem(Msg.getString("PopUpUnitMenu.confirmSite"));
+
+		confirmItem.setForeground(new Color(139,69,19));
+		confirmItem.addActionListener(e -> {
+
+			boolean isConfirm = site.isSitePicked();
+			if (!isConfirm) {
+				site.setSitePicked(!isConfirm);
+//				String s = site.isSitePicked() + "";
+//				s = s.toLowerCase();
+//				s = Conversion.capitalize(s);
+				logger.info(site, "Just confirmed the site location. Ready to go to the next phase.");
+				repaint();
+			}
+			else {
+				logger.info(site, "The site has already been confirmed at this point.");
+			}
+			
+        });
+
+		return confirmItem;
+	}
+	
+	
 	public void destroy() {
-		settlement = null;
-		settlement.destroy();
-		unit = null;
-		unit.destroy();
-		itemOne = null;
-		itemTwo = null;			
+		panels.clear();
+		panels = null;
 	}
+
 }

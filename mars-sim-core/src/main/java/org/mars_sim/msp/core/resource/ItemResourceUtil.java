@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ItemResourceUtil.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-06-12
  * @author Manny Kung
  */
 
@@ -9,90 +9,90 @@ package org.mars_sim.msp.core.resource;
 
 import java.io.Serializable;
 import java.util.Collections;
-import java.util.Iterator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.stream.Collectors;
 
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
-import org.mars_sim.msp.core.malfunction.MalfunctionFactory;
+import org.mars_sim.msp.core.goods.GoodType;
+import org.mars_sim.msp.core.manufacture.ManufactureConfig;
+import org.mars_sim.msp.core.manufacture.ManufactureProcessInfo;
 
 public class ItemResourceUtil implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	// Light utility vehicle attachment parts for mining.
-	public static final String PNEUMATIC_DRILL = "pneumatic drill";
-	public static final String BACKHOE = "backhoe";
-	public static final String SOCKET_WRENCH = "socket wrench";
-	public static final String PIPE_WRENCH = "pipe wrench";
+	private static final String PRESSURE_SUIT = "pressure suit";
+	private static final String GARMENT = "garment";
 	
-	// Other strings
-	public static final String EXTINGUSHER = "fire extinguisher";
-	public static final String WORK_GLOVES = "work gloves";
-	public static final String CONTAINMENT = "mushroom containment kit";
-	public static final String SMALL_HAMMER = "small hammer";
-	public static final String LASER_SINTERING_3D_PRINTER = "laser sintering 3d printer";
+	public static final String BATTERY_MODULE = "battery module";
+	public static final String ROVER_WHEEL = "rover wheel";
+	public static final String FIBERGLASS = "fiberglass";
 	
+	// Light utility vehicle attachment parts for mining or construction.
+	private static final String BACKHOE = "backhoe";
+	private static final String PNEUMATIC_DRILL = "pneumatic drill";
 
-	public static final Part pneumaticDrillAR = (Part) findItemResource(PNEUMATIC_DRILL);
-	public static final Part backhoeAR = (Part) findItemResource(BACKHOE);
-	public static final Part socketWrenchAR = (Part) findItemResource(SOCKET_WRENCH);
-	public static final Part pipeWrenchAR = (Part) findItemResource(PIPE_WRENCH);
+	/** String name of the manufacturing process of producing an EVA suit. */	
+	private static final String ASSEMBLE_EVA_SUIT = "Assemble EVA suit";
 	
-	public static final Part fireExtinguisherAR = (Part) findItemResource(EXTINGUSHER);
-	public static final Part workGlovesAR = (Part) findItemResource(WORK_GLOVES);
-	public static final Part mushroomBoxAR = (Part) findItemResource(CONTAINMENT);
-	public static final Part smallHammerAR = (Part) findItemResource(SMALL_HAMMER);
+	// 3-D printer
+	private static final String LASER_SINTERING_3D_PRINTER = "laser sintering 3d printer";
 
+	public static int garmentID;
+	public static int pressureSuitID;
 	public static int pneumaticDrillID;
 	public static int backhoeID;
-	public static int socketWrenchID;
-	public static int pipeWrenchID;
-	
-	public static int fireExtinguisherID;
-	public static int workGlovesID;
-	public static int mushroomBoxID;
-	public static int smallHammerID;
-
 	public static int printerID;
 
 	private static Map<String, Part> itemResourceMap;
 	private static Map<Integer, Part> itemResourceIDMap;
-	private static Map<Integer, String> partIDNameMap;
-
 	private static Set<Part> partSet;
-
 	private static List<Part> sortedParts;
 
-	private static MalfunctionFactory factory;
-
 	private static PartConfig partConfig = SimulationConfig.instance().getPartConfiguration();
-
+	private static ManufactureConfig manufactureConfig = SimulationConfig.instance().getManufactureConfiguration();
+	
+	public static Set<Integer> evaSuitPartIDs;
 	
 	/**
-	 * Constructor
+	 * Constructor.
 	 */
 	public ItemResourceUtil() {
-		factory = Simulation.instance().getMalfunctionFactory();		
-		
 		partSet = getItemResources();
-		
 		createMaps();
-
 		createIDs();
 	}
-
+	
 	/**
-	 * Creates an item resource
-	 * 
+	 * Initializes the EVA suit parts.
+	 */
+	public static void initEVASuit() {
+		if (evaSuitPartIDs == null || evaSuitPartIDs.isEmpty()) {
+
+			ManufactureProcessInfo manufactureProcessInfo = null;
+			
+			if (manufactureConfig == null)
+				manufactureConfig = SimulationConfig.instance().getManufactureConfiguration();
+			
+			for (ManufactureProcessInfo info : manufactureConfig.getManufactureProcessList()) {
+				if (info.getName().equals(ASSEMBLE_EVA_SUIT)) {
+		        		manufactureProcessInfo = info;
+		        		break;
+				}
+			}
+
+			evaSuitPartIDs = convertNameListToResourceIDs(manufactureProcessInfo.getInputNames());
+		}
+	}
+	
+	/**
+	 * Creates an item resource. This is only used for test cases but should it be here?
+	 *
 	 * @param resourceName
 	 * @param id
 	 * @param description
@@ -100,96 +100,113 @@ public class ItemResourceUtil implements Serializable {
 	 * @param solsUsed
 	 * @return
 	 */
-	public static Part createItemResource(String resourceName, int id, String description, double massPerItem,
+	public static Part createItemResource(String resourceName, int id, String description, GoodType type, double massPerItem,
 			int solsUsed) {
-		Part p = new Part(resourceName, id, description, massPerItem, solsUsed);
+		Part p = new Part(resourceName, id, description, type, massPerItem, solsUsed);
 		ItemResourceUtil.registerBrandNewPart(p);
 		return p;
 	}
-	
+
 	/**
-	 * Prepares the id's of a few item resources
+	 * Prepares the id's of a few item resources.
 	 */
-	public void createIDs() {
+	public static void createIDs() {
+
+		// Create item ids reference
+		garmentID = findIDbyItemResourceName(GARMENT);
+		pressureSuitID = findIDbyItemResourceName(PRESSURE_SUIT);
+
 		pneumaticDrillID = findIDbyItemResourceName(PNEUMATIC_DRILL);
 		backhoeID = findIDbyItemResourceName(BACKHOE);
-		socketWrenchID = findIDbyItemResourceName(SOCKET_WRENCH);
-		pipeWrenchID = findIDbyItemResourceName(PIPE_WRENCH);
-		
-		fireExtinguisherID = findIDbyItemResourceName(EXTINGUSHER);
-		workGlovesID = findIDbyItemResourceName(WORK_GLOVES);
-		mushroomBoxID = findIDbyItemResourceName(CONTAINMENT);
-		smallHammerID = findIDbyItemResourceName(SMALL_HAMMER);
 
 		printerID = findIDbyItemResourceName(LASER_SINTERING_3D_PRINTER);
 	}
 
+	
 	/**
-	 * Prepares maps for storing all item resources
+	 * Convert a list of string into their equivalent IDs.
+	 * 
+	 * @param string list
+	 * @return a set of ids
 	 */
-	public static void createMaps() {
-		itemResourceMap = new ConcurrentHashMap<>();
-		sortedParts = new CopyOnWriteArrayList<>(partSet);
-		Collections.sort(sortedParts);
-
-		for (Part p : sortedParts) {
-			itemResourceMap.put(p.getName(), p);
-		}
-
-		itemResourceIDMap = new ConcurrentHashMap<>();
-		for (Part p : sortedParts) {
-			itemResourceIDMap.put(p.getID(), p);
-		}
-
-		partIDNameMap = new ConcurrentHashMap<Integer, String>();
-		for (Part p : sortedParts) {
-			partIDNameMap.put(p.getID(), p.getName());
-		}
-	}
-
-	/**
-	 * Prepares maps for storing all item resources
-	 */
-	public static void createTestMaps() {		
-		partSet = getItemResources();
-		itemResourceMap = new ConcurrentHashMap<>();
-		sortedParts = new CopyOnWriteArrayList<>(partSet);
-		Collections.sort(sortedParts);
-
-		partIDNameMap = new ConcurrentHashMap<Integer, String>();
-		for (Part p : sortedParts) {
-			partIDNameMap.put(p.getID(), p.getName());
-		}
+	public static Set<Integer> convertNameListToResourceIDs(List<String> strings) {
+		return convertNameArray2ResourceIDs(strings.stream()
+		        .toArray(String[]::new));
 	}
 	
 	/**
-	 * Register a new part in all 3 item resource maps
+	 * Converts a array of string names into their equivalent IDs.
 	 * 
+	 * @param name array
+	 * @return a set of ids
+	 */
+	public static Set<Integer> convertNameArray2ResourceIDs(String [] names) {
+		Set<Integer> ids = new HashSet<>();
+		for (String n : names) {
+			
+			AmountResource ar = ResourceUtil.findAmountResource(n);
+			if (ar != null) {
+//				ids.add(ar.getID());
+			}		
+			else {
+				ItemResource item = findItemResource(n);
+				if (item != null) {
+					ids.add(item.getID());
+				}
+			}
+		}
+		return ids;
+	}
+
+	/**
+	 * Prepares maps for storing all item resources.
+	 */
+	private static void createMaps() {
+		itemResourceMap = new HashMap<>();
+		sortedParts = new CopyOnWriteArrayList<>(partSet);
+		Collections.sort(sortedParts);
+
+		for (Part p : sortedParts) {
+			itemResourceMap.put(p.getName().toLowerCase(), p);
+		}
+
+		itemResourceIDMap = new HashMap<>();
+		for (Part p : sortedParts) {
+			itemResourceIDMap.put(p.getID(), p);
+		}
+	}
+
+	/**
+	 * Registers a new part in all 3 item resource maps.
+	 *
 	 * @param p {@link Part}
 	 */
 	public static void registerBrandNewPart(Part p) {
-		itemResourceMap.put(p.getName(), p);
+		itemResourceMap.put(p.getName().toLowerCase(), p);
 		itemResourceIDMap.put(p.getID(), p);
-		partIDNameMap.put(p.getID(), p.getName());
 	}
 
 	/**
 	 * Finds an item resource by name.
-	 * 
+	 *
 	 * @param name the name of the resource.
 	 * @return resource
 	 * @throws ResourceException if resource could not be found.
 	 */
 	public static ItemResource findItemResource(String name) {
 		// Use Java 8 stream
-		return getItemResources().stream().filter(item -> item.getName().equals(name.toLowerCase())).findFirst()
-				.orElse(null);// .get();
-		// return getItemResourcesMap().get(name.toLowerCase());
+		Part ir = getItemResources().stream().filter(item -> item.getName().equalsIgnoreCase(name)).findFirst()
+				.orElse(null);
+		if (ir == null) {
+			throw new IllegalArgumentException("No ItemResource called " + name);	
+		}
+
+		return ir;
 	}
 
 	/**
 	 * Finds an amount resource by id.
-	 * 
+	 *
 	 * @param id the resource's id.
 	 * @return resource
 	 * @throws ResourceException if resource could not be found.
@@ -198,17 +215,9 @@ public class ItemResourceUtil implements Serializable {
 		return itemResourceIDMap.get(id);
 	}
 
-//	/**
-//	 * Gets a ummutable collection of all the item resources.
-//	 * @return collection of item resources.
-//	 */
-//	public static Set<ItemResource> getItemResources() {
-//		return Collections.unmodifiableSet(partConfig.getItemResources());
-//	}
-
 	/**
-	 * Creates a set of item resources
-	 * 
+	 * Creates a set of item resources.
+	 *
 	 * @return
 	 */
 	public static Set<Part> getItemResources() {
@@ -220,17 +229,8 @@ public class ItemResourceUtil implements Serializable {
 	}
 
 	/**
-	 * Gets an immutable set of all the amount resources.
-	 * 
-	 * @return set of amount resources.
-	 */
-	public static Set<Integer> getItemIDs() {
-		return itemResourceIDMap.keySet();
-	}
-
-	/**
-	 * Gets a list of sorted parts
-	 * 
+	 * Gets a list of sorted parts.
+	 *
 	 * @return
 	 */
 	public static List<Part> getSortedParts() {
@@ -239,130 +239,34 @@ public class ItemResourceUtil implements Serializable {
 		return sortedParts;
 	}
 
-	
-	/**
-	 * Gets a map of parts
-	 * 
-	 * @return
-	 */
-	public static Map<String, Part> getItemResourcesMap() {
-		return factory.getNamePartMap();
-	}
-
-	/**
-	 * gets a sorted map of all amount resource names by calling
-	 * {@link AmountResourceConfig#getAmountResourcesMap()}.
-	 * 
-	 * @return {@link Map}<{@link Integer}, {@link String}>
-	 */
-	public static Map<Integer, String> getPartIDNameMap() {
-		return partIDNameMap;
-	}
-
 	/**
 	 * Finds an item resource name by id.
-	 * 
+	 *
 	 * @param id the resource's id.
 	 * @return resource name
 	 * @throws ResourceException if resource could not be found.
 	 */
 	public static String findItemResourceName(int id) {
-		return partIDNameMap.get(id);
+		return findItemResource(id).getName();
 	}
-	
-	
+
 	/**
-	 * Finds an amount resource by name.
-	 * 
+	 * Finds the id of the item resource by name.
+	 *
 	 * @param name the name of the resource.
 	 * @return resource
 	 * @throws ResourceException if resource could not be found.
 	 */
+	
 	public static Integer findIDbyItemResourceName(String name) {
-		return getKeyByValue(partIDNameMap, name.toLowerCase());
+		ItemResource ir = findItemResource(name);
+		return ir.getID();
 	}
 
-	/**
-	 * Returns the first matched key from a given value in a map for one-to-one
-	 * relationship
-	 * 
-	 * @param map
-	 * @param value
-	 * @return key
-	 */
-	public static <T, E> T getKeyByValue(Map<T, E> map, E value) {
-		for (Entry<T, E> entry : map.entrySet()) {
-			if (Objects.equals(value, entry.getValue())) {
-				return entry.getKey();
-			}
+	public static Map<Integer, Double> removePartMap(Map<Integer, Double> parts, Set<Integer> unneeded) {
+		for (Integer i : unneeded) {
+			parts.remove(i);
 		}
-		return null;
+		return parts;
 	}
-
-	/**
-	 * Returns a set of keys from a given value in a map using Java 8 stream
-	 * 
-	 * @param map
-	 * @param value
-	 * @return a set of key
-	 */
-	public static <T, E> Set<T> getKeySetByValue(Map<T, E> map, E value) {
-		return map.entrySet().stream().filter(entry -> Objects.equals(entry.getValue(), value)).map(Map.Entry::getKey)
-				.collect(Collectors.toSet());
-	}
-
-	/**
-	 * Gets an immutable set of all the amount resources.
-	 * 
-	 * @return set of amount resources.
-	 */
-	public static Set<Integer> getIDs() {
-		return itemResourceIDMap.keySet();
-	}
-
-//	/**
-//	 * gets a sorted map of all amount resource names by calling
-//	 * {@link AmountResourceConfig#getAmountResourcesMap()}.
-//	 * @return {@link Map}<{@link Integer}, {@link String}>
-//	 */
-//	public static Map<Integer, String> getIDNameMap() {
-//		return IDNameMap;
-//	}
-
-	/**
-	 * gets a sorted map of all amount resources by calling
-	 * {@link AmountResourceConfig#getAmountResourcesIDMap()}.
-	 * 
-	 * @return {@link Map}<{@link Integer},{@link AmountResource}>
-	 */
-	public static Map<Integer, Part> getItemResourcesIDMap() {
-		return itemResourceIDMap;
-	}
-
-//	/**
-//	 * gets a sorted map of all amount resources by calling
-//	 * {@link AmountResourceConfig#getAmountResourcesMap()}.
-//	 * @return {@link Map}<{@link String},{@link AmountResource}>
-//	 */
-//	public static Map<String, Part> getItemResourcesMap() {
-//		return itemResourceMap;
-//	}
-
-	/**
-	 * convenience method that calls {@link #getAmountResources()} and turns the
-	 * result into an alphabetically ordered list of strings.
-	 * 
-	 * @return {@link List}<{@link String}>
-	 */
-	public static List<String> getItemResourceStringSortedList() {
-		List<String> resourceNames = new CopyOnWriteArrayList<String>();
-		Iterator<Part> i = partSet.iterator();
-		while (i.hasNext()) {
-			resourceNames.add(i.next().getName().toLowerCase());
-		}
-		Collections.sort(resourceNames);
-		return resourceNames;
-	}
-
-
 }

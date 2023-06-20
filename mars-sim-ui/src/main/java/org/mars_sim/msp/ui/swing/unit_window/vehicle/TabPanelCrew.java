@@ -1,217 +1,384 @@
-/**
+/*
  * Mars Simulation Project
- * CrewTabPanel.java
- * @version 3.1.2 2020-09-02
+ * TabPanelCrew.java
+ * @date 2022-07-09
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.vehicle;
 
+import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.util.Arrays;
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
-import javax.swing.DefaultListModel;
-import javax.swing.JList;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
 
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.UnitEvent;
+import org.mars_sim.msp.core.UnitEventType;
+import org.mars_sim.msp.core.UnitListener;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.mission.Mission;
+import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.vehicle.Crewable;
+import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.tool.monitor.MonitorWindow;
 import org.mars_sim.msp.ui.swing.tool.monitor.PersonTableModel;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
+import org.mars_sim.msp.ui.swing.utils.UnitModel;
+import org.mars_sim.msp.ui.swing.utils.UnitTableLauncher;
 
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-
-/** 
- * The CrewTabPanel is a tab panel for a vehicle's crew information.
+/**
+ * The TabPanelCrew is a tab panel for a vehicle's crew information.
  */
-public class TabPanelCrew
-extends TabPanel
-implements MouseListener, ActionListener {
+@SuppressWarnings("serial")
+public class TabPanelCrew extends TabPanel implements ActionListener {
 
-	/** default serial id. */
-	private static final long serialVersionUID = 1L;
+	/** default logger. */
+	private static SimLogger logger = SimLogger.getLogger(TabPanelCrew.class.getName());
 
-	private WebLabel crewNumLabel;
-	private WebLabel crewCapLabel;
-	private DefaultListModel<Person> crewListModel;
-	//private DefaultListModel<Unit> crewListModel;
-	private JList<Person> crewList;
-	//private JList<Unit> crewList;
-	private Collection<Person> crewCache;
-	//private Collection<Unit> crewCache;
+	private static final String CREW_ICON = "people"; //$NON-NLS-1$
+
+	private MemberTableModel memberTableModel;
+	private JTable memberTable;
+
+	private JLabel crewNumTF;
 
 	private int crewNumCache;
 	private int crewCapacityCache;
 
-	/** Is UI constructed. */
-	private boolean uiDone = false;
-	
+	/** The mission instance. */
+	private Mission mission;
 	/** The Crewable instance. */
 	private Crewable crewable;
-	
+
 	/**
 	 * Constructor.
+	 * 
 	 * @param vehicle the vehicle.
 	 * @param desktop the main desktop.
 	 */
-	public TabPanelCrew(Vehicle vehicle, MainDesktopPane desktop) { 
+	public TabPanelCrew(Vehicle vehicle, MainDesktopPane desktop) {
 		// Use the TabPanel constructor
 		super(
-			Msg.getString("TabPanelCrew.title"), //$NON-NLS-1$
 			null,
+			ImageLoader.getIconByName(CREW_ICON),
 			Msg.getString("TabPanelCrew.tooltip"), //$NON-NLS-1$
 			vehicle, desktop
 		);
 
 		crewable = (Crewable) vehicle;
-
+		mission = vehicle.getMission();
 	}
 
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
-		
-		// Prepare title label.
-		WebPanel titlePanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		WebLabel titleLabel = new WebLabel(Msg.getString("TabPanelCrew.title"), WebLabel.CENTER); //$NON-NLS-1$
-		titleLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		titlePanel.add(titleLabel);
-		topContentPanel.add(titlePanel);
-
+	@Override
+	protected void buildUI(JPanel content) {
+        JPanel northPanel = new JPanel();
+        northPanel.setLayout(new BoxLayout(northPanel, BoxLayout.Y_AXIS));
+        
 		// Create crew count panel
-		WebPanel crewCountPanel = new WebPanel(new GridLayout(2, 1, 0, 0));
-//		crewCountPanel.setBorder(new MarsPanelBorder());
-		topContentPanel.add(crewCountPanel);
+		AttributePanel crewCountPanel = new AttributePanel(2);
+		northPanel.add(crewCountPanel, BorderLayout.CENTER);
 
-		// Create crew num label
+		// Create crew num header label
 		crewNumCache = crewable.getCrewNum();
-		crewNumLabel = new WebLabel(Msg.getString("TabPanelCrew.crew", crewNumCache), WebLabel.CENTER); //$NON-NLS-1$
-		crewCountPanel.add(crewNumLabel);
+		crewNumTF = crewCountPanel.addTextField(Msg.getString("TabPanelCrew.crewNum"),
+								Integer.toString(crewNumCache),
+								 Msg.getString("TabPanelCrew.crew.tooltip"));
 
-		// Create crew capacity label
+		// Create crew cap header label
 		crewCapacityCache = crewable.getCrewCapacity();
-		crewCapLabel = new WebLabel(Msg.getString("TabPanelCrew.crewCapacity", crewCapacityCache), WebLabel.CENTER); //$NON-NLS-1$
-		crewCountPanel.add(crewCapLabel);
+		crewCountPanel.addTextField(Msg.getString("TabPanelCrew.crewCapacity"),
+								Integer.toString(crewCapacityCache),
+					 			Msg.getString("TabPanelCrew.crewCapacity.tooltip"));
 
-		// Create crew display panel
-		WebPanel crewDisplayPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
-//		crewDisplayPanel.setBorder(new MarsPanelBorder());
-		topContentPanel.add(crewDisplayPanel);
-
-		// Create scroll panel for crew list.
-		WebScrollPane crewScrollPanel = new WebScrollPane();
-		crewScrollPanel.setPreferredSize(new Dimension(175, 200));
-		crewDisplayPanel.add(crewScrollPanel);
-
-		// Create crew list model
-		crewListModel = new DefaultListModel<Person>();
-		//crewListModel = new DefaultListModel<Unit>();
-		crewCache = crewable.getCrew();
-		//crewCache = crewable.getUnitCrew();
-		Iterator<Person> i = crewCache.iterator();
-		//Iterator<Unit> i = crewCache.iterator();
-		while (i.hasNext()) crewListModel.addElement(i.next());
-
-		// Create crew list
-		crewList = new JList<Person>(crewListModel);
-		//crewList = new JList<Unit>(crewListModel);
-		crewList.addMouseListener(this);
-		crewScrollPanel.setViewportView(crewList);
 
 		// Create crew monitor button
-		WebButton monitorButton = new WebButton(ImageLoader.getIcon(Msg.getString("img.monitor"))); //$NON-NLS-1$
+		JButton monitorButton = new JButton(ImageLoader.getIconByName(MonitorWindow.ICON)); 
 		monitorButton.setMargin(new Insets(1, 1, 1, 1));
 		monitorButton.addActionListener(this);
 		monitorButton.setToolTipText(Msg.getString("TabPanelCrew.tooltip.monitor")); //$NON-NLS-1$
-		crewDisplayPanel.add(monitorButton);
+
+		JPanel crewButtonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+		crewButtonPanel.add(monitorButton);
+		northPanel.add(crewButtonPanel, BorderLayout.SOUTH);
+       	content.add(northPanel, BorderLayout.NORTH);
+
+		// Create scroll panel for member list.
+		JScrollPane memberScrollPane = new JScrollPane();
+		memberScrollPane.setPreferredSize(new Dimension(300, 300));
+		content.add(memberScrollPane, BorderLayout.CENTER);
+
+		// Create member table model.
+		memberTableModel = new MemberTableModel();
+		if (mission != null)
+			memberTableModel.setMission(mission);
+
+		// Create member table.
+		memberTable = new JTable(memberTableModel);
+		memberTable.getColumnModel().getColumn(0).setPreferredWidth(110);
+		memberTable.getColumnModel().getColumn(1).setPreferredWidth(140);
+		memberTable.setRowSelectionAllowed(true);
+		memberTable.setAutoCreateRowSorter(true);
+		memberTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		
+		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
+		renderer.setHorizontalAlignment(SwingConstants.CENTER);
+		memberTable.getColumnModel().getColumn(2).setCellRenderer(renderer);
+		memberScrollPane.setViewportView(memberTable);
+
+		// Call it a click to display details button when user double clicks the table
+		memberTable.addMouseListener(new UnitTableLauncher(getDesktop()));
+
+		update();
 	}
 
 	/**
 	 * Updates the info on this panel.
 	 */
+	@Override
 	public void update() {
-		if (!uiDone)
-			initializeUI();
-		
-		Vehicle vehicle = (Vehicle) unit;
+		Vehicle vehicle = (Vehicle) getUnit();
 		Crewable crewable = (Crewable) vehicle;
+		Mission newMission = vehicle.getMission();
+		if (mission != newMission) {
+			mission = newMission;
+			memberTableModel.setMission(newMission);
+		}
 
 		// Update crew num
 		if (crewNumCache != crewable.getCrewNum() ) {
 			crewNumCache = crewable.getCrewNum() ;
-			crewNumLabel.setText(Msg.getString("TabPanelCrew.crew", crewNumCache)); //$NON-NLS-1$
+			crewNumTF.setText(crewNumCache + "");
 		}
 
-		// Update crew capacity
-		if (crewCapacityCache != crewable.getCrewCapacity()) {
-			crewCapacityCache = crewable.getCrewCapacity();
-			crewCapLabel.setText(Msg.getString("TabPanelCrew.crewCapacity", crewCapacityCache)); //$NON-NLS-1$
-		}
-
-		// Update crew list
-		//if (!Arrays.equals(crewCache.toArray(), crewable.getUnitCrew().toArray())) {
-		if (!Arrays.equals(crewCache.toArray(), crewable.getCrew().toArray())) {
-			//crewCache = crewable.getUnitCrew();
-			crewCache = crewable.getCrew();
-			crewListModel.clear();
-			Iterator<Person> i = crewCache.iterator();
-			//Iterator<Unit> i = crewCache.iterator();
-			while (i.hasNext()) crewListModel.addElement(i.next());
-		}
-
+		// Update crew table
+		memberTableModel.updateMembers();
 	}
 
-	/** 
+	/**
 	 * Action event occurs.
+	 * 
 	 * @param event the action event
 	 */
 	public void actionPerformed(ActionEvent event) {
 		// If the crew monitor button was pressed, create tab in monitor tool.
-		Vehicle vehicle = (Vehicle) unit;
+		Vehicle vehicle = (Vehicle) getUnit();
 		Crewable crewable = (Crewable) vehicle;
-		desktop.addModel(new PersonTableModel(crewable));
-	}
-
-	/** 
-	 * Mouse clicked event occurs.
-	 * @param event the mouse event
-	 */
-	public void mouseClicked(MouseEvent event) {
-		// If double-click, open person window.
-		if (event.getClickCount() >= 2) {
-			Person person = (Person) crewList.getSelectedValue();
-			if (person != null) desktop.openUnitWindow(person, false);
+		try {
+			getDesktop().addModel(new PersonTableModel(crewable));
+		} catch (Exception e) {
+			logger.severe("PersonTableModel cannot be added.");
 		}
 	}
 
-	public void mousePressed(MouseEvent event) {}
-	public void mouseReleased(MouseEvent event) {}
-	public void mouseEntered(MouseEvent event) {}
-	public void mouseExited(MouseEvent event) {}
-	
+	@Override
 	public void destroy() {
-		crewNumLabel = null; 
-		crewCapLabel = null; 
-		crewListModel = null; 
-		crewList = null; 
-		crewCache = null; 
+		super.destroy();
+		
+		crewNumTF = null;
+		memberTable = null;
+		memberTableModel = null;
+	}
+
+	/**
+	 * Table model for mission members.
+	 */
+	private class MemberTableModel extends AbstractTableModel implements UnitListener, UnitModel {
+
+		// Private members.
+		private Mission mission;
+		private List<Worker> members;
+
+		/**
+		 * Constructor.
+		 */
+		private MemberTableModel() {
+			mission = null;
+			members = new ArrayList<>();
+		}
+
+		/**
+		 * Gets the row count.
+		 *
+		 * @return row count.
+		 */
+		public int getRowCount() {
+			return members.size();
+		}
+
+		/**
+		 * Gets the column count.
+		 *
+		 * @return column count.
+		 */
+		public int getColumnCount() {
+			return 3;
+		}
+
+		/**
+		 * Gets the column name at a given index.
+		 *
+		 * @param columnIndex the column's index.
+		 * @return the column name.
+		 */
+		public String getColumnName(int columnIndex) {
+			if (columnIndex == 0)
+				return Msg.getString("MainDetailPanel.column.name"); //$NON-NLS-1$
+			else if (columnIndex == 1)
+				return Msg.getString("MainDetailPanel.column.task"); //$NON-NLS-1$
+			else
+				return "Boarded";
+		}
+
+		/**
+		 * Gets the value at a given row and column.
+		 *
+		 * @param row    the table row.
+		 * @param column the table column.
+		 * @return the value.
+		 */
+		public Object getValueAt(int row, int column) {
+			if (row < members.size()) {
+				Worker member = members.get(row);
+				if (column == 0)
+					return member.getName();
+				else if (column == 1)
+					return member.getTaskDescription();
+				else {
+					if (boarded(member))
+						return "Y";
+					else
+						return "N";
+				}
+			} else
+				return Msg.getString("unknown"); //$NON-NLS-1$
+		}
+
+		/**
+		 * Has this member boarded the vehicle ?
+		 *
+		 * @param member
+		 * @return
+		 */
+		boolean boarded(Worker member) {
+			if (mission instanceof VehicleMission) {			
+				if (member.getUnitType() == UnitType.PERSON) {
+					Rover r = (Rover)(((VehicleMission)mission).getVehicle());
+					if (r != null && r.isCrewmember((Person)member))
+						return true;
+				}
+			}
+			return false;
+		}
+
+		/**
+		 * Sets the mission for this table model.
+		 *
+		 * @param newMission the new mission.
+		 */
+		void setMission(Mission newMission) {
+			this.mission = newMission;
+			updateMembers();
+		}
+
+		/**
+		 * Catch unit update event.
+		 *
+		 * @param event the unit event.
+		 */
+		public void unitUpdate(UnitEvent event) {
+			UnitEventType type = event.getType();
+			Worker member = (Worker) event.getSource();
+			int index = members.indexOf(member);
+			if (type == UnitEventType.NAME_EVENT) {
+				fireTableCellUpdated(index, 0);
+			} else if ((type == UnitEventType.TASK_DESCRIPTION_EVENT) || (type == UnitEventType.TASK_EVENT)
+					|| (type == UnitEventType.TASK_ENDED_EVENT) || (type == UnitEventType.TASK_SUBTASK_EVENT)
+					|| (type == UnitEventType.TASK_NAME_EVENT)) {
+				fireTableCellUpdated(index, 1);
+			}
+		}
+
+		/**
+		 * Update mission members.
+		 */
+		void updateMembers() {
+			if (mission != null) {
+				List<Worker> newList = new ArrayList<>(mission.getMembers());
+
+				if (!members.equals(newList)) {
+					List<Integer> rows = new ArrayList<>();
+
+					for (Worker mm: members) {
+						if (!newList.contains(mm)) {
+							mm.removeUnitListener(this);
+						}
+					}
+
+					for (Worker mm: newList) {
+						if (!members.contains(mm)) {
+							mm.addUnitListener(this);
+							int index = newList.indexOf(mm);
+							rows.add(index);
+						}
+					}
+
+					// Replace the old member list with new one.
+					members = newList;
+
+					for (int i : rows) {
+						// Update this row
+						fireTableRowsUpdated(i, i);
+					}
+				}
+			} else {
+				if (members.size() > 0) {
+					clearMembers();
+					fireTableDataChanged();
+				}
+			}
+		}
+
+		/**
+		 * Clear all members from the table.
+		 */
+		private void clearMembers() {
+			if (members != null) {
+				Iterator<Worker> i = members.iterator();
+				while (i.hasNext()) {
+					Worker member = i.next();
+					member.removeUnitListener(this);
+				}
+				members.clear();
+			}
+		}
+
+		@Override
+		public Unit getAssociatedUnit(int row) {
+			return (Unit) members.get(row);
+		}
 	}
 }

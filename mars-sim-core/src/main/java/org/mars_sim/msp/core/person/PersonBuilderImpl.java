@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PersonBuilderImpl.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -10,10 +10,13 @@ package org.mars_sim.msp.core.person;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.mars_sim.msp.core.configuration.ConfigHelper;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
+import org.mars_sim.msp.core.person.ai.PersonAttributeManager;
 import org.mars_sim.msp.core.person.ai.PersonalityTraitType;
 import org.mars_sim.msp.core.person.ai.Skill;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.reportingAuthority.ReportingAuthority;
 import org.mars_sim.msp.core.structure.Settlement;
 
 public class PersonBuilderImpl implements PersonBuilder<Person> {
@@ -53,7 +56,7 @@ public class PersonBuilderImpl implements PersonBuilder<Person> {
 		return this;
 	}
 
-	public PersonBuilder<Person> setSponsor(String sponsor) {
+	public PersonBuilder<Person> setSponsor(ReportingAuthority sponsor) {
 		person.setSponsor(sponsor);
 		return this;
 	}
@@ -72,7 +75,8 @@ public class PersonBuilderImpl implements PersonBuilder<Person> {
 			while (i.hasNext()) {
 				String skillName = i.next();
 				int level = skillMap.get(skillName);
-				person.getSkillManager().addNewSkill(new Skill(SkillType.valueOfIgnoreCase(skillName), level));
+				person.getSkillManager().addNewSkill(new Skill(SkillType.valueOf(ConfigHelper.convertToEnumName(skillName)),
+													level));
 			}
 		}
 		return this;
@@ -128,7 +132,7 @@ public class PersonBuilderImpl implements PersonBuilder<Person> {
 	 */
 	public PersonBuilder<Person> setAttribute(Map<String, Integer> attributeMap) {
 		if (attributeMap == null || attributeMap.isEmpty()) {
-			person.getNaturalAttributeManager().setRandomAttributes(person);	
+			((PersonAttributeManager) person.getNaturalAttributeManager()).setRandomAttributes(person);	
 		}
 		else {
 			Iterator<String> i = attributeMap.keySet().iterator();

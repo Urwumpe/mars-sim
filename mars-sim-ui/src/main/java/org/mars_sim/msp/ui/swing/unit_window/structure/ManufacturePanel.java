@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ManufacturePanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -16,7 +16,7 @@ import java.util.Iterator;
 import javax.swing.BoundedRangeModel;
 import javax.swing.JButton;
 import javax.swing.JLabel;
-
+import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 
 import org.mars_sim.msp.core.manufacture.ManufactureProcess;
@@ -26,14 +26,12 @@ import org.mars_sim.msp.core.resource.ItemType;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
-
-import com.alee.laf.panel.WebPanel;
 
 /**
  * A panel showing information about a manufacturing process.
  */
-public class ManufacturePanel extends WebPanel {
+@SuppressWarnings("serial")
+public class ManufacturePanel extends JPanel {
 
 	// Data members
 	private ManufactureProcess process;
@@ -47,7 +45,7 @@ public class ManufacturePanel extends WebPanel {
 	 * @param processStringWidth the max string width to display for the process name.
 	 */
 	public ManufacturePanel(ManufactureProcess process, boolean showBuilding, int processStringWidth) {
-		// Call WebPanel constructor
+		// Call JPanel constructor
 		super();
 
 		// Initialize data members.
@@ -61,11 +59,11 @@ public class ManufacturePanel extends WebPanel {
         setBorder(new MarsPanelBorder());
 
         // Prepare name panel.
-        WebPanel namePane = new WebPanel(new FlowLayout(FlowLayout.LEFT, 1, 0));
+        JPanel namePane = new JPanel(new FlowLayout(FlowLayout.LEFT, 1, 0));
         add(namePane);
 
         // Prepare cancel button.
-        JButton cancelButton = new JButton(ImageLoader.getIcon("CancelSmall"));
+        JButton cancelButton = new JButton(ImageLoader.getIconByName("action/cancel"));
         cancelButton.setMargin(new Insets(0, 0, 0, 0));
         cancelButton.addActionListener(new ActionListener() {
         	public void actionPerformed(ActionEvent event) {
@@ -86,7 +84,7 @@ public class ManufacturePanel extends WebPanel {
         }
         if (name.length() > processStringWidth) name = name.substring(0, processStringWidth) + "...";
 		// Capitalize process names
-        JLabel nameLabel = new JLabel(Conversion.capitalize(name), JLabel.CENTER);
+        JLabel nameLabel = new JLabel(name, JLabel.CENTER);
         namePane.add(nameLabel);
 
         if (showBuilding) {
@@ -97,7 +95,7 @@ public class ManufacturePanel extends WebPanel {
         }
 
         // Prepare work panel.
-        WebPanel workPane = new WebPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        JPanel workPane = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
         add(workPane);
 
         // Prepare work label.
@@ -111,7 +109,7 @@ public class ManufacturePanel extends WebPanel {
         workPane.add(workBar);
 
         // Prepare time panel.
-        WebPanel timePane = new WebPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        JPanel timePane = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
         add(timePane);
 
         // Prepare time label.
@@ -152,6 +150,7 @@ public class ManufacturePanel extends WebPanel {
 
     /**
      * Gets the manufacture process.
+     * 
      * @return process
      */
     public ManufactureProcess getManufactureProcess() {
@@ -160,41 +159,41 @@ public class ManufacturePanel extends WebPanel {
 
     /**
      * Gets a tool tip string for a manufacturing process.
+     * 
      * @param info the manufacture process info.
      * @param building the manufacturing building (or null if none).
      */
     public static String getToolTipString(ManufactureProcessInfo info, Building building) {
         StringBuilder result = new StringBuilder("<html>");
 
-        result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&nbsp;Process : ").append(Conversion.capitalize(info.getName())).append("<br>");
-    	//if (building != null) result.append("Building : ").append(building.getNickName()).append("<br>");
-        result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;Labor Req : ").append(info.getWorkTimeRequired()).append(" millisols<br>");
-        result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;&nbsp;Time Req : ").append(info.getProcessTimeRequired()).append(" millisols<br>");
-        result.append("&emsp;&emsp;&emsp;&emsp;Power Req : ").append(info.getPowerRequired()).append(" kW<br>");
-        result.append("&emsp;&emsp;&nbsp;Bldg Tech Req : Level ").append(info.getTechLevelRequired()).append("<br>");
-        result.append("Mat Sci Skill Req : Level ").append(info.getSkillLevelRequired()).append("<br>");
+        result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;Process : ").append(info.getName()).append("<br>");
+        result.append("&emsp;&emsp;&emsp;&nbsp;Labor Req : ").append(info.getWorkTimeRequired()).append(" millisols<br>");
+        result.append("&emsp;&emsp;&emsp;&nbsp;&nbsp;Time Req : ").append(info.getProcessTimeRequired()).append(" millisols<br>");
+        result.append("&emsp;&emsp;&emsp;Power Req : ").append(info.getPowerRequired()).append(" kW<br>");
+        result.append("&emsp;&nbsp;Bldg Tech Req : Level ").append(info.getTechLevelRequired()).append("<br>");
+        result.append("&nbsp;Mat Sci Skill Req : Level ").append(info.getSkillLevelRequired()).append("<br>");
 
     	// Add process inputs.
-    	result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&nbsp;Inputs : ");
+    	result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;&nbsp;Inputs : ");
     	Iterator<ManufactureProcessItem> i = info.getInputList().iterator();
     	int ii = 0;
     	while (i.hasNext()) {
     		ManufactureProcessItem item = i.next();
     		// Capitalize process names
-            if (ii ==0) result.append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName())).append("<br>");
-            else result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;").append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName())).append("<br>");
+            if (ii == 0) result.append(getItemAmountString(item)).append(" ").append(item.getName()).append("<br>");
+            else result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;").append(getItemAmountString(item)).append(" ").append(item.getName()).append("<br>");
             ii++;
     	}
 
     	// Add process outputs.
-    	result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&nbsp;&nbsp;Outputs : ");
+    	result.append("&emsp;&emsp;&emsp;&emsp;&nbsp;Outputs : ");
     	Iterator<ManufactureProcessItem> j = info.getOutputList().iterator();
     	int jj = 0;
     	while (j.hasNext()) {
     		ManufactureProcessItem item = j.next();
     		//  Capitalize process names
-            if (jj==0) result.append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName())).append("<br>");
-            else result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;").append(getItemAmountString(item)).append(" ").append(Conversion.capitalize(item.getName())).append("<br>");
+            if (jj == 0) result.append(getItemAmountString(item)).append(" ").append(item.getName()).append("<br>");
+            else result.append("&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;").append(getItemAmountString(item)).append(" ").append(item.getName()).append("<br>");
             jj++;
     	}
 
@@ -205,6 +204,7 @@ public class ManufacturePanel extends WebPanel {
 
     /**
      * Gets a string representing an manufacture process item amount.
+     * 
      * @param item the manufacture process item.
      * @return amount string.
      */

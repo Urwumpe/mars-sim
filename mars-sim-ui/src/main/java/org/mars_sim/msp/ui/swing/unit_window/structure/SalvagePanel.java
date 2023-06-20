@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * SalvagePanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
@@ -22,6 +22,7 @@ import java.util.Iterator;
 /**
  * A panel displaying information about a salvage process.
  */
+@SuppressWarnings("serial")
 public class SalvagePanel extends JPanel {
 
     // Data members
@@ -53,7 +54,7 @@ public class SalvagePanel extends JPanel {
         add(namePane);
         
         // Prepare cancel button.
-        JButton cancelButton = new JButton(ImageLoader.getIcon("CancelSmall"));
+        JButton cancelButton = new JButton(ImageLoader.getIconByName("action/cancel"));
         cancelButton.setMargin(new Insets(0, 0, 0, 0));
         cancelButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent event) {
@@ -119,6 +120,7 @@ public class SalvagePanel extends JPanel {
     
     /**
      * Gets the salvage process.
+     * 
      * @return process
      */
     public SalvageProcess getSalvageProcess() {
@@ -127,6 +129,7 @@ public class SalvagePanel extends JPanel {
     
     /**
      * Gets a tool tip string for a salvage process.
+     * 
      * @param process the salvage process.
      * @param building the manufacturing building (or null if none).
      */
@@ -134,11 +137,11 @@ public class SalvagePanel extends JPanel {
             Building building) {
         StringBuilder result = new StringBuilder("<html>");
 
-        result.append("Salvage Process: ").append(processInfo.toString()).append("<br>");
+        result.append("Salvage Process: ").append(processInfo.getName()).append("<br>");
         if (building != null) result.append("Manufacture Building: ").append(building.getBuildingType()).append("<br>");
-        result.append("Effort Time Required: ").append(processInfo.getWorkTimeRequired()).append(" millisols<br>");
-        result.append("Building Tech Level Required: ").append(processInfo.getTechLevelRequired()).append("<br>");
-        result.append("Materials Science Skill Level Required: ").append(processInfo.getSkillLevelRequired()).append("<br>");
+        result.append("Effort Time Req'd: ").append(processInfo.getWorkTimeRequired()).append(" millisols<br>");
+        result.append("Building Tech Level Req'd: ").append(processInfo.getTechLevelRequired()).append("<br>");
+        result.append("Materials Science Skill Level Req'd: ").append(processInfo.getSkillLevelRequired()).append("<br>");
         
         // Add salvaged item.
         if (process != null) result.append("Salvaged Item: ").append(process.getSalvagedUnit().getName()).append("<br>");
@@ -158,7 +161,7 @@ public class SalvagePanel extends JPanel {
     }
     
 	/**
-	 * Prepare object for garbage collection.
+	 * Prepares object for garbage collection.
 	 */
 	public void destroy() {
 		process = null;

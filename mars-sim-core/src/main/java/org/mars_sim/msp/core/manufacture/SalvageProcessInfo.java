@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SalvageProcessInfo.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.manufacture;
@@ -157,8 +157,7 @@ public class SalvageProcessInfo implements Serializable, Comparable<SalvageProce
 		partSalvageList = null;
 	}
 
-	@Override
-	public String toString() {
+	public String getName() {
 		return "salvage " + itemName;
 	}
 }

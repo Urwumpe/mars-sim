@@ -1,22 +1,16 @@
-/**
+/*
  * Mars Simulation Project
  * WriteReport.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-01
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.role.RoleType;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.Administration;
@@ -27,7 +21,7 @@ import org.mars_sim.msp.core.vehicle.Rover;
 /**
  * The WriteReport class is a task for writing reports in an office space
  */
-public class WriteReport extends Task implements Serializable {
+public class WriteReport extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -55,28 +49,28 @@ public class WriteReport extends Task implements Serializable {
 	 */
 	public WriteReport(Person person) {
 		// Use Task constructor.
-		super(NAME, person, true, false, STRESS_MODIFIER, true, 10 + RandomUtil.getRandomInt(20));
+		super(NAME, person, true, false, STRESS_MODIFIER, 10D + RandomUtil.getRandomInt(20));
 
 		if (person.isInSettlement()) {
 
 			// If person is in a settlement, try to find an office building.
-			Building officeBuilding = getAvailableOffice(person);
+			Building officeBuilding = Administration.getAvailableOffice(person);
 			if (officeBuilding != null) {
 				// Walk to the office building.
-				walkToTaskSpecificActivitySpotInBuilding(officeBuilding, false);
+				walkToTaskSpecificActivitySpotInBuilding(officeBuilding, FunctionType.ADMINISTRATION, false);
 				office = officeBuilding.getAdministration();
 				if (!office.isFull()) {
 					office.addStaff();
 					// Walk to the dining building.
-					walkToTaskSpecificActivitySpotInBuilding(officeBuilding, true);
+					walkToTaskSpecificActivitySpotInBuilding(officeBuilding, FunctionType.ADMINISTRATION, true);
 				}
 			}
 			else {
-				Building dining = EatDrink.getAvailableDiningBuilding(person, false);
+				Building dining = BuildingManager.getAvailableDiningBuilding(person, false);
 				// Note: dining building is optional
 				if (dining != null) {
 					// Walk to the dining building.
-					walkToTaskSpecificActivitySpotInBuilding(dining, true);
+					walkToTaskSpecificActivitySpotInBuilding(dining, FunctionType.DINING, true);
 				}
 //				else {
 //					// work anywhere
@@ -110,11 +104,6 @@ public class WriteReport extends Task implements Serializable {
 	}
 
 	@Override
-	public FunctionType getLivingFunction() {
-		return FunctionType.ADMINISTRATION;
-	}
-
-	@Override
 	protected double performMappedPhase(double time) {
 		if (getPhase() == null) {
 			throw new IllegalArgumentException("Task phase is null");
@@ -136,61 +125,39 @@ public class WriteReport extends Task implements Serializable {
 		return 0D;
 	}
 
+	/**
+	 * Release office space
+	 */
 	@Override
-	protected void addExperience(double time) {
-		// This task adds no experience.
-	}
-
-	@Override
-	public void endTask() {
-		super.endTask();
-
+	protected void clearDown() {
 		// Remove person from administration function so others can use it.
 		if (office != null && office.getNumStaff() > 0) {
 			office.removeStaff();
 		}
 	}
 
-	/**
-	 * Gets an available building with the administration function.
-	 * 
-	 * @param person the person looking for the office.
-	 * @return an available office space or null if none found.
-	 */
-	public static Building getAvailableOffice(Person person) {
-		Building result = null;
-
-		// If person is in a settlement, try to find a building with an office.
-		if (person.isInSettlement()) {
-			BuildingManager buildingManager = person.getSettlement().getBuildingManager();
-			List<Building> offices = buildingManager.getBuildings(FunctionType.ADMINISTRATION);
-			offices = BuildingManager.getNonMalfunctioningBuildings(offices);
-			offices = BuildingManager.getLeastCrowdedBuildings(offices);
-
-			if (offices.size() > 0) {
-				Map<Building, Double> selectedOffices = BuildingManager.getBestRelationshipBuildings(person, offices);
-				result = RandomUtil.getWeightedRandomObject(selectedOffices);
-			}
-		}
-
-		return result;
-	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		return 0;
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(0);
-		return results;
-	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
-
-		office = null;
-	}
+//	/**
+//	 * Gets an available building with the administration function.
+//	 * 
+//	 * @param person the person looking for the office.
+//	 * @return an available office space or null if none found.
+//	 */
+//	public static Building getAvailableOffice(Person person) {
+//		Building result = null;
+//
+//		// If person is in a settlement, try to find a building with an office.
+//		if (person.isInSettlement()) {
+//			BuildingManager buildingManager = person.getSettlement().getBuildingManager();
+//			List<Building> offices = buildingManager.getBuildings(FunctionType.ADMINISTRATION);
+//			offices = BuildingManager.getNonMalfunctioningBuildings(offices);
+//			offices = BuildingManager.getLeastCrowdedBuildings(offices);
+//
+//			if (offices.size() > 0) {
+//				Map<Building, Double> selectedOffices = BuildingManager.getBestRelationshipBuildings(person, offices);
+//				result = RandomUtil.getWeightedRandomObject(selectedOffices);
+//			}
+//		}
+//
+//		return result;
+//	}
 }

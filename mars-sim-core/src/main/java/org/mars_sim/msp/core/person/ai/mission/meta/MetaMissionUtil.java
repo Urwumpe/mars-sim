@@ -1,13 +1,13 @@
 /**
  * Mars Simulation Project
  * MetaMissionUtil.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission.meta;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * A utility mission for getting the list of meta missions.
@@ -31,7 +31,7 @@ public class MetaMissionUtil {
 	 */
 	private static void initializeMetaMissions() {
 
-		metaMissions = new CopyOnWriteArrayList<MetaMission>();
+		metaMissions = new ArrayList<>();
 
 		// Populate metaMissions list with all meta missions.
 		metaMissions.add(new AreologyFieldStudyMeta());
@@ -40,7 +40,8 @@ public class MetaMissionUtil {
 		metaMissions.add(new BuildingSalvageMissionMeta());
 		metaMissions.add(new CollectIceMeta());
 		metaMissions.add(new CollectRegolithMeta());
-		metaMissions.add(new EmergencySupplyMissionMeta());
+		metaMissions.add(new DeliveryMeta());
+		metaMissions.add(new EmergencySupplyMeta());
 		metaMissions.add(new ExplorationMeta());
 		metaMissions.add(new MeteorologyFieldStudyMeta());
 		metaMissions.add(new MiningMeta());
@@ -52,14 +53,7 @@ public class MetaMissionUtil {
 	}
 
 	private static void initializeRobotMetaMissions() {
-
-		robotMetaMissions = new CopyOnWriteArrayList<MetaMission>();
-
-		// Populate robotMetaMissions list with all meta missions.
-		// robotMetaMissions.add(new TradeMeta());
-		// robotMetaMissions.add(new TravelToSettlementMeta());
-		// robotMetaMissions.add(new BuildingConstructionMissionMeta());
-		// robotMetaMissions.add(new BuildingSalvageMissionMeta());
+		robotMetaMissions = new ArrayList<>();
 	}
 
 	public static int getNumMetaMissions() {
@@ -83,7 +77,6 @@ public class MetaMissionUtil {
 		}
 
 		// Return copy of meta mission list.
-		// return new CopyOnWriteArrayList<MetaMission>(metaMissions);
 		return metaMissions;
 	}
 
@@ -95,7 +88,6 @@ public class MetaMissionUtil {
 		}
 
 		// Return copy of meta mission list.
-		// return new CopyOnWriteArrayList<MetaMission>(robotMetaMissions);
 		return robotMetaMissions;
 	}
 }

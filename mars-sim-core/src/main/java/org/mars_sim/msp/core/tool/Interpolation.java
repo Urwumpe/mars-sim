@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * Interpolation.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -9,15 +9,11 @@ package org.mars_sim.msp.core.tool;
 
 import java.awt.Color;
 import java.util.Arrays;
-import java.util.List;
 
-import org.apache.commons.math3.analysis.TrivariateFunction;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math3.analysis.interpolation.PiecewiseBicubicSplineInterpolatingFunction;
 import org.apache.commons.math3.analysis.interpolation.PiecewiseBicubicSplineInterpolator;
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
-import org.apache.commons.math3.analysis.interpolation.TricubicSplineInterpolator;
-import org.apache.commons.math3.analysis.interpolation.TrivariateGridInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 
 public class Interpolation {
@@ -134,74 +130,6 @@ public class Interpolation {
        System.out.println("Elevation when x = 250: " + value);
        
     }
-    
-    public static void testTri() {
-//    	see http://commons.apache.org/proper/commons-math/userguide/analysis.html
-        double[] xval = new double[] {203, 211, 221, 229, 238, 246, 248, 249, 252, 255, 218, 181};
-        double[] yval = new double[] {166, 179, 193, 208, 223, 238, 241, 244, 249, 255, 253, 251};
-        double[] zval = new double[] {155, 170, 185, 201, 218, 236, 239, 243, 249, 255, 255, 254};
- 
-        double[][][] fval = new double[xval.length][yval.length][zval.length];
-
-        TrivariateGridInterpolator interpolator = new TricubicSplineInterpolator();
-//        TricubicSplineInterpolator
-        
-        TrivariateFunction p = interpolator.interpolate(xval, yval, zval, fval);
-
-//        double[] wxval = new double[] {3, 2, 5, 6.5};
-//        try {
-//            p = interpolator.interpolate(wxval, yval, zval, fval);
-////            Assert.fail("an exception should have been thrown");
-//        } catch (MathIllegalArgumentException e) {
-//            // Expected
-//        }
-
-//	      System.out.println("Piecewise functions:");
-//	      Arrays.stream(p.getPolynomials()).forEach(System.out::println);
-	      
-	      double value = p.value(208, 185, 163);
-	      System.out.println(value);
-    
-    
-//        double[] wyval = new double[] {-4, -3, -1, -1};
-//        try {
-//            p = interpolator.interpolate(xval, wyval, zval, fval);
-////            Assert.fail("an exception should have been thrown");
-//        } catch (MathIllegalArgumentException e) {
-//            // Expected
-//        }
-//
-//        double[] wzval = new double[] {-12, -8, -5.5, -3, -4, 2.5};
-//        try {
-//            p = interpolator.interpolate(xval, yval, wzval, fval);
-////            Assert.fail("an exception should have been thrown");
-//        } catch (MathIllegalArgumentException e) {
-//            // Expected
-//        }
-//
-//        double[][][] wfval = new double[xval.length][yval.length + 1][zval.length];
-//        try {
-//            p = interpolator.interpolate(xval, yval, zval, wfval);
-////            Assert.fail("an exception should have been thrown");
-//        } catch (DimensionMismatchException e) {
-//            // Expected
-//        }
-//        wfval = new double[xval.length - 1][yval.length][zval.length];
-//        try {
-//            p = interpolator.interpolate(xval, yval, zval, wfval);
-////            Assert.fail("an exception should have been thrown");
-//        } catch (DimensionMismatchException e) {
-//            // Expected
-//        }
-//        wfval = new double[xval.length][yval.length][zval.length - 1];
-//        try {
-//            p = interpolator.interpolate(xval, yval, zval, wfval);
-////            Assert.fail("an exception should have been thrown");
-//        } catch (DimensionMismatchException e) {
-//            // Expected
-//        }
-    }
-    
     
     public void test1() {
     	double[] xValues = new double[] {36, 36.001, 36.002};

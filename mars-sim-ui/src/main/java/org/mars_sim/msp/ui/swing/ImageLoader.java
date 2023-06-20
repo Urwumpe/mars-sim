@@ -1,47 +1,66 @@
-/**
+/*
  * Mars Simulation Project
  * ImageLoader.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-04-13
  * @author Barry Evans
  */
-
 package org.mars_sim.msp.ui.swing;
 
 import java.awt.Image;
-import java.awt.Toolkit;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 import java.util.logging.Logger;
 
+import javax.imageio.ImageIO;
+import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
-import org.mars_sim.msp.ui.swing.tool.settlement.SettlementTransparentPanel;
+import org.apache.batik.transcoder.TranscoderException;
+import org.mars.sim.console.MarsTerminal;
+import org.mars_sim.msp.ui.swing.tool.svg.SVGIcon;
 
 /**
  * This is a static class that acts as a helper to load Images for use in the
  * UI. It is based on loading the resource form the class path via the
- * ClassLoader assuming all the Images to load a PNG. However other alternative
- * strategies can be easily implemented within this class.
+ * ClassLoader. However other alternative strategies can be easily 
+ * implemented within this class.
  */
 public class ImageLoader {
-	
-	/** default logger. */
-	private static Logger logger = Logger.getLogger(ImageLoader.class.getName());
 
-	private static HashMap<String, ImageIcon> iconCache = new HashMap<String, ImageIcon>();
-	private static HashMap<String, Image> imageCache = new HashMap<String, Image>();
-	private static Toolkit usedToolkit = null;
+	/** default logger. */
+	private static final Logger logger = Logger.getLogger(ImageLoader.class.getName());
+
+	private static Map<String, Icon> iconByName = new HashMap<>();
+	private static Properties iconPaths;
+
+	private static HashMap<String, Image> imageCache = new HashMap<>();
+
+	private static Icon defaultIcon;
 
 	/**
-	 * Sub-directory/package for the images
+	 * Sub-directory/package for the images.
 	 */
-	/* [landrus, 26.11.09]: use classloader compatible paths */
-	public final static String IMAGE_DIR = "/images/";
-
-	public final static String ICON_DIR = "/icons/";
-
-	public final static String VEHICLE_ICON_DIR = "/icons/vehicle/";
+	// Note: Switch to classloader compatible paths
+	private static final String IMAGE_DIR = "/images/";
+	private static final String MAPS_DIR = "/maps/";
+	private static final String ICON_DIR = "/icons/";
+	private static final String SVG = "svg";
 	
+	static {
+		iconPaths = new Properties();
+		try (InputStream input = ImageLoader.class.getResourceAsStream("/icons.properties")) {
+			iconPaths.load(input);
+		} catch (IOException e) {
+			logger.severe("Can't load icons.properties.");
+		}
+
+		defaultIcon = getIconByName("unknown");
+	}
+
 	/**
 	 * Static singleton
 	 */
@@ -49,133 +68,117 @@ public class ImageLoader {
 	}
 
 	/**
-	 * Load the image icon with the specified name and a "png" image extension. This
-	 * operation may either create a new Image Icon of returned a previously created
-	 * one.
-	 *
-	 * @param imagename
-	 *            Name of the image to load.
-	 * @return ImageIcon containing image of specified name.
+	 * Get icon by it's logical name. The logical name is mapped to a file 
+	 * by the icon.properties or if not present the icon naming convention
+	 * is applied.
+	 * 
+	 * @param iconName Logical name of icon. 
 	 */
-	public static ImageIcon getIcon(String imagename) {
-		return getIcon(imagename, "png", IMAGE_DIR);
-	}
-
-	/**
-	 * Load the image icon with the specified name and a "png" image extension. This
-	 * operation may either create a new Image Icon of returned a previously created
-	 * one.
-	 *
-	 * @param imagename
-	 *            Name of the image to load.
-	 * @return ImageIcon containing image of specified name.
-	 */
-	public static ImageIcon getIcon(String imagename, String dir) {
-		return getIcon(imagename, "png", dir);
-	}
-	
-	public static ImageIcon getNewIcon(String imagename) {
-		ImageIcon found = null;
-		
-		if (imagename == null || imagename.equals("")) {
-			return found;
-		}
-		
-//		else if (imagename.contains(".svg")) {
-//    		
-//        	if (imagename.equals(MainWindow.SANDSTORM_SVG)) {
-//        		found = SettlementTransparentPanel.sandstorm;
-//        	}
-//        	else if (imagename.equals(MainWindow.DUST_DEVIL_SVG)) {
-//        		found = SettlementTransparentPanel.dustDevil;
-//        	}
-//        	else if (imagename.equals(MainWindow.SNOWFLAKE_SVG)) {
-//        		found = SettlementTransparentPanel.snowflake;
-//        	}
-//        	else if (imagename.equals(MainWindow.COLD_WIND_SVG)) {
-//        		found = SettlementTransparentPanel.wind;
-//        	}
-//        	else if (imagename.equals("")) {
-//        		found = SettlementTransparentPanel.emptyIcon;
-//        	}
-//    	}
-//    	
-//    	else {
-		
-			String ext = "png";
-			String fullImageName = imagename.endsWith(ext) ? imagename : imagename + "." + ext;
-			found = iconCache.get(fullImageName);
-			if (found == null) {
-				String fileName = fullImageName.startsWith("/") ? fullImageName : "/" + fullImageName;
-	
-				/* [landrus, 26.11.09]: don't use the system classloader in a webstart env. */
-				URL resource = ImageLoader.class.getResource(fileName);// ClassLoader.getSystemResource(fileName);
-				if (resource == null) {
-	    			logger.severe("'" + fileName + "' cannot be found");
-	    		}
-				
-				found = new ImageIcon(resource);
-		    	
-				iconCache.put(fullImageName, found);
-			}
-//    	}
-
-		return found;
-	}
-
-	/**
-	 * Load the image icon with the specified name. This operation may either create
-	 * a new Image Icon of returned a previously created one.
-	 *
-	 * @param imagename
-	 *            Name of the image to load.
-	 * @param ext
-	 *            the file extension (ex. "png", "jpg").
-	 * @param idr
-	 *            the direcotyr of the file .  
-	 * @return ImageIcon containing image of specified name.
-	 */
-	public static ImageIcon getIcon(String imagename, String ext, String dir) {
-		String fullImageName = imagename.endsWith(ext) ? imagename : imagename + "." + ext;
-		ImageIcon found = iconCache.get(fullImageName);
+	public static Icon getIconByName(String iconName) {
+		Icon found = iconByName.get(iconName);
 		if (found == null) {
-			String fileName = fullImageName.startsWith("/") ? fullImageName : dir + fullImageName;
-//			logger.config("Filename : " + fileName + "   imagename : " + imagename + "    ext : "+ ext + "    dir : " + dir);
-			found = new ImageIcon(ImageLoader.class.getResource(fileName));
-//			if (found == null) {
-//				logger.severe("Filename : " + fileName + " NOT found !");
-//			}
-//			else
-				iconCache.put(fullImageName, found);
+			// Is there a path already defined 
+			String imagePath = iconPaths.getProperty(iconName);
+			if (imagePath == null) {
+				// No path, assume this is PNG
+				imagePath = ICON_DIR + iconName + "_24.png";
+			}
+			
+			if (imagePath.endsWith(SVG)) {
+				found = loadSVGIcon(imagePath);
+			}
+			else {
+				found = loadImageIcon(imagePath);
+			}
+
+			// Display a default icon
+			if(found == null) {
+				found = defaultIcon;
+			}
+			iconByName.put(iconName, found);
 		}
-		
+
 		return found;
 	}
 
+	private static ImageIcon loadImageIcon(String fileName) {
+		URL imageSource = ImageLoader.class.getResource(fileName);
+		if (imageSource == null) {
+			return null;
+		}
+		return new ImageIcon(imageSource);
+	}
+
 	/**
-	 * Get an image with the specified name. The name should include the suffix
+	 * Load an SVG icon from a spec.
+	 * @param spec The spec defines the icon size & filepath
+	 * @return
+	 */
+	private static Icon loadSVGIcon(String spec) {
+        SVGIcon newIcon = null;
+        try {
+			// SVG Spec is defined as "<size>,<filepath .svg>"
+			String []items = spec.split(",");
+			String filename = items[1];
+			int size = Integer.parseInt(items[0]);
+            URL resource = ImageLoader.class.getClassLoader().getResource(filename);
+
+            newIcon = new SVGIcon(resource.toString(), size, size);
+        } catch (TranscoderException e) {
+			logger.severe("Can't transcode the specs into svg icon.");
+        }
+
+		return newIcon;
+	}
+ 	/**
+	 * Gets an image with the specified name. The name should include the suffix
 	 * identifying the format of the image.
 	 *
-	 * @param imagename
+	 * @param imageName
 	 *            Name of image including suffix.
 	 * @return Image found and loaded.
 	 */
-	public static Image getImage(String imagename) {
-		Image newImage = imageCache.get(imagename);
+	public static Image getImage(String imageName) {
+		Image newImage = imageCache.get(imageName);
 		if (newImage == null) {
-
-			if (usedToolkit == null) {
-				usedToolkit = Toolkit.getDefaultToolkit();
+			InputStream imageURL = null;
+			String imagePath = iconPaths.getProperty(imageName);
+			if (imagePath != null) {
+				imageURL = ImageLoader.class.getResourceAsStream(imagePath);
+			}
+			else {
+				// Search for image
+				imageURL = ImageLoader.class.getResourceAsStream(IMAGE_DIR + imageName);
+				if (imageURL == null) {
+					imageURL = ImageLoader.class.getResourceAsStream(ICON_DIR + imageName);
+					if (imageURL == null) {					
+						imageURL = ImageLoader.class.getResourceAsStream(MAPS_DIR + imageName);
+					}		
+				}
 			}
 
-			URL imageURL = ImageLoader.class.getResource(IMAGE_DIR + imagename);
-			if (imageURL == null) {
-    			logger.severe("'" + IMAGE_DIR + imagename + "' cannot be found");
-    		}
+			if (imageURL == null) {	
+				logger.severe("'" + imageName + "' cannot be found");
+			}
 
-			newImage = usedToolkit.createImage(imageURL);
-			imageCache.put(imagename, newImage);
+			// Read and load image
+			try {
+				newImage = ImageIO.read(imageURL);
+			} catch (IOException e) {
+				logger.severe("Can't read image URL.");
+			}
+			imageCache.put(imageName, newImage);
 		}
 		return newImage;
+	}
+
+	/**
+	 * Converts from icon to image.
+	 *
+	 * @param icon
+	 * @return
+	 */
+	public static Image iconToImage(Icon icon) {
+		return MarsTerminal.iconToImage(icon);
 	}
 }

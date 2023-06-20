@@ -1,22 +1,23 @@
-/**
+/*
  * Mars Simulation Project
  * MissionCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
 
+import javax.swing.JPanel;
+
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
 
-import com.alee.laf.panel.WebPanel;
 
 /**
  * A panel for displaying custom mission information.
  */
 @SuppressWarnings("serial")
 public abstract class MissionCustomInfoPanel
-extends WebPanel {
+extends JPanel {
 
 	/**
 	 * Updates the panel based on a mission event.

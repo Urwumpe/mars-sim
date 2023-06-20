@@ -1,101 +1,105 @@
-/**
+/*
  * Mars Simulation Project
  * MissionTableModel.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-28
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
 
-import java.text.DecimalFormat;
-import java.util.Iterator;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.GameManager;
+import org.mars_sim.msp.core.GameManager.GameMode;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.GameManager.GameMode;
-import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
-import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
+import org.mars_sim.msp.core.mission.ConstructionMission;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
 import org.mars_sim.msp.core.person.ai.mission.MissionEventType;
 import org.mars_sim.msp.core.person.ai.mission.MissionListener;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.person.ai.mission.MissionManagerListener;
-import org.mars_sim.msp.core.person.ai.mission.NavPoint;
-import org.mars_sim.msp.core.person.ai.mission.TravelMission;
+import org.mars_sim.msp.core.person.ai.mission.MissionPlanning;
+import org.mars_sim.msp.core.person.ai.mission.PlanType;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.vehicle.GroundVehicle;
 import org.mars_sim.msp.core.vehicle.Vehicle;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
 
+/**
+ * This class model how mission data is organized and displayed
+ * within the Monitor Window for all settlements.
+ */
 @SuppressWarnings("serial")
 public class MissionTableModel extends AbstractTableModel
 		implements MonitorModel, MissionManagerListener, MissionListener {
 
-	private DecimalFormat decFormatter = new DecimalFormat("#,###,##0.0");
-	/** Track the GameMode */
-	private GameMode mode;
-	
 	// Column indexes
 	/** Date filed column. */
-	private final static int DATE_FILED = 0;
+	private static final int DATE_FILED = 0;
 	/** Date Embarked column. */
-	private final static int DATE_EMBARKED = 1;
+	private static final int DATE_EMBARKED = 1;
 	/** Date Returned column. */
-	private final static int DATE_RETURNED = 2;
+	private static final int DATE_RETURNED = 2;
 	/** Starting member column. */
-	private final static int STARTING_MEMBER = 3;
-	/** Desc column. */
-	private final static int DESC = 4;
+	private static final int STARTING_MEMBER = 3;
+	/** Name ID column. */
+	private static final int TYPE_ID = 4;
 	/** Description column. */
-	private final static int DESIGNATION = 5;
+	private static final int DESIGNATION = 5;
 	/** Phase column. */
-	private final static int PHASE = 6;
+	private static final int PHASE = 6;
 	/** Mission vehicle column. */
-	private final static int VEHICLE = 7;
+	private static final int VEHICLE = 7;
 	/** Starting settlement column. */
-	private final static int STARTING_SETTLEMENT = 8;
+	private static final int STARTING_SETTLEMENT = 8;
 	/** Member number column. */
-	private final static int MEMBER_NUM = 9;
+	private static final int MEMBER_NUM = 9;
 	/** Navpoint number column. */
-	private final static int NAVPOINT_NUM = 10;
-	/** Travelled distance column. */
-	private final static int TRAVELLED_DISTANCE = 11;
+	private static final int NAVPOINT_NUM = 10;
+	/** Remaining distance to next navpoint column. */
+	private static final int REMAINING_DISTANCE_TO_NEXT_NAVPOINT = 11;
 	/** Remaining distance column. */
-	private final static int REMAINING_DISTANCE = 12;
+	private static final int TOTAL_REMAINING_DISTANCE = 12;
+	/** Travelled distance column. */
+	private static final int TRAVELLED_DISTANCE = 13;
 	/** Proposed route distance column. */
-	private final static int PROPOSED_ROUTE_DISTANCE = 13;
+	private static final int PROPOSED_ROUTE_DISTANCE = 14;
 	/** The number of Columns. */
-	private final static int COLUMNCOUNT = 14;
+	private static final int COLUMNCOUNT = 15;
 	/** Names of Columns. */
-	private static String columnNames[];
+	private static String[] columnNames;
 	/** Types of Columns. */
-	private static Class<?> columnTypes[];
+	private static Class<?>[] columnTypes;
 
+	private GameMode mode = GameManager.getGameMode();
+	
 	private List<Mission> missionCache;
 
 	private Settlement commanderSettlement;
-	
+
+	private boolean monitorMissions = false;
+
 	private static MissionManager missionManager = Simulation.instance().getMissionManager();
 
-	public MissionTableModel() {
+	static {
 		columnNames = new String[COLUMNCOUNT];
 		columnTypes = new Class[COLUMNCOUNT];
 		columnNames[DATE_FILED] = Msg.getString("MissionTableModel.column.filed"); //$NON-NLS-1$
-		columnTypes[DATE_FILED] = String.class;
+		columnTypes[DATE_FILED] = MarsClock.class;
 		columnNames[DATE_EMBARKED] = Msg.getString("MissionTableModel.column.embarked"); //$NON-NLS-1$
-		columnTypes[DATE_EMBARKED] = String.class;
+		columnTypes[DATE_EMBARKED] = MarsClock.class;
 		columnNames[DATE_RETURNED] = Msg.getString("MissionTableModel.column.returned"); //$NON-NLS-1$
-		columnTypes[DATE_RETURNED] = String.class;
+		columnTypes[DATE_RETURNED] = MarsClock.class;
 		columnNames[STARTING_MEMBER] = Msg.getString("MissionTableModel.column.name"); //$NON-NLS-1$
 		columnTypes[STARTING_MEMBER] = String.class;
-		columnNames[DESC] = Msg.getString("MissionTableModel.column.desc"); //$NON-NLS-1$
-		columnTypes[DESC] = String.class;
+		columnNames[TYPE_ID] = Msg.getString("MissionTableModel.column.typeID"); //$NON-NLS-1$
+		columnTypes[TYPE_ID] = String.class;
 		columnNames[DESIGNATION] = Msg.getString("MissionTableModel.column.designation"); //$NON-NLS-1$
 		columnTypes[DESIGNATION] = String.class;
 		columnNames[PHASE] = Msg.getString("MissionTableModel.column.phase"); //$NON-NLS-1$
@@ -110,92 +114,133 @@ public class MissionTableModel extends AbstractTableModel
 		columnTypes[NAVPOINT_NUM] = Integer.class;
 		columnNames[TRAVELLED_DISTANCE] = Msg.getString("MissionTableModel.column.distanceTravelled"); //$NON-NLS-1$
 		columnTypes[TRAVELLED_DISTANCE] = Integer.class;
-		columnNames[REMAINING_DISTANCE] = Msg.getString("MissionTableModel.column.distanceRemaining"); //$NON-NLS-1$
-		columnTypes[REMAINING_DISTANCE] = Integer.class;
+		columnNames[TOTAL_REMAINING_DISTANCE] = Msg.getString("MissionTableModel.column.totalRemaining"); //$NON-NLS-1$
+		columnTypes[TOTAL_REMAINING_DISTANCE] = Integer.class;
+		columnNames[REMAINING_DISTANCE_TO_NEXT_NAVPOINT] = Msg.getString("MissionTableModel.column.legRemaining"); //$NON-NLS-1$
+		columnTypes[REMAINING_DISTANCE_TO_NEXT_NAVPOINT] = Integer.class;		
 		columnNames[PROPOSED_ROUTE_DISTANCE] = Msg.getString("MissionTableModel.column.proposedDistance"); //$NON-NLS-1$
 		columnTypes[PROPOSED_ROUTE_DISTANCE] = Integer.class;
-
-		if (GameManager.mode == GameMode.COMMAND) {
-			mode = GameMode.COMMAND;
-			commanderSettlement = Simulation.instance().getUnitManager().getCommanderSettlement();
-			missionCache = missionManager.getMissionsForSettlement(commanderSettlement);
-		}
-		else {
-			missionCache = missionManager.getMissions();
-		}
-		
-		missionManager.addListener(this);
-		Iterator<Mission> i = missionCache.iterator();
-		while (i.hasNext())
-			i.next().addMissionListener(this);
 	}
 
 	/**
-	 * Get the name of this model. The name will be a description helping the user
+	 * Constructor.
+	 */
+	public MissionTableModel() {
+
+
+		if (mode == GameMode.COMMAND) {
+			commanderSettlement = Simulation.instance().getUnitManager().getCommanderSettlement();
+
+			// Must take a copy
+			missionCache = new ArrayList<>(missionManager.getMissionsForSettlement(commanderSettlement));
+		}
+		else {
+			// Must take my own copy
+			missionCache = new ArrayList<>(missionManager.getMissions());
+		}
+
+		missionManager.addListener(this);
+	}
+		
+	/**
+	 * Set whether the changes to the Missions should be monitor for change. Set up the 
+	 * Missionlisteners for the Mission in the table.
+	 * @param activate 
+	 */
+    public void setMonitorEntites(boolean activate) {
+		if (activate != monitorMissions) {
+			if (activate) {
+				for(Mission m : missionCache) {
+					if (!m.isDone()) {
+						m.addMissionListener(this);
+					}
+				}
+			}
+			else {
+				for(Mission m : missionCache) {
+					m.removeMissionListener(this);
+				}
+			}
+			monitorMissions = activate;
+		}
+	}
+
+
+	/**
+	 * Cannot filter missions by Settlement although is should be possible.
+	 */
+	@Override
+	public boolean setSettlementFilter(Settlement filter) {
+		// Mission doesn't support filtering ???
+		return false;
+	}
+
+	/**
+	 * Gets the name of this model. The name will be a description helping the user
 	 * understand the contents.
 	 *
 	 * @return Descriptive name.
 	 */
+	@Override
 	public String getName() {
 		return Msg.getString("MissionTableModel.tabName"); //$NON-NLS-1$
 	}
 
 	/**
 	 * Adds a new mission.
-	 * 
+	 *
 	 * @param mission the new mission.
 	 */
+	@Override
 	public void addMission(Mission mission) {
+		if (missionCache.contains(mission))
+			return;
+
 		boolean goodToGo = false;
-		if (mode == GameMode.COMMAND) {	
-			if (mission.getStartingMember().getAssociatedSettlement().getName().equals(commanderSettlement.getName())
-				&& !missionCache.contains(mission)) {
+		if (mode == GameMode.COMMAND) {
+			if (mission.getStartingPerson().getAssociatedSettlement().getName()
+					.equals(commanderSettlement.getName())) {
 				goodToGo = true;
 			}
 		}
-		
+
 		else {
-			if (!missionCache.contains(mission)) {
-				goodToGo = true;
-			}
+			goodToGo = true;
 		}
-		
+
 		if (goodToGo) {
 			missionCache.add(mission);
 			mission.addMissionListener(this);
-			
+
 			// Inform listeners of new row
-			SwingUtilities.invokeLater(new Runnable() {
-				public void run() {
-		//			fireTableRowsInserted(missionCache.size() - 1, missionCache.size() - 1);
-					fireTableRowsInserted(0, missionCache.size() - 1);
-				}
-			});
+			fireTableRowsInserted(0, missionCache.size() - 1);
 		}
 	}
 
 	/**
 	 * Removes an old mission.
-	 * 
+	 *
 	 * @param mission the old mission.
 	 */
+	@Override
 	public void removeMission(Mission mission) {
 		if (missionCache.contains(mission)) {
 			int index = missionCache.indexOf(mission);
 			missionCache.remove(mission);
 			mission.removeMissionListener(this);
 
-			// Inform listeners of new row
+			// Delete a particular row
 			SwingUtilities.invokeLater(new MissionTableRowDeleter(index));
 		}
 	}
 
 	/**
-	 * Return the type of the column requested.
-	 * 
+	 * Returns the type of the column requested.
+	 *
 	 * @param columnIndex Index of column.
 	 * @return Class of specified column.
 	 */
+	@Override
 	public Class<?> getColumnClass(int columnIndex) {
 		if ((columnIndex >= 0) && (columnIndex < columnTypes.length)) {
 			return columnTypes[columnIndex];
@@ -204,11 +249,12 @@ public class MissionTableModel extends AbstractTableModel
 	}
 
 	/**
-	 * Return the name of the column requested.
-	 * 
+	 * Returns the name of the column requested.
+	 *
 	 * @param columnIndex Index of column.
 	 * @return name of specified column.
 	 */
+	@Override
 	public String getColumnName(int columnIndex) {
 		if ((columnIndex >= 0) && (columnIndex < columnNames.length)) {
 			return columnNames[columnIndex];
@@ -217,11 +263,12 @@ public class MissionTableModel extends AbstractTableModel
 	}
 
 	/**
-	 * Return the object at the specified row indexes.
-	 * 
+	 * Returns the object at the specified row indexes.
+	 *
 	 * @param row Index of the row object.
 	 * @return Object at the specified row.
 	 */
+	@Override
 	public Object getObject(int row) {
 		return missionCache.get(row);
 	}
@@ -237,270 +284,239 @@ public class MissionTableModel extends AbstractTableModel
 	/**
 	 * Gets the model count string.
 	 */
+	@Override
 	public String getCountString() {
-		return " " + Msg.getString("MissionTableModel.numberOfMissions", //$NON-NLS-2$
-//			Integer.toString(missionCache.size())
+		return "  " + Msg.getString("MissionTableModel.numberOfMissions", //$NON-NLS-2$
 				missionCache.size());
 	}
 
 	/**
 	 * Catch mission update event.
-	 * 
+	 *
 	 * @param event the mission event.
 	 */
+	@Override
 	public void missionUpdate(MissionEvent event) {
-		int index = missionCache.indexOf(event.getSource());
-		
-//		MissionEventType eventType = event.getType();
-//		Mission mission = (Mission) event.getSource();
-//
-//		if (mission != null) {
-//			List<Mission> list = missionManager.getMissions();
-//			int numMissions = list.size();
-//			int index = missionCache.indexOf(mission);
-//			if (index <= -1 
-//					|| index < missionCache.size()
-//					|| missionCache.size() != numMissions
-//					|| (!missionCache.contains(mission)
-//							&& list.contains(mission))
-////					|| !missionCache.equals(missionManager.getMissions()) {	
-//					){
-//				// Update the missionCache
-//				missionCache = missionManager.getMissions();
-//			}
 
-			if ((index > -1) && (index < missionCache.size())) {
-				MissionEventType eventType = event.getType();
+		int index = missionCache.indexOf(event.getSource());
+
+		if (index > -1) {
+			MissionEventType eventType = event.getType();
+
+			int column0 = -1;
+
+			if (eventType == MissionEventType.VEHICLE_EVENT)
+				column0 = VEHICLE;
+			else if (eventType == MissionEventType.STARTING_SETTLEMENT_EVENT)
+				column0 = STARTING_SETTLEMENT;
+			else if (eventType == MissionEventType.TYPE_ID_EVENT)
+				column0 = TYPE_ID;
+			else if (eventType == MissionEventType.DESIGNATION_EVENT)
+				column0 = DESIGNATION;
+			else if (eventType == MissionEventType.ADD_MEMBER_EVENT
+					|| eventType == MissionEventType.REMOVE_MEMBER_EVENT)
+				column0 = MEMBER_NUM;
+			else if (eventType == MissionEventType.DATE_EVENT)
+				column0 = DATE_FILED;
+			else if (eventType == MissionEventType.NAME_EVENT)
+				column0 = STARTING_MEMBER;
+
+			if (column0 > -1)
+				SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column0));
+
+			if (event.getSource() instanceof VehicleMission) {
+
+				int column1 = -1;
+				int column2 = -1;
+				int column3 = -1;
+				int column4 = -1;
+				int column5 = -1;
+				int column6 = -1;
 				
-				int column0 = -1;
-				
-				if (eventType == MissionEventType.VEHICLE_EVENT)
-					column0 = VEHICLE;
-				else if (eventType == MissionEventType.STARTING_SETTLEMENT_EVENT)
-					column0 = STARTING_SETTLEMENT;
-				else if (eventType == MissionEventType.DESCRIPTION_EVENT)
-					column0 = DESC;
-				else if (eventType == MissionEventType.DESIGNATION_EVENT)
-					column0 = DESIGNATION;
-				else if (eventType == MissionEventType.ADD_MEMBER_EVENT
-						|| eventType == MissionEventType.REMOVE_MEMBER_EVENT)
-					column0 = MEMBER_NUM;
-				else if (eventType == MissionEventType.DATE_EVENT)
-					column0 = DATE_FILED;
-				else if (eventType == MissionEventType.NAME_EVENT)
-					column0 = STARTING_MEMBER;
-				
-				if (column0 > -1)
-					SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column0));
-			
-				if (event.getSource() instanceof VehicleMission) {
-					
-					int column1 = -1;
-					int column2 = -1;
-					int column3 = -1;
-					int column4 = -1;
-					int column5 = -1;
-					
-					if (eventType == MissionEventType.DISTANCE_EVENT) {
-						column1 = TRAVELLED_DISTANCE;
-						column2 = REMAINING_DISTANCE;
-						column3 = PROPOSED_ROUTE_DISTANCE;
-					} 
-					
-					if (eventType == MissionEventType.NAVPOINTS_EVENT)
-						column4 = NAVPOINT_NUM;
-									
-					if (eventType == MissionEventType.PHASE_EVENT
-							|| eventType == MissionEventType.PHASE_DESCRIPTION_EVENT)
-//							|| eventType == MissionEventType.END_MISSION_EVENT)
-						column5 = PHASE;
-					
-					if (column1 > -1)
-						SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column1));
-					if (column2 > -1)
-						SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column2));
-					if (column3 > -1)
-						SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column3));
-					if (column4 > -1)
-						SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column4));
-					if (column5 > -1)
-						SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column5));
+				if (eventType == MissionEventType.DISTANCE_EVENT) {
+					column1 = TRAVELLED_DISTANCE;
+					column2 = TOTAL_REMAINING_DISTANCE;
+					column3 = REMAINING_DISTANCE_TO_NEXT_NAVPOINT;
+					column4 = PROPOSED_ROUTE_DISTANCE;
 				}
+
+				if (eventType == MissionEventType.NAVPOINTS_EVENT)
+					column5 = NAVPOINT_NUM;
+
+				if (eventType == MissionEventType.PHASE_EVENT
+						|| eventType == MissionEventType.PHASE_DESCRIPTION_EVENT)
+					column6 = PHASE;
+
+				// TODO THis is pretty bad. Shoudl rework to only fire a single invokeLater uisng a columns range
+				if (column0 > -1)
+					SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column1));
+				if (column1 > -1)
+					SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column2));
+				if (column2 > -1)
+					SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column3));
+				if (column3 > -1)
+					SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column4));
+				if (column4 > -1)
+					SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column5));
+				if (column5 > -1)
+					SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column6));
 			}
-			else 
-				// Update the missionCache
-				missionCache = missionManager.getMissions();
-//		}
+		}
 	}
 
+	@Override
 	public int getRowCount() {
 		return missionCache.size();
 	}
 
 	/**
 	 * Return the number of columns
-	 * 
+	 *
 	 * @return column count.
 	 */
+	@Override
 	public int getColumnCount() {
 		return COLUMNCOUNT;
 	}
 
 	/**
-	 * Return the value of a Cell
-	 * 
+	 * Returns the value of a Cell.
+	 *
 	 * @param rowIndex    Row index of the cell.
 	 * @param columnIndex Column index of the cell.
 	 */
+	@Override
 	public Object getValueAt(int rowIndex, int columnIndex) {
 		Object result = null;
 
-//		if (rowIndex < missionCache.size()) {
+		if (rowIndex < missionCache.size()) {
 			Mission mission = missionCache.get(rowIndex);
 
-			if (mission != null) {// && mission.getDescription() != null && !mission.getDescription().equals("")) {
+			if (mission != null) {
 				switch (columnIndex) {
 
 				case DATE_FILED: {
-					result = mission.getDateFiled();
-				}
-					break;
-					
-				case DATE_EMBARKED: {
-					result = mission.getDateEmbarked();
-				}
-					break;
-					
-				case DATE_RETURNED : {
-					result = mission.getDateReturned();
-				}
-					break;
-					
-				case STARTING_MEMBER: {
-					result = mission.getStartingMember().getName();
+					result = mission.getLog().getDateCreated();
 				}
 					break;
 
-				case DESC: {
-					result = mission.getDescription();
+				case DATE_EMBARKED: {
+					result = mission.getLog().getDateStarted();
 				}
 					break;
-					
+
+				case DATE_RETURNED : {
+					result = mission.getLog().getDateFinished();
+
+				}
+					break;
+
+				case STARTING_MEMBER: {
+					result = mission.getStartingPerson().getName();
+				}
+					break;
+
+				case TYPE_ID: {
+					result = mission.getName();
+				}
+					break;
+
 				case DESIGNATION: {
 					result = mission.getFullMissionDesignation();
 				}
 					break;
 
 				case PHASE: {
-					if (mission.getPlan() == null) {
-						result = "Submitting Plan";
-					}
-					else if (mission.getPhase() != null && VehicleMission.REVIEWING.equals(mission.getPhase())) {
-						int percent = (int) mission.getPlan().getPercentComplete();
+					MissionPlanning plan = mission.getPlan();
+					if ((plan != null) && plan.getStatus() == PlanType.PENDING) {
+						int percent = (int) plan.getPercentComplete();
 						if (percent > 100)
 							percent = 100;
-						int score = (int)mission.getPlan().getScore();
-						int min = (int)mission.getStartingMember().getAssociatedSettlement().getMinimumPassingScore();
-						result = percent + "%. Score : " + score + " (Min : " + min + ") "
-								+ Conversion.capitalize(mission.getPhaseDescription());
+						int score = (int)plan.getScore();
+						int min = (int)mission.getAssociatedSettlement().getMinimumPassingScore();
+						result = percent + "% Reviewed - Score: " + score + " [Min: " + min + "]";
 					}
 					else
-						result = Conversion.capitalize(mission.getPhaseDescription());
+						result = mission.getPhaseDescription();
 
 				}
 					break;
 
 				case VEHICLE: {
-					result = ""; //$NON-NLS-1$
-					if (mission instanceof VehicleMission) {
-//						VehicleMission vehicleMission = (VehicleMission) mission;
-//						if (vehicleMission.getVehicle() != null)
-//							result = vehicleMission.getVehicle().getName();
-						result = mission.getReservedVehicle();
-					} else if (mission instanceof BuildingConstructionMission) {
-						BuildingConstructionMission constructionMission = (BuildingConstructionMission) mission;
+					result = "";
+					Vehicle reserved = null;
+					if (mission instanceof VehicleMission vm) {
+						reserved = vm.getVehicle();
+					} else if (mission instanceof ConstructionMission constructionMission) {
 						List<GroundVehicle> constVehicles = constructionMission.getConstructionVehicles();
-						if (constVehicles.size() > 0) {
-							Vehicle vehicle = constVehicles.get(0);
-							result = vehicle.getName();
+						if (!constVehicles.isEmpty()) {
+							reserved = constVehicles.get(0);
 						}
-					} else if (mission instanceof BuildingSalvageMission) {
-						BuildingSalvageMission salvageMission = (BuildingSalvageMission) mission;
-						List<GroundVehicle> constVehicles = salvageMission.getConstructionVehicles();
-						if (constVehicles.size() > 0) {
-							Vehicle vehicle = constVehicles.get(0);
-							result = vehicle.getName();
-						}
+					}
+					if (reserved != null) {
+						result = reserved.getName();
 					}
 				}
 					break;
 
 				case STARTING_SETTLEMENT: {
-					result = ""; //$NON-NLS-1$
-					if (mission instanceof TravelMission) {
-						NavPoint nav0 = ((TravelMission) mission).getNavpoint(0);
-						if ((nav0 != null) && nav0.isSettlementAtNavpoint()) {
-							result = nav0.getSettlement().getName();
-						}
-					}
+					result = mission.getAssociatedSettlement();
 				}
 					break;
 
 				case MEMBER_NUM: {
-					result = mission.getMembersNumber();
+					result = mission.getSignup().size();
 				}
 					break;
 
 				case NAVPOINT_NUM: {
-					if (mission instanceof TravelMission) {
-						TravelMission travelMission = (TravelMission) mission;
-						result = travelMission.getNumberOfNavpoints();
+					if (mission instanceof VehicleMission vm) {
+						result = vm.getNavpoints().size();
 					} else
 						result = 0;
 				}
 					break;
 
 				case TRAVELLED_DISTANCE: {
-					if (mission instanceof VehicleMission) {
-						VehicleMission vehicleMission = (VehicleMission) mission;
-						result = decFormatter.format(vehicleMission.getActualTotalDistanceTravelled());
+					if (mission instanceof VehicleMission vm) {
+						result = vm.getTotalDistanceTravelled();
 					} else
 						result = 0;
 				}
 					break;
 
-				case REMAINING_DISTANCE: {
-					if (mission instanceof TravelMission) {
-						TravelMission travelMission = (TravelMission) mission;
-						if (mission == null || travelMission == null)
-							result = 0;
-						else {
-							try {
-								result = decFormatter.format(travelMission.getTotalRemainingDistance());
-							} catch (Exception e) {
-								result = 0;
-							}
-						}
+				case TOTAL_REMAINING_DISTANCE: {
+					if (mission instanceof VehicleMission vm) {
+						result = vm.getTotalDistanceRemaining();
 					} else
 						result = 0;
 				}
-				
+
 				break;
 
-				case PROPOSED_ROUTE_DISTANCE: {
-					if (mission instanceof TravelMission) {
-						TravelMission travelMission = (TravelMission) mission;
-						try {
-							result = decFormatter.format(travelMission.getProposedRouteTotalDistance());
-						} catch (Exception e) {
-						}
+				case REMAINING_DISTANCE_TO_NEXT_NAVPOINT: {
+					if (mission instanceof VehicleMission vm) {
+						result = vm.getDistanceCurrentLegRemaining();
 					} else
 						result = 0;
 				}
 
+				break;
+				
+				case PROPOSED_ROUTE_DISTANCE: {
+					if (mission instanceof VehicleMission vm) {
+						result = vm.getDistanceProposed();
+					} else
+						result = 0;
+				}
+
+				break;
+				
+				default:
+					result = "";
 				}
 			}
-//		}
+		}
 
 		return result;
 	}
@@ -508,13 +524,12 @@ public class MissionTableModel extends AbstractTableModel
 	/**
 	 * Prepares the model for deletion.
 	 */
+	@Override
 	public void destroy() {
 		Object[] missions = missionCache.toArray();
 		for (int x = 0; x < missions.length; x++) {
 			removeMission((Mission) missions[x]);
 		}
-
-		missionManager = null;
 	}
 
 	/**

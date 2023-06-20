@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MersenneTwisterFast.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-05
  * @author Scott Davis
  */
 
@@ -11,7 +11,9 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.Random;
+import java.security.SecureRandom;
+
+// See https://cs.gmu.edu/~sean/research/mersenne/MersenneTwisterFast.java
 
 /**
  * <h3>MersenneTwister and MersenneTwisterFast</h3>
@@ -21,7 +23,7 @@ import java.util.Random;
  * <a href="http://www.math.keio.ac.jp/matumoto/emt.html"> The Mersenne Twister
  * Home Page</a>, with the initialization improved using the new 2002/1/26
  * initialization algorithm By Sean Luke, October 2004.
- * 
+ *
  * <p>
  * <b>MersenneTwister</b> is a drop-in subclass replacement for
  * java.util.Random. It is properly synchronized and can be used in a
@@ -60,7 +62,7 @@ import java.util.Random;
  *
  * <p>
  * <b>Changes since V20:</b> Added clearGuassian(). Modified stateEquals() to be
- * synchronizd on both objects for MersenneTwister, and changed its
+ * synchronized on both objects for MersenneTwister, and changed its
  * documentation. Added synchronization to both setSeed() methods, to
  * writeState(), and to readState() in MersenneTwister. Removed synchronization
  * from readObject() in MersenneTwister.
@@ -134,7 +136,7 @@ import java.util.Random;
  * have helped Random increase in speed to the point where it is faster than
  * MersenneTwister but slower than MersenneTwisterFast (which should be the
  * case, as it's a less complex algorithm but is synchronized).
- * 
+ *
  * <p>
  * <b>Changes Since V5:</b> New empty constructor made to work the same as
  * java.util.Random -- namely, it seeds based on the current time in
@@ -152,7 +154,7 @@ import java.util.Random;
  * 1999, and the original code is Copyright (c) 1999 by Michael Lecuyer.
  *
  * <h3>Java notes</h3>
- * 
+ *
  * <p>
  * This implementation implements the bug fixes made in Java 1.2's version of
  * Random, which means it can be used with earlier versions of Java. See
@@ -206,7 +208,7 @@ import java.util.Random;
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  */
 
 // Note: this class is hard-inlined in all of its methods.  This makes some of
@@ -380,7 +382,7 @@ public strictfp class MersenneTwisterFast implements Serializable, Cloneable {
 		setSeed(19650218);
 		i = 1;
 		j = 0;
-		k = (N > array.length ? N : array.length);
+		k = (Math.max(N, array.length));
 		for (; k != 0; k--) {
 			mt[i] = (mt[i] ^ ((mt[i - 1] ^ (mt[i - 1] >>> 30)) * 1664525)) + array[j] + j; /* non linear */
 			// mt[i] &= 0xffffffff; /* for WORDSIZE > 32 machines */
@@ -919,7 +921,7 @@ public strictfp class MersenneTwisterFast implements Serializable, Cloneable {
 	/**
 	 * Returns a double in the range from 0.0 to 1.0, possibly inclusive of 0.0 and
 	 * 1.0 themselves. Thus:
-	 * 
+	 *
 	 * <table border=0>
 	 * <tr>
 	 * <th>Expression</th>
@@ -943,7 +945,7 @@ public strictfp class MersenneTwisterFast implements Serializable, Cloneable {
 	 * </tr>
 	 * <caption>Table of intervals</caption>
 	 * </table>
-	 * 
+	 *
 	 * <p>
 	 * This version preserves all possible random values in the double range.
 	 */
@@ -1134,7 +1136,7 @@ public strictfp class MersenneTwisterFast implements Serializable, Cloneable {
 	/**
 	 * Returns a float in the range from 0.0f to 1.0f, possibly inclusive of 0.0f
 	 * and 1.0f themselves. Thus:
-	 * 
+	 *
 	 * <table border=0>
 	 * <tr>
 	 * <th>Expression</th>
@@ -1158,7 +1160,7 @@ public strictfp class MersenneTwisterFast implements Serializable, Cloneable {
 	 * </tr>
 	 * <caption>Table of intervals</caption>
 	 * </table>
-	 * 
+	 *
 	 * <p>
 	 * This version preserves all possible random values in the float range.
 	 */
@@ -1284,7 +1286,10 @@ public strictfp class MersenneTwisterFast implements Serializable, Cloneable {
 		long ms;
 		System.out.println("\nTime to test grabbing 100000000 ints");
 
-		Random rr = new Random(SEED);
+		SecureRandom rr = new SecureRandom();
+		byte rb[] = new byte[20];
+		rr.nextBytes(rb);
+
 		xx = 0;
 		ms = System.currentTimeMillis();
 		for (j = 0; j < 100000000; j++)

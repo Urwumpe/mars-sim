@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * AddMembersDialog.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
@@ -17,22 +17,21 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import javax.swing.DefaultListModel;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JInternalFrame;
+import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionMember;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.ModalInternalFrame;
-
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
 
 /**
  * A dialog window for adding members to the mission for the mission tool.
@@ -45,20 +44,20 @@ class AddMembersDialog extends ModalInternalFrame {
 	private Mission mission;
 	protected MainDesktopPane desktop;
 	
-	private DefaultListModel<MissionMember> memberListModel;
-	private DefaultListModel<MissionMember> availableListModel;
-	private JList<MissionMember> availableList;
-	private WebButton addButton;
+	private DefaultListModel<Worker> memberListModel;
+	private DefaultListModel<Worker> availableListModel;
+	private JList<Worker> availableList;
+	private JButton addButton;
 	
 	/**
 	 * Constructor.
 	 * @param owner {@link Dialog} the owner dialog.
 	 * @param mission {@link Mission} the mission to add to.
-	 * @param memberListModel {@link DefaultListModel}<{@link MissionMember}> the member list model in the edit mission dialog.
-	 * @param availableMembers {@link Collection}<{@link MissionMember}> the available members to add.
+	 * @param memberListModel {@link DefaultListModel}<{@link Worker}> the member list model in the edit mission dialog.
+	 * @param availableMembers {@link Collection}<{@link Worker}> the available members to add.
 	 */
 	public AddMembersDialog(JInternalFrame owner, MainDesktopPane desktop, Mission mission, 
-	        DefaultListModel<MissionMember> memberListModel, Collection<MissionMember> availableMembers) {
+	        DefaultListModel<Worker> memberListModel, Collection<Worker> availableMembers) {
 		// Use JDialog constructor
 		//super(owner, "Add Members", true);
 		// Use JInternalFrame constructor
@@ -76,25 +75,25 @@ class AddMembersDialog extends ModalInternalFrame {
 		((JComponent) getContentPane()).setBorder(new MarsPanelBorder());
 		
 		// Create the header label.
-		WebLabel headerLabel = new WebLabel("Select available people to add to the mission.");
+		JLabel headerLabel = new JLabel("Select available people to add to the mission.");
 		add(headerLabel, BorderLayout.NORTH);
 		
 		// Create the available people panel.
-		WebPanel availablePeoplePane = new WebPanel(new BorderLayout(0, 0));
+		JPanel availablePeoplePane = new JPanel(new BorderLayout(0, 0));
 		add(availablePeoplePane, BorderLayout.CENTER);
 		
         // Create scroll panel for available list.
-		WebScrollPane availableScrollPane = new WebScrollPane();
+		JScrollPane availableScrollPane = new JScrollPane();
         availableScrollPane.setPreferredSize(new Dimension(100, 100));
         availablePeoplePane.add(availableScrollPane, BorderLayout.CENTER);
         
         // Create available list model
-        availableListModel = new DefaultListModel<MissionMember>();
-        Iterator<MissionMember> i = availableMembers.iterator();
+        availableListModel = new DefaultListModel<Worker>();
+        Iterator<Worker> i = availableMembers.iterator();
         while (i.hasNext()) availableListModel.addElement(i.next());
         
         // Create member list
-        availableList = new JList<MissionMember>(availableListModel);
+        availableList = new JList<Worker>(availableListModel);
         availableList.addListSelectionListener(
         		new ListSelectionListener() {
         			public void valueChanged(ListSelectionEvent e) {
@@ -106,11 +105,11 @@ class AddMembersDialog extends ModalInternalFrame {
         availableScrollPane.setViewportView(availableList);
 		
         // Create button panel.
-		WebPanel buttonPane = new WebPanel(new FlowLayout(FlowLayout.RIGHT));
+		JPanel buttonPane = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 		add(buttonPane, BorderLayout.SOUTH);
 		
 		// Create add button.
-		addButton = new WebButton("Add");
+		addButton = new JButton("Add");
 		addButton.setEnabled(availableList.getSelectedValuesList().size() > 0);
 		addButton.addActionListener(
 				new ActionListener() {
@@ -123,7 +122,7 @@ class AddMembersDialog extends ModalInternalFrame {
 		buttonPane.add(addButton);
 		
 		// Create cancel button.
-		WebButton cancelButton = new WebButton("Cancel");
+		JButton cancelButton = new JButton("Cancel");
 		cancelButton.addActionListener(
 				new ActionListener() {
         			public void actionPerformed(ActionEvent e) {

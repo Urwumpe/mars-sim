@@ -1,31 +1,28 @@
-/**
+/*
  * Mars Simulation Project
  * Workout.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-04
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
+import org.mars_sim.msp.core.structure.building.function.Exercise;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.tool.RandomUtil;
-import org.mars_sim.msp.core.structure.building.function.Exercise;
 
 /**
  * The Workout class is a task for working out in an exercise facility.
  */
-public class Workout extends Task implements Serializable {
+public class Workout extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -46,23 +43,23 @@ public class Workout extends Task implements Serializable {
 
 	/**
 	 * Constructor. This is an effort-driven task.
-	 * 
+	 *
 	 * @param person the person performing the task.
 	 */
 	public Workout(Person person) {
 		// Use Task constructor.
-		super(NAME, person, true, false, STRESS_MODIFIER, true, 
-				20 + RandomUtil.getRandomInt(5) - RandomUtil.getRandomInt(5));
+		super(NAME, person, true, false, STRESS_MODIFIER,
+				10.0 + RandomUtil.getRandomInt(-7, 7));
 
-		if (person.isInside()) {
+		if (person.isInSettlement()) {
 
 			// If person is in a settlement, try to find a gym.
 			Building gymBuilding = getAvailableGym(person);
 			if (gymBuilding != null) {
 				// Walk to gym building.
-				walkToTaskSpecificActivitySpotInBuilding(gymBuilding, false);
+				walkToTaskSpecificActivitySpotInBuilding(gymBuilding, FunctionType.EXERCISE, true);
 				gym = gymBuilding.getExercise();
-				
+
 				// Initialize phase
 				addPhase(EXERCISING);
 				setPhase(EXERCISING);
@@ -73,21 +70,15 @@ public class Workout extends Task implements Serializable {
 				if (quarters != null) {
 					walkToBed(quarters, person, true);
 				}
-				
+
 				// Initialize phase
 				addPhase(EXERCISING);
 				setPhase(EXERCISING);
 			}
-			
+
 		} else {
 			endTask();
 		}
-
-	}
-
-	@Override
-	public FunctionType getLivingFunction() {
-		return FunctionType.EXERCISE;
 	}
 
 	@Override
@@ -103,25 +94,24 @@ public class Workout extends Task implements Serializable {
 
 	/**
 	 * Performs the exercising phase.
-	 * 
+	 *
 	 * @param time the amount of time (millisols) to perform the phase.
 	 * @return the amount of time (millisols) left over after performing the phase.
 	 */
 	private double exercisingPhase(double time) {
-		person.getCircadianClock().exercise(time);
-		person.getPhysicalCondition().workOut();
-		return 0D;
+		// Regulates hormones
+		// Improves musculoskeletal systems
+		// Record the exercise time [in millisols]
+		person.getPhysicalCondition().workout(time);
+		
+		return 0;
 	}
 
+	/**
+	 * Removes the person from the associated gym.
+	 */
 	@Override
-	protected void addExperience(double time) {
-		// This task adds no experience.
-	}
-
-	@Override
-	public void endTask() {
-		super.endTask();
-
+	protected void clearDown() {
 		// Remove person from exercise function so others can use it.
 		if (gym != null && gym.getNumExercisers() > 0) {
 			gym.removeExerciser();
@@ -130,7 +120,7 @@ public class Workout extends Task implements Serializable {
 
 	/**
 	 * Gets an available building with the exercise function.
-	 * 
+	 *
 	 * @param person the person looking for the gym.
 	 * @return an available exercise building or null if none found.
 	 */
@@ -140,7 +130,7 @@ public class Workout extends Task implements Serializable {
 		// If person is in a settlement, try to find a building with a gym.
 		if (person.isInSettlement()) {
 			BuildingManager buildingManager = person.getSettlement().getBuildingManager();
-			List<Building> gyms = buildingManager.getBuildings(FunctionType.EXERCISE);
+			Set<Building> gyms = buildingManager.getBuildingSet(FunctionType.EXERCISE);
 			gyms = BuildingManager.getNonMalfunctioningBuildings(gyms);
 
 			if (RandomUtil.getRandomInt(1) == 0)
@@ -155,23 +145,5 @@ public class Workout extends Task implements Serializable {
 		}
 
 		return result;
-	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		return 0;
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(0);
-		return results;
-	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
-
-		gym = null;
 	}
 }

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MapPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-06-19
  * @author Scott Davis
  */
 
@@ -18,6 +18,8 @@ import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -26,226 +28,229 @@ import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.swing.JPanel;
+
+import org.mars_sim.mapdata.MapData;
+import org.mars_sim.mapdata.MapDataUtil;
+import org.mars_sim.mapdata.MapMetaData;
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.time.ClockListener;
 import org.mars_sim.msp.core.time.ClockPulse;
-import org.mars_sim.msp.core.time.MasterClock;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
 import org.mars_sim.msp.ui.swing.tool.mission.NavpointPanel;
 import org.mars_sim.msp.ui.swing.tool.navigator.NavigatorWindow;
 
-import com.alee.laf.panel.WebPanel;
+@SuppressWarnings("serial")
+public class MapPanel extends JPanel implements MouseWheelListener {
 
-public class MapPanel extends WebPanel implements ClockListener {
+	public static final String DEFAULT_MAPTYPE = "surface";
 
-	/** default serial id. */
-	private static final long serialVersionUID = 1L;
-
-	private static Logger logger = Logger.getLogger(MapPanel.class.getName());
+	private static final Logger logger = Logger.getLogger(MapPanel.class.getName());
+	
 	private static final double HALF_PI = Math.PI / 2d;
 
-	public final static int MAP_BOX_HEIGHT = NavigatorWindow.HORIZONTAL_SURFACE_MAP;
-	public final static int MAP_BOX_WIDTH = NavigatorWindow.HORIZONTAL_SURFACE_MAP;
+	public static final int MAP_BOX_HEIGHT = NavigatorWindow.MAP_BOX_WIDTH;
+	public static final int MAP_BOX_WIDTH = MAP_BOX_HEIGHT;
 	private static int dragx, dragy;
 
-//	private static final double PERIOD_IN_MILLISOLS = 10D * 500D / MarsClock.SECONDS_PER_MILLISOL; //3;
+	private transient ExecutorService executor;
 
 	// Data members
-//	private double timeCache = 0;
 	private boolean mapError;
 	private boolean wait;
-	private boolean update;
-
+//	private boolean update;
+	private boolean recreateMap = false;
+	
+	private double RHO_DEFAULT;
+	private final double ZOOM_STEP = 16;
+	private double multiplier;
+	
 	private String mapErrorMessage;
-	private String mapType;
-	private String oldMapType;
-
-	private List<MapLayer> mapLayers;
-	private Map map;
-
-	// private Thread displayThread;
-	// private Thread createMapThread;
-
-	private static MasterClock masterClock = Simulation.instance().getMasterClock();
-
+	private String mapStringType;
+	
 	private Coordinates centerCoords;
 
 	private Image mapImage;
-	private SurfMarsMap surfMap;
-	private TopoMarsMap topoMap;
-	private GeologyMarsMap geoMap;
 
+	private transient Map marsMap;
+	
 	private MainDesktopPane desktop;
 
-//	private MainScene mainScene;
+	private NavigatorWindow navwin;
+	
+	private NavpointPanel navPanel;
+	
+	private Image starfield;
+	
+	private List<MapLayer> mapLayers;
 
-	private Graphics dbg;
-	private Image dbImage = null;
-	// private long refreshRate;
-	private double rho = CannedMarsMap.PIXEL_RHO;
-
-	// private ThreadPoolExecutor executor;
-	private transient ExecutorService executor;
-
-	public MapPanel(MainDesktopPane desktop, long refreshRate) {
-		super();
-		this.desktop = desktop;
-//		this.mainScene = desktop.getMainScene();
-
-		// executor = ? (ThreadPoolExecutor) Executors.newCachedThreadPool(); //
-		// newFixedThreadPool(1); //
-		executor = Executors.newSingleThreadExecutor();
-
-		masterClock.addClockListener(this);
-
-		// this.refreshRate = refreshRate;
-
-		mapType = SurfMarsMap.TYPE;
-		oldMapType = mapType;
-
-		topoMap = new TopoMarsMap(this);
-		surfMap = new SurfMarsMap(this);
-		geoMap = new GeologyMarsMap(this);
-		
-		map = surfMap;
-		mapError = false;
-		wait = false;
-		mapLayers = new CopyOnWriteArrayList<MapLayer>();
-		update = true;
-		centerCoords = new Coordinates(HALF_PI, 0D);
-
-		setPreferredSize(new Dimension(MAP_BOX_WIDTH, MAP_BOX_HEIGHT));
-		setBackground(Color.BLACK);
-		setOpaque(true);
-	}
-
-	/*
-	 * Sets up the mouse dragging capability
+	private static final MapDataUtil mapUtil = MapDataUtil.instance();
+	
+	/**
+	 * Constructor 1.
+	 * 
+	 * @param desktop
+	 * @param navwin
 	 */
-	public void setNavWin(NavigatorWindow navwin) {
-		// showMap(centerCoords);
-		setMapType(getMapType());
-		map.drawMap(centerCoords);
-
-		// Note: need navWin prior to calling addMouseMotionListener()
-		addMouseMotionListener(new MouseAdapter() {
-
-			@Override
-			public void mouseDragged(MouseEvent e) {
-				// setCursor(new Cursor(Cursor.MOVE_CURSOR));
-				int dx, dy, x = e.getX(), y = e.getY();
-
-				dx = dragx - x;
-				dy = dragy - y;
-
-				if (dx != 0 || dy != 0) {
-					if (x > 0 && x < MAP_BOX_HEIGHT && y > 0 && y < MAP_BOX_HEIGHT) {
-						// double rho = CannedMarsMap.PIXEL_RHO;
-						centerCoords = centerCoords.convertRectToSpherical((double) dx, (double) dy, rho);
-
-						// if (!executor.isTerminated() || !executor.isShutdown() )
-						// executor.execute(new MapTask());
-
-						map.drawMap(centerCoords);
-
-//						paintDoubleBuffer();
-						repaint();
-					}
-				}
-
-				dragx = x;
-				dragy = y;
-
-				// setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-			}
-		});
-
-		addMouseListener(new MouseAdapter() {
-			@Override
-			public void mousePressed(MouseEvent e) {
-				// System.out.println("mousepressed X = " + e.getX());
-				// System.out.println(" Y = " + e.getY());
-				dragx = e.getX();
-				dragy = e.getY();
-				setCursor(new Cursor(Cursor.MOVE_CURSOR));
-			}
-
-			@Override
-			public void mouseReleased(MouseEvent e) {
-				dragx = 0;
-				dragy = 0;
-				navwin.updateCoords(centerCoords);
-				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-			}
-		});
-	}
-
-	/*
-	 * Sets up the mouse dragging capability
-	 */
-	public void setNavpointPanel(NavpointPanel panel) {
-		// showMap(centerCoords);
-		setMapType(getMapType());
-		map.drawMap(centerCoords);
-
-		// Note: need navWin prior to calling addMouseMotionListener()
-		addMouseMotionListener(new MouseAdapter() {
-
-			@Override
-			public void mouseDragged(MouseEvent e) {
-				// setCursor(new Cursor(Cursor.MOVE_CURSOR));
-				int dx, dy, x = e.getX(), y = e.getY();
-
-				dx = dragx - x;
-				dy = dragy - y;
-
-				if (dx != 0 || dy != 0) {
-					if (x > 0 && x < MAP_BOX_HEIGHT && y > 0 && y < MAP_BOX_HEIGHT) {
-						// double rho = CannedMarsMap.PIXEL_RHO;
-						centerCoords = centerCoords.convertRectToSpherical((double) dx, (double) dy, rho);
-
-						// if (!executor.isTerminated() || !executor.isShutdown() )
-						// executor.execute(new MapTask());
-
-						map.drawMap(centerCoords);
-
-//						paintDoubleBuffer();
-						repaint();
-					}
-				}
-
-				dragx = x;
-				dragy = y;
-
-				// setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-			}
-		});
-
-		addMouseListener(new MouseAdapter() {
-			@Override
-			public void mousePressed(MouseEvent e) {
-				// System.out.println("mousepressed X = " + e.getX());
-				// System.out.println(" Y = " + e.getY());
-				dragx = e.getX();
-				dragy = e.getY();
-				setCursor(new Cursor(Cursor.MOVE_CURSOR));
-			}
-
-			@Override
-			public void mouseReleased(MouseEvent e) {
-				dragx = 0;
-				dragy = 0;
-				panel.updateCoords(centerCoords);
-				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-			}
-		});
-
+	public MapPanel(MainDesktopPane desktop, NavigatorWindow navwin) {
+		this(desktop);
+		this.navwin = navwin;
 	}
 	
 	/**
-	 * Adds a new map layer
+	 * Constructor 2.
+	 * 
+	 * @param desktop
+	 * @param navPanel
+	 */
+	public MapPanel(MainDesktopPane desktop, NavpointPanel navPanel) {
+		this(desktop);
+		this.navPanel = navPanel;
+	}
+	
+	/**
+	 * Constructor 3.
+	 * 
+	 * @param desktop
+	 * @param refreshRate
+	 */
+	public MapPanel(MainDesktopPane desktop, long refreshRate) {
+		this(desktop);
+		this.desktop = desktop;
+	}
+	
+	/**
+	 * Constructor 4.
+	 * 
+	 * @param desktop
+	 */
+	public MapPanel(MainDesktopPane desktop) {
+		super();
+		this.desktop = desktop;
+		
+		init();
+	}
+	
+	public void init() {
+		
+		starfield = ImageLoader.getImage("map/starfield");
+		
+		executor = Executors.newSingleThreadExecutor();
+		
+		// Initializes map instance as surf map
+		setMapType(DEFAULT_MAPTYPE);
+		
+		mapError = false;
+		wait = false;
+		mapLayers = new CopyOnWriteArrayList<>();
+//		update = true;
+		centerCoords = new Coordinates(HALF_PI, 0D);
+	
+		setPreferredSize(new Dimension(MAP_BOX_WIDTH, MAP_BOX_HEIGHT));
+		setMaximumSize(getPreferredSize());
+		setSize(getPreferredSize());
+		setBackground(Color.BLACK);
+		setOpaque(true);
+		
+		RHO_DEFAULT = getScale();
+		multiplier = RHO_DEFAULT / ZOOM_STEP;
+		logger.info("scale: " + Math.round(RHO_DEFAULT * 10.0)/10.0 + "  multiplier: " + Math.round(multiplier * 10.0)/10.0);
+	}
+
+	
+	public void mouseWheelMoved(MouseWheelEvent e) {
+		
+		// Gets the latest scale
+		double oldRho = getScale();
+
+		// May use this if (e.isControlDown()) {} to add ctrl key
+        // May use if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {} to combine with other keys 
+		
+		double delta = e.getWheelRotation();
+    	double rhoDelta = - multiplier * delta;
+    	double newRho = oldRho + rhoDelta;
+    	
+//      Note 1:: Scroll up to zoom in or magnify map
+//    	Note 2:Scroll down to zoom out or shrink the map
+
+		if (newRho > RHO_DEFAULT * 4) {
+			newRho = RHO_DEFAULT * 4;
+		}
+		else if (newRho < RHO_DEFAULT / 4) {
+			newRho = RHO_DEFAULT / 4;
+		}
+ 
+		if (newRho != oldRho) {
+			
+	    	// Update the map scale
+	    	setMapScale(newRho);
+
+			// Call showMap
+	    	// which in turns calls updateDisplay()
+	    	// which in turns calls MapTask thread
+	    	// which in turns calls marsMap.drawMap(centerCoords, getScale());
+			showMap(centerCoords, newRho);
+		}
+    }
+	
+	/*
+	 * Sets up the mouse dragging capability.
+	 */
+	public void setMouseDragger(boolean isNavigator) {
+
+		// List to the mouse scroll
+		addMouseWheelListener(this);
+		
+		// Note: need navWin prior to calling addMouseMotionListener()
+		addMouseMotionListener(new MouseAdapter() {
+			@Override
+			public void mouseDragged(MouseEvent e) {
+				int dx, dy, x = e.getX(), y = e.getY();
+
+				dx = dragx - x;
+				dy = dragy - y;
+
+				if ((dx != 0 || dy != 0) 
+					 && x > 0 && x < MAP_BOX_WIDTH 
+					 && y > 0 && y < MAP_BOX_HEIGHT) {
+					
+					centerCoords = centerCoords.convertRectToSpherical(dx, dy, marsMap.getScale());
+					marsMap.drawMap(centerCoords, getScale());
+					repaint();
+				}
+
+				dragx = x;
+				dragy = y;
+			}
+		});
+
+		addMouseListener(new MouseAdapter() {
+			@Override
+			public void mousePressed(MouseEvent e) {
+				dragx = e.getX();
+				dragy = e.getY();
+				setCursor(new Cursor(Cursor.MOVE_CURSOR));
+			}
+
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				dragx = 0;
+				dragy = 0;
+				if (isNavigator) {
+					navwin.updateCoordsMaps(centerCoords);
+				}
+				else {
+					navPanel.updateCoords(centerCoords);
+				}
+
+				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+			}
+		});
+	}
+
+	/**
+	 * Adds a new map layer.
 	 * 
 	 * @param newLayer the new map layer.
 	 * @param index    the index order of the map layer.
@@ -292,193 +297,116 @@ public class MapPanel extends WebPanel implements ClockListener {
 	 * 
 	 * @return map type.
 	 */
-	public String getMapType() {
-		return mapType;
+	public MapMetaData getMapType() {
+		return marsMap.getType();
 	}
 
+	public Map getMap() {
+		return marsMap;
+	}
+
+	public MapData getMapData() {
+		return mapUtil.getMapData(mapStringType);
+	}
+	
 	/**
 	 * Sets the map type.
+	 * 
+	 * @return map type set successfully
 	 */
-	public void setMapType(String mapType) {
-		this.mapType = mapType;
-		if (SurfMarsMap.TYPE.equals(mapType))
-			map = surfMap;
-		else if (TopoMarsMap.TYPE.equals(mapType))
-			map = topoMap;
-		else if (GeologyMarsMap.TYPE.equals(mapType))
-			map = geoMap;
-		showMap(centerCoords);
+	public boolean setMapType(String mapStringType) {
+		
+		if ((marsMap == null) || !mapStringType.equals(marsMap.getType().getId())) {
+			MapData data = mapUtil.getMapData(mapStringType);
+			this.mapStringType = mapStringType;
+			if (data == null) {
+				logger.warning("Map type cannot be loaded " + mapStringType);
+				return false;
+			}
+			marsMap = new CannedMarsMap(this, mapUtil.getMapData(mapStringType));
+			recreateMap = true;
+		}
+			
+		showMap(centerCoords, getScale());
+		return true;
 	}
 
 	public Coordinates getCenterLocation() {
 		return centerCoords;
 	}
-
+	
 	public void showMap(Coordinates newCenter) {
-		boolean recreateMap = false;
+		showMap(newCenter, getScale());
+	}
+	
+	/**
+	 * Displays map at given center, regenerating if necessary.
+	 *
+	 * @param newCenter the center location for the globe
+	 */
+	public void showMap(Coordinates newCenter, double scale) {
 		if (centerCoords == null) {
 			if (newCenter != null) {
 				recreateMap = true;
-				centerCoords = new Coordinates(newCenter);
+				centerCoords = newCenter;
 			}
 		} else if (!centerCoords.equals(newCenter)) {
 			if (newCenter != null) {
 				recreateMap = true;
-				centerCoords.setCoords(newCenter);
-			} else
-				centerCoords = null;
-		}
-
-		if (!mapType.equals(oldMapType)) {
-			recreateMap = true;
-			oldMapType = mapType;
+				centerCoords = newCenter;
+			} 
 		}
 
 		if (recreateMap) {
 			wait = true;
-			if (!executor.isTerminated() || !executor.isShutdown())
-				executor.execute(new MapTask());
-
-//			//			if ((createMapThread != null) && (createMapThread.isAlive()))
-////				createMapThread.interrupt();
-////				createMapThread = new Thread(new Runnable() {
-//				public void run() {
-//	    			try {
-//	    				mapError = false;
-//	    				map.drawMap(centerCoords);
-//	    			}
-//	    			catch (Exception e) {
-//	    				e.printStackTrace(System.err);
-//	    				mapError = true;
-//	    				mapErrorMessage = e.getMessage();
-//	    			}
-//	    			wait = false;
-//
-//	    			paintDoubleBuffer();
-//	    			repaint();
-//	    		}
-////			});
-////			createMapThread.start();
-//
+			updateDisplay(scale);
+			recreateMap = false;
 		}
+	}
 
-		updateDisplay();
+	public void updateDisplay() {
+		updateDisplay(getScale());
+	}
+
+	public void updateDisplay(double scale) {
+		if ((desktop.isToolWindowOpen(NavigatorWindow.NAME) 
+			|| desktop.isToolWindowOpen(MissionWindow.NAME)) ) {
+//			&& update 
+//			&& (!executor.isTerminated() || !executor.isShutdown())) {
+				executor.execute(new MapTask(scale));
+		}
 	}
 
 	class MapTask implements Runnable {
 
-		private MapTask() {
+		private double scale;
+		
+		private MapTask(double scale) {
+			this.scale = scale;
 		}
 
 		@Override
 		public void run() {
 			try {
 				mapError = false;
-				map.drawMap(centerCoords);
+
+				if (centerCoords == null) {
+					logger.severe("centerCoords is null.");
+					centerCoords = new Coordinates(HALF_PI, 0);
+				}
+				
+				marsMap.drawMap(centerCoords, scale);
+				wait = false;
+				repaint();
+				
 			} catch (Exception e) {
-				e.printStackTrace(System.err);
 				mapError = true;
 				mapErrorMessage = e.getMessage();
+				logger.severe("Can't draw surface map: " + e);
 			}
-			wait = false;
-
-//			paintDoubleBuffer();
-			repaint();
 		}
 	}
-
-//	/**
-//	 * Updates the current display
-//
-//    private void updateDisplay() {
-//        if ((displayThread == null) || (!displayThread.isAlive())) {
-//        	displayThread = new Thread(this, "Navpoint Map");
-//        	displayThread.start();
-//        } else {
-//        	displayThread.interrupt();
-//        }
-//    }
-//	 
-
-	public void updateDisplay() {
-		if (update) {
-			if (!executor.isTerminated() || !executor.isShutdown())
-				executor.execute(new MapTask());
-		}
-	}
-
-//	public void paintComponent(Graphics g) {
-//		super.paintComponent(g);
-//		if (dbImage != null) {
-//			g.drawImage(dbImage, 0, 0, null);
-//		}
-//	}
-
-//	/*
-//	 * Uses double buffering to draws into its own graphics object dbg before
-//	 * calling paintComponent()
-//	 */
-//	public void paintDoubleBuffer() {
-//		if (dbImage == null) {
-//			dbImage = createImage(MAP_BOX_WIDTH, MAP_BOX_HEIGHT);
-//			if (dbImage == null) {
-//				// System.out.println("dbImage is null");
-//				return;
-//			} else
-//				dbg = dbImage.getGraphics();
-//		}
-//
-////        Graphics2D g2d = (Graphics2D) dbg;
-////        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-//
-//		if (wait) {
-//			if (mapImage != null) {
-//				dbg.drawImage(mapImage, 0, 0, this);
-//			}
-//			String message = "Generating Map";
-//			drawCenteredMessage(message, dbg);
-//		} else {
-//			if (mapError) {
-//				logger.log(Level.SEVERE, "mapError: " + mapErrorMessage);
-//				// Display previous map image
-//				if (mapImage != null) {
-//					dbg.drawImage(mapImage, 0, 0, this);
-//				}
-//
-//				// Draw error message
-//				if (mapErrorMessage == null) {
-//					mapErrorMessage = "Null Map";
-//				}
-//				drawCenteredMessage(mapErrorMessage, dbg);
-//			} else {
-//				// Paint black background
-//				dbg.setColor(Color.black);
-//				dbg.fillRect(0, 0, Map.DISPLAY_WIDTH, Map.DISPLAY_HEIGHT);
-//
-//				if (centerCoords != null) {
-//					if (map != null) {
-//						if (map.isImageDone()) {
-//							mapImage = map.getMapImage();
-//							dbg.drawImage(mapImage, 0, 0, this);
-//						}
-//					}
-//
-//					// Display map layers.
-//					// List<MapLayer> tempMapLayers = new ArrayList<MapLayer>(mapLayers);
-//					// Iterator<MapLayer> i = tempMapLayers.iterator();
-//					// while (i.hasNext()) {
-//					// i.next().displayLayer(centerCoords, mapType, dbg);
-//					// }
-//
-//					for (MapLayer l : mapLayers) {
-//						if (dbg != null)
-//							l.displayLayer(centerCoords, mapType, dbg);
-//					}
-//				}
-//			}
-//		}
-//	}
-
+	
 	public void paintComponent(Graphics g) {
         super.paintComponent(g);
 
@@ -503,17 +431,21 @@ public class MapPanel extends WebPanel implements ClockListener {
         	else {
         		// Paint black background
                 g.setColor(Color.black);
+                
                 g.fillRect(0, 0, Map.DISPLAY_WIDTH, Map.DISPLAY_HEIGHT);
 
+                g.drawImage(starfield, 0, 0, Color.black, null);
+                
                 if (centerCoords != null) {
-                	if (map.isImageDone()) {
-                		mapImage = map.getMapImage();
+                	if (marsMap != null && marsMap.isImageDone()) {
+                		mapImage = marsMap.getMapImage();
                 		g.drawImage(mapImage, 0, 0, this);
+//                		logger.log(Level.INFO, "g.drawImage");
                 	}
 
                 	// Display map layers.
                 	Iterator<MapLayer> i = mapLayers.iterator();
-                	while (i.hasNext()) i.next().displayLayer(centerCoords, mapType, g);
+                	while (i.hasNext()) i.next().displayLayer(centerCoords, marsMap, g);
                 }
         	}
         }
@@ -547,59 +479,55 @@ public class MapPanel extends WebPanel implements ClockListener {
 		g.drawString(message, x, y);
 	}
 
-	@Override
-	public void clockPulse(ClockPulse pulse) {
-		// TODO Auto-generated method stub
-
+	public void update(ClockPulse pulse) {
+		updateDisplay();
 	}
 
-	@Override
-	public void uiPulse(double time) {
-//		if (mainScene != null) {
-//			if (!mainScene.isMinimized() && mainScene.isMainTabOpen()
-//					&& (desktop.isToolWindowOpen(NavigatorWindow.NAME) || (desktop.isToolWindowOpen(MissionWindow.NAME)
-//							&& ((MissionWindow) desktop.getToolWindow(MissionWindow.NAME)).isNavPointsMapTabOpen()))) {
-//				// TODO: should also check if navpoints tab is open or not
-////				timeCache += time;
-////				if (timeCache > PERIOD_IN_MILLISOLS * time) {
-//				// Repaint map panel
-//				updateDisplay();
-////					timeCache = 0;
-////				}	
-//			}
-//		} else 
-			if (desktop.isToolWindowOpen(NavigatorWindow.NAME) || desktop.isToolWindowOpen(MissionWindow.NAME)
-		// ||desktop.isToolWindowOpen(ResupplyWindow.NAME)
-		) {
-//			timeCache += time;
-//			if (timeCache > PERIOD_IN_MILLISOLS * time) {
-			updateDisplay();
-//				timeCache = 0;
-//			}
-		}
-	}
+    public Coordinates getMouseCoordinates(int x, int y) {
+		double xMap = x - (Map.DISPLAY_WIDTH) - 1;
+		double yMap = y - (Map.DISPLAY_HEIGHT) - 1;
+		
+		return centerCoords.convertRectToSpherical(xMap, yMap, marsMap.getScale());
+    }
+    
+	/**
+	 * Gets the scale of the Mars surface map.
+	 * 
+	 * @param value
+	 */
+    public void setMapScale(double value) {
+    	marsMap.setMapScale(value);
+//    	navwin.getGlobeDisplay().setMapScale(value);
+    }
+    
+//    public void drawMarsMap(double value) {
+//		marsMap.drawMap(centerCoords, value);
+//		logger.log(Level.INFO, "drawMarsMap()");
+//    }
 
-	@Override
-	public void pauseChange(boolean isPaused, boolean showPane) {
-		// TODO Auto-generated method stub
-	}
-
+    /**
+     * Gets the scale of the Mars surface map.
+     * 
+     * @return
+     */
+    public double getScale() {
+    	return marsMap.getScale();
+    }
+    
 	/**
 	 * Prepares map panel for deletion.
 	 */
 	public void destroy() {
 		// Remove clock listener.
-		masterClock.removeClockListener(this);
 		mapLayers = null;
-		centerCoords = null;
+		if (executor != null) {
+			// Stop anything running
+			executor.shutdownNow();
+		}
 		executor = null;
-		map = null;
-		surfMap = null;
-		topoMap = null;
-		geoMap = null;
-		update = false;
-		dbg = null;
-		dbImage = null;
+		marsMap = null;
+//		update = false;
 		mapImage = null;
 	}
+
 }

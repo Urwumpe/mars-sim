@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ModifyTransportItemDialog.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.resupply;
@@ -12,6 +12,8 @@ import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
+import javax.swing.JButton;
+import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
 import org.mars_sim.msp.core.interplanetary.transport.Transportable;
@@ -20,13 +22,11 @@ import org.mars_sim.msp.core.interplanetary.transport.settlement.ArrivingSettlem
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.ModalInternalFrame;
 
-import com.alee.laf.button.WebButton;
-import com.alee.laf.panel.WebPanel;
-
 /**
  * A dialog for modifying transport items.
  * TODO externalize strings
  */
+@SuppressWarnings("serial")
 public class ModifyTransportItemDialog extends ModalInternalFrame {
 
 	// Data members.
@@ -34,10 +34,11 @@ public class ModifyTransportItemDialog extends ModalInternalFrame {
 	private TransportItemEditingPanel editingPanel;
 	private ResupplyWindow resupplyWindow;
 
-	private WebButton commitButton;
+	private JButton commitButton;
 	
 	/**
 	 * Constructor.
+	 * 
 	 * @param owner the owner of this dialog.
 	 * @param title title of dialog.
 	 * @param transportItem the transport item to modify.
@@ -51,10 +52,10 @@ public class ModifyTransportItemDialog extends ModalInternalFrame {
 		this.transportItem = transportItem;
 		this.resupplyWindow = resupplyWindow;
 
-		this.setSize(560,500);
+		this.setSize(560, 500);
 
 		 // Create main panel
-        WebPanel mainPane = new WebPanel(new BorderLayout());
+        JPanel mainPane = new JPanel(new BorderLayout());
         setContentPane(mainPane);
 
         initEditingPanel();
@@ -62,13 +63,12 @@ public class ModifyTransportItemDialog extends ModalInternalFrame {
 		mainPane.add(editingPanel, BorderLayout.CENTER);
 
 		// Create the button pane.
-		WebPanel buttonPane = new WebPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+		JPanel buttonPane = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
 
 		mainPane.add(buttonPane, BorderLayout.SOUTH);
 
 		// Create commit button.
-		// Change button text from "Modify" to "Commit Changes"
-		commitButton = new WebButton("Commit Changes");
+		commitButton = new JButton("Commit Changes");
 		commitButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent evt) {
 				// Modify transport item and close dialog.
@@ -79,7 +79,7 @@ public class ModifyTransportItemDialog extends ModalInternalFrame {
 
 		// Create cancel button.
 		// Change button text from "Cancel"  to "Discard Changes"
-		WebButton cancelButton = new WebButton("Discard Changes");
+		JButton cancelButton = new JButton("Discard Changes");
 		cancelButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				// Close dialog.
@@ -90,11 +90,7 @@ public class ModifyTransportItemDialog extends ModalInternalFrame {
 		buttonPane.add(cancelButton);
 
         // Add to its own tab pane
-//        if (desktop.getMainScene() != null)
-//        	desktop.add(this);
-//        	//desktop.getMainScene().getDesktops().get(2).add(this);
-//        else 
-        	desktop.add(this);    
+		desktop.add(this);    
 
 		Dimension desktopSize = desktop.getParent().getSize();
 	    Dimension jInternalFrameSize = this.getSize();
@@ -119,7 +115,6 @@ public class ModifyTransportItemDialog extends ModalInternalFrame {
 		else {
 			throw new IllegalStateException("Transport item: " + transportItem + " is not valid.");
 		}
-
 	}
 
 
@@ -128,17 +123,13 @@ public class ModifyTransportItemDialog extends ModalInternalFrame {
 	 */
 	private void modifyTransportItem() {
 		if ((editingPanel != null) && editingPanel.modifyTransportItem()) {
-			//if ( d != null ) d.dispose();
-			//if ( s != null ) s.close();
 			dispose();
-			//resupplyWindow.setRunning(false);
+			resupplyWindow.refreshMission();
 		}
 	}
 	
 	public void setCommitButton(boolean value) {
-		System.out.println("set commit button to " + value);
 		SwingUtilities.invokeLater(() -> commitButton.setEnabled(value));
-	    //setVisible(true);
 	}
 	
 }

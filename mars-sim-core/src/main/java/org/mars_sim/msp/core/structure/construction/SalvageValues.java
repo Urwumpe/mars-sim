@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SalvageValues.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.construction;
@@ -11,24 +11,20 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.goods.GoodsManager;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskManager;
-import org.mars_sim.msp.core.resource.Part;
+import org.mars_sim.msp.core.person.ai.task.util.TaskManager;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.ai.task.BotTaskManager;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.BuildingConfig;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
-import org.mars_sim.msp.core.structure.building.function.GroundVehicleMaintenance;
 import org.mars_sim.msp.core.structure.building.function.LifeSupport;
 import org.mars_sim.msp.core.structure.building.function.LivingAccommodations;
 import org.mars_sim.msp.core.structure.building.function.RoboticStation;
-import org.mars_sim.msp.core.structure.goods.GoodsManager;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
+import org.mars_sim.msp.core.structure.building.function.VehicleGarage;
 import org.mars_sim.msp.core.time.MarsClock;
 
 /**
@@ -49,7 +45,9 @@ implements Serializable {
 	private Map<Integer, Double> settlementSalvageValueCache;
 	private MarsClock settlementSalvageValueCacheTime;
 
-	private static UnitManager unitManager = Simulation.instance().getUnitManager();
+	private static UnitManager unitManager;
+	
+	private static MarsClock marsClock;
 
 	/**
 	 * Constructor.
@@ -86,13 +84,12 @@ implements Serializable {
 	 */
 	public double getSettlementSalvageProfit(int constructionSkill) {
 
-		MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
 		if ((settlementSalvageValueCacheTime == null) || 
-				(MarsClock.getTimeDiff(currentTime, settlementSalvageValueCacheTime) > 1000D)) {
+				(MarsClock.getTimeDiff(marsClock, settlementSalvageValueCacheTime) > 1000D)) {
 			if (settlementSalvageValueCache == null) 
-				settlementSalvageValueCache = new HashMap<Integer, Double>();
+				settlementSalvageValueCache = new HashMap<>();
 			settlementSalvageValueCache.clear();
-			settlementSalvageValueCacheTime = (MarsClock) currentTime.clone();
+			settlementSalvageValueCacheTime = new MarsClock(marsClock);
 		}
 
 		if (!settlementSalvageValueCache.containsKey(constructionSkill)) {
@@ -199,7 +196,7 @@ implements Serializable {
 		double result = 0D;
 
 		BuildingManager buildingManager = settlement.getBuildingManager();
-		Iterator<Building> i = buildingManager.getBuildings().iterator();//getACopyOfBuildings().iterator();.getACopyOfBuildings().iterator();
+		Iterator<Building> i = buildingManager.getBuildingSet().iterator();
 		while (i.hasNext()) {
 			Building building = i.next();
 			double salvageProfit = getNewBuildingSalvageProfit(building, constructionSkill);
@@ -302,8 +299,8 @@ implements Serializable {
         }
 		
 		// Check that the building doesn't currently have any vehicles in it.
-		if (building.hasFunction(FunctionType.GROUND_VEHICLE_MAINTENANCE)) {
-		    GroundVehicleMaintenance vehicleMaint = building.getGroundVehicleMaintenance();
+		if (building.hasFunction(FunctionType.VEHICLE_MAINTENANCE)) {
+		    VehicleGarage vehicleMaint = building.getVehicleParking();
 		    if (vehicleMaint.getCurrentVehicleNumber() > 0) {
 		        result = 0D;
 		    }
@@ -348,7 +345,7 @@ implements Serializable {
 		while (i.hasNext()) {
 			Integer part = i.next();
 			int number = stageInfo.getParts().get(part);
-			double partValue = goodsManager.getGoodValuePerItem(GoodsUtil.getResourceGood(part));
+			double partValue = goodsManager.getGoodValuePoint(part);
 			result += number * partValue;
 		}
 
@@ -360,12 +357,13 @@ implements Serializable {
 	}
 
 	/**
-	 * Reloads instances after loading from a saved sim
+	 * Loads instances.
 	 * 
 	 * @param u {@link UnitManager}
 	 */
-	public static void initializeInstances(UnitManager u) {
+	public static void initializeInstances(UnitManager u, MarsClock mc) {
 		unitManager = u;
+		marsClock = mc;
 	}
 	
 	/**

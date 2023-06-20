@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * EditMissionDialog.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-03-17
  * @author Scott Davis
  */
 
@@ -14,20 +14,17 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.Iterator;
 
+import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JPanel;
 
-import org.mars_sim.msp.core.person.ai.mission.CollectResourcesMission;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionMember;
-import org.mars_sim.msp.core.person.ai.mission.TravelMission;
-import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.ModalInternalFrame;
 import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
 
-import com.alee.laf.button.WebButton;
-import com.alee.laf.panel.WebPanel;
 
 /**
  * The edit mission dialog for the mission tool.
@@ -68,11 +65,11 @@ public class EditMissionDialog extends ModalInternalFrame {
         add(infoPane, BorderLayout.CENTER);
         
         // Create the button panel.
-        WebPanel buttonPane = new WebPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
+        JPanel buttonPane = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
         add(buttonPane, BorderLayout.SOUTH);
         
         // Create the modify button.
-        WebButton modifyButton = new WebButton("Modify");
+        JButton modifyButton = new JButton("Execute");
         modifyButton.addActionListener(
         		new ActionListener() {
         			public void actionPerformed(ActionEvent e) {
@@ -84,7 +81,7 @@ public class EditMissionDialog extends ModalInternalFrame {
         buttonPane.add(modifyButton);
         
         // Create the cancel button.
-        WebButton cancelButton = new WebButton("Cancel");
+        JButton cancelButton = new JButton("Cancel");
 		cancelButton.addActionListener(
 				new ActionListener() {
         			public void actionPerformed(ActionEvent e) {
@@ -97,18 +94,12 @@ public class EditMissionDialog extends ModalInternalFrame {
 		// Finish and display dialog.
 		//pack();
 		//setLocationRelativeTo(owner);
-		//setResizable(false);
-		//setVisible(true);
-		
-        // Add to its own tab pane
-//        if (desktop.getMainScene() != null)
-//        	desktop.add(this);
-//        	//desktop.getMainScene().getDesktops().get(1).add(this);
-//        else 
-        	desktop.add(this);
+		setResizable(false);
+
+        desktop.add(this);
 	    
 	    
-        setSize(new Dimension(700, 550));
+        setSize(new Dimension(400, 400));
 		Dimension desktopSize = desktop.getParent().getSize();
 	    Dimension jInternalFrameSize = this.getSize();
 	    int width = (desktopSize.width - jInternalFrameSize.width) / 2;
@@ -124,13 +115,13 @@ public class EditMissionDialog extends ModalInternalFrame {
 	 */
 	private void modifyMission() {
 		// Set the mission description.
-		mission.setDescription(infoPane.descriptionField.getText());
+		mission.setName(infoPane.descriptionField.getText());
 		
 		// Change the mission's action.
 		setAction((String) infoPane.actionDropDown.getSelectedItem());
 		
 		// Set mission members.
-		setMissionMembers();
+		setWorkers();
 	}
 	
 	/**
@@ -138,74 +129,44 @@ public class EditMissionDialog extends ModalInternalFrame {
 	 * @param action the action string.
 	 */
 	private void setAction(String action) {
-		if (action.equals(InfoPanel.ACTION_CONTINUE)) endCollectionPhase();
+		if (action.equals(InfoPanel.ACTION_CONTINUE)) endEVAPhase();
 		else if (action.equals(InfoPanel.ACTION_HOME)) returnHome();
-		else if (action.equals(InfoPanel.ACTION_NEAREST)) goToNearestSettlement();
 	}
 	
 	/**
-	 * End the mission collection phase at the current site.
+	 * End the mission EVA phase at the current site.
 	 */
-	private void endCollectionPhase() {
-		if (mission instanceof CollectResourcesMission) 
-			((CollectResourcesMission) mission).endCollectingAtSite();
+	private void endEVAPhase() {
+		if (mission != null) {
+			mission.abortPhase();
+		}
 	}
 	
 	/**
 	 * Have the mission return home and end collection phase if necessary.
 	 */
 	private void returnHome() {
-		if (mission instanceof TravelMission) {
-			TravelMission travelMission = (TravelMission) mission;
-//			try {
-				int offset = 2;
-				if (travelMission.getPhase().equals(VehicleMission.TRAVELLING)) offset = 1;
-				travelMission.setNextNavpointIndex(travelMission.getNumberOfNavpoints() - offset);
-				travelMission.updateTravelDestination();
-				endCollectionPhase();
-//			}
-//			catch (MissionException e) {}
+		if (mission != null) {
+			mission.abortMission("Return home");
 		}
-	}
-	
-	/**
-	 * Go to the nearest settlement and end collection phase if necessary.
-	 */
-	private void goToNearestSettlement() {
-		mission.goToNearestSettlement();
-//		if (mission instanceof VehicleMission) {
-//			VehicleMission vehicleMission = (VehicleMission) mission;
-//			try {
-//				Settlement nearestSettlement = vehicleMission.findClosestSettlement();
-//				if (nearestSettlement != null) {
-//					vehicleMission.clearRemainingNavpoints();
-//		    		vehicleMission.addNavpoint(new NavPoint(nearestSettlement.getCoordinates(), nearestSettlement, 
-//		    				nearestSettlement.getName()));
-//		    		vehicleMission.associateAllMembersWithSettlement(nearestSettlement);
-//		    		vehicleMission.updateTravelDestination();
-//		    		endCollectionPhase();
-//				}
-//			}
-//			catch (Exception e) {}
-//		}
 	}
 	
 	/**
 	 * Sets the mission members.
 	 */
-	private void setMissionMembers() {
+	private void setWorkers() {
 		// Add new members.
 		for (int x = 0; x < infoPane.memberListModel.size(); x++) {
-		    MissionMember member = (MissionMember) infoPane.memberListModel.elementAt(x);
-			if (!mission.hasMember(member)) {
+		    Worker member = (Worker) infoPane.memberListModel.elementAt(x);
+			if (!mission.getMembers().contains(member)) {
 			    member.setMission(mission);
 			}
 		}
 		
 		// Remove old members.
-		Iterator<MissionMember> i = mission.getMembers().iterator();
+		Iterator<Worker> i = mission.getMembers().iterator();
 		while (i.hasNext()) {
-			MissionMember member = i.next();
+			Worker member = i.next();
 			if (!infoPane.memberListModel.contains(member)) {
 			    member.setMission(null);
 			}

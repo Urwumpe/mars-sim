@@ -1,36 +1,46 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="https://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="https://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<artifactId>mars-sim</artifactId>
-		<groupId>com.github</groupId>
-		<version>3.1.2</version>
+		<groupId>com.github.mars-sim</groupId>
+		<version>pre-3.6.0</version>
 	</parent>
-	<groupId>com.github.mars-sim</groupId>
 	<artifactId>mars-sim-mapdata</artifactId>
 	<name>mars-sim-mapdata</name>
 	<dependencies>
-			<!-- http://tukaani.org/xz/java.html 
-				 https://mvnrepository.com/artifact/org.tukaani/xz 
-			: 120 KB Note that 1.8 has issues that affects saving -->
 		<dependency>
 			<groupId>org.tukaani</groupId>
 			<artifactId>xz</artifactId>
-			<version>1.8</version>
+			<version>1.9</version>
 		</dependency>
-		<!-- https://mvnrepository.com/artifact/me.lemire.integercompression/JavaFastPFOR : 196 KB-->
 		<dependency>
 		    <groupId>me.lemire.integercompression</groupId>
 		    <artifactId>JavaFastPFOR</artifactId>
 		    <version>0.1.12</version>
 		</dependency>
-		<!-- https://mvnrepository.com/artifact/com.google.guava/guava : 2.6 MB -->
+		<!-- https://mvnrepository.com/artifact/com.google.guava/guava : 2.8 MB -->
 		<dependency>
 			<groupId>com.google.guava</groupId>
 			<artifactId>guava</artifactId>
-			<version>30.0-jre</version>
-		</dependency>			
+			<version>32.0.0-jre</version>
+		</dependency>
+
+		<!-- For use of JOCL -->
+		<!-- https://mvnrepository.com/artifact/org.jogamp.gluegen/gluegen-rt-main -->
+		<dependency>
+			<groupId>org.jogamp.gluegen</groupId>
+			<artifactId>gluegen-rt-main</artifactId>
+			<version>2.3.2</version>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/org.jogamp.jocl/jocl-main -->
+		<dependency>
+			<groupId>org.jogamp.jocl</groupId>
+			<artifactId>jocl-main</artifactId>
+			<version>2.3.2</version>
+		</dependency>
+
 	</dependencies>
 </project>

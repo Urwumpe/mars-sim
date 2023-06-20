@@ -1,147 +1,106 @@
-/**
+/*
  * Mars Simulation Project
- * AstronomicalObservationBuildingPanel.java
- * @version 3.1.2 2020-09-02
+ * BuildingPanelAstronomicalObservation.java
+ * @date 2022-07-09
  * @author Sebastien Venot
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.structure.building.function.AstronomicalObservation;
 import org.mars_sim.msp.ui.astroarts.OrbitViewer;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
 /**
  * A panel for the astronomical observation building function.
  */
+@SuppressWarnings("serial")
 public class BuildingPanelAstronomicalObservation
 extends BuildingFunctionPanel {
+	
+	private static final String TELESCOPE_ICON = "astro";
 
 	// Data members
 	private int currentObserversAmount;
 
-	private WebLabel observersLabel;
-	//private BalloonToolTip balloonToolTip = new BalloonToolTip();
-	
+	private JLabel observersLabel;
+
 	private AstronomicalObservation function;
-	private OrbitViewer orbitViewer;
-	
+
 	/**
 	 * Constructor.
+	 * 
 	 * @param observatory the astronomical observatory building function.
 	 * @param desktop the main desktop.
 	 */
-	public BuildingPanelAstronomicalObservation(AstronomicalObservation observatory, 
+	public BuildingPanelAstronomicalObservation(
+			AstronomicalObservation observatory, 
 			MainDesktopPane desktop) {
+		
 		// User BuildingFunctionPanel constructor.
-		super(observatory.getBuilding(), desktop);
+		super(
+			Msg.getString("BuildingPanelAstronomicalObservation.title"), 
+			ImageLoader.getIconByName(TELESCOPE_ICON), 
+			observatory.getBuilding(), 
+			desktop
+		);
 
 		function = observatory;
 		currentObserversAmount = function.getObserverNum();
-
-		// Set panel layout
-		setLayout(new BorderLayout());
+	}
+	
+	/**
+	 * Build the UI
+	 */
+	@Override
+	protected void buildUI(JPanel center) {
 		
 		// Prepare label panelAstronomicalObservation
-		WebPanel labelPanel = new WebPanel(new GridLayout(5, 1, 0, 0));
-		add(labelPanel, BorderLayout.NORTH);
-
-		// Astronomy top label
-		// 2014-11-21 Changed font type, size and color and label text
-		WebLabel astronomyLabel = new WebLabel(Msg.getString("BuildingPanelAstronomicalObservation.title"), WebLabel.CENTER); //$NON-NLS-1$
-		astronomyLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		//astronomyLabel.setForeground(new Color(102, 51, 0)); // dark brown
-		labelPanel.add(astronomyLabel);
+		AttributePanel labelPanel = new AttributePanel(2);
+		center.add(labelPanel, BorderLayout.NORTH);
 
 		// Observer number label
-		// 2014-11-21 Fixed currentObserversAmount
-		observersLabel = new WebLabel(Msg.getString("BuildingPanelAstronomicalObservation.numberOfObservers", currentObserversAmount), WebLabel.CENTER); //$NON-NLS-1$
-		observersLabel.setHorizontalAlignment(WebLabel.CENTER);
-		update();
-		labelPanel.add(observersLabel);
+		observersLabel = labelPanel.addTextField( Msg.getString("BuildingPanelAstronomicalObservation.numberOfObservers"),
+									  Integer.toString(currentObserversAmount), null);
 
 		// Observer capacityLabel
-		WebLabel observerCapacityLabel = new WebLabel(
-			Msg.getString(
-				"BuildingPanelAstronomicalObservation.observerCapacity", //$NON-NLS-1$
-				function.getObservatoryCapacity()
-			),WebLabel.CENTER
-		);
-		labelPanel.add(observerCapacityLabel);
-		
-		labelPanel.setOpaque(false);
-		labelPanel.setBackground(new Color(0,0,0,128));
-		astronomyLabel.setOpaque(false);
-		astronomyLabel.setBackground(new Color(0,0,0,128));
-		observersLabel.setOpaque(false);
-		observersLabel.setBackground(new Color(0,0,0,128));
+		labelPanel.addTextField(Msg.getString("BuildingPanelAstronomicalObservation.observerCapacity"),
+					 					Integer.toString(function.getObservatoryCapacity()), null);
 		
       	// Create the button panel.
-		WebPanel buttonPane = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+		JPanel buttonPane = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		
 		// Create the orbit viewer button.
-		WebButton button = new WebButton("Orbit Viewer");
-		
-		//balloonToolTip.createBalloonTip(button, "Click to open the solar system orbit viewer"); 
-		//button.setToolTipText("Click to open the solar system orbit viewer");
-		button.addActionListener(
+		JButton starMap = new JButton();
+		starMap.setIcon(ImageLoader.getIconByName(OrbitViewer.ICON));
+		starMap.setToolTipText("Open the Orbit Viewer");
+
+		starMap.addActionListener(
 			new ActionListener() {
 				public void actionPerformed(ActionEvent e) {
-//					openOrbitViewer();
+					getDesktop().openToolWindow(OrbitViewer.NAME);
 				}
 			});
-		buttonPane.add(button);
-		labelPanel.add(buttonPane);
+		buttonPane.add(starMap);
+		center.add(buttonPane, BorderLayout.CENTER);
 	}
 
 	@Override
 	public void update() {
 		if (currentObserversAmount != function.getObserverNum()) {
 			currentObserversAmount = function.getObserverNum();
-			observersLabel.setText(
-				Msg.getString(
-					"BuildingPanelAstronomicalObservation.numberOfObservers", //$NON-NLS-1$
-					currentObserversAmount
-				)
-			);
+			observersLabel.setText(Integer.toString(currentObserversAmount));
 		}
 	}
-	
-    public void setViewer(OrbitViewer orbitViewer) {
-    	this.orbitViewer = orbitViewer;
-    }
-    
-//	/**
-//	 * Open orbit viewer
-//	 */
-//    // 2015-11-04 Added openOrbitViewer()
-//	private void openOrbitViewer() {
-//
-//		MainWindow mw = desktop.getMainWindow();
-//		if (mw != null)  {
-//			if (orbitViewer == null && !desktop.isOrbitViewerOn())
-//				orbitViewer = new OrbitViewer(desktop, this);
-//		}
-//
-//		MainScene ms = desktop.getMainScene();
-//		
-//		if (ms != null)  {
-//			if (orbitViewer == null && !desktop.isOrbitViewerOn()) {
-//				orbitViewer = new OrbitViewer(desktop, this);
-//			}
-//		}
-//	}
-
 }

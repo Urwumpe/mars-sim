@@ -1,9 +1,18 @@
+/**
+ * Mars Simulation Project
+ * AirlockCommand.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand.settlement;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.mars.sim.console.chat.ChatCommand;
 import org.mars.sim.console.chat.Conversation;
+import org.mars.sim.console.chat.simcommand.CommandHelper;
 import org.mars.sim.console.chat.simcommand.StructuredResponse;
 import org.mars_sim.msp.core.structure.Airlock;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -25,19 +34,23 @@ public class AirlockCommand extends AbstractSettlementCommand {
 		StructuredResponse response = new StructuredResponse();
 		
 		BuildingManager bm = settlement.getBuildingManager();
-		List<Building> i = bm.getBuildings(FunctionType.EVA);
-		
-		response.appendTableHeading("Building", 16, "State", 14, "Active", "Operator", PERSON_WIDTH,
-									"Inner Door", "Outer Door");
-		for (Building building : i) {
-			Airlock airlock = building.getEVA().getAirlock();
-			response.appendTableRow(building.getNickName(), airlock.getState().name(),
-									(airlock.isActivated() ? "Yes" : "No"),
-									airlock.getOperatorName(),
-									(airlock.isInnerDoorLocked() ? "Locked" : "Unlocked"),
-									(airlock.isOuterDoorLocked() ? "Locked" : "Unlocked"));
+		if ((input == null) || input.isEmpty()) {
+			// Display summary for all airlocks
+			List<Airlock> i = bm.getBuildings(FunctionType.EVA).stream()
+									.map(b -> b.getEVA().getAirlock())
+									.collect(Collectors.toList());
+			CommandHelper.outputAirlock(response, i);
 		}
-
+		else {
+			// Display details
+			for(Building b : bm.getBuildings(FunctionType.EVA)) {
+				if (b.getName().contains(input)) {
+					CommandHelper.outputAirlockDetailed(response, b.getName(),
+														b.getEVA().getAirlock());
+					response.appendBlankLine();
+				}
+			}
+		}
 		context.println(response.getOutput());
 		return true;
 	}

@@ -1,13 +1,15 @@
 /**
  * Mars Simulation Project
  * PersonBuilder.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.core.person;
 
 import java.util.Map;
+
+import org.mars_sim.msp.core.reportingAuthority.ReportingAuthority;
 
 public interface PersonBuilder<T> {
 
@@ -21,7 +23,7 @@ public interface PersonBuilder<T> {
 
 	public PersonBuilder<Person> setAssociatedSettlement(int s);
 
-	public PersonBuilder<Person> setSponsor(String sponsor);
+	public PersonBuilder<Person> setSponsor(ReportingAuthority sponsor);
 	
 	/**
 	 * Sets the skills of a person

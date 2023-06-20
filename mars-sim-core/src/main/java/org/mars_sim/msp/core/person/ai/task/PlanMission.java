@@ -1,28 +1,26 @@
-/**
+/*
  * Mars Simulation Project
  * PlanMission.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-11
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.mission.MissionPlanning;
+import org.mars_sim.msp.core.person.ai.mission.PlanType;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.structure.building.Building;
+import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.Administration;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.tool.RandomUtil;
@@ -31,14 +29,12 @@ import org.mars_sim.msp.core.tool.RandomUtil;
 /**
  * This class is a task for reviewing mission plans
  */
-public class PlanMission extends Task implements Serializable {
+public class PlanMission extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	private static transient Logger logger = Logger.getLogger(PlanMission.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	private static final SimLogger logger = SimLogger.getLogger(PlanMission.class.getName());
 	
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.planMission"); //$NON-NLS-1$
@@ -57,8 +53,6 @@ public class PlanMission extends Task implements Serializable {
 	// Data members
 	/** The administration building the person is using. */
 	private Administration office;
-	/** The role of the person who is reviewing the mission plan. */
-//	public RoleType roleType;
 
 	/**
 	 * Constructor. This is an effort-driven task.
@@ -67,13 +61,14 @@ public class PlanMission extends Task implements Serializable {
 	 */
 	public PlanMission(Person person) {
 		// Use Task constructor.
-		super(NAME, person, true, false, STRESS_MODIFIER, true, 150D + RandomUtil.getRandomInt(-15, 15));
+		super(NAME, person, true, false, STRESS_MODIFIER, RandomUtil.getRandomInt(20, 50));
 
-//		logger.info(person + " was at PlanMission.");
-		
-//		roleType = person.getRole().getType();
-		
-		if (person.isInSettlement() && person.getBuildingLocation().getBuildingType().contains("EVA Airlock")) {
+		boolean canDo = person.getMind().canStartNewMission();
+		if (!canDo) {
+			endTask();
+		}
+			
+		if (person.isInSettlement()) {
 
 			// If person is in a settlement, try to find an office building.
 			Building officeBuilding = Administration.getAvailableOffice(person);
@@ -84,52 +79,32 @@ public class PlanMission extends Task implements Serializable {
 				if (!office.isFull()) {
 					office.addStaff();
 					// Walk to the office building.
-					walkToTaskSpecificActivitySpotInBuilding(officeBuilding, true);
+					walkToTaskSpecificActivitySpotInBuilding(officeBuilding, FunctionType.ADMINISTRATION, true);
 				}
 			}
 			else {
-				Building dining = EatDrink.getAvailableDiningBuilding(person, false);
+				Building dining = BuildingManager.getAvailableDiningBuilding(person, false);
 				// Note: dining building is optional
 				if (dining != null) {
 					// Walk to the dining building.
-					walkToTaskSpecificActivitySpotInBuilding(dining, true);
+					walkToTaskSpecificActivitySpotInBuilding(dining, FunctionType.DINING, true);
 				}
-//				else {
-//					// work anywhere
-//				}				
+				// work anywhere		
 			}
-			// TODO: add other workplace if administration building is not available
+			// Note: add other workplace if administration building is not available
 
 		} // end of roleType
 		else {
+			logger.warning(person, "Not in a Settlement");
 			endTask();
 		}
 
 		// Initialize phase
 		addPhase(SELECTING);
-//		addPhase(GATHERING);
 		addPhase(SUBMITTING);
 		
 		setPhase(SELECTING);
-	}
-	
-//	public static boolean isRoleValid(RoleType roleType) {
-//		return roleType == RoleType.PRESIDENT || roleType == RoleType.MAYOR
-//				|| roleType == RoleType.COMMANDER || roleType == RoleType.SUB_COMMANDER
-//				|| roleType == RoleType.CHIEF_OF_LOGISTICS_N_OPERATIONS
-//				|| roleType == RoleType.CHIEF_OF_MISSION_PLANNING
-//				|| roleType == RoleType.CHIEF_OF_ENGINEERING
-//				|| roleType == RoleType.CHIEF_OF_SAFETY_N_HEALTH
-//				|| roleType == RoleType.CHIEF_OF_SCIENCE
-//				|| roleType == RoleType.CHIEF_OF_SUPPLY_N_RESOURCES
-//				|| roleType == RoleType.CHIEF_OF_AGRICULTURE
-//				|| roleType == RoleType.MISSION_SPECIALIST;
-//	}
-	
-	@Override
-	public FunctionType getLivingFunction() {
-		return FunctionType.ADMINISTRATION;
-	}
+	}	
 
 	@Override
 	protected double performMappedPhase(double time) {
@@ -151,29 +126,26 @@ public class PlanMission extends Task implements Serializable {
 	 * @return the amount of time (millisols) left over after performing the phase.
 	 */
 	private double selectingPhase(double time) {
+		double remainingTime = 0;
 		
 		boolean canDo = person.getMind().canStartNewMission();
-		
 		if (!canDo) {
-//			LogConsolidated.log(logger, Level.INFO, 10_000, sourceName, 
-//					"[" + person.getAssociatedSettlement() + "] " 
-//			+ person.getName() + " already joined in a mission and was unable to start a new one at this moment.");
 			endTask();
 		}
 		else {
-//			LogConsolidated.log(Level.INFO, 10_000, sourceName, 
-//					"[" + person.getAssociatedSettlement() + "] " + person.getName() 
-//					+ " was looking into the mission needs of the settlement.");
-			
 			// Start a new mission
 			person.getMind().getNewMission();
 			
 			Mission mission = person.getMind().getMission();
 			if (mission != null)
 				setPhase(SUBMITTING);
+			else {
+				// No mission found so stop planning for now
+				endTask();
+			}
 		}
 		
-        return 0;
+        return remainingTime;
 	}
 	
 	/**
@@ -183,73 +155,50 @@ public class PlanMission extends Task implements Serializable {
 	 * @return the amount of time (millisols) left over after performing the phase.
 	 */
 	private double submittingPhase(double time) {
+		double remainingTime = 0;
 		
 		Mission mission = person.getMind().getMission();
+		MissionPlanning plan = mission.getPlan();
 		
-		if (mission instanceof VehicleMission) {
-			LogConsolidated.log(logger, Level.INFO, 0, sourceName, 
-					"[" + person.getLocationTag().getQuickLocation() + "] " + person.getName() 
-					+ " submitted a mission plan for " + mission.toString() + ".");
-			// Flag the mission plan ready for submission
-			((VehicleMission)mission).flag4Submission();
-//			mission.setPhase(VehicleMission.REVIEWING);
-				// Note: the plan will go up the chain of command
-				// 1. takeAction() in Mind will call mission.performMission(person) 
-				// 2. performMission() in Mission will lead to calling  performPhase() in VehicleMission
-				// 3. performPhase() in VehicleMission will call requestApprovalPhase() 
-				// 4. requestReviewPhase() in VehicleMission will call requestApprovalPhase() in Mission
+		if ((plan != null) && !mission.isDone()) {
+			logger.log(worker, Level.INFO, 30_000, "Submitted a mission plan for " 
+					+ mission.getName() + ".");
+			
+			// Set the plan pending and add to approval list
+			plan.setStatus(PlanType.PENDING);
+			missionManager.requestMissionApproving(plan);
 		}
-				
-//		if (mission != null) {
-//			// if the mission is approved/accepted after submission  
-//		}
 		
 		// Add experience
 		addExperience(time); 
 		
 		endTask();
 		
-		return 0;
+		return remainingTime;
 	}
 	
 	@Override
 	protected void addExperience(double time) {
         double newPoints = time / 20D;
-        int experienceAptitude = person.getNaturalAttributeManager().getAttribute(
+        int experienceAptitude = worker.getNaturalAttributeManager().getAttribute(
                 NaturalAttributeType.EXPERIENCE_APTITUDE);
-        int leadershipAptitude = person.getNaturalAttributeManager().getAttribute(
+        int leadershipAptitude = worker.getNaturalAttributeManager().getAttribute(
                 NaturalAttributeType.LEADERSHIP);
         newPoints += newPoints * (experienceAptitude + leadershipAptitude- 100D) / 100D;
         newPoints *= getTeachingExperienceModifier();
-        person.getSkillManager().addExperience(SkillType.MANAGEMENT, newPoints, time);
+        worker.getSkillManager().addExperience(SkillType.MANAGEMENT, newPoints, time);
 
 	}
 
+	/**
+	 * Releases office space.
+	 */
 	@Override
-	public void endTask() {
-		super.endTask();
-
+	protected void clearDown() {
 		// Remove person from administration function so others can use it.
 		if (office != null && office.getNumStaff() > 0) {
 			office.removeStaff();
 		}
 	}
 
-	@Override
-	public int getEffectiveSkillLevel() {
-		return 0;
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(0);
-		return results;
-	}
-	
-	@Override
-	public void destroy() {
-		super.destroy();
-
-		office = null;
-	}
 }

@@ -1,53 +1,58 @@
-/**
+/*
  * Mars Simulation Project
  * InviteStudyCollaborator.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-06-11
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
-import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.social.Relationship;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.social.RelationshipType;
+import org.mars_sim.msp.core.person.ai.social.RelationshipUtil;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.core.science.ScientificStudyUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
-import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
 
 /**
  * A task for inviting a researcher to collaborate on a scientific study.
  */
-public class InviteStudyCollaborator
-extends Task
-implements Serializable {
+public class InviteStudyCollaborator extends Task {
+
+	private final static class PersonScore  {
+		double score;
+		Person invitee;
+
+		double getScore() {
+			return score;
+		}
+
+		Person getInvitee() {
+			return invitee;
+		}
+	}
 
     /** default serial id. */
     private static final long serialVersionUID = 1L;
 
     /** default logger. */
-    private static Logger logger = Logger.getLogger(InviteStudyCollaborator.class.getName());
-    
-	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-			 logger.getName().length());
+    private static SimLogger logger = SimLogger.getLogger(InviteStudyCollaborator.class.getName());
 
     /** Task name */
     private static final String NAME = Msg.getString(
@@ -66,30 +71,34 @@ implements Serializable {
     /** The scientific study. */
     private ScientificStudy study;
     /** The collaborative researcher to invite. */
-    private Person invitee;
+    private List<Person> invitees;
 
     /**
      * Constructor
      * @param person the person performing the task.
      */
     public InviteStudyCollaborator(Person person) {
-        super(NAME, person, false, true, STRESS_MODIFIER, true, DURATION);
+    	// Skill determined by Study
+        super(NAME, person, false, true, STRESS_MODIFIER, null, 25D, DURATION);
+        setExperienceAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
 
         study = person.getStudy();
         if (study != null) {
+        	addAdditionSkill(study.getScience().getSkill());
 
             // Determine best invitee.
-            invitee = determineBestInvitee();
+        	int open = study.getMaxCollaborators() - study.getNumOpenResearchInvitations();
+            invitees = determineBestInvitee(open);
 
-            if (invitee != null) {
+            if (!invitees.isEmpty()) {
 
                 // If person is in a settlement, try to find an administration building.
                 boolean adminWalk = false;
                 if (person.isInSettlement()) {
-                    Building adminBuilding = getAvailableAdministrationBuilding(person);
-                    if (adminBuilding != null) {
-                        // Walk to administration building.
-                        walkToTaskSpecificActivitySpotInBuilding(adminBuilding, false);
+                    Building b = BuildingManager.getAvailableBuilding(study, person);
+                    if (b != null) {
+                        // Walk to that building.
+                    	walkToResearchSpotInBuilding(b, false);
                         adminWalk = true;
                     }
                 }
@@ -109,12 +118,12 @@ implements Serializable {
                 }
             }
             else {
-                logger.severe("No available collaborative researchers available for invitation.");
+                logger.severe(person, "No available collaborative researchers available for invitation.");
                 endTask();
             }
         }
         else {
-            logger.severe(person.getName() + " does not have a primary scientific study.");
+            logger.severe(person, "Does not have a primary scientific study.");
             endTask();
         }
 
@@ -124,46 +133,14 @@ implements Serializable {
     }
 
     /**
-     * Gets an available administration building that the person can use.
-     * @param person the person
-     * @return available administration building or null if none.
-     */
-    public static Building getAvailableAdministrationBuilding(Person person) {
-
-        Building result = null;
-
-        if (person.isInSettlement()) {
-            BuildingManager manager = person.getSettlement().getBuildingManager();
-            List<Building> administrationBuildings = manager.getBuildings(FunctionType.ADMINISTRATION);
-            administrationBuildings = BuildingManager.getNonMalfunctioningBuildings(administrationBuildings);
-            administrationBuildings = BuildingManager.getLeastCrowdedBuildings(administrationBuildings);
-
-            if (administrationBuildings.size() > 0) {
-                Map<Building, Double> administrationBuildingProbs = BuildingManager.getBestRelationshipBuildings(
-                        person, administrationBuildings);
-                result = RandomUtil.getWeightedRandomObject(administrationBuildingProbs);
-            }
-        }
-
-        return result;
-    }
-
-    @Override
-    public FunctionType getLivingFunction() {
-        return FunctionType.ADMINISTRATION;
-    }
-
-    /**
      * Determines the best available researcher to invite for collaboration on a study.
      * @return best collaborative invitee or null if none.
      */
-    private Person determineBestInvitee() {
-        Person bestInvitee = null;
-        double bestValue = Double.NEGATIVE_INFINITY;
+    private List<Person> determineBestInvitee(int required) {
 
-        Iterator<Person> i = ScientificStudyUtil.getAvailableCollaboratorsForInvite(study).iterator();
-        while (i.hasNext()) {
-            Person invitee = i.next();
+        List<PersonScore> potentials = new ArrayList<>();
+
+        for(Person invitee : ScientificStudyUtil.getAvailableCollaboratorsForInvite(study)) {
             double inviteeValue = 0D;
 
             ScienceType jobScience = ScienceType.getJobScience(invitee.getMind().getJob());
@@ -185,13 +162,11 @@ implements Serializable {
             inviteeValue += (totalAchievement / 10D);
 
             // Modify based on study researcher's personal opinion of invitee.
-//            RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
-            double opinion = relationshipManager.getOpinionOfPerson(study.getPrimaryResearcher(), invitee);
+            double opinion = RelationshipUtil.getOpinionOfPerson(study.getPrimaryResearcher(), invitee);
             inviteeValue *= (opinion / 100D);
 
             // Modify based on current number of studies researcher is currently collaborating on.
-//            ScientificStudyManager studyManager = Simulation.instance().getScientificStudyManager();
-            int numCollaborativeStudies = scientificStudyManager.getOngoingCollaborativeStudies(invitee).size();
+            int numCollaborativeStudies = invitee.getCollabStudies().size();
             inviteeValue /= (numCollaborativeStudies + 1D);
 
             // Modify based on if researcher and primary researcher are at same settlement.
@@ -200,13 +175,17 @@ implements Serializable {
             if ((researcherSettlement != null) && researcherSettlement.equals(primarySettlement))
                 inviteeValue *= 2D;
 
-            if (inviteeValue > bestValue) {
-                bestInvitee = invitee;
-                bestValue = inviteeValue;
-            }
+            PersonScore score = new PersonScore();
+            score.invitee = invitee;
+            score.score = inviteeValue;
+			potentials.add(score);
         }
 
-        return bestInvitee;
+        return potentials.stream()
+        		.sorted(Comparator.comparingDouble(PersonScore::getScore).reversed())
+        		.limit(required)
+        		.map(PersonScore::getInvitee)
+        		.collect(Collectors.toList());
     }
 
     /**
@@ -216,64 +195,31 @@ implements Serializable {
      */
     private double writingInvitationPhase(double time) {
 
+		if (person.getPhysicalCondition().computeFitnessLevel() < 2) {
+			logger.log(person, Level.FINE, 10_000, "Ended inviting study collaborator. Not feeling well.");
+			endTask();
+		}
+
         if (isDone()) {
+			endTask();
             return time;
         }
 
         // If duration, send invitation.
         if (getDuration() <= (getTimeCompleted() + time)) {
 
-            // Add invitation to study.
-            study.addInvitedResearcher(invitee);
+        	for (Person invitee : invitees) {
+	            // Add invitation to study.
+	            study.addInvitedResearcher(invitee);
 
-            // Check if existing relationship between primary researcher and invitee.
-//            RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
-            if (!relationshipManager.hasRelationship(person, invitee)) {
-                // Add new communication meeting relationship.
-                relationshipManager.addRelationship(person, invitee, Relationship.COMMUNICATION_MEETING);
-            }
-
-            // Add 10 points to invitee's opinion of primary researcher due to invitation.
-            Relationship relationship = relationshipManager.getRelationship(invitee, person);
-            double currentOpinion = relationship.getPersonOpinion(invitee);
-            relationship.setPersonOpinion(invitee, currentOpinion + 10D);
-            LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-					"[" + person.getLocationTag().getLocale() + "] " + person
-					+ " was inviting " + invitee.getName() +
-                    " to collaborate in " + study.toString());
+	            RelationshipUtil.changeOpinion(person, invitee, RelationshipType.REMOTE_COMMUNICATION, RandomUtil.getRandomDouble(5));
+	            
+	            logger.log(worker, Level.FINE, 0, "Inviting " + invitee.getName() +
+	                    " to collaborate in " + study.getName() + ".");
+	        }
         }
 
         return 0D;
-    }
-
-    @Override
-    protected void addExperience(double time) {
-        // Add experience to relevant science skill
-        // 1 base experience point per 25 millisols of proposal writing time.
-        double newPoints = time / 25D;
-
-        // Experience points adjusted by person's "Academic Aptitude" attribute.
-        int academicAptitude = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
-        newPoints += newPoints * ((double) academicAptitude - 50D) / 100D;
-        newPoints *= getTeachingExperienceModifier();
-
-        SkillType skillName = study.getScience().getSkill();
-        person.getSkillManager().addExperience(skillName, newPoints, time);
-    }
-
-    @Override
-    public List<SkillType> getAssociatedSkills() {
-        List<SkillType> skills = new ArrayList<SkillType>(1);
-        if (study != null) 
-        	skills.add(study.getScience().getSkill());
-        return skills;
-    }
-
-    @Override
-    public int getEffectiveSkillLevel() {
-        SkillManager manager = person.getSkillManager();
-        SkillType skillName = study.getScience().getSkill();
-        return manager.getEffectiveSkillLevel(skillName);
     }
 
     @Override
@@ -287,13 +233,5 @@ implements Serializable {
         else {
             return time;
         }
-    }
-
-    @Override
-    public void destroy() {
-        super.destroy();
-
-        study = null;
-        invitee = null;
     }
 }

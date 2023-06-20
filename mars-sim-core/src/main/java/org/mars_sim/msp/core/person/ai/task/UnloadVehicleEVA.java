@@ -1,46 +1,31 @@
-/**
+/*
  * Mars Simulation Project
  * UnloadVehicleEVA.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-06
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.awt.geom.Point2D;
-import java.io.Serializable;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Set;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.CollectionUtils;
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LocalAreaUtil;
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.equipment.Equipment;
+import org.mars_sim.msp.core.equipment.EquipmentType;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
-import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.resource.ResourceUtil;
-import org.mars_sim.msp.core.robot.RoboticAttributeManager;
-import org.mars_sim.msp.core.robot.RoboticAttributeType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Crewable;
-import org.mars_sim.msp.core.vehicle.GroundVehicle;
-import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.Towing;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
@@ -48,27 +33,24 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
  * The UnloadVehicleEVA class is a task for unloading fuel and supplies from a
  * vehicle when the vehicle is outside.
  */
-public class UnloadVehicleEVA extends EVAOperation implements Serializable {
+public class UnloadVehicleEVA extends EVAOperation {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(UnloadVehicleEVA.class.getName());
+	private static SimLogger logger = SimLogger.getLogger(UnloadVehicleEVA.class.getName());
 	
-	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-			logger.getName().length());
-	
-	private static int iceID = ResourceUtil.iceID;
-	private static int regolithID = ResourceUtil.regolithID;
-	private static int oxygenID = ResourceUtil.oxygenID;
-	private static int waterID = ResourceUtil.waterID;
-	private static int foodID = ResourceUtil.foodID;
-	private static int methaneID = ResourceUtil.methaneID;
+	private static final int ICE_ID = ResourceUtil.iceID;
+	private static final int REGOLITH_ID = ResourceUtil.regolithID;
+	private static final int OXYGEN_ID = ResourceUtil.oxygenID;
+	private static final int WATER_ID = ResourceUtil.waterID;
+	private static final int FOOD_ID = ResourceUtil.foodID;
+	private static final int METHANOL_ID = ResourceUtil.methanolID;
 	
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.unloadVehicleEVA"); //$NON-NLS-1$
-
+	
 	/** Task phases. */
 	private static final TaskPhase UNLOADING = new TaskPhase(Msg.getString("Task.phase.unloading")); //$NON-NLS-1$
 
@@ -76,7 +58,7 @@ public class UnloadVehicleEVA extends EVAOperation implements Serializable {
 	 * The amount of resources (kg) one person of average strength can unload per
 	 * millisol.
 	 */
-	private static double UNLOAD_RATE = 20D;
+	private static final double UNLOAD_RATE = 20D;
 
 	// Data members
 	/** The vehicle that needs to be unloaded. */
@@ -84,64 +66,6 @@ public class UnloadVehicleEVA extends EVAOperation implements Serializable {
 	/** The settlement the person is unloading to. */
 	private Settlement settlement;
 
-	/**
-	 * Constructor
-	 * 
-	 * @param person the person to perform the task.
-	 */
-	public UnloadVehicleEVA(Person person) {
-		// Use EVAOperation constructor.
-		super(NAME, person, true, 25);
-
-		settlement = CollectionUtils.findSettlement(person.getCoordinates());
-		if (settlement == null) {
-        	if (person.isOutside())
-        		setPhase(WALK_BACK_INSIDE);
-        	else
-        		endTask();
-		}
-		
-		VehicleMission mission = getMissionNeedingUnloading();
-		if (mission != null) {
-			vehicle = mission.getVehicle();
-		} else {
-			List<Vehicle> nonMissionVehicles = getNonMissionVehiclesNeedingUnloading(settlement);
-			if (nonMissionVehicles.size() > 0) {
-				vehicle = nonMissionVehicles.get(RandomUtil.getRandomInt(nonMissionVehicles.size() - 1));
-			}
-		}
-		
-		if (vehicle != null) {
-			// Add the rover to a garage if possible.
-			if (BuildingManager.add2Garage((GroundVehicle)vehicle)) {
-				// no need of doing EVA
-	        	if (person.isOutside())
-	        		setPhase(WALK_BACK_INSIDE);
-	        	else
-	        		endTask();
-			}
-			
-			// Determine location for unloading.
-			Point2D unloadingLoc = determineUnloadingLocation();
-			setOutsideSiteLocation(unloadingLoc.getX(), unloadingLoc.getY());
-
-			setDescription(Msg.getString("Task.description.unloadVehicleEVA.detail", vehicle.getName())); // $NON-NLS-1$
-
-			// Initialize task phase
-			addPhase(UNLOADING);
-//			setPhase(UNLOADING); 
-			// NOTE: EVAOperation will set the phase. Do NOT do it here
-			
-			LogConsolidated.log(logger, Level.FINER, 0, sourceName, 
-					"[" + person.getLocationTag().getLocale() + "] " + person.getName() 
-					+ " in " + person.getLocationTag().getImmediateLocation() + " was going to unload " + vehicle.getName() + ".", null);
-		} else {
-        	if (person.isOutside())
-        		setPhase(WALK_BACK_INSIDE);
-        	else
-        		endTask();
-		}
-	}
 
 	/**
 	 * Constructor
@@ -151,15 +75,19 @@ public class UnloadVehicleEVA extends EVAOperation implements Serializable {
 	 */
 	public UnloadVehicleEVA(Person person, Vehicle vehicle) {
 		// Use EVAOperation constructor.
-		super("Unloading vehicle EVA", person, true, RandomUtil.getRandomDouble(10D) + 10D);
+		super(NAME, person, true, RandomUtil.getRandomDouble(25D) + 10D, null);
 
 		setDescription(Msg.getString("Task.description.unloadVehicleEVA.detail", vehicle.getName())); // $NON-NLS-1$
 		this.vehicle = vehicle;
 
+		if (!person.isBarelyFit()) {
+			checkLocation();
+        	return;
+		}
+		
 		// Determine location for unloading.
-		Point2D unloadingLoc = determineUnloadingLocation();
-		setOutsideSiteLocation(unloadingLoc.getX(), unloadingLoc.getY());
-
+		setOutsideLocation(vehicle);
+		
 		settlement = CollectionUtils.findSettlement(person.getCoordinates());
 		if (settlement == null) {
 			endTask();
@@ -167,31 +95,27 @@ public class UnloadVehicleEVA extends EVAOperation implements Serializable {
 				
 		// Initialize phase
 		addPhase(UNLOADING);
-//		setPhase(UNLOADING); 
+
 		// NOTE: EVAOperation will set the phase. Do NOT do it here
+//		setPhase(UNLOADING); 
 		
-		LogConsolidated.log(logger, Level.FINER, 0, sourceName, 
-				"[" + person.getLocationTag().getLocale() + "] " + person.getName() 
-				+ " in " + person.getLocationTag().getImmediateLocation() + " was going to unload " + vehicle.getName() + ".", null);
-		
-//		logger.fine(person.getName() + " is unloading " + vehicle.getName());
+		logger.log(person, Level.FINE, 20_000, "Going to unload "  + vehicle.getName() + ".");
+
 	}
 
 	@Override
 	protected double performMappedPhase(double time) {
 
 		time = super.performMappedPhase(time);
-
-		if (getPhase() == null) {
-//			logger.finer(person + " had no task phase. Ending the task of unloading vehicle with EVA.");
-//			endTask();
-//			return time;
-			throw new IllegalArgumentException("Task phase is null");
-		} else if (UNLOADING.equals(getPhase())) {
-			return unloadingPhase(time);
-		} else {
-			return time;
+		if (!isDone()) {
+			if (getPhase() == null) {
+				throw new IllegalArgumentException("Task phase is null");
+			}
+			else if (UNLOADING.equals(getPhase())) {
+				time = unloadingPhase(time);
+			}
 		}
+		return time;
 	}
 
 	/**
@@ -200,173 +124,124 @@ public class UnloadVehicleEVA extends EVAOperation implements Serializable {
 	 * @param time the amount of time (millisol) to perform the phase.
 	 * @return the amount of time (millisol) after performing the phase.
 	 */
-	protected double unloadingPhase(double time) {
-	
+	protected double unloadingPhase(double time) {		
+		double remainingTime = 0;
+		
+		if (checkReadiness(time, true) > 0)
+			return time;
+		
 		if (settlement == null || vehicle == null) {
-        	if (person.isOutside())
-        		setPhase(WALK_BACK_INSIDE);
-        	else
-        		endTask();
-			return 0;
-		}
-		
-		if (!vehicle.isInSettlementVicinity() || BuildingManager.isInAGarage(vehicle)) {
-        	if (person.isOutside())
-        		setPhase(WALK_BACK_INSIDE);
-        	else
-        		endTask();
-			return 0;
-		}
-		
-		// Check for radiation exposure during the EVA operation.
-		if (person.isOutside() && isRadiationDetected(time)) {
-			setPhase(WALK_BACK_INSIDE);
-			return 0;
+			checkLocation();
+			return time;
 		}
 
-		// Check if person should end EVA operation.
-		if (person.isOutside() && (shouldEndEVAOperation() || addTimeOnSite(time))) {
-			setPhase(WALK_BACK_INSIDE);
-			return 0;
+		if (settlement.getBuildingManager().isInGarage(vehicle)) {
+			checkLocation();
+			return time;
 		}
-
+		
 		// Determine unload rate.
-		int strength = 0;
-		if (person != null)
-			strength = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.STRENGTH);
-		else if (robot != null)
-			strength = robot.getRoboticAttributeManager().getAttribute(RoboticAttributeType.STRENGTH);
+		int strength = worker.getNaturalAttributeManager().getAttribute(NaturalAttributeType.STRENGTH);
 		double strengthModifier = .1D + (strength * .018D);
 		double amountUnloading = UNLOAD_RATE * strengthModifier * time / 4D;
 
-		Inventory vehicleInv = vehicle.getInventory();
-		
-		Inventory settlementInv = settlement.getInventory();
-		
-//		if (person != null)
-//			LogConsolidated.log(logger, Level.INFO, 0, sourceName, 
-//				"[" + person.getLocationTag().getLocale() + "] " + person.getName() 
-//				+ " in " + person.getLocationTag().getImmediateLocation() + " proceeded to unload " + vehicle.getName() + ".", null);
-//		else 
-//			LogConsolidated.log(logger, Level.INFO, 0, sourceName, 
-//					"[" + robot.getLocationTag().getLocale() + "] " + robot.getName() 
-//					+ " in " + robot.getLocationTag().getImmediateLocation() + " proceeded to unload " + vehicle.getName() + ".", null);
-		
 		// Unload equipment.
 		if (amountUnloading > 0D) {
-			Iterator<Unit> k = vehicleInv.findAllUnitsOfClass(Equipment.class).iterator();
-			while (k.hasNext() && (amountUnloading > 0D)) {
-				Equipment equipment = (Equipment) k.next();
-
-				// Unload inventories of equipment (if possible)
-				unloadEquipmentInventory(equipment);
-
-				equipment.transfer(vehicleInv, settlementInv);
-//				vehicleInv.retrieveUnit(equipment);
-//				settlementInv.storeUnit(equipment);
+			Set<Equipment> originalEqm = new HashSet<>(vehicle.getEquipmentSet());
+			Iterator<Equipment> k = originalEqm.iterator();
+			while (k.hasNext() && (amountUnloading > 0D)) {	
+				Equipment equipment = k.next();
+				boolean doUnload = true;
 				
-				amountUnloading -= equipment.getMass();
+				if (vehicle instanceof Crewable && equipment.getEquipmentType() == EquipmentType.EVA_SUIT) {
+					int numSuit = vehicle.findNumContainersOfType(EquipmentType.EVA_SUIT);
+					int numCrew = ((Crewable)vehicle).getCrewNum();
+					// Note: Ensure each crew member in the vehicle has an EVA suit to wear
+					doUnload = (numSuit > numCrew);
+				}
 				
-				if (person != null)
-					LogConsolidated.log(logger, Level.INFO, 10_000, sourceName, 
-						"[" + person.getLocationTag().getLocale() + "] " + person.getName() 
-//						+ person.getLocationTag().getImmediateLocation().toLowerCase() 
-						+ " unloaded " + equipment.getNickName() + " from " + vehicle.getName() + ".", null);
-				else
-					LogConsolidated.log(logger, Level.INFO, 10_000, sourceName, 
-						"[" + robot.getLocationTag().getLocale() + "] " + robot.getName() 
-//						+ robot.getLocationTag().getImmediateLocation().toLowerCase() 
-						+ " unloaded " + equipment.getNickName() + " from " + vehicle.getName() + ".", null);
+				// Unload the equipment
+				if (doUnload) {
+					// Unload inventories of equipment (if possible)
+					UnloadVehicleGarage.unloadEquipmentInventory(equipment, settlement);
+					equipment.transfer(settlement);		
+					amountUnloading -= equipment.getMass();
+					
+					logger.log(worker, Level.INFO, 10_000, "Unloaded " + equipment.getNickName()
+						+ " from " + vehicle.getName() + ".");
+				}
 			}
 		}
 
 		double totalAmount = 0;
 		// Unload amount resources.
-		Iterator<Integer> i = vehicleInv.getAllARStored(false).iterator();
+		Iterator<Integer> i = vehicle.getAmountResourceIDs().iterator();
 		while (i.hasNext() && (amountUnloading > 0D)) {
-			Integer resource = i.next();
-			double amount = vehicleInv.getAmountResourceStored(resource, false);
+			int id = i.next();
+			double amount = vehicle.getAmountResourceStored(id);
 			if (amount > amountUnloading) {
 				amount = amountUnloading;
 			}
-			double capacity = settlementInv.getAmountResourceRemainingCapacity(resource, true, false);
+			double capacity = settlement.getAmountResourceRemainingCapacity(id);
 			if (capacity < amount) {
 				amount = capacity;
 				amountUnloading = 0D;
 			}
-			try {
-				vehicleInv.retrieveAmountResource(resource, amount);
-				settlementInv.storeAmountResource(resource, amount, true);
-				
-				if (resource != waterID && resource != methaneID 
-						&& resource != foodID && resource != oxygenID) {
-					double laborTime = 0;
-					if (resource == iceID || resource == regolithID)
-						laborTime = CollectResources.LABOR_TIME;
-					else
-						laborTime = CollectMinedMinerals.LABOR_TIME;
-					
-					settlementInv.addAmountSupply(resource, amount);
-					// Add to the daily output
-					settlement.addOutput(resource, amount, laborTime);
-		            // Recalculate settlement good value for output item.
-		            settlement.getGoodsManager().updateGoodValue(GoodsUtil.getResourceGood(resource), false);	
-				}
-				
-			} catch (Exception e) {
+			
+			// Transfer the amount resource from vehicle to settlement
+			vehicle.retrieveAmountResource(id, amount);
+			settlement.storeAmountResource(id, amount);
+			
+			if (id != WATER_ID && id != METHANOL_ID 
+					&& id != FOOD_ID && id != OXYGEN_ID) {
+				double laborTime = 0;
+				if (id == ICE_ID || id == REGOLITH_ID)
+					laborTime = CollectResources.LABOR_TIME;
+				else
+					laborTime = CollectMinedMinerals.LABOR_TIME;
+
+				// Add to the daily output
+				settlement.addOutput(id, amount, laborTime);
 			}
+
 			amountUnloading -= amount;
 			
+			if (totalAmount > 0) {
+					logger.log(worker, Level.INFO, 10_000, "Just unloaded " 
+							+ Math.round(amount*100.0)/100.0 + " kg of resources from " + vehicle.getName() + ".");
+			}
+			
 			totalAmount += amount;
-		}
-		
-		if (totalAmount > 0) {
-			if (person != null)
-				LogConsolidated.log(logger, Level.INFO, 10_000, sourceName, 
-				"[" + person.getLocationTag().getLocale() + "] " + person.getName() 
-//				+ person.getLocationTag().getImmediateLocation() 
-				+ " just unloaded a total of " + Math.round(totalAmount*100.0)/100.0 + " kg of resources from " + vehicle.getName() + ".", null);
-			else
-				LogConsolidated.log(logger, Level.INFO, 10_000, sourceName, 
-				"[" + robot.getLocationTag().getLocale() + "] " + robot.getName() 
-//				+ robot.getLocationTag().getImmediateLocation() 
-				+ " just unloaded a total of " + Math.round(totalAmount*100.0)/100.0 + " kg of resources from " + vehicle.getName() + ".", null);
 		}
 		
 		int totalItems = 0;
 		// Unload item resources.
 		if (amountUnloading > 0D) {
-			Iterator<Integer> j = vehicleInv.getAllItemResourcesStored().iterator();
+			Iterator<Integer> j = vehicle.getItemResourceIDs().iterator();
 			while (j.hasNext() && (amountUnloading > 0D)) {
-				Integer resource = j.next();
-				Part part= (Part)(ItemResourceUtil.findItemResource(resource));
+				int id = j.next();
+				Part part = ItemResourceUtil.findItemResource(id);
 				double mass = part.getMassPerItem();
-				int num = vehicleInv.getItemResourceNum(resource);
+				int num = vehicle.getItemResourceStored(id);
 				if ((num * mass) > amountUnloading) {
 					num = (int) Math.round(amountUnloading / mass);
 					if (num == 0) {
 						num = 1;
 					}
 				}
-				vehicleInv.retrieveItemResources(resource, num);
-				settlementInv.storeItemResources(resource, num);
+				vehicle.retrieveItemResource(id, num);
+				settlement.storeItemResource(id, num);
 				amountUnloading -= (num * mass);
 				
 				totalItems += num;
 			}
 			
 			if (totalItems > 0) {
-				if (person != null)
-					LogConsolidated.log(logger, Level.INFO, 10_000, sourceName, 
-						"[" + person.getLocationTag().getLocale() + "] " + person.getName() 
-//						+ " in " + person.getLocationTag().getImmediateLocation() 
-						+ " just unloaded a total of " + totalItems + " items from " + vehicle.getName() + ".", null);
-				else
-					LogConsolidated.log(logger, Level.INFO, 10_000, sourceName, 
-						"[" + robot.getLocationTag().getLocale() + "] " + robot.getName() 
-//						+ " in " + robot.getLocationTag().getImmediateLocation() 
-						+ " just unloaded a total of " + totalItems + " items from " + vehicle.getName() + ".", null);
+				logger.log(worker, Level.INFO, 10_000, "Just unloaded a total of "
+						+ totalItems + " items from " + vehicle.getName() + ".");
 			}
+			
+			person.getPhysicalCondition().stressMuscle(time/2);
 		}
 
 		// Unload towed vehicles.
@@ -376,9 +251,11 @@ public class UnloadVehicleEVA extends EVAOperation implements Serializable {
 			if (towedVehicle != null) {
 				towingVehicle.setTowedVehicle(null);
 				towedVehicle.setTowingVehicle(null);
-				if (!settlementInv.containsUnit(towedVehicle)) {
-					settlementInv.storeUnit(towedVehicle);
+				if (!settlement.containsParkedVehicle(towedVehicle)) {
+					settlement.addParkedVehicle(towedVehicle);
 					towedVehicle.findNewParkingLoc();
+					
+					person.getPhysicalCondition().stressMuscle(time/2);
 				}
 			}
 		}
@@ -388,179 +265,42 @@ public class UnloadVehicleEVA extends EVAOperation implements Serializable {
 			Crewable crewable = (Crewable) this;
 			for (Person p : crewable.getCrew()) {
 				if (p.isDeclaredDead()) {
+						
+					if (p.transfer(settlement)) {
 					
-					LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-						"[" + person.getLocationTag().getLocale() + "] " + person.getName() 
-						+ " was retrieving the dead body of " + p + " from " + vehicle.getName() 
-						+ " parked in the vicinity of "
-						+ settlement, null);
-					
-					p.transfer(vehicle, settlementInv);
-					
-					BuildingManager.addToMedicalBuilding(p, settlement.getIdentifier());			
-					
-					p.setAssociatedSettlement(settlement.getIdentifier());
-//					p.getMind().getTaskManager().clearTask();
+						BuildingManager.addToMedicalBuilding(p, settlement);			
+						
+						p.setAssociatedSettlement(settlement.getIdentifier());
+						
+						logger.info(worker, "successfully retrieved the dead body of " + p + " from " + vehicle.getName());
+					}
+					else {
+						logger.warning(worker, "failed to retrieve the dead body of " + p + " from " + vehicle.getName());
+					}
 				}
-				
-//				else {
-//					LogConsolidated.log(logger, Level.FINER, 0, sourceName,
-//							"[" + p.getLocationTag().getLocale() + "] " + p.getName() + " came home safety on rover "+ vehicle.getName() + ".", null);
-//				
-//					if (vehicle.getGarage() != null) {
-//						// the rover is parked inside a garage
-//						vehicle.getInventory().retrieveUnit(p);
-//						settlement.getInventory().storeUnit(p);
-//						BuildingManager.addPersonOrRobotToBuilding(p, vehicle.getGarage());
-//						
-////						p.getMind().getTaskManager().addTask(new Walk(p));
-//						p.getMind().getTaskManager().getNewTask();
-//					}
-//					
-//					else if (p != person) {
-//						// the person is still inside the vehicle
-//						// Clear any other task and 
-////						p.getMind().getTaskManager().clearTask();
-//					}
-//				}
 			}
 		}
 
 		if (isFullyUnloaded(vehicle)) {
-        	if (person.isOutside())
-        		setPhase(WALK_BACK_INSIDE);
-        	else
-        		endTask();
-	        return 0;
+			if (totalAmount > 0) {
+				logger.log(worker, Level.INFO, 10_000, 
+						"Just unloaded a total of " + Math.round(totalAmount*100.0)/100.0 
+						+ " kg of resources from " + vehicle.getName() + ".");
+			}
+			
+			checkLocation();
+	        return remainingTime;
 		}
 		
+        // Add experience points
+        addExperience(time);
+
 		// Check for an accident during the EVA operation.
 		checkForAccident(time);
         
-		return 0D;
+		return remainingTime;
 	}
 	
-
-	/**
-	 * Gets a list of vehicles that need unloading and aren't reserved for a
-	 * mission.
-	 * 
-	 * @param settlement the settlement the vehicle is at.
-	 * @return list of vehicles.
-	 */
-	public static List<Vehicle> getNonMissionVehiclesNeedingUnloading(Settlement settlement) {
-		List<Vehicle> result = new CopyOnWriteArrayList<Vehicle>();
-
-		if (settlement != null) {
-			Iterator<Vehicle> i = settlement.getParkedVehicles().iterator();
-			while (i.hasNext()) {
-				Vehicle vehicle = i.next();
-				boolean needsUnloading = false;
-				if (vehicle instanceof Rover && !vehicle.isReserved()) {
-					int peopleOnboard = vehicle.getInventory().getNumContainedPeople();
-					if (peopleOnboard == 0) {
-						if (!BuildingManager.isInAGarage((GroundVehicle)vehicle)) {
-							if (vehicle.getInventory().getTotalInventoryMass(false) > 0D) {
-								needsUnloading = true;
-							}
-							if (vehicle instanceof Towing) {
-								if (((Towing) vehicle).getTowedVehicle() != null) {
-									needsUnloading = true;
-								}
-							}
-						}
-					}
-
-					int robotsOnboard = vehicle.getInventory().getNumContainedRobots();
-					if (robotsOnboard == 0) {
-						if (!BuildingManager.isInAGarage((GroundVehicle)vehicle)) {
-							if (vehicle.getInventory().getTotalInventoryMass(false) > 0D) {
-								needsUnloading = true;
-							}
-							if (vehicle instanceof Towing) {
-								if (((Towing) vehicle).getTowedVehicle() != null) {
-									needsUnloading = true;
-								}
-							}
-						}
-					}
-				}
-				
-				if (needsUnloading) {
-					result.add(vehicle);
-				}
-			}
-		}
-
-		return result;
-	}
-
-	/**
-	 * Gets a list of all disembarking vehicle missions at a settlement.
-	 * 
-	 * @param settlement the settlement.
-	 * @return list of vehicle missions.
-	 */
-	public static List<Mission> getAllMissionsNeedingUnloading(Settlement settlement) {
-
-		List<Mission> result = new CopyOnWriteArrayList<Mission>();
-
-		Iterator<Mission> i = missionManager.getMissions().iterator();
-		while (i.hasNext()) {
-			Mission mission = (Mission) i.next();
-			if (mission instanceof VehicleMission) {
-				if (VehicleMission.DISEMBARKING.equals(mission.getPhase())) {
-					VehicleMission vehicleMission = (VehicleMission) mission;
-					if (vehicleMission.hasVehicle()) {
-						Vehicle vehicle = vehicleMission.getVehicle();
-						if (settlement == vehicle.getSettlement()) {
-							int peopleOnboard = vehicle.getInventory().getNumContainedPeople();
-							if (peopleOnboard == 0) {
-								if (!isFullyUnloaded(vehicle)) {
-									if (!BuildingManager.isInAGarage(vehicle)) {
-										result.add(vehicleMission);
-									}
-								}
-							}
-
-							int robotsOnboard = vehicle.getInventory().getNumContainedRobots();
-							if (robotsOnboard == 0) {
-								if (!isFullyUnloaded(vehicle)) {
-									if (!BuildingManager.isInAGarage(vehicle)) {
-										result.add(vehicleMission);
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		return result;
-	}
-
-	/**
-	 * Gets a random vehicle mission unloading at the settlement.
-	 * 
-	 * @return vehicle mission.
-	 */
-	private VehicleMission getMissionNeedingUnloading() {
-
-		VehicleMission result = null;
-		List<Mission> unloadingMissions = null;
-		if (person != null)
-			unloadingMissions = getAllMissionsNeedingUnloading(person.getSettlement());
-		else if (robot != null)
-			unloadingMissions = getAllMissionsNeedingUnloading(robot.getSettlement());
-
-		if (unloadingMissions.size() > 0) {
-			int index = RandomUtil.getRandomInt(unloadingMissions.size() - 1);
-			result = (VehicleMission) unloadingMissions.get(index);
-		}
-
-		return result;
-	}
 
 	/**
 	 * Gets the vehicle being unloaded.
@@ -571,121 +311,28 @@ public class UnloadVehicleEVA extends EVAOperation implements Serializable {
 		return vehicle;
 	}
 
-	/**
-	 * Determine location to unload the vehicle.
-	 * 
-	 * @return location.
-	 */
-	private Point2D determineUnloadingLocation() {
 
-		Point2D.Double newLocation = null;
-		boolean goodLocation = false;
-		for (int x = 0; (x < 50) && !goodLocation; x++) {
-			Point2D.Double boundedLocalPoint = LocalAreaUtil.getRandomExteriorLocation(vehicle, 1D);
-			newLocation = LocalAreaUtil.getLocalRelativeLocation(boundedLocalPoint.getX(), boundedLocalPoint.getY(),
-					vehicle);
-			if (person != null)
-				goodLocation = LocalAreaUtil.isLocationCollisionFree(newLocation.getX(), newLocation.getY(),
-						person.getCoordinates());
-			else if (robot != null)
-				goodLocation = LocalAreaUtil.isLocationCollisionFree(newLocation.getX(), newLocation.getY(),
-						robot.getCoordinates());
-		}
-
-		return newLocation;
-	}
 
 	@Override
 	protected TaskPhase getOutsideSitePhase() {
 		return UNLOADING;
 	}
 
-
-	/**
-	 * Unload the inventory from a piece of equipment.
-	 * 
-	 * @param equipment the equipment.
-	 */
-	private void unloadEquipmentInventory(Equipment equipment) {
-		Inventory eInv = equipment.getInventory();
-		Inventory sInv = settlement.getInventory();
-
-		// Unload amount resources.
-		// Note: only unloading amount resources at the moment.
-		Iterator<Integer> i = eInv.getAllARStored(false).iterator();
-		while (i.hasNext()) {
-			Integer resource = i.next();
-			double amount = eInv.getAmountResourceStored(resource, false);
-			double capacity = sInv.getAmountResourceRemainingCapacity(resource, true, false);
-			if (amount < capacity) {
-				amount = capacity;
-			}
-			try {
-				eInv.retrieveAmountResource(resource, amount);
-				sInv.storeAmountResource(resource, amount, true);
-			} catch (Exception e) {
-			}
-		}
-	}
-
 	/**
 	 * Returns true if the vehicle is fully unloaded.
+	 * This has to ignore any EVA suits.
 	 * 
 	 * @param vehicle Vehicle to check.
 	 * @return is vehicle fully unloaded?
 	 */
-	static public boolean isFullyUnloaded(Vehicle vehicle) {
-		return (vehicle.getInventory().getTotalInventoryMass(false) == 0D);
-	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		if (person != null)
-			return person.getSkillManager().getEffectiveSkillLevel(SkillType.EVA_OPERATIONS);
-		else 
-			return robot.getSkillManager().getEffectiveSkillLevel(SkillType.EVA_OPERATIONS);
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(1);
-		results.add(SkillType.EVA_OPERATIONS);
-		return results;
-	}
-
-	@Override
-	protected void addExperience(double time) {
-
-		// Add experience to "EVA Operations" skill.
-		// (1 base experience point per 100 millisols of time spent)
-		double evaExperience = time / 100D;
-
-		// Experience points adjusted by person's "Experience Aptitude" attribute.
-		NaturalAttributeManager nManager = null;
-		RoboticAttributeManager rManager = null;
-		int experienceAptitude = 0;
-		if (person != null) {
-			nManager = person.getNaturalAttributeManager();
-			experienceAptitude = nManager.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
-		} else if (robot != null) {
-			rManager = robot.getRoboticAttributeManager();
-			experienceAptitude = rManager.getAttribute(RoboticAttributeType.EXPERIENCE_APTITUDE);
+	public static boolean isFullyUnloaded(Vehicle vehicle) {
+		double total = vehicle.getStoredMass();
+		for(Equipment e : vehicle.getEquipmentSet()) {
+			if (e.getEquipmentType() == EquipmentType.EVA_SUIT) {
+				total -= e.getMass();
+			}
 		}
-
-		double experienceAptitudeModifier = (((double) experienceAptitude) - 50D) / 100D;
-		evaExperience += evaExperience * experienceAptitudeModifier;
-		evaExperience *= getTeachingExperienceModifier();
-		if (person != null)
-			person.getSkillManager().addExperience(SkillType.EVA_OPERATIONS, evaExperience, time);
-		else if (robot != null)
-			robot.getSkillManager().addExperience(SkillType.EVA_OPERATIONS, evaExperience, time);
-	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
-
-		vehicle = null;
-		settlement = null;
+		
+		return total <= 0.001D;
 	}
 }

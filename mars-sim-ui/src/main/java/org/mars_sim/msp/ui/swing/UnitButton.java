@@ -1,13 +1,11 @@
 /**
  * Mars Simulation Project
  * UnitButton.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing;
-
-import java.awt.Font;
 
 import javax.swing.JButton;
 import javax.swing.SwingConstants;
@@ -40,7 +38,6 @@ public class UnitButton extends JButton {
 		this.unit = unit;
 
 		// Prepare default unit button values
-		setFont(new Font("SansSerif", Font.PLAIN, 9));
 		setVerticalTextPosition(SwingConstants.BOTTOM);
 		setHorizontalTextPosition(SwingConstants.CENTER);
 		setAlignmentX(.5F);

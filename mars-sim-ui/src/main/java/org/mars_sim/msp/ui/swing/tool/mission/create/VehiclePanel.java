@@ -1,17 +1,15 @@
-/**
+/*
  * Mars Simulation Project
  * VehiclePanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-10-21
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.Collection;
@@ -19,27 +17,23 @@ import java.util.Iterator;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.mars_sim.msp.core.CollectionUtils;
-import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.tool.Conversion;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
-
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
 
 /**
  * A wizard panel for selecting the mission vehicle.
@@ -53,7 +47,7 @@ class VehiclePanel extends WizardPanel {
 	// Data members.
 	private VehicleTableModel vehicleTableModel;
 	private JTable vehicleTable;
-	private WebLabel errorMessageLabel;
+	private JLabel errorMessageLabel;
 
 	/**
 	 * Constructor.
@@ -71,27 +65,25 @@ class VehiclePanel extends WizardPanel {
 		setBorder(new MarsPanelBorder());
 
 		// Create the select vehicle label.
-		WebLabel selectVehicleLabel = new WebLabel("Select a rover for this mission :", WebLabel.CENTER);
-		selectVehicleLabel.setFont(selectVehicleLabel.getFont().deriveFont(Font.BOLD));
-		selectVehicleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		JLabel selectVehicleLabel = createTitleLabel("Select a rover for this mission :");
 		add(selectVehicleLabel);
 
 		// Create the vehicle panel.
-		WebPanel vehiclePane = new WebPanel(new BorderLayout(0, 0));
+		JPanel vehiclePane = new JPanel(new BorderLayout(0, 0));
 		vehiclePane.setMaximumSize(new Dimension(Short.MAX_VALUE, 100));
 		vehiclePane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(vehiclePane);
 
 		// Create scroll panel for vehicle list.
-		WebScrollPane vehicleScrollPane = new WebScrollPane();
+		JScrollPane vehicleScrollPane = new JScrollPane();
 		vehiclePane.add(vehicleScrollPane, BorderLayout.CENTER);
 
 		// Create the vehicle table model.
 		vehicleTableModel = new VehicleTableModel();
 
 		// Create the vehicle table.
-		vehicleTable = new ZebraJTable(vehicleTableModel);
-		TableStyle.setTableStyle(vehicleTable);
+		vehicleTable = new JTable(vehicleTableModel);
+		
 		// Added sorting
 		vehicleTable.setAutoCreateRowSorter(true);
 		vehicleTable.setDefaultRenderer(Object.class, new UnitTableCellRenderer(vehicleTableModel));
@@ -141,10 +133,7 @@ class VehiclePanel extends WizardPanel {
 		vehicleScrollPane.setViewportView(vehicleTable);
 
 		// Create the error message label.
-		errorMessageLabel = new WebLabel(" ", WebLabel.CENTER);
-		errorMessageLabel.setFont(errorMessageLabel.getFont().deriveFont(Font.BOLD));
-		errorMessageLabel.setForeground(Color.RED);
-		errorMessageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		errorMessageLabel = createErrorLabel();
 		add(errorMessageLabel);
 
 		// Add a vertical glue.
@@ -205,13 +194,14 @@ class VehiclePanel extends WizardPanel {
 		private VehicleTableModel() {
 			// Use UnitTableModel constructor.
 			super();
-
+						
 			// Add columns.
 			columns.add("Name");
 			columns.add("Type");
 			columns.add("Crew Cap.");
 			columns.add("Range");
 			columns.add("Lab");
+			
 			columns.add("Sick Bay");
 			columns.add("Cargo Cap.");
 			columns.add("Current Cargo");
@@ -231,8 +221,7 @@ class VehiclePanel extends WizardPanel {
 
 			if (row < units.size()) {
 				Rover vehicle = (Rover) getUnit(row);
-				Inventory inv = vehicle.getInventory();
-
+				
 				try {
 					if (column == 0)
 						result = vehicle.getName();
@@ -241,21 +230,21 @@ class VehiclePanel extends WizardPanel {
 					else if (column == 2)
 						result = vehicle.getCrewCapacity();
 					else if (column == 3)
-						result = (int) vehicle.getRange(wizard.getMissionBean().getMissionType());
+						result = (int) vehicle.getRange();
 					else if (column == 4)
 						result = vehicle.hasLab();
 					else if (column == 5)
 						result = vehicle.hasSickBay();
 					else if (column == 6)
-						result = (int) inv.getGeneralCapacity();
+						result = (int) vehicle.getCargoCapacity();
 					else if (column == 7)
-						result = (int) inv.getTotalInventoryMass(true);
+						result = (int) vehicle.getStoredMass();
 					else if (column == 8)
 						result = vehicle.printStatusTypes();
 					else if (column == 9) {
-						Mission mission = missionManager.getMissionForVehicle(vehicle);
+						Mission mission = vehicle.getMission();
 						if (mission != null)
-							result = mission.getDescription();
+							result = mission.getName();
 						else
 							result = "None";
 					}
@@ -294,27 +283,19 @@ class VehiclePanel extends WizardPanel {
 			Rover vehicle = (Rover) getUnit(row);
 
 			if (column == 7) {
-//                try {
-				if (vehicle.getInventory().getTotalInventoryMass(true) > 0D)
+				if (vehicle.getStoredMass() > 0D)
 					result = true;
-//                }
-//                catch (InventoryException e) {
-//                    e.printStackTrace(System.err);
-//                }
 			} else if (column == 8) {
-				if (!vehicle.haveStatusType(StatusType.PARKED) && !vehicle.haveStatusType(StatusType.GARAGED))
+				if ((vehicle.getPrimaryStatus() != StatusType.PARKED) && (vehicle.getPrimaryStatus() != StatusType.GARAGED))
 					result = true;
 
 				// Allow rescue/salvage mission to use vehicle undergoing maintenance.
 				if (MissionType.RESCUE_SALVAGE_VEHICLE == getWizard().getMissionData().getMissionType()) {
-					if (vehicle.haveStatusType(StatusType.MAINTENANCE))
-						result = false;
-					else
-						result = true;
+                    result = !vehicle.haveStatusType(StatusType.MAINTENANCE);
 				}
 				
 			} else if (column == 9) {
-				Mission mission = missionManager.getMissionForVehicle(vehicle);
+				Mission mission = vehicle.getMission();
 				if (mission != null)
 					result = true;
 			}

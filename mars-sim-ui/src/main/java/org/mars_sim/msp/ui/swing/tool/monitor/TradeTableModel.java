@@ -1,78 +1,278 @@
-/**
+/*
  * Mars Simulation Project
  * TradeTableModel.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-22
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
-import javax.swing.SwingUtilities;
-import javax.swing.table.AbstractTableModel;
-
+import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitEvent;
 import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.UnitListener;
-import org.mars_sim.msp.core.UnitManager;
-import org.mars_sim.msp.core.UnitManagerEvent;
-import org.mars_sim.msp.core.UnitManagerEventType;
-import org.mars_sim.msp.core.UnitManagerListener;
-import org.mars_sim.msp.core.equipment.Container;
+import org.mars_sim.msp.core.equipment.EquipmentFactory;
+import org.mars_sim.msp.core.equipment.EquipmentType;
+import org.mars_sim.msp.core.goods.Good;
+import org.mars_sim.msp.core.goods.GoodsUtil;
+import org.mars_sim.msp.core.resource.ItemResourceUtil;
+import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.structure.goods.Good;
-import org.mars_sim.msp.core.structure.goods.GoodType;
-import org.mars_sim.msp.core.structure.goods.GoodsUtil;
-import org.mars_sim.msp.ui.swing.tool.Conversion;
+import org.mars_sim.msp.core.vehicle.VehicleType;
+
 @SuppressWarnings("serial")
-public class TradeTableModel
-extends AbstractTableModel
-implements UnitListener, MonitorModel, UnitManagerListener {
+public class TradeTableModel extends EntityTableModel<Good>
+implements UnitListener {
 
-	private static final String TRADE_GOODS = "Name of Goods";
-	private static final String VP_AT = "Value @ ";
-	private static final String PRICE_AT = "Price $ @ ";
-	private static final String CATEGORY = "Category";
-	private static final String ONE_SPACE = " ";
-	
+	static final int NUM_INITIAL_COLUMNS = 3;
+	private static final int NUM_DATA_COL = 8;
+	private static final int COLUMNCOUNT = NUM_INITIAL_COLUMNS + NUM_DATA_COL;
+
+	/** Names of Columns. */
+	private static final String[] columnNames;
+	/** Types of columns. */
+	private static final Class<?>[] columnTypes;
+
+
+	private static final int DEMAND_COL = 3;
+	private static final int SUPPLY_COL = 4;
+	static final int QUANTITY_COL = 5;
+	private static final int MASS_COL = 6;
+	private static final int MARKET_COL = 7;
+	private static final int VALUE_COL = 8;
+	static final int COST_COL = 9;
+	static final int PRICE_COL = 10;
+
+	static {
+		columnNames = new String[NUM_INITIAL_COLUMNS + NUM_DATA_COL];
+		columnTypes = new Class[COLUMNCOUNT];
+		columnNames[0] = "Good";
+		columnTypes[0] = String.class;
+		columnNames[1] =  "Category";
+		columnTypes[1] = String.class;
+		columnNames[2] =  "Type";
+		columnTypes[2] = String.class;
+
+		columnNames[DEMAND_COL] =  "Demand";
+		columnTypes[DEMAND_COL] = Double.class;
+		columnNames[SUPPLY_COL] =  "Supply";
+		columnTypes[SUPPLY_COL] = Double.class;
+		columnNames[QUANTITY_COL] =  "Quantity";
+		columnTypes[QUANTITY_COL] = Double.class;
+		columnNames[MASS_COL] =  "Tot Mass [kg]";
+		columnTypes[MASS_COL] = Double.class;
+		columnNames[MARKET_COL] =  "National VP";
+		columnTypes[MARKET_COL] = Double.class;
+		columnNames[VALUE_COL] =  "Local VP";
+		columnTypes[VALUE_COL] = Double.class;
+		columnNames[COST_COL] =  "Cost [$]";
+		columnTypes[COST_COL] = Double.class;
+		columnNames[PRICE_COL] =  "Price [$]";
+		columnTypes[PRICE_COL] = Double.class;
+	};
+
 	// Data members
-	private List<Good> goodsList;
-	private List<Settlement> settlements;
-
-	protected static UnitManager unitManager = Simulation.instance().getUnitManager();
+	private Settlement selectedSettlement;
+	private boolean monitorSettlement = false;
 
 	/**
-	 * Constructor.
+	 * Constructor 2.
+	 * 
+	 * @param selectedSettlement
+	 * @param window
 	 */
-	public TradeTableModel() {
+	public TradeTableModel(Settlement selectedSettlement) {
+		super(Msg.getString("TradeTableModel.tabName"), "TradeTableModel.counting", columnNames, columnTypes);
 
-		// Initialize goods list.
-		goodsList = GoodsUtil.getGoodsList();
+		// Cache the data columns
+		setCachedColumns(NUM_INITIAL_COLUMNS, COLUMNCOUNT-1);
+
+		this.selectedSettlement = selectedSettlement;
+
+		setSettlementFilter(selectedSettlement);
+	}
+	
+	@Override
+	public boolean setSettlementFilter(Settlement filter) {
+		if (selectedSettlement != null) {
+			selectedSettlement.removeUnitListener(this);
+		}
 
 		// Initialize settlements.
-		settlements = new ArrayList<Settlement>(unitManager.getSettlements());
+		selectedSettlement = filter;
+
+		// Initialize goods list.
+		resetEntities(GoodsUtil.getGoodsList());
 
 		// Add table as listener to each settlement.
-		Iterator<Settlement> i = settlements.iterator();
-		while (i.hasNext()) i.next().addUnitListener(this);
+		if (monitorSettlement) {
+			selectedSettlement.addUnitListener(this);
+		}
 
-		// Add as unit manager listener.
-		unitManager.addUnitManagerListener(this);
+		return true;
+	}
+	
+	    
+	/**
+	 * Set whether the changes to the Entities should be monitor for change. Set up the 
+	 * Unitlisteners for the selected Settlement where Food comes from for the table.
+	 * @param activate 
+	 */
+    public void setMonitorEntites(boolean activate) {
+		if (activate != monitorSettlement) {
+			if (activate) {
+				selectedSettlement.addUnitListener(this);
+			}
+			else {
+				selectedSettlement.removeUnitListener(this);
+			}
+			monitorSettlement = activate;
+		}
 	}
 
 	/**
-	 * Catch unit update event.
+	 * Catches unit update event.
+	 *
 	 * @param event the unit event.
 	 */
 	@Override
 	public void unitUpdate(UnitEvent event) {
-		if (event.getType() == UnitEventType.GOODS_VALUE_EVENT) {
-			SwingUtilities.invokeLater(new TradeTableUpdater(event));
+		Unit unit = (Unit) event.getSource();
+		UnitEventType eventType = event.getType();
+		if ((eventType == UnitEventType.GOODS_VALUE_EVENT
+			|| eventType == UnitEventType.FOOD_EVENT)
+			&& event.getTarget() instanceof Good 
+			&& unit.equals(selectedSettlement)) {
+				entityValueUpdated((Good)event.getTarget(), NUM_INITIAL_COLUMNS, COLUMNCOUNT-1);
+			}
+	}
+
+	/**
+	 * Has this model got a natural order that the model conforms to ?
+	 *
+	 * @return If true, it implies that the user should not be allowed to order.
+	 */
+	public boolean getOrdered() {
+		return false;
+	}
+
+	/**
+	 * get the value for a Good property
+	 * @param selectedGood Good selected
+	 * @param columnIndex COlumn to get
+	 */
+	protected  Object getEntityValue(Good selectedGood, int columnIndex) {
+		switch(columnIndex) {
+			case 0:
+				return selectedGood.getName();
+			case 1:
+				return getGoodCategoryName(selectedGood);
+			case 2:
+				return selectedGood.getGoodType().getName();
+			case DEMAND_COL:
+				return selectedSettlement.getGoodsManager().getDemandValue(selectedGood);
+			case SUPPLY_COL:
+				return selectedSettlement.getGoodsManager().getSupplyValue(selectedGood);
+			case QUANTITY_COL:
+				return getQuantity(selectedSettlement, selectedGood.getID());
+			case MASS_COL:
+				return getTotalMass(selectedSettlement, selectedGood);
+			case MARKET_COL:
+				return selectedGood.getInterMarketGoodValue();
+			case VALUE_COL:
+				return selectedSettlement.getGoodsManager().getGoodValuePoint(selectedGood.getID());
+			case COST_COL:
+				return selectedGood.getCostOutput();
+			case PRICE_COL:
+				return selectedSettlement.getGoodsManager().getPrice(selectedGood);
+			default:
+				return null;
 		}
+	}
+
+	/**
+	 * Gets the quantity of a resource.
+	 *
+	 * @param settlement
+	 * @param id
+	 * @return
+	 */
+    private Object getQuantity(Settlement settlement, int id) {
+
+    	if (id < ResourceUtil.FIRST_ITEM_RESOURCE_ID) {
+    		return null;
+    	}
+    	else if (id < ResourceUtil.FIRST_VEHICLE_RESOURCE_ID) {
+    		return settlement.getItemResourceStored(id);
+    	}
+    	else if (id < ResourceUtil.FIRST_EQUIPMENT_RESOURCE_ID) {
+    		return settlement.findNumVehiclesOfType(VehicleType.convertID2Type(id));
+    	}
+    	else if (id < ResourceUtil.FIRST_ROBOT_RESOURCE_ID) {
+    		EquipmentType type = EquipmentType.convertID2Type(id);
+    		if (type == EquipmentType.EVA_SUIT)
+    			return settlement.getNumEVASuit();
+    		
+    		return settlement.findNumContainersOfType(type);
+    	}
+    	else {
+    		return settlement.getInitialNumOfRobots();
+    	}
+    }
+
+	/**
+	 * Gets the total mass of a good.
+	 *
+	 * @param settlement
+	 * @param good
+	 * @return
+	 */
+    private Object getTotalMass(Settlement settlement, Good good) {
+    	int id = good.getID(); 
+    	
+    	if (id < ResourceUtil.FIRST_ITEM_RESOURCE_ID) {
+      		// For Amount Resource
+    		return Math.round(settlement.getAmountResourceStored(id) * 100.0)/100.0;
+    	}
+    	else if (id < ResourceUtil.FIRST_VEHICLE_RESOURCE_ID) {
+    		// For Item Resource
+    		if (ItemResourceUtil.findItemResource(id) != null) {
+    			return settlement.getItemResourceStored(id) * ItemResourceUtil.findItemResource(id).getMassPerItem();
+    		}
+    			return 0;
+    	}
+    	else if (id < ResourceUtil.FIRST_EQUIPMENT_RESOURCE_ID) {
+    		// For Vehicle
+    		VehicleType vehicleType = VehicleType.convertID2Type(id);
+    		if (settlement.getAVehicle(vehicleType) == null)
+    			return 0;
+    		
+    		return settlement.findNumVehiclesOfType(vehicleType) * CollectionUtils.getVehicleTypeBaseMass(vehicleType); 
+    	}
+    	else if (id < ResourceUtil.FIRST_ROBOT_RESOURCE_ID) {
+    		// For Equipment   		
+    		EquipmentType type = EquipmentType.convertID2Type(id);
+
+    		if (type == EquipmentType.EVA_SUIT)
+    			return settlement.getNumEVASuit() * EquipmentFactory.getEquipmentMass(type);
+    		
+    		return settlement.findNumContainersOfType(type) * EquipmentFactory.getEquipmentMass(type);		
+    	}
+    	else {
+    		return settlement.getInitialNumOfRobots() * Robot.EMPTY_MASS;
+    	}
+    }
+
+	/**
+	 * Gets the good category name in the internationalized string.
+	 *
+	 * @param good
+	 * @return
+	 */
+	private static String getGoodCategoryName(Good good) {
+		return good.getCategory().getMsgKey();
 	}
 
 	/**
@@ -80,173 +280,11 @@ implements UnitListener, MonitorModel, UnitManagerListener {
 	 */
 	@Override
 	public void destroy() {
+		super.destroy();
+
 		// Remove as listener for all settlements.
-		Iterator<Settlement> i = settlements.iterator();
-		while (i.hasNext()) i.next().removeUnitListener(this);
+		selectedSettlement.removeUnitListener(this);
 
-		// Remove as listener to unit manager.
-		unitManager.removeUnitManagerListener(this);
-		
-		unitManager = null;
-	}
-
-	/**
-	 * Gets the model count string.
-	 */
-	@Override
-	public String getCountString() {
-		return new StringBuilder(ONE_SPACE + goodsList.size() + ONE_SPACE + TRADE_GOODS).toString();
-	}
-
-	/**
-	 * Get the name of this model. The name will be a description helping
-	 * the user understand the contents.
-	 *
-	 * @return Descriptive name.
-	 */
-	@Override
-	public String getName() {
-		return Msg.getString("TradeTableModel.tabName");
-	}
-
-	/**
-	 * Return the object at the specified row indexes.
-	 * @param row Index of the row object.
-	 * @return Object at the specified row.
-	 */
-	public Object getObject(int row) {
-		return goodsList.get(row);
-	}
-
-	/**
-	 * Has this model got a natural order that the model conforms to. If this
-	 * value is true, then it implies that the user should not be allowed to
-	 * order.
-	 */
-	public boolean getOrdered() {
-		return false;
-	}
-
-	/**
-	 * Return the name of the column requested.
-	 * @param columnIndex Index of column.
-	 * @return name of specified column.
-	 */
-	public String getColumnName(int columnIndex) {
-		if (columnIndex == 0) return TRADE_GOODS;
-		else if (columnIndex == 1) return CATEGORY;
-		else {
-			int col = columnIndex - 2;
-			if (col % 2 == 0) // is even
-				return VP_AT + settlements.get(col/2).getName();
-			else // is odd
-				return PRICE_AT + settlements.get(col/2).getName();
-		}
-	}
-
-	/**
-	 * Return the type of the column requested.
-	 * @param columnIndex Index of column.
-	 * @return Class of specified column.
-	 */
-	public Class<?> getColumnClass(int columnIndex) {
-		if (columnIndex < 2) return String.class;
-		else return Double.class;
-	}
-
-	public int getColumnCount() {
-		return settlements.size() * 2 + 2;
-	}
-
-	public int getRowCount() {
-		return goodsList.size();
-	}
-
-	public Object getValueAt(int rowIndex, int columnIndex) {
-		if (columnIndex == 0) {
-			return Conversion.capitalize(goodsList.get(rowIndex).getName().toString());
-		}
-
-		else if (columnIndex == 1) {
-			return Conversion.capitalize(getGoodCategoryName(goodsList.get(rowIndex)).toString());
-		}
-
-		else {
-			int col = columnIndex - 2;
-			if (col % 2 == 0) // is even
-				return settlements.get(col/2).getGoodsManager().getGoodValuePerItem(goodsList.get(rowIndex));
-			else // is odd
-				return settlements.get(col/2).getGoodsManager().getPricePerItem(goodsList.get(rowIndex));
-		}
-	}
-
-
-	/**
-	 * Gets the good category name in the internationalized string
-	 * @param good
-	 * @return
-	 */
-	public String getGoodCategoryName(Good good) {
-		String key = good.getCategory().getMsgKey();
-		if (good.getCategory() == GoodType.EQUIPMENT) {
-			if (Container.class.isAssignableFrom(good.getClassType())) 
-				key = "GoodType.container"; //$NON-NLS-1$
-		}
-		return Msg.getString(key);
-	}
-
-	/**
-	 * Inner class for updating goods table.
-	 */
-	private class TradeTableUpdater implements Runnable {
-
-		private UnitEvent event;
-
-		private TradeTableUpdater(UnitEvent event) {
-			this.event = event;
-		}
-
-		public void run() {
-			if (event.getTarget() == null) 
-				fireTableDataChanged();
-			else {
-				int rowIndex = goodsList.indexOf(event.getTarget());
-				int columnIndex = settlements.indexOf(event.getSource()) * 2 + 2; 
-				fireTableCellUpdated(rowIndex, columnIndex);
-			}
-		}
-	}
-
-	@Override
-	public void unitManagerUpdate(UnitManagerEvent event) {
-
-		if (event.getUnit() instanceof Settlement) {
-
-			Settlement settlement = (Settlement) event.getUnit();
-
-			if (UnitManagerEventType.ADD_UNIT == event.getEventType()) {
-				// If settlement is new, add to settlement list.
-				if (!settlements.contains(settlement)) {
-					settlements.add(settlement);
-					settlement.addUnitListener(this);
-				}
-			}
-			else if (UnitManagerEventType.REMOVE_UNIT == event.getEventType()) {
-				// If settlement is gone, remove from settlement list.
-				if (settlements.contains(settlement)) {
-					settlements.remove(settlement);
-					settlement.removeUnitListener(this);
-				}
-			}
-
-			// Update table structure due to cells changing.
-			SwingUtilities.invokeLater(new Runnable() {
-				@Override
-				public void run() {
-					fireTableStructureChanged();
-					//fireTableStructureChanged();
-				}
-			});
-		}
+		selectedSettlement = null;
 	}
 }

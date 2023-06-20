@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * Ingredient.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-30
  * @author Manny Kung
  */
 
@@ -25,14 +25,14 @@ public class Ingredient implements Serializable {
 
 	private int amountResource;
 
-	Ingredient(int id, int amountResource, double proportion) {
+	Ingredient(int id, int amountResourceID, double proportion) {
 		this.id = id;
-		this.amountResource = amountResource;
+		this.amountResource = amountResourceID;
 		this.proportion = proportion;
 	}
 
 	public String getName() {
-		return ResourceUtil.findAmountResourceName(id);
+		return ResourceUtil.findAmountResourceName(amountResource);
 	}
 
 	public int getAmountResourceID() {
@@ -60,7 +60,6 @@ public class Ingredient implements Serializable {
 	}
 
 	public double getDryMass() {
-
 		return ingredientDryMass;
 	}
 

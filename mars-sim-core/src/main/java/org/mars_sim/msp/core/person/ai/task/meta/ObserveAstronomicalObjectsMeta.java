@@ -1,49 +1,47 @@
-/**
+/*
  * Mars Simulation Project
  * ObserveAstronomicalObjectsMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-06
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-import java.io.Serializable;
 import java.util.Iterator;
 import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.fav.FavoriteType;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
+import org.mars_sim.msp.core.person.ai.task.EVAOperation;
 import org.mars_sim.msp.core.person.ai.task.ObserveAstronomicalObjects;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.core.structure.building.function.AstronomicalObservation;
-import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * Meta task for the ObserveAstronomicalObjects task.
  */
-public class ObserveAstronomicalObjectsMeta implements MetaTask, Serializable {
-
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
+public class ObserveAstronomicalObjectsMeta extends FactoryMetaTask {
     
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.observeAstronomicalObjects"); //$NON-NLS-1$
 
     /** default logger. */
-    private static Logger logger = Logger.getLogger(ObserveAstronomicalObjectsMeta.class.getName());
+    private static final Logger logger = Logger.getLogger(ObserveAstronomicalObjectsMeta.class.getName());
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
-
+    public ObserveAstronomicalObjectsMeta() {
+		super(NAME, WorkerType.PERSON, TaskScope.ANY_HOUR);
+		
+		setFavorite(FavoriteType.ASTRONOMY);
+		setTrait(TaskTrait.ACADEMIC, TaskTrait.ARTISTIC);
+		setPreferredJob(JobType.ASTRONOMER);
+	}
+    
     @Override
     public Task constructInstance(Person person) {
         return new ObserveAstronomicalObjects(person);
@@ -60,18 +58,11 @@ public class ObserveAstronomicalObjectsMeta implements MetaTask, Serializable {
         if (null != observatory && person.isInSettlement()) {
 
             // Probability affected by the person's stress and fatigue.
-            PhysicalCondition condition = person.getPhysicalCondition();
-            double fatigue = condition.getFatigue();
-            double stress = condition.getStress();
-            double hunger = condition.getHunger();
-            
-            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            if (!person.getPhysicalCondition().isFitByLevel(500, 50, 500))
             	return 0;
             
-            // Check if it is completely dark outside.
-            double sunlight = surface.getSolarIrradiance(person.getCoordinates());
-
-            if (sunlight < 15) {
+            // Check if it is getting dark outside.
+            if (EVAOperation.isGettingDark(person)) {
 
                 ScienceType astronomy = ScienceType.ASTRONOMY;
 
@@ -88,7 +79,7 @@ public class ObserveAstronomicalObjectsMeta implements MetaTask, Serializable {
                             primaryResult *= ObserveAstronomicalObjects.getObservatoryCrowdingModifier(person, observatory);
 
                             // If researcher's current job isn't related to astronomy, divide by two.
-                            Job job = person.getMind().getJob();
+                            JobType job = person.getMind().getJob();
                             if (job != null) {
                                 ScienceType jobScience = ScienceType.getJobScience(job);
                                 if (astronomy != jobScience) {
@@ -105,7 +96,7 @@ public class ObserveAstronomicalObjectsMeta implements MetaTask, Serializable {
                 }
 
                 // Add probability for each study researcher is collaborating on.
-                Iterator<ScientificStudy> i = scientificStudyManager.getOngoingCollaborativeStudies(person).iterator();
+                Iterator<ScientificStudy> i = person.getCollabStudies().iterator();
                 while (i.hasNext()) {
                     ScientificStudy collabStudy = i.next();
                     if (ScientificStudy.RESEARCH_PHASE.equals(collabStudy.getPhase())) {
@@ -119,7 +110,7 @@ public class ObserveAstronomicalObjectsMeta implements MetaTask, Serializable {
                                     collabResult *= ObserveAstronomicalObjects.getObservatoryCrowdingModifier(person, observatory);
 
                                     // If researcher's current job isn't related to astronomy, divide by two.
-                                    Job job = person.getMind().getJob();
+                                    JobType job = person.getMind().getJob();
                                     if (job != null) {
                                         ScienceType jobScience = ScienceType.getJobScience(job);
                                         if (astronomy != jobScience) {
@@ -138,47 +129,13 @@ public class ObserveAstronomicalObjectsMeta implements MetaTask, Serializable {
                 }
 
                 if (result <= 0) return 0;
+                result *= (person.getAssociatedSettlement().getGoodsManager().getTourismFactor()
+	               		 + person.getAssociatedSettlement().getGoodsManager().getResearchFactor())/1.5;
                 
-                // Effort-driven task modifier.
-                result *= person.getPerformanceRating();
-
-                // Job modifier.
-                Job job = person.getMind().getJob();
-                if (job != null) {
-                    result *= job.getStartTaskProbabilityModifier(ObserveAstronomicalObjects.class)
-                    		* (person.getAssociatedSettlement().getGoodsManager().getTourismFactor()
-    	               		 + person.getAssociatedSettlement().getGoodsManager().getResearchFactor())/1.5;
-                }
-
-                // Modify if research is the person's favorite activity.
-                if (person.getFavorite().getFavoriteActivity() == FavoriteType.ASTRONOMY) {
-                    result += RandomUtil.getRandomInt(1, 20);
-                }
-                
-                if (person.getFavorite().getFavoriteActivity() == FavoriteType.RESEARCH) {
-                    result *= 1.2D;
-                }
-                
-    	        // 2015-06-07 Added Preference modifier
-                if (result > 0)
-                	result = result + result * person.getPreference().getPreferenceScore(this)/2D;
-
-    	        if (result < 0) result = 0;
+                result *= getPersonModifier(person);
             }
         }
 
         return result;
     }
-
-	@Override
-	public Task constructInstance(Robot robot) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public double getProbability(Robot robot) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
 }

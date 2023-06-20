@@ -1,14 +1,11 @@
-/**
+/*
  * Mars Simulation Project
  * Vehicle.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-06-10
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.core.vehicle;
 
-import java.awt.geom.Point2D;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -18,57 +15,47 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Direction;
-import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.LocalAreaUtil;
 import org.mars_sim.msp.core.LocalBoundedObject;
-import org.mars_sim.msp.core.LogConsolidated;
+import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitEventType;
+import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.data.MSolDataItem;
 import org.mars_sim.msp.core.data.MSolDataLogger;
+import org.mars_sim.msp.core.environment.MarsSurface;
+import org.mars_sim.msp.core.equipment.Container;
+import org.mars_sim.msp.core.equipment.Equipment;
+import org.mars_sim.msp.core.equipment.EquipmentInventory;
+import org.mars_sim.msp.core.equipment.EquipmentOwner;
+import org.mars_sim.msp.core.equipment.EquipmentType;
+import org.mars_sim.msp.core.equipment.ItemHolder;
 import org.mars_sim.msp.core.location.LocationStateType;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.malfunction.Malfunctionable;
 import org.mars_sim.msp.core.manufacture.Salvagable;
 import org.mars_sim.msp.core.manufacture.SalvageInfo;
 import org.mars_sim.msp.core.manufacture.SalvageProcessInfo;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.mission.AreologyFieldStudy;
-import org.mars_sim.msp.core.person.ai.mission.BiologyFieldStudy;
-import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
-import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
-import org.mars_sim.msp.core.person.ai.mission.CollectIce;
-import org.mars_sim.msp.core.person.ai.mission.CollectRegolith;
-import org.mars_sim.msp.core.person.ai.mission.EmergencySupply;
-import org.mars_sim.msp.core.person.ai.mission.Exploration;
-import org.mars_sim.msp.core.person.ai.mission.MeteorologyFieldStudy;
-import org.mars_sim.msp.core.person.ai.mission.Mining;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionType;
-import org.mars_sim.msp.core.person.ai.mission.RescueSalvageVehicle;
-import org.mars_sim.msp.core.person.ai.mission.Trade;
-import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
-import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
-import org.mars_sim.msp.core.person.ai.task.EVAOperation;
-import org.mars_sim.msp.core.person.ai.task.HaveConversation;
-import org.mars_sim.msp.core.person.ai.task.Maintenance;
+import org.mars_sim.msp.core.person.ai.task.Conversation;
+import org.mars_sim.msp.core.person.ai.task.MaintainBuilding;
 import org.mars_sim.msp.core.person.ai.task.Repair;
-import org.mars_sim.msp.core.person.ai.task.UnloadVehicleEVA;
-import org.mars_sim.msp.core.person.ai.task.UnloadVehicleGarage;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
+import org.mars_sim.msp.core.project.Stage;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.Indoor;
+import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.SystemType;
+import org.mars_sim.msp.core.structure.building.function.VehicleMaintenance;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
@@ -79,52 +66,31 @@ import org.mars_sim.msp.core.tool.RandomUtil;
  * a specific type of vehicle.
  */
 public abstract class Vehicle extends Unit
-		implements Malfunctionable, Salvagable, Temporal, Indoor, LocalBoundedObject, Serializable {
+		implements Malfunctionable, Salvagable, Temporal, Indoor,
+		LocalBoundedObject, EquipmentOwner, ItemHolder {
 
 	private static final long serialVersionUID = 1L;
 
-	private static final Logger logger = Logger.getLogger(Vehicle.class.getName());
-	private static final String loggerName = logger.getName();
-	private static final String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
-
+	// default logger.
+	private static final SimLogger logger = SimLogger.getLogger(Vehicle.class.getName());
+	
+	private static final double RANGE_FACTOR = 1.2;
+	private static final double MAXIMUM_RANGE = 10_000;
+	
+	private static final int MAX_NUM_SOLS = 14;
+	
 	/** The error margin for determining vehicle range. (Actual distance / Safe distance). */
-	private static double fuel_range_error_margin;// = SimulationConfig.instance().getSettlementConfiguration().loadMissionControl()[0];
-	private static double life_support_range_error_margin;// = SimulationConfig.instance().getSettlementConfiguration().loadMissionControl()[1];
+	private static double fuel_range_error_margin;
+	private static double life_support_range_error_margin;
 
-	// For Methane : 
-	// Specific energy is 55.5	MJ/kg, or 15,416 Wh/kg, or 15.416kWh / kg
-	// Energy density is 0.0364 MJ/L, 36.4 kJ/L or 10 Wh/L
-	// Note : 1 MJ = 0.277778 kWh; 1 kWh = 3.6 MJ
-	// as comparison, 1 gallon (or 3.7854 L) of gasoline (which, for the record, it says is 33.7 kilowatt-hours) +> 8.9 kWh / L
-	
-	/** The specific energy of CH4 [kWh/kg] */
-	private static final double METHANE_SPECIFIC_ENERGY = 15.416D;
-	/** The Solid Oxide Fuel Cell Conversion Efficiency (dimension-less) */
-	public static final double SOFC_CONVERSION_EFFICIENCY = .65;
-	/** Lifetime Wear in millisols **/
-	private static final double WEAR_LIFETIME = 668_000; // 668 Sols (1 orbit)
-	/** Estimated Number of hours traveled each day. **/
-	private static final int ESTIMATED_NUM_HOURS = 16;
-	/** The scope name for Light Utility Vehicle.  **/
-//	private static final String LUV = "LUV";
-	
-	/** The unit count for this person. */
-	private static int uniqueCount = Unit.FIRST_VEHICLE_UNIT_ID;
-	
 	/** The types of status types that make a vehicle unavailable for us. */
 	private static final List<StatusType> badStatus = Arrays.asList(
-			StatusType.MAINTENANCE, 
-			StatusType.TOWED, 
+			StatusType.MAINTENANCE,
+			StatusType.TOWED,
 			StatusType.MOVING,
-			StatusType.STUCK, 
+			StatusType.STUCK,
 			StatusType.MALFUNCTION);
-	
-	// 1989 NASA Mars Manned Transportation Vehicle - Shuttle Fuel Cell Power Plant (FCP)  7.6 kg/kW
-	
-	// DOE 2010 Targe : Specific power = 650 W_e/L; Power Density = 650 W_e/kg
-	// Toyota Mirai Fuel cell - 90 kW
-	
-	// Data members
+
 	/** True if vehicle is currently reserved for a mission. */
 	protected boolean isReservedMission;
 	/** True if vehicle is due for maintenance. */
@@ -136,369 +102,219 @@ public abstract class Vehicle extends Unit
 	/** True if vehicle is salvaged. */
 	private boolean isSalvaged;
 	
-	/** Unique identifier for this vehicle. */
-	private int identifier;
 	/** Vehicle's associated Settlement. */
 	private int associatedSettlementID;
 	
-	/** Current speed of vehicle in kph. */
-	private double speed = 0; // 
-	/** Base speed of vehicle in kph (can be set in child class). */
-	private double baseSpeed = 0; // 
-	/** The base range of the vehicle (with full tank of fuel and no cargo) (km). */
-	private double baseRange = 0;
-	/** Total cumulative distance traveled by vehicle (km). */
-	private double odometerMileage; // 
-	/** Distance traveled by vehicle since last maintenance (km) . */
-	private double distanceMaint; // 
-	/** The efficiency of the vehicle's drivetrain. (kWh/km). */
-	private double drivetrainEfficiency;
-	/** The continuous motor power output of the vehicle. (kW). */
-	private double continuousPower = 8;
-	/** The total number of hours the vehicle is capable of operating. (kW). */
-	private double totalHours;
-	/** The maximum fuel capacity of the vehicle [kg] */
-	private double fuelCapacity;
-	/** The total energy of the vehicle in full tank [kWh]. */
-	private double totalEnergy = 100D;
-	/** The base fuel economy of the vehicle [km/kg]. */
-	private double baseFuelEconomy;
-	/** The base fuel consumption of the vehicle [km/kWh]. */
-	private double baseFuelConsumption;
-	/** The estimated average fuel economy of the vehicle for a trip [km/kg]. */
-	private double estimatedAveFuelEconomy;
-	/** The estimated combined total crew weight for a trip [km/kg]. */
-	private double estimatedTotalCrewWeight;
-	/** The cargo capacity of the vehicle for a trip [km/kg]. */
-	private double cargoCapacity;
-	/** The actual start mass of the vehicle (base mass + crew weight + full cargo weight) for a trip [km/kg]. */
-	private double startMass;
-	/** The estimated beginning mass of the vehicle (base mass + crew weight + full cargo weight) for a trip [km/kg]. */
-	private double beginningMass;
-	/** The estimated end mass of the vehicle (base mass + crew weight + remaining cargo weight) for a trip [km/kg]. */
-	private double endMass;
-	/** Width of vehicle (meters). */
-	private double width;
-	/** Length of vehicle (meters). */
-	private double length;
-	/** Parked X location (meters) from center of settlement. */
-	private double xLocParked;
-	/** Parked Y location (meters) from center of settlement. */
-	private double yLocParked;
+	/** The average road load power of the vehicle [kph]. */
+	private double averageRoadLoadSpeed;
+
+	/** The average road load power of the vehicle [kW]. */
+	private double averageRoadLoadPower;
+			
 	/** Parked facing (degrees clockwise from North). */
 	private double facingParked;
+	/** The Base Lifetime Wear in msols **/
+	private double baseWearLifetime;
+	/** Current accel of vehicle in m/s2. */
+	private double accel = 0;
+	/** Current speed of vehicle in kph. */
+	private double speed = 0; //
+	/** Total cumulative distance traveled by vehicle (km). */
+	private double odometerMileage; //
+	/** The last distance travelled by vehicle (km). */
+	private double lastDistance;
+	/** Distance traveled by vehicle since last maintenance (km) . */
+	private double distanceMaint; //
+	/** The cumulative fuel usage of the vehicle [kg] */
+//	private double fuelCumUsed;
+	/** The cumulative energy usage of the vehicle [kWh] */
+	private double cumEnergyUsedKWH;
+	/** The instantaneous fuel economy of the vehicle [km/kg]. */
+	private double iFuelEconomy;
+	/** The instantaneous fuel consumption of the vehicle [Wh/km]. */
+	private double iFuelConsumption;
+	/** The actual start mass of the vehicle (base mass + crew weight + full cargo weight) for a trip [km/kg]. */
+	private double startMass = 0;
 	
-	/** The vehicle type. */	
-	private String vehicleType;
-	/** The type of dessert loaded. */	
-	private String typeOfDessertLoaded;
+	/** The vehicle specification */
+	private String specName;
 	
+	/** Parked position (meters) from center of settlement. */
+	private LocalPosition posParked;
+	
+	/** The vehicle type. */
+	protected VehicleType vehicleType;
+
 	/** A collection of locations that make up the vehicle's trail. */
-	private ArrayList<Coordinates> trail;
+	private List<Coordinates> trail;
 	/** List of operator activity spots. */
-	private List<Point2D> operatorActivitySpots;
+	private List<LocalPosition> operatorActivitySpots;
 	/** List of passenger activity spots. */
-	private List<Point2D> passengerActivitySpots;
+	private List<LocalPosition> passengerActivitySpots;
 	/** List of status types. */
-	private Set<StatusType> statusTypes;
+	private Set<StatusType> statusTypes = new HashSet<>();
+	
+	/** The primary status type. */
+	private StatusType primaryStatus;
+
 	/** The vehicle's status log. */
-	private MSolDataLogger<Set<StatusType>> vehicleLog = new MSolDataLogger<Set<StatusType>>(5);
+	private MSolDataLogger<Set<StatusType>> vehicleLog = new MSolDataLogger<>(MAX_NUM_SOLS);
+	/** The vehicle's road speed history. */
+	private MSolDataLogger<Integer> roadSpeedHistory = new MSolDataLogger<>(MAX_NUM_SOLS);
+	/** The vehicle's road power history. */	
+	private MSolDataLogger<Integer> roadPowerHistory = new MSolDataLogger<>(MAX_NUM_SOLS);
 	
 	/** The malfunction manager for the vehicle. */
-	protected MalfunctionManager malfunctionManager; 
+	protected MalfunctionManager malfunctionManager;
 	/** Direction vehicle is traveling */
 	private Direction direction;
 	/** The operator of the vehicle. */
-	private VehicleOperator vehicleOperator;
+	private Worker vehicleOperator;
 	/** The one currently towing this vehicle. */
 	private Vehicle towingVehicle;
-	/** The The vehicle's salvage info. */
-	private SalvageInfo salvageInfo; 
+	/** The vehicle's salvage info. */
+	private SalvageInfo salvageInfo;
+	/** The EquipmentInventory instance. */
+	private EquipmentInventory eqmInventory;
+	/** The VehicleController instance. */
+	private VehicleController vehicleController;
+	/** The VehicleSpec instance. */
+	private VehicleSpec spec;
 
+	private Mission mission;
+	
 	static {
 		life_support_range_error_margin = simulationConfig.getSettlementConfiguration()
-				.loadMissionControl()[0];
-		fuel_range_error_margin = simulationConfig.getSettlementConfiguration().loadMissionControl()[1];
+				.getRoverValues()[0];
+		fuel_range_error_margin = simulationConfig.getSettlementConfiguration().getRoverValues()[1];
 	}
-	
+
 	/**
-	 * Must be synchronised to prevent duplicate ids being assigned via different
-	 * threads.
-	 * 
-	 * @return
-	 */
-	private static synchronized int getNextIdentifier() {
-		return uniqueCount++;
-	}
-	
-	/**
-	 * Get the unique identifier for this person
-	 * 
-	 * @return Identifier
-	 */
-	public int getIdentifier() {
-		return identifier;
-	}
-	
-	public void incrementID() {
-		// Gets the identifier
-		this.identifier = getNextIdentifier();
-	}
-	
-	/**
-	 * Constructor 1 : prepares a Vehicle object with a given settlement
-	 * 
+	 * Constructor 1 : prepares a Vehicle object with a given settlement.
+	 *
 	 * @param name                the vehicle's name
 	 * @param vehicleType         the configuration description of the vehicle.
 	 * @param settlement          the settlement the vehicle is parked at.
 	 * @param maintenanceWorkTime the work time required for maintenance (millisols)
 	 */
-	Vehicle(String name, String vehicleType, Settlement settlement, double maintenanceWorkTime) {
+	Vehicle(String name, VehicleSpec spec, Settlement settlement, double maintenanceWorkTime) {
 		// Use Unit constructor
 		super(name, settlement.getCoordinates());
 		
-		if (unitManager == null)
-			unitManager = sim.getUnitManager();
+		this.spec = spec;
+		this.specName = spec.getName();
+		this.vehicleType = spec.getType();
+		setBaseMass(spec.getEmptyMass());
 		
-		// Add this vehicle to the lookup map
-		unitManager.addVehicleID(this);
-		
-		this.vehicleType = vehicleType;
-		
-		// Obtain the associated settlement ID 
+		// Get the description
+		String description = spec.getDescription();
+		// Set the description
+		setDescription(description);
+		// Get cargo capacity
+		double cargoCapacity = spec.getTotalCapacity();
+		// Create microInventory instance
+		eqmInventory = new EquipmentInventory(this, cargoCapacity);
+
+		// Set the capacities for each supported resource
+		Map<Integer, Double> capacities = spec.getCargoCapacityMap();
+		if (capacities != null) {
+			eqmInventory.setResourceCapacityMap(capacities);
+		}
+
+		// Set total distance traveled by vehicle (km)
+		odometerMileage = 0;
+		// Set distance traveled by vehicle since last maintenance (km)
+		distanceMaint = 0;
+		// Obtain the associated settlement ID
 		associatedSettlementID = settlement.getIdentifier();
 
-		// Add this vehicle to be owned by the settlement
-		settlement.addOwnedVehicle(this);
-
-		// Store this vehicle in the settlement
-		settlement.getInventory().storeUnit(this);
-	
-		// Initialize vehicle data
-		vehicleType = vehicleType.toLowerCase();
-
 		direction = new Direction(0);
-		trail = new ArrayList<Coordinates>();
+		trail = new ArrayList<>();
 		statusTypes = new HashSet<>();
-		
+
 		isReservedMission = false;
 		distanceMark = false;
 		reservedForMaintenance = false;
 		emergencyBeacon = false;
 		isSalvaged = false;
+		
+		// Make this vehicle to be owned by the settlement
+		settlement.addOwnedVehicle(this);
+
+		// Set the initial coordinates to be that of the settlement
+		setCoordinates(settlement.getCoordinates());
+		
+		baseWearLifetime = 668_000 * spec.getWearModifier(); // 668 Sols (1 orbit)
 
 		// Initialize malfunction manager.
-		malfunctionManager = new MalfunctionManager(this, WEAR_LIFETIME, maintenanceWorkTime);
-		
-		// Add "vehicle" as scope
-		malfunctionManager.addScopeString(SystemType.VEHICLE.getName());
-		
-		// Add its vehicle type as scope
-		malfunctionManager.addScopeString(vehicleType);
-		
-		if (!vehicleType.equals(LightUtilityVehicle.class.getSimpleName())) {
-			// Add "rover" as scope
-			malfunctionManager.addScopeString(SystemType.ROVER.getName());
-		}
-		
-		addStatus(StatusType.PARKED);
-		
-		// Set width and length of vehicle.
-		width = vehicleConfig.getWidth(vehicleType);
-		length = vehicleConfig.getLength(vehicleType);
+		malfunctionManager = new MalfunctionManager(this, baseWearLifetime, maintenanceWorkTime);
 
-		// Set description
-		setDescription(vehicleType);
-		// Set total distance traveled by vehicle (km)
-		odometerMileage = 0;
-		// Set distance traveled by vehicle since last maintenance (km)
-		distanceMaint = 0;
-		// Set base speed.
-		baseSpeed = vehicleConfig.getBaseSpeed(vehicleType);
-//		setBaseSpeed(baseSpeed);
+		setupScopeString();
 
-		// Set the empty mass of the vehicle.
-		setBaseMass(vehicleConfig.getEmptyMass(vehicleType));
+		primaryStatus = StatusType.PARKED;
+		
+		writeLog();
 
-		// Set the drivetrain efficiency [in kWh/km] of the vehicle.
-		drivetrainEfficiency = vehicleConfig.getDrivetrainEfficiency(vehicleType) ;
-		
-		// Gets the capacity [in kg] of vehicle's fuel tank 
-		fuelCapacity = vehicleConfig.getCargoCapacity(vehicleType, ResourceUtil.findAmountResourceName(getFuelType())); 
-
-		// Gets the total energy [in kWh] on a full tank of methane
-		totalEnergy = METHANE_SPECIFIC_ENERGY * fuelCapacity * SOFC_CONVERSION_EFFICIENCY;
-
-		// Gets the maximum total # of hours the vehicle is capable of operating
-		totalHours = totalEnergy / continuousPower;
-		
-		// Gets the average number of sols the vehicle is capable of operating
-//		double sols = totalHours / ESTIMATED_NUM_HOURS;
-		
-		// Gets the base range [in km] of the vehicle
-		baseRange = baseSpeed * totalHours;
-//		baseRange = totalEnergy / drivetrainEfficiency;
-		
-		// Gets the base fuel economy [in km/kg] of this vehicle 
-		baseFuelEconomy = baseRange / fuelCapacity;
-		
-		// Gets the base fuel consumption [in km/kWh] of this vehicle 
-		baseFuelConsumption = baseRange / totalEnergy;
-		
-		// Gets the crew capacity
-		int numCrew = 0; 
-//		if (this instanceof Rover)
-			numCrew = vehicleConfig.getCrewSize(vehicleType);//((Rover)this).getCrewCapacity();
-//		else if (this instanceof LightUtilityVehicle)
-//			numCrew = vehicleConfig.getCrewSize(type);//Vehicle.((LightUtilityVehicle)this).getCrewCapacity();
-		
-		estimatedTotalCrewWeight = numCrew * Person.getAverageWeight();
-		
-		cargoCapacity = vehicleConfig.getTotalCapacity(vehicleType);
-		
-		if (this instanceof Rover) {
-			beginningMass = getBaseMass() + estimatedTotalCrewWeight + 500;	//cargoCapacity/3;
-			
-			// Accounts for the rock sample, ice or regolith collected
-			endMass = getBaseMass() + estimatedTotalCrewWeight + 1000;	//cargoCapacity/15;
-			
-			// Gets the estimated average fuel economy for a trip [km/kg]
-			estimatedAveFuelEconomy = baseFuelEconomy * (beginningMass / endMass * .75);
-			
-//			logger.config(Conversion.capitalize(vehicleType) 
-//					+ " -          total energy : " + Math.round(totalEnergy*100.0)/100.0 + " kWh");
-//			logger.config(Conversion.capitalize(vehicleType) 
-//					+ " -           total hours : " + Math.round(totalHours*100.0)/100.0 + " hrs");
-//			logger.config(Conversion.capitalize(vehicleType) 
-//					+ " -             # of sols : " + Math.round(sols*100.0)/100.0);
-//			logger.config(Conversion.capitalize(vehicleType) 
-//					+ " -            base range : " + Math.round(baseRange*100.0)/100.0 + " km");
-//			logger.config(Conversion.capitalize(vehicleType) 
-//					+ " - drivetrain efficiency : " + Math.round(drivetrainEfficiency*100.0)/100.0 + " kWh/km");
-//			logger.config(Conversion.capitalize(vehicleType) 
-//					+ " -        beginning mass : " + Math.round(beginningMass*100.0)/100.0 + " kg");
-//			logger.config(Conversion.capitalize(vehicleType) 
-//					+ " -              end mass : " + Math.round(endMass*100.0)/100.0 + " kg");		
-//			logger.config(Conversion.capitalize(vehicleType) 
-//					+ " -          current Mass : " + Math.round(getMass()*100.0)/100.0 + " kg");	
-//			logger.config(Conversion.capitalize(vehicleType) 
-//					+ " -     base fuel economy : " + Math.round(baseFuelEconomy*100.0)/100.0 + " km/kg");
-//			logger.config(Conversion.capitalize(vehicleType) 
-//					+ " -  average fuel economy : " + Math.round(estimatedAveFuelEconomy*100.0)/100.0 + " km/kg");
-//			logger.config(Conversion.capitalize(vehicleType) 
-//					+ " -  base fuel cosumption : " + Math.round(baseFuelConsumption*100.0)/100.0 + " km/kWh");
-			
-		}
+		// Instantiate the motor controller
+		vehicleController = new VehicleController(this);
 		
 		// Set initial parked location and facing at settlement.
 		findNewParkingLoc();
 
 		// Initialize operator activity spots.
-		operatorActivitySpots = new ArrayList<Point2D>(vehicleConfig.getOperatorActivitySpots(vehicleType));
+		operatorActivitySpots = spec.getOperatorActivitySpots();
 
 		// Initialize passenger activity spots.
-		passengerActivitySpots = new ArrayList<Point2D>(vehicleConfig.getPassengerActivitySpots(vehicleType));
+		passengerActivitySpots = spec.getPassengerActivitySpots();
 	}
 
 	/**
-	 * Constructor 2 : prepares a Vehicle object for testing (called by MockVehicle)
-	 * 
-	 * @param name                the vehicle's name
-	 * @param vehicleType         the configuration description of the vehicle.
-	 * @param settlement          the settlement the vehicle is parked at.
-	 * @param baseSpeed           the base speed of the vehicle (kph)
-	 * @param baseMass            the base mass of the vehicle (kg)
-	 * @param fuelEconomy		  the fuel economy of the vehicle (km/kg)
-	 * @param maintenanceWorkTime the work time required for maintenance (millisols)
+	 * Sets the scope string.
 	 */
-	protected Vehicle(String name, String vehicleType, Settlement settlement, double baseSpeed, double baseMass,
-			double fuelEconomy, double maintenanceWorkTime) {
-
-		// Use Unit constructor
-		super(name, settlement.getCoordinates());
-		
-		if (unitManager == null)
-			unitManager = sim.getUnitManager();
-		
-//		this.identifier = getNextIdentifier();
-		
-		if (unitManager != null) // for passing maven test
-			unitManager.addVehicleID(this);
-		
-		// Place this person within a settlement
-//		enter(LocationCodeType.SETTLEMENT);
-		
-		this.vehicleType = vehicleType;
-
-		associatedSettlementID = settlement.getIdentifier();
-//		containerUnit = settlement;
-		setContainerID(associatedSettlementID);
-		settlement.getInventory().storeUnit(this);
-
-		direction = new Direction(0);
-		trail = new ArrayList<Coordinates>();
-		statusTypes = new HashSet<>();
-		
-		// Set description
-		setDescription(vehicleType);
-		// Set total distance traveled by vehicle (km)
-		odometerMileage = 0;
-		// Set distance traveled by vehicle since last maintenance (km)
-		distanceMaint = 0;
-		// Set base speed.
-		this.baseSpeed = baseSpeed;
-//		setBaseSpeed(baseSpeed);
-
-		// Set the empty mass of the vehicle.
-		setBaseMass(baseMass);
-		
-		this.drivetrainEfficiency = .15;
-		isReservedMission = false;
-		distanceMark = false;
-		reservedForMaintenance = false;
-		emergencyBeacon = false;
-
-		isSalvaged = false;
-		salvageInfo = null;
-		width = 0D;
-		length = 0D;
-		xLocParked = 0D;
-		yLocParked = 0D;
-		facingParked = 0D;
-
-		// Initialize malfunction manager.
-		malfunctionManager = new MalfunctionManager(this, WEAR_LIFETIME, maintenanceWorkTime);
-		malfunctionManager.addScopeString(SystemType.VEHICLE.getName());// "Vehicle");
-		
-		addStatus(StatusType.PARKED);
+	protected void setupScopeString() {
+		// Add "vehicle" as scope
+		malfunctionManager.addScopeString(SystemType.VEHICLE.getName());
+	
+		// Add its vehicle type as scope
+		malfunctionManager.addScopeString(vehicleType.name());
+	}
+	
+	/**
+	 * Gets the base image for this Vehicle.
+	 * 
+	 * @todo This needs refactoring to avoid copying out VehicleSpec properties
+	 * @return Name of base image for this vehicle
+	 */
+	public String getBaseImage() {
+		return spec.getBaseImage();
+	}
+	/**
+	 * Gets the name of the vehicle specification.
+	 * 
+	 * @see VehicleConfig#getVehicleSpec(String)
+	 * @return Name of the VehicleSpec
+	 */
+	public String getSpecName() {
+		return specName;
 	}
 
-	public String getDescription(String vehicleType) {
-		return vehicleConfig.getDescription(vehicleType);
-	}
-
-	public String getVehicleType() {
+	public VehicleType getVehicleType() {
 		return vehicleType;
 	}
 
 	@Override
 	public double getWidth() {
-		return width;
+		return spec.getWidth();
 	}
 
 	@Override
 	public double getLength() {
-		return length;
+		return spec.getLength();
 	}
 
 	@Override
-	public double getXLocation() {
-		return xLocParked;
-	}
-
-	@Override
-	public double getYLocation() {
-		return yLocParked;
+	public LocalPosition getPosition() {
+		return posParked;
 	}
 
 	@Override
@@ -508,69 +324,76 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Gets a list of operator activity spots.
-	 * 
+	 *
 	 * @return list of activity spots as Point2D objects.
 	 */
-	public List<Point2D> getOperatorActivitySpots() {
+	public List<LocalPosition> getOperatorActivitySpots() {
 		return operatorActivitySpots;
 	}
 
 	/**
 	 * Gets a list of passenger activity spots.
-	 * 
+	 *
 	 * @return list of activity spots as Point2D objects.
 	 */
-	public List<Point2D> getPassengerActivitySpots() {
+	public List<LocalPosition> getPassengerActivitySpots() {
 		return passengerActivitySpots;
 	}
 
 	/**
 	 * Sets the location and facing of the vehicle when parked at a settlement.
-	 * 
-	 * @param xLocation the x location (meters from settlement center - West:
-	 *                  positive, East: negative).
-	 * @param yLocation the y location (meters from settlement center - North:
-	 *                  positive, South: negative).
+	 *
+	 * @param position  Position of the parking relative to the Settlement
 	 * @param facing    (degrees from North clockwise).
 	 */
-	public void setParkedLocation(double xLocation, double yLocation, double facing) {
-
-		// Get current human crew positions relative to the vehicle.
-		Map<Person, Point2D> currentCrewPositions = getCurrentCrewPositions();
-
-		// Get current robot crew positions relative to the vehicle.
-		Map<Robot, Point2D> currentRobotCrewPositions = getCurrentRobotCrewPositions();
-
+	public void setParkedLocation(LocalPosition position, double facing) {
 		// Set new parked location for the vehicle.
-		this.xLocParked = xLocation;
-		this.yLocParked = yLocation;
+		this.posParked = position;
 		this.facingParked = facing;
-
+		
+		// Get current human crew positions relative to the vehicle.
+		Map<Person, LocalPosition> currentCrewPositions = getCurrentCrewPositions();
 		// Set the human crew locations to the vehicle's new parked location.
-		setCrewPositions(currentCrewPositions);
+		if (currentCrewPositions != null)
+			setCrewPositions(currentCrewPositions);
+		
+		// Get current robot crew positions relative to the vehicle.
+		Map<Robot, LocalPosition> currentRobotCrewPositions = getCurrentRobotCrewPositions();
 
 		// Set the robot crew locations to the vehicle's new parked location.
-		setRobotCrewPositions(currentRobotCrewPositions);
+		if (currentRobotCrewPositions != null)
+			setRobotCrewPositions(currentRobotCrewPositions);
 	}
 
 	/**
+	 * Sets the location and facing of the drone when parked at a settlement.
+	 *
+	 * @param position  Position of the parking relative to the Settlement
+	 * @param facing    (degrees from North clockwise).
+	 */
+	public void setFlyerLocation(LocalPosition position, double facing) {
+		// Set new parked location for the flyer.
+		this.posParked = position;
+		this.facingParked = facing;
+	}
+	
+	/**
 	 * Gets all human crew member positions relative to within the vehicle.
-	 * 
+	 *
 	 * @return map of crew members and their relative vehicle positions.
 	 */
-	private Map<Person, Point2D> getCurrentCrewPositions() {
+	private Map<Person, LocalPosition> getCurrentCrewPositions() {
 
-		Map<Person, Point2D> result = null;
+		Map<Person, LocalPosition> result = null;
 
 		// Record current object-relative crew positions if vehicle is crewable.
 		if (this instanceof Crewable) {
 			Crewable crewable = (Crewable) this;
-			result = new HashMap<Person, Point2D>(crewable.getCrewNum());
-			Iterator<Person> i = ((Crewable) this).getCrew().iterator();
+			result = new HashMap<>(crewable.getCrewNum());
+			Iterator<Person> i = crewable.getCrew().iterator();
 			while (i.hasNext()) {
 				Person crewmember = i.next();
-				Point2D crewPos = LocalAreaUtil.getObjectRelativeLocation(crewmember.getXLocation(),
-						crewmember.getYLocation(), this);
+				LocalPosition crewPos = LocalAreaUtil.getObjectRelativePosition(crewmember.getPosition(), this);
 				result.put(crewmember, crewPos);
 			}
 		}
@@ -580,22 +403,21 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Gets all robot crew member positions relative to within the vehicle.
-	 * 
+	 *
 	 * @return map of crew members and their relative vehicle positions.
 	 */
-	private Map<Robot, Point2D> getCurrentRobotCrewPositions() {
+	private Map<Robot, LocalPosition> getCurrentRobotCrewPositions() {
 
-		Map<Robot, Point2D> result = null;
+		Map<Robot, LocalPosition> result = null;
 
 		// Record current object-relative crew positions if vehicle is crewable.
 		if (this instanceof Crewable) {
 			Crewable crewable = (Crewable) this;
-			result = new HashMap<Robot, Point2D>(crewable.getRobotCrewNum());
+			result = new HashMap<>(crewable.getRobotCrewNum());
 			Iterator<Robot> i = ((Crewable) this).getRobotCrew().iterator();
 			while (i.hasNext()) {
 				Robot robotCrewmember = i.next();
-				Point2D crewPos = LocalAreaUtil.getObjectRelativeLocation(robotCrewmember.getXLocation(),
-						robotCrewmember.getYLocation(), this);
+				LocalPosition crewPos = LocalAreaUtil.getObjectRelativePosition(robotCrewmember.getPosition(), this);
 				result.put(robotCrewmember, crewPos);
 			}
 		}
@@ -606,8 +428,10 @@ public abstract class Vehicle extends Unit
 	/**
 	 * Sets the positions of all human crew members (if any) to the vehicle's
 	 * location.
+	 * 
+	 * @param currentCrewPositions
 	 */
-	private void setCrewPositions(Map<Person, Point2D> currentCrewPositions) {
+	private void setCrewPositions(Map<Person, LocalPosition> currentCrewPositions) {
 
 		// Only move crew if vehicle is Crewable.
 		if (this instanceof Crewable) {
@@ -615,11 +439,10 @@ public abstract class Vehicle extends Unit
 			while (i.hasNext()) {
 				Person crewmember = i.next();
 
-				Point2D currentCrewPos = currentCrewPositions.get(crewmember);
-				Point2D.Double settlementLoc = LocalAreaUtil.getLocalRelativeLocation(currentCrewPos.getX(),
-						currentCrewPos.getY(), this);
-				crewmember.setXLocation(settlementLoc.getX());
-				crewmember.setYLocation(settlementLoc.getY());
+				LocalPosition currentCrewPos = currentCrewPositions.get(crewmember);
+				LocalPosition settlementLoc = LocalAreaUtil.getLocalRelativePosition(currentCrewPos,
+																		this);
+				crewmember.setPosition(settlementLoc);
 			}
 		}
 	}
@@ -627,8 +450,10 @@ public abstract class Vehicle extends Unit
 	/**
 	 * Sets the positions of all robot crew members (if any) to the vehicle's
 	 * location.
+	 * 
+	 * @param currentRobotCrewPositions
 	 */
-	private void setRobotCrewPositions(Map<Robot, Point2D> currentRobotCrewPositions) {
+	private void setRobotCrewPositions(Map<Robot, LocalPosition> currentRobotCrewPositions) {
 
 		// Only move crew if vehicle is Crewable.
 		if (this instanceof Crewable) {
@@ -636,78 +461,42 @@ public abstract class Vehicle extends Unit
 			while (i.hasNext()) {
 				Robot robotCrewmember = i.next();
 
-				Point2D currentCrewPos = currentRobotCrewPositions.get(robotCrewmember);
-				Point2D.Double settlementLoc = LocalAreaUtil.getLocalRelativeLocation(currentCrewPos.getX(),
-						currentCrewPos.getY(), this);
-				robotCrewmember.setXLocation(settlementLoc.getX());
-				robotCrewmember.setYLocation(settlementLoc.getY());
+				LocalPosition currentCrewPos = currentRobotCrewPositions.get(robotCrewmember);
+				LocalPosition settlementLoc = LocalAreaUtil.getLocalRelativePosition(currentCrewPos,
+														this);
+				robotCrewmember.setPosition(settlementLoc);
 			}
 		}
 	}
 
 	/**
-	 * Returns a list of vehicle's status types
-	 * 
-	 * @return the vehicle's status types
-	 */
-	public Set<StatusType> getStatusTypes() {
-		return statusTypes;
-	}
-
-	/**
-	 * Checks if the two set of status types are the same
-	 * 
-	 * @param st1
-	 * @param st2
-	 * @return true if the two set of status types are the same
-	 */
-	public boolean hasSameStatusTypes(Set<StatusType> st1, Set<StatusType> st2) {
-		if (st1.equals(st2))
-			return true;
-		
-		return false;
-	}
-	
-	/**
-	 * Prints a string list of status types
-	 * 
+	 * Prints a string list of status types.
+	 *
 	 * @return
 	 */
 	public String printStatusTypes() {
-		return statusTypes.toString();
+		StringBuilder builder = new StringBuilder();
+		builder.append(primaryStatus.getName());
+
+		for (StatusType st : statusTypes) {
+			builder.append(", ").append(st.getName());
+		}
+		return builder.toString();
 	}
-	
+
 	/**
-	 * Checks if this vehicle has already been tagged with a status type
-	 * 
+	 * Checks if this vehicle has already been tagged with a status type.
+	 *
 	 * @param status the status type of interest
 	 * @return yes if it has it
 	 */
 	public boolean haveStatusType(StatusType status) {
-		if (statusTypes.contains(status))
-			return true;
-		
-		return false;
-	}
-	
+        return statusTypes.contains(status);
+    }
+
 	/**
-	 * Checks if this vehicle has already been tagged with anyone of the provided status types
-	 * 
-	 * @param status a variable number of the status type of interest
-	 * @return yes if it has anyone of them
-	 */
-	public boolean haveStatusTypes(StatusType... statuses) {
-	    for (StatusType st : statuses) {
-			if (statusTypes.contains(st))
-				return true;
-	    }
-	    
-	    return false;
-	}
-	
-	/**
-	 * Checks if this vehicle has no issues and is ready for mission
-	 * 
+	 * Checks if this vehicle has no issues and is ready for mission.
+	 *
 	 * @return yes if it has anyone of the bad status types
 	 */
 	public boolean isVehicleReady() {
@@ -715,16 +504,63 @@ public abstract class Vehicle extends Unit
 			if (statusTypes.contains(st))
 				return false;
 	    }
-	    
+
 	    return true;
 	}
-	
+
+	public StatusType getPrimaryStatus() {
+		return primaryStatus;
+	}
+
 	/**
-	 * Adds a status type for this vehicle
+	 * Sets the Primary status of a Vehicle that represents it's situation.
 	 * 
-	 * @param type
+	 * @param newStatus Must be a primary status value
 	 */
-	public void addStatus(StatusType newStatus) {
+	public void setPrimaryStatus(StatusType newStatus) {
+		setPrimaryStatus(newStatus, null);
+	}
+
+	/**
+	 * Sets the Primary status of a Vehicle that represents it's situation. Also there is 
+	 * a Secondary status on why the primary has changed.
+	 * 
+	 * @param newStatus Must be a primary status value
+	 * @param secondary Reason for the change; can be null be none given
+	 */
+	public void setPrimaryStatus(StatusType newStatus, StatusType secondary) {
+		if (!newStatus.isPrimary()) {
+			throw new IllegalArgumentException("Status is not Primary " + newStatus.getName());
+		}
+
+		boolean doEvent = false;
+		if (primaryStatus != newStatus) {
+			primaryStatus = newStatus;
+			doEvent = true;
+		}
+
+		// Secondary is optional
+		if ((secondary != null) && !statusTypes.contains(secondary)) {
+			statusTypes.add(secondary);
+			doEvent = true;
+		}
+
+		if (doEvent) {
+			writeLog();
+			fireUnitUpdate(UnitEventType.STATUS_EVENT, newStatus);
+		}
+	}
+
+	/**
+	 * Adds a Secondary status type for this vehicle.
+	 *
+	 * @param newStatus the status to be added
+	 */
+	public void addSecondaryStatus(StatusType newStatus) {
+		if (newStatus.isPrimary()) {
+			throw new IllegalArgumentException("Status is not Secondary " + newStatus.getName());
+		}
+
 		// Update status based on current situation.
 		if (!statusTypes.contains(newStatus)) {
 			statusTypes.add(newStatus);
@@ -732,84 +568,66 @@ public abstract class Vehicle extends Unit
 			fireUnitUpdate(UnitEventType.STATUS_EVENT, newStatus);
 		}
 	}
-	
+
 	/**
-	 * Remove a status type for this vehicle
-	 * 
-	 * @param type
+	 * Removes a Secondary status type for this vehicle.
+	 *
+	 * @param oldStatus the status to be removed
 	 */
-	public void removeStatus(StatusType newStatus) {
+	public void removeSecondaryStatus(StatusType oldStatus) {
 		// Update status based on current situation.
-		if (statusTypes.contains(newStatus)) {
-			statusTypes.remove(newStatus);
+		if (statusTypes.contains(oldStatus)) {
+			statusTypes.remove(oldStatus);
 			writeLog();
-			fireUnitUpdate(UnitEventType.STATUS_EVENT, newStatus);
+			fireUnitUpdate(UnitEventType.STATUS_EVENT, oldStatus);
 		}
-	}
-	
-	/**
-	 * Checks the vehicle's status.
-	 */
-	private void checkStatus() {
-		// Update status based on current situation.
-		if (speed == 0) {
-			if (getGarage() != null) {
-				addStatus(StatusType.GARAGED);
-				removeStatus(StatusType.PARKED);
-			}
-			else {
-				addStatus(StatusType.PARKED);
-				removeStatus(StatusType.GARAGED);
-			}
-			
-			removeStatus(StatusType.MOVING);
-//			removeStatus(StatusType.TOWED);
-		}
-		
-		else {
-			addStatus(StatusType.MOVING);
-			removeStatus(StatusType.GARAGED);
-			removeStatus(StatusType.PARKED);
-		}
-		
-		if (towingVehicle != null) {
-			addStatus(StatusType.TOWED);
-//			removeStatus(StatusType.GARAGED);
-//			removeStatus(StatusType.PARKED);
-		}
-		else {
-			removeStatus(StatusType.TOWED);
-		}
-		
-		if (reservedForMaintenance) {
-			addStatus(StatusType.MAINTENANCE);
-			removeStatus(StatusType.MOVING);
-		}
-		else {
-			removeStatus(StatusType.MAINTENANCE);
-		}
-		
-		if (malfunctionManager.hasMalfunction()) {
-			addStatus(StatusType.MALFUNCTION);	
-		}
-	}
-	
-	/**
-	 * Records the status in the vehicle log 
-	 * 
-	 * @param type
-	 */
-	private void writeLog() {
-		vehicleLog.addDataPoint(new HashSet<>(statusTypes));
 	}
 
+	/**
+	 * Checks if the vehicle is currently in a garage or not.
+	 *
+	 * @return true if vehicle is in a garage.
+	 */
+	public boolean isInAGarage() {
+
+		Settlement settlement = getSettlement();
+		if (settlement != null) {
+			List<Building> list = settlement.getBuildingManager().getBuildings(FunctionType.VEHICLE_MAINTENANCE);
+			for (Building garageBuilding : list) {
+				VehicleMaintenance garage = garageBuilding.getVehicleMaintenance();
+				if (garage != null) {
+					if (garage.containsVehicle(this)
+						|| (getVehicleType() == VehicleType.DELIVERY_DRONE
+						&& garage.containsFlyer((Flyer)this))) {
+							return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Records the status in the vehicle log.
+	 */
+	private void writeLog() {
+		Set<StatusType> entry = new HashSet<>(statusTypes);
+		entry.add(primaryStatus);
+		vehicleLog.addDataPoint(entry);
+	}
+
+	/**
+	 * Gets the vehicle log.
+	 *
+	 * @return a map of vehicle status by sol
+	 */
 	public Map<Integer, List<MSolDataItem<Set<StatusType>>>> getVehicleLog() {
 		return vehicleLog.getHistory();
 	}
-	
+
 	/**
 	 * Checks if the vehicle is reserved for any reason.
-	 * 
+	 *
 	 * @return true if vehicle is currently reserved
 	 */
 	public boolean isReserved() {
@@ -818,7 +636,7 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Checks if the vehicle is reserved for a mission.
-	 * 
+	 *
 	 * @return true if vehicle is reserved for a mission.
 	 */
 	public boolean isReservedForMission() {
@@ -827,7 +645,7 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Sets if the vehicle is reserved for a mission or not.
-	 * 
+	 *
 	 * @param reserved the vehicle's reserved for mission status
 	 */
 	public void setReservedForMission(boolean reserved) {
@@ -839,7 +657,7 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Checks if the vehicle is reserved for maintenance.
-	 * 
+	 *
 	 * @return true if reserved for maintenance.
 	 */
 	public boolean isReservedForMaintenance() {
@@ -848,7 +666,7 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Sets if the vehicle is reserved for maintenance or not.
-	 * 
+	 *
 	 * @param reserved true if reserved for maintenance
 	 */
 	public void setReservedForMaintenance(boolean reserved) {
@@ -860,18 +678,27 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Sets the vehicle that is currently towing this vehicle.
-	 * 
+	 *
 	 * @param towingVehicle the vehicle
 	 */
 	public void setTowingVehicle(Vehicle towingVehicle) {
 		if (this == towingVehicle)
 			throw new IllegalArgumentException("Vehicle cannot tow itself.");
+
+		if (towingVehicle != null) {
+			// if towedVehicle is not null, it means this rover has just hooked up for towing the towedVehicle
+			addSecondaryStatus(StatusType.TOWED);
+		}
+		else {
+			removeSecondaryStatus(StatusType.TOWED);
+		}
+
 		this.towingVehicle = towingVehicle;
 	}
 
 	/**
 	 * Gets the vehicle that is currently towing this vehicle.
-	 * 
+	 *
 	 * @return towing vehicle
 	 */
 	public Vehicle getTowingVehicle() {
@@ -879,20 +706,26 @@ public abstract class Vehicle extends Unit
 	}
 
 	/**
-	 * Check if this vehicle is being towed (by another vehicle).
-	 * 
+	 * Checks if this vehicle is being towed (by another vehicle).
+	 *
 	 * @return true if it is being towed
 	 */
 	public boolean isBeingTowed() {
-		if (towingVehicle == null)
-			return false;
-		
-		return true;
-	}
+        return towingVehicle != null;
+    }
 
 	/**
-	 * Gets the speed of vehicle
+	 * Gets the average power of the vehicle when operating [kW].
 	 * 
+	 * @return
+	 */
+	public double getAveragePower() {
+		return spec.getBasePower();
+	}
+	
+	/**
+	 * Gets the speed of vehicle.
+	 *
 	 * @return the vehicle's speed (in km/hr)
 	 */
 	public double getSpeed() {
@@ -900,8 +733,8 @@ public abstract class Vehicle extends Unit
 	}
 
 	/**
-	 * Sets the vehicle's current speed
-	 * 
+	 * Sets the vehicle's current speed.
+	 *
 	 * @param speed the vehicle's speed (in km/hr)
 	 */
 	public void setSpeed(double speed) {
@@ -909,159 +742,399 @@ public abstract class Vehicle extends Unit
 			throw new IllegalArgumentException("Vehicle speed cannot be less than 0 km/hr: " + speed);
 		if (Double.isNaN(speed))
 			throw new IllegalArgumentException("Vehicle speed is a NaN");
-		this.speed = speed;
-		fireUnitUpdate(UnitEventType.SPEED_EVENT);
+
+		if (speed != this.speed) {
+			if (speed == 0D) {
+				setPrimaryStatus(StatusType.PARKED);
+			} 
+			else if (this.speed == 0D) {
+				// Was zero so now must be moving
+				setPrimaryStatus(StatusType.MOVING);
+			}
+			this.speed = speed;
+			fireUnitUpdate(UnitEventType.SPEED_EVENT);
+		}
 	}
 
 	/**
 	 * Gets the base speed of vehicle
-	 * 
-	 * @return the vehicle's base speed (in km/hr)
+	 *
+	 * @return the vehicle's base speed (in kph or km/hr)
 	 */
 	public double getBaseSpeed() {
-		return baseSpeed;
+		return spec.getBaseSpeed();
 	}
 
-//	/**
-//	 * Sets the base speed of vehicle
-//	 * 
-//	 * @param speed the vehicle's base speed (in km/hr)
-//	 */
-//	public void setBaseSpeed(double speed) {
-//		if (speed < 0D)
-//			throw new IllegalArgumentException("Vehicle base speed cannot be less than 0 km/hr");
-//		baseSpeed = speed;
-//	}
 
 	/**
-	 * Gets the current fuel range of the vehicle
-	 * Note : this method will be overridden by Rover's getRange(). 
-	 * 
-	 * @param missionType the type of mission (needed in Rover's getRange())
+	 * Gets the current fuel range of the vehicle.
+	 *
 	 * @return the current fuel range of the vehicle (in km)
 	 */
-	public double getRange(MissionType missionType) {
-		Inventory vInv = getInventory();
-        int fuelType = getFuelType();
-        double amountOfFuel = vInv.getAmountResourceStored(fuelType, false);
-		if (amountOfFuel > 0)
-			return estimatedAveFuelEconomy * amountOfFuel * getBaseMass() / getMass();// / fuel_range_error_margin;
-		else
-			return estimatedAveFuelEconomy * fuelCapacity * getBaseMass() / getMass();// / fuel_range_error_margin;
+	public double getRange() {
+
+		double range = 0;
+		Mission mission = getMission();
+
+        if ((mission == null) || (mission.getStage() == Stage.PREPARATION)) {
+        	// Before the mission is created, the range would be based on vehicle's capacity
+        	range = Math.min(getBaseRange() * RANGE_FACTOR, getEstimatedFuelEconomy() * getFuelCapacity()) * getMass() / getBeginningMass();// * fuel_range_error_margin
+        }
+        else {
+        	
+    		int fuelTypeID = getFuelTypeID();
+    		if (fuelTypeID < 0) {
+    			range = MAXIMUM_RANGE;
+    		}
+    		else {
+                double amountOfFuel = getAmountResourceStored(fuelTypeID);
+            	// During the journey, the range would be based on the amount of fuel in the vehicle
+        		range = Math.min(getBaseRange() * RANGE_FACTOR, getEstimatedFuelEconomy() * amountOfFuel) * getMass() / getBeginningMass();
+    		}
+        }
+
+        return (int)range;
 	}
 
 	/**
-	 * Gets the base range of the vehicle
-	 * 
-	 * @return the base range of the vehicle (in km)
+	 * Gets the base range of the vehicle.
+	 *
+	 * @return the base range of the vehicle [km]
 	 * @throws Exception if error getting range.
 	 */
 	public double getBaseRange() {
-		return baseRange;
+		return spec.getBaseRange();
 	}
 
 	/**
-	 * Gets the fuel capaacity of the vehicle [kg].
-	 * 
+	 * Gets the fuel capacity of the vehicle [kg].
+	 *
 	 * @return
 	 */
 	public double getFuelCapacity() {
-		return fuelCapacity;
+		return spec.getFuelCapacity();
 	}
-	
 
 	/**
-	 * Gets the energy available at the full tank [kWh].
+	 * Sets the average road load speed of the vehicle [kph].
 	 * 
 	 * @return
 	 */
-	public double getFullEnergy() {
-		return totalEnergy;	
+	public void setAverageRoadLoadSpeed(int value) {
+		logger.info(this, 10_000L, " AverageRoadLoadSpeed: " + value);
+		roadSpeedHistory.addDataPoint(value);
 	}
+	
+	/**
+	 * Sets the average road load power of the vehicle [kW].
+	 * 
+	 * @return
+	 */
+	public void setAverageRoadLoadPower(int value) {
+		logger.info(this, 10_000L, " AverageRoadLoadPower: " + value);
+		roadPowerHistory.addDataPoint(value);
+	}
+	
+	/**
+	 * Gets the average road load power of the vehicle [kph].
+	 * 
+	 * @return
+	 */
+	public double getAverageRoadLoadSpeed() {
+		return averageRoadLoadSpeed;
+	}
+	
+	/**
+	 * Gets the average road load power of the vehicle [kW].
+	 * 
+	 * @return
+	 */
+	public double getAverageRoadLoadPower() {
+		return averageRoadLoadPower;
+	}
+	
+	
+	/**
+	 * Gets the cumulative energy usage of the vehicle [kWh].
+	 * 
+	 * @return
+	 */
+	public double getCumEnergyUsage() {
+		return cumEnergyUsedKWH;
+	}
+	
+	/**
+	 * Gets the energy available at the full tank [kWh].
+	 *
+	 * @return
+	 */
+	public double getEnergyCapacity() {
+		return spec.getEnergyCapacity();
+	}
+
+	/**
+	 * Gets the estimated energy available for the drivetrain [kWh].
+	 *
+	 * @return
+	 */
+	public double getDrivetrainEnergy() {
+		return spec.getDrivetrainEnergy();
+	}
+	
+	/**
+	 * Gets the fuel to energy conversion factor [Wh/kg].
+	 * 
+	 * @return
+	 */
+	public double getFuelConv() {
+		return spec.getFuel2DriveEnergy();
+	}
+	
+	/**
+	 * Gets the cumulative fuel economy [km/kg].
+	 * 
+	 * @return
+	 */
+	public double getCumFuelEconomy() {
+//		return getFuelConv() / getCumFuelConsumption();
+		if (odometerMileage == 0 || cumEnergyUsedKWH == 0)
+			return 0;
+		return odometerMileage / cumEnergyUsedKWH / 1000 * getFuelConv();
+	}
+	
+	/**
+	 * Gets the cumulative fuel consumption [Wh/km].
+	 * 
+	 * @return
+	 */
+	public double getCumFuelConsumption() {
+		if (odometerMileage == 0 || cumEnergyUsedKWH == 0)
+			return 0;
+		return 1000 * cumEnergyUsedKWH / odometerMileage;
+	}
+	
+	/**
+	 * Gets the coefficient for converting cumulative FC to cumulative FE.
+	 * 
+	 * @return
+	 */
+	public double getCoeffCumFC2FE() {
+		double cumFE = getCumFuelEconomy();
+		double cumFC = getCumFuelConsumption();
+		
+		if (cumFE > 0 && cumFC > 0 && averageRoadLoadPower > 0 && averageRoadLoadSpeed >0)
+			return cumFE / cumFC * averageRoadLoadPower / averageRoadLoadSpeed ;
+		
+		return 0;
+	}
+	
 	
 	/**
 	 * Gets the base fuel economy of the vehicle [km/kg].
+	 * 
 	 * @return
 	 */
 	public double getBaseFuelEconomy() {
-		return baseFuelEconomy;
+		return spec.getBaseFuelEconomy();
 	}
 
 	/**
-	 * Gets the instantaneous fuel economy of the vehicle [km/kg] 
-	 * Note: assume that it is primarily dependent upon the current weight of the vehicle
+	 * Gets the base fuel consumption of the vehicle [Wh/km].
 	 * 
 	 * @return
-	 */ 
-	public double getIFuelEconomy() {
-//		if (speed > 0 && startMass != getMass())
-//			logger.info(this 
-//				+ "   current mass : " + Math.round(getMass()*10.0)/10.0
-//				+ "   start mass : " + Math.round(startMass*10.0)/10.0 
-//				+ "   driveTrain : " + drivetrainEfficiency 
-//				+ "   IFC : " + Math.round(estimatedAveFuelEconomy * startMass / getMass()*10.0)/10.0);
-		return estimatedAveFuelEconomy * startMass / getMass(); 
-		
+	 */
+	public double getBaseFuelConsumption() {
+		return spec.getBaseFuelConsumption();
 	}
 	
 	/**
-	 * Records the beginning weight of the vehicle and its payload
+	 * Gets the instantaneous fuel consumption of the vehicle [Wh/km].
+	 * 
+	 * @return
+	 */
+	public double getIFuelConsumption() {
+		return iFuelConsumption;
+	}
+	
+	/**
+	 * Sets the instantaneous fuel consumption of the vehicle [kWh/km].
+	 * 
+	 * @param iFuelC
+	 */
+	public void setIFuelConsumption(double iFuelC) {
+		this.iFuelConsumption = iFuelC;
+	}
+	
+	/**
+	 * Sets the instantaneous fuel economy of the vehicle [km/kg].
+	 * 
+	 * @param iFuelEconomy
+	 */
+	public void setIFuelEconomy(double iFuelEconomy) {
+		this.iFuelEconomy = iFuelEconomy;
+	}
+	
+	/**
+	 * Gets the instantaneous fuel economy of the vehicle [km/kg].
+	 * 
+	 * @return
+	 */
+	public double getIFuelEconomy() {
+		return iFuelEconomy;
+	}
+	
+	/**
+	 * Mass of Equipment is the stored mass plus the base mass.
+	 */
+	@Override
+	public double getMass() {
+		return eqmInventory.getStoredMass() + getBaseMass();
+	}
+	
+	/**
+	 * Gets the estimated beginning mass [kg].
+	 */
+	public double getBeginningMass() {
+		return spec.getBeginningMass();
+	}
+	
+	/**
+	 * Records the beginning weight of the vehicle and its payload [kg].
 	 */
 	public void recordStartMass() {
-		startMass = getMass();	
-	}
-	
-	/**
-	 * Gets the estimated average fuel consumption of the vehicle [km/kg] for a trip 
-	 * Note: Assume that it is half of two fuel consumption values (between the beginning and the end of the trip)
-	 * 
-	 * @return
-	 */
-	public double getEstimatedAveFuelConsumption() {
-		return estimatedAveFuelEconomy;
-	}
-	
-	/**
-	 * Gets the drivetrain efficiency of the vehicle.
-	 * 
-	 * @return drivetrain efficiency [km/kg]
-	 */
-	public double getDrivetrainEfficiency() {
-		return drivetrainEfficiency;
+		startMass = getMass();
 	}
 
 	/**
-	 * Returns total distance traveled by vehicle (in km.)
-	 * 
-	 * @return the total distanced traveled by the vehicle (in km)
+	 * Records the beginning weight of the vehicle and its payload [kg].
+	 */
+	public double getStartMass() {
+		return startMass;
+	}
+	
+	/**
+	 * Gets the initial fuel economy of the vehicle [km/kg] for a trip.
+	 *
+	 * @return
+	 */
+	public double getInitialFuelEconomy() {
+		return spec.getInitialFuelEconomy();
+	}
+
+	/**
+	 * Gets the estimated fuel economy of the vehicle [km/kg] for a trip.
+	 *
+	 * @return
+	 */
+	public double getEstimatedFuelEconomy() {
+		double base = getBaseFuelEconomy();
+		double cum = getCumFuelEconomy();
+		double init = getInitialFuelEconomy();
+		// Note: init < base always
+		// Note: if cum < base, then trip is less economical more than expected
+		// Note: if cum > base, then trip is more economical than expected
+		if (cum == 0)
+			return (.5 * base + .5 * init) * VehicleController.FUEL_ECONOMY_FACTOR;
+		else {
+			return (.3 * base + .3 * init + .4 * cum);
+		}
+	}
+
+	/**
+	 * Gets the initial fuel consumption of the vehicle [Wh/km] for a trip.
+	 *
+	 * @return
+	 */
+	public double getInitialFuelConsumption() {
+		return spec.getInitialFuelConsumption();
+	}
+	
+	/**
+	 * Gets the estimated fuel consumption of the vehicle [Wh/km] for a trip.
+	 *
+	 * @return
+	 */
+	public double getEstimatedFuelConsumption() {
+		double base = getBaseFuelConsumption();
+		double cum = getCumFuelConsumption();
+		double init = getInitialFuelConsumption();
+		// Note: init > base always
+		// Note: if cum > base, then vehicle consumes more than expected
+		// Note: if cum < base, then vehicle consumes less than expected		
+		if (cum == 0)
+			return (.5 * base + .5 * init) / VehicleController.FUEL_ECONOMY_FACTOR;
+		else {
+			return (.3 * base + .3 * init + .4 * cum);
+		}
+	}
+	
+	/**
+	 * Gets the number of battery modules of the vehicle.
+	 *
+	 * @return
+	 */
+	public int getBatteryModule() {
+		return spec.getBatteryModule();
+	}
+	
+	/**
+	 * Gets the number of fuel cell stacks of the vehicle.
+	 *
+	 * @return
+	 */
+	public int getFuellCellStack() {
+		return spec.getFuelCellStack();
+	}
+			
+	/**
+	 * Gets the drivetrain efficiency of the vehicle.
+	 *
+	 * @return drivetrain efficiency
+	 */
+	public double getDrivetrainEfficiency() {
+		return spec.getDrivetrainEfficiency();
+	}
+
+	/**
+	 * Returns total distance traveled by vehicle [km].
+	 *
+	 * @return the total distanced traveled by the vehicle [km]
 	 */
 	public double getOdometerMileage() {
 		return odometerMileage;
 	}
 
 	/**
-	 * Adds a distance ]in km] to the vehicle's odometer (total distance traveled)
-	 * 
-	 * @param distance distance to add to total distance traveled (in km)
+	 * Adds the distance traveled to vehicle's odometer (total distance traveled)
+	 * and record the fuel used.
+	 *
+	 * @param distance the distance traveled traveled [km]
+	 * @param cumEnergyUsed the energy used [Wh]
 	 */
-	public void addOdometerMileage(double distance) {
-		odometerMileage += distance;
+	public void addOdometerMileage(double distance, double cumEnergyUsed) {
+		this.odometerMileage += distance;
+		this.lastDistance = distance;
+		this.cumEnergyUsedKWH += cumEnergyUsed/1000;
 	}
 
+	public double getLastDistanceTravelled() {
+		return lastDistance;
+	}
+	
 	/**
-	 * Returns distance traveled by vehicle since last maintenance (in km.)
-	 * 
-	 * @return distance traveled by vehicle since last maintenance (in km)
+	 * Returns distance traveled by vehicle since last maintenance [km].
+	 *
+	 * @return distance traveled by vehicle since last maintenance [km]
 	 */
 	public double getDistanceLastMaintenance() {
 		return distanceMaint;
 	}
 
 	/**
-	 * Adds a distance (in km.) to the vehicle's distance since last maintenance.
-	 * Set distanceMark to true if vehicle is due for maintenance.
-	 * 
-	 * @param distance distance to add (in km)
+	 * Adds a distance to the vehicle's distance since last maintenance.
+	 * Sets distanceMark to true if vehicle is due for maintenance.
+	 *
+	 * @param distance distance to add ([km]
 	 */
 	public void addDistanceLastMaintenance(double distance) {
 		distanceMaint += distance;
@@ -1069,93 +1142,138 @@ public abstract class Vehicle extends Unit
 			distanceMark = true;
 	}
 
-	/** Sets vehicle's distance since last maintenance to zero */
+	/** 
+	 * Sets vehicle's distance since last maintenance to zero. 
+	 */
 	public void clearDistanceLastMaintenance() {
 		distanceMaint = 0;
 	}
 
 	/**
-	 * Returns direction of vehicle (0 = north, clockwise in radians)
-	 * 
+	 * Returns direction of vehicle (0 = north, clockwise in radians).
+	 *
 	 * @return the direction the vehicle is traveling (in radians)
 	 */
 	public Direction getDirection() {
-		return (Direction) direction.clone();
+		return direction;
 	}
 
 	/**
-	 * Sets the vehicle's facing direction (0 = north, clockwise in radians)
-	 * 
+	 * Sets the vehicle's facing direction (0 = north, clockwise in radians).
+	 *
 	 * @param direction the direction the vehicle is traveling (in radians)
 	 */
 	public void setDirection(Direction direction) {
-		this.direction.setDirection(direction.getDirection());
+		this.direction = direction;
 	}
 
 	/**
-	 * Gets the operator of the vehicle (person or AI)
+	 * Gets the instantaneous acceleration of the vehicle [m/s2].
 	 * 
+	 * @return
+	 */
+	public double getAccel() {
+		return accel;
+	}
+
+	/**
+	 * Sets the acceleration in [m/s2].
+	 * 
+	 * @param accel
+	 */
+	public void setAccel(double accel) {
+		this.accel = accel;
+	}
+	
+	/**
+	 * Gets the allowable acceleration of the vehicle [m/s2].
+	 * 
+	 * @return
+	 */
+	public double getAllowedAccel() {
+		if (speed <= 1)
+			return getBaseAccel();
+		return getBaseAccel() * getBeginningMass() / getMass();
+//		return (baseAccel + Math.min(baseAccel, averagePower / getMass() / speed * 3600)) / 2.0;
+	}
+	
+	/**
+	 * Gets the base acceleration of the vehicle [m/s2].
+	 * 
+	 * @return
+	 */
+	public double getBaseAccel() {
+		return spec.getBaseAccel();
+	}
+	
+	public abstract double getTerrainGrade();
+
+	public abstract double getElevation();
+
+	/**
+	 * Gets the operator of the vehicle (person or AI).
+	 *
 	 * @return the vehicle operator
 	 */
-	public VehicleOperator getOperator() {
+	public Worker getOperator() {
 		return vehicleOperator;
 	}
 
 	/**
-	 * Sets the operator of the vehicle
-	 * 
+	 * Sets the operator of the vehicle.
+	 *
 	 * @param vehicleOperator the vehicle operator
 	 */
-	public void setOperator(VehicleOperator vehicleOperator) {
+	public void setOperator(Worker vehicleOperator) {
 		this.vehicleOperator = vehicleOperator;
 		fireUnitUpdate(UnitEventType.OPERATOR_EVENT, vehicleOperator);
 	}
 
 	/**
-	 * Checks if a particular operator is appropriate for a vehicle.
-	 * 
-	 * @param operator the operator to check
-	 * @return true if appropriate operator for this vehicle.
-	 */
-	public abstract boolean isAppropriateOperator(VehicleOperator operator);
-
-	/**
 	 * Returns the current settlement vehicle is parked at. Returns null if vehicle
 	 * is not currently parked at a settlement.
-	 * 
+	 *
 	 * @return the settlement the vehicle is parked at
 	 */
+	@Override
 	public Settlement getSettlement() {
-		
-		if (getContainerID() == 0)
+
+		if (getContainerID() <= Unit.MARS_SURFACE_UNIT_ID)
 			return null;
-		
+
 		Unit c = getContainerUnit();
 
-		if (c instanceof Settlement)
+		if (c.getUnitType() == UnitType.SETTLEMENT)
 			return (Settlement) c;
-		else
-			return null;
-//		
-//		 Unit topUnit = getTopContainerUnit();
-//		 
-//		 if ((topUnit != null) && (topUnit instanceof Settlement)) return (Settlement)
-//		 topUnit; else return null;
-//		 
+
+		// If this unit is an LUV and it is within a rover
+		if (c.getUnitType() == UnitType.VEHICLE)
+			return ((Vehicle)c).getSettlement();
+
+		return null;
 	}
 
 	/**
-	 * Get the garage building that the vehicle is at
-	 * 
+	 * Gets the garage building that the vehicle is at.
+	 *
 	 * @return {@link Vehicle}
 	 */
 	public Building getGarage() {
-		return BuildingManager.getBuilding(this, getSettlement());
+		Settlement settlement = getSettlement();
+		if (settlement != null) {
+			for (Building garageBuilding : settlement.getBuildingManager().getGarages()) {
+				VehicleMaintenance garage = garageBuilding.getVehicleMaintenance();
+				if (garage != null && garage.containsVehicle(this)) {
+					return garageBuilding;
+				}
+			}
+		}
+		return null;
 	}
 
 	/**
 	 * Gets the unit's malfunction manager.
-	 * 
+	 *
 	 * @return malfunction manager
 	 */
 	public MalfunctionManager getMalfunctionManager() {
@@ -1164,8 +1282,8 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Time passing for vehicle.
-	 * 
-	 * @param time the amount of time passing (millisols)
+	 *
+	 * @param pulse the amount of clock pulse passing (in millisols)
 	 * @throws Exception if error during time.
 	 */
 	@Override
@@ -1173,301 +1291,97 @@ public abstract class Vehicle extends Unit
 		if (!isValid(pulse)) {
 			return false;
 		}
-		
-		// Checks status.
-		checkStatus();
-		
-		if (haveStatusType(StatusType.MOVING)) {
+
+		if (primaryStatus == StatusType.MOVING) {
 			// Assume the wear and tear factor is at 100% by being used in a mission
-			malfunctionManager.activeTimePassing(pulse.getElapsed());
+			malfunctionManager.activeTimePassing(pulse);
 		}
-		
+
 		// If it's back at a settlement and is NOT in a garage
-		if (getSettlement() != null && !isRoverInAGarage()) {
-			// Assume the wear and tear factor is 75% less by being exposed outdoor
-			malfunctionManager.activeTimePassing(pulse.getElapsed() * .25);
+		else if (LocationStateType.WITHIN_SETTLEMENT_VICINITY == getLocationStateType()
+			&& !haveStatusType(StatusType.MAINTENANCE)) {
+			int rand = RandomUtil.getRandomInt(3);
+			// Assume the wear and tear factor is 75% less when not operating 
+			if (rand == 3)
+				malfunctionManager.activeTimePassing(pulse);
 		}
-		
+
 		// Make sure reservedForMaintenance is false if vehicle needs no maintenance.
-		if (haveStatusType(StatusType.MAINTENANCE)) {
-			if (malfunctionManager.getEffectiveTimeSinceLastMaintenance() <= 0D) {
-				setReservedForMaintenance(false);
-				removeStatus(StatusType.MAINTENANCE);
-			}
+		if (haveStatusType(StatusType.MAINTENANCE) 
+			&& malfunctionManager.getEffectiveTimeSinceLastMaintenance() <= 0D) {
+			setReservedForMaintenance(false);
+			removeSecondaryStatus(StatusType.MAINTENANCE);
 		}
-		else {
+		else { // not under maintenance
 			// Note: during maintenance, it doesn't need to be checking for malfunction.
 			malfunctionManager.timePassing(pulse);
 		}
 
-		if (haveStatusType(StatusType.MALFUNCTION)) {
-			if (malfunctionManager.getMalfunctions().size() == 0)
-				removeStatus(StatusType.MALFUNCTION);
+		if (haveStatusType(StatusType.MALFUNCTION)
+			&& malfunctionManager.getMalfunctions().size() == 0) {
+				removeSecondaryStatus(StatusType.MALFUNCTION);
 		}
-				
-//		if (haveStatusType(StatusType.OUT_OF_FUEL)
-//			|| haveStatusType(StatusType.PARKED)
-//			|| haveStatusType(StatusType.GARAGED)) {
-//			setOperator(null);
-//			setSpeed(0);
-//		} 
-		
+
+		// Add the location to the trail if outside on a mission
 		addToTrail(getCoordinates());
+		// Check once per msol (millisol integer)
+		if (pulse.isNewMSol()) {
+			int count = 0;
+			int sum = 0;
 
-		correctVehicleReservation();
-
-//		// If operator is dead, remove operator and stop vehicle.
-//		VehicleOperator operator = vehicleOperator;
-//		if ((operator != null) && (operator instanceof Person)) {
-//			Person personOperator = (Person) operator;
-//			if (personOperator.getPhysicalCondition().isDead()) {
-//				setOperator(null);
-//				setSpeed(0);
-//				setParkedLocation(0D, 0D, getDirection().getDirection());
-//			}
-//			// TODO : will another person take his place as the driver
-//		}
-		return true;
-	}
-
-//	/**
-//	 * Checks on a person's status to see if he can walk home or be rescued
-//	 * 
-//	 * @param rover
-//	 * @param p
-//	 * @param disembarkSettlement
-//	 */
-//	private void checkPersonStatus(Rover rover, Person p, Settlement disembarkSettlement) {
-//		if (p.isInVehicle() || p.isOutside()) {
-//			// Get random inhabitable building at emergency settlement.
-//			Building destinationBuilding = disembarkSettlement.getBuildingManager().getRandomAirlockBuilding();
-//			if (destinationBuilding != null) {
-//				Point2D destinationLoc = LocalAreaUtil.getRandomInteriorLocation(destinationBuilding);
-//				Point2D adjustedLoc = LocalAreaUtil.getLocalRelativeLocation(destinationLoc.getX(),
-//						destinationLoc.getY(), destinationBuilding);
-//
-//				double fatigue = p.getFatigue(); // 0 to infinity
-//				double perf = p.getPerformanceRating(); // 0 to 1
-//				double stress = p.getStress(); // 0 to 100
-//				double energy = p.getEnergy(); // 100 to infinity
-//				double hunger = p.getHunger(); // 0 to infinity
-//
-//				boolean hasStrength = fatigue < 1000 && perf > .4 && stress < 60 && energy > 750 && hunger < 1000;
-//				
-//				if (p.isInVehicle()) {// && p.getInventory().findNumUnitsOfClass(EVASuit.class) == 0) {
-//					// Checks to see if the person has an EVA suit	
-//					if (!ExitAirlock.goodEVASuitAvailable(rover.getInventory(), p)) {
-//
-//						LogConsolidated.log(logger, Level.WARNING, 0, sourceName, "[" + p.getLocationTag().getLocale() + "] "
-//										+ p + " could not find a working EVA suit and needed to wait.");
-//					
-//						// If the person does not have an EVA suit	
-//						int availableSuitNum = Mission.getNumberAvailableEVASuitsAtSettlement(disembarkSettlement);
-////						int suitVehicle = rover.getInventory().findNumUnitsOfClass(EVASuit.class);
-//						
-//						if (availableSuitNum > 0) {
-//							// Deliver an EVA suit from the settlement to the rover
-//							// TODO: Need to generate a task for a person to hand deliver an extra suit
-//							EVASuit suit = disembarkSettlement.getInventory().findAnEVAsuit(); //(EVASuit) disembarkSettlement.getInventory().findUnitOfClass(EVASuit.class);
-//							if (suit != null && rover.getInventory().canStoreUnit(suit, false)) {
-//								
-//								suit.transfer(disembarkSettlement, rover);
-////								disembarkSettlement.getInventory().retrieveUnit(suit);
-////								rover.getInventory().storeUnit(suit);
-//								
-//								LogConsolidated.log(logger, Level.WARNING, 0, sourceName, "[" + p.getLocationTag().getLocale() + "] "
-//										+ p + " received a spare EVA suit from the settlement.");
-//							}
-//						}
-//					}
-//				}
-//				
-//				if (Walk.canWalkAllSteps(p, adjustedLoc.getX(), adjustedLoc.getY(), 0, destinationBuilding)) {
-//			
-//					if (hasStrength) {
-//						LogConsolidated.log(logger, Level.INFO, 20_000, sourceName, 
-//								"[" + disembarkSettlement.getName() + "] "
-//								+ p.getName() + " still had strength left and would help unload cargo.");
-//						// help unload the cargo
-//						unloadCargo(p, rover);
-//					}	
-//					else {
-//						LogConsolidated.log(logger, Level.INFO, 20_000, sourceName, 
-//								"[" + disembarkSettlement.getName() + "] "
-//								+ p.getName() + " had no more strength and walked back to the settlement.");
-//						// walk back home
-//						assignTask(p, new Walk(p, adjustedLoc.getX(), adjustedLoc.getY(), 0, destinationBuilding));
-//					}
-//					
-//				} 
-//				
-//				else if (!hasStrength) {
-//
-//					// Help this person put on an EVA suit
-//					// TODO: consider inflatable medical tent for emergency transport of incapacitated personnel
-//					
-//					// This person needs to be rescued.
-//					LogConsolidated.log(logger, Level.INFO, 0, sourceName, 
-//							"[" + disembarkSettlement.getName() + "] "
-//							+ Msg.getString("RoverMission.log.emergencyEnterSettlement", p.getName(), 
-//									disembarkSettlement.getNickName())); //$NON-NLS-1$
-//					
-//					// Initiate an rescue operation
-//					// TODO: Gets a lead person to perform it and give him a rescue badge
-//					rescueOperation(rover, p, disembarkSettlement);
-//					
-//					LogConsolidated.log(logger, Level.INFO, 0, sourceName, 
-//							"[" + disembarkSettlement.getName() + "] "
-//							+ p.getName() 
-//							+ " was transported to ("
-//							+ Math.round(p.getXLocation()*10.0)/10.0 + ", " 
-//							+ Math.round(p.getYLocation()*10.0)/10.0 + ") in "
-//							+ p.getBuildingLocation().getNickName()); //$NON-NLS-1$
-//					
-//					// TODO: how to force the person to receive some form of medical treatment ?
-//					p.getMind().getTaskManager().clearAllTasks();
-//					p.getMind().getTaskManager().addTask(new RequestMedicalTreatment(p), false);
-//					
-//				}
-//
-//			}
-//			
-//			else {
-//				logger.severe("No inhabitable buildings at " + disembarkSettlement);
-//			}
-//		}
-//	}
-	
-	/**
-	 * Rescue the person from the rover
-	 * 
-	 * @param r the rover
-	 * @param p the person
-	 * @param s the settlement
-	 */
-	private void rescueOperation(Rover r, Person p, Settlement s) {
-		
-		if (p.isDeclaredDead()) {
-			Unit cu = p.getPhysicalCondition().getDeathDetails().getContainerUnit();
-//			cu.getInventory().retrieveUnit(p);
-			p.transfer(cu, s);
-		}
-		// Retrieve the person from the rover
-		else if (r != null) {
-//			r.getInventory().retrieveUnit(p);
-			p.transfer(r, s);
-		}
-		else if (p.isOutside()) {
-//			unitManager.getMarsSurface().getInventory().retrieveUnit(p);
-			p.transfer(unitManager.getMarsSurface(), s);
-		}
-		
-		// Store the person into the settlement
-//		s.getInventory().storeUnit(p);
-		
-		// Gets the settlement id
-		int id = s.getIdentifier();
-		// Store the person into a medical building
-		BuildingManager.addToMedicalBuilding(p, id);
-
-		// Register the historical event
-//		HistoricalEvent rescueEvent = new MissionHistoricalEvent(EventType.MISSION_RESCUE_PERSON, 
-//				this,
-//				p.getPhysicalCondition().getHealthSituation(), 
-//				p.getTaskDescription(), 
-//				p.getName(),
-//				r.getNickName(), 
-//				p.getLocationTag().getLocale(),
-//				p.getAssociatedSettlement().getName()
-//				);
-//		eventManager.registerNewEvent(rescueEvent);
-	}
-	
-	/**
-	 * Give a person the task from unloading the vehicle
-	 * 
-	 * @param p
-	 * @param rover
-	 */
-	private void unloadCargo(Person p, Rover rover) {
-		if (RandomUtil.lessThanRandPercent(50)) {
-			if (BuildingManager.add2Garage((GroundVehicle) rover)) {
-				assignTask(p, new UnloadVehicleGarage(p, rover));
-			} 
-			
-			else {
-				// Check if it is day time.
-				if (!EVAOperation.isGettingDark(p)) {
-					assignTask(p, new UnloadVehicleEVA(p, rover));
+			for (int sol: roadSpeedHistory.getHistory().keySet()) {
+				List<MSolDataItem<Integer>> speeds = roadSpeedHistory.getHistory().get(sol);
+				for (MSolDataItem<Integer> s: speeds) {
+					count++;
+					sum += s.getData();
 				}
 			}
 			
-//			return;	
-		}	
-	}
-	
-	/**
-	 * Adds a new task for a person in the mission. Task may be not assigned if it
-	 * is effort-driven and person is too ill to perform it.
-	 * 
-	 * @param person the person to assign to the task
-	 * @param task   the new task to be assigned
-	 * @return true if task can be performed.
-	 */
-	protected boolean assignTask(Person person, Task task) {
-		boolean canPerformTask = true;
-
-		// If task is effort-driven and person too ill, do not assign task.
-		if (task.isEffortDriven() && (person.getPerformanceRating() == 0D)) {
-			canPerformTask = false;
-		}
-
-		if (canPerformTask) {
-			person.getMind().getTaskManager().addTask(task, false);
-		}
-
-		return canPerformTask;
-	}
-	
-	/**
-	 * Checks if the rover is currently in a garage or not.
-	 * 
-	 * @return true if rover is in a garage.
-	 */
-	public boolean isRoverInAGarage() {
-		return (BuildingManager.getBuilding(this) != null);
-	}
-	
-	/**
-	 * Resets the vehicle reservation status
-	 */
-	public void correctVehicleReservation() {
-		if (isReservedMission) {
-			// Set reserved for mission to false if the vehicle is not associated with a
-			// mission.
-			if (missionManager.getMissionForVehicle(this) == null) {
-				LogConsolidated.log(logger, Level.FINE, 500, sourceName,
-						"[" + getLocationTag().getLocale() + "] " + getName() 
-						+ " was found reserved for an non-existing mission. Untagging it.");
-				setReservedForMission(false);
+			if (count > 0 && sum > 0)
+				averageRoadLoadSpeed = sum / count;
+			
+			count = 0;
+			sum = 0;
+			for (int sol: roadPowerHistory.getHistory().keySet()) {
+				List<MSolDataItem<Integer>> speeds = roadPowerHistory.getHistory().get(sol);
+				for (MSolDataItem<Integer> s: speeds) {
+					count++;
+					sum += s.getData();
+				}
 			}
-		} else {
-			if (missionManager.getMissionForVehicle(this) != null) {
-				LogConsolidated.log(logger, Level.FINE, 500, sourceName,
-						"[" + getLocationTag().getLocale() + "] " + getName()
-						+ " is on a mission but is not registered as mission reserved. Correcting it.");
-				setReservedForMission(true);
-			}
+			
+			if (count > 0 && sum > 0)
+				averageRoadLoadPower = sum / count;
 		}
+		
+		return true;
 	}
-	
+
+	/**
+	 * Resets the vehicle reservation status.
+	 */
+	// public void correctVehicleReservation() {
+	// 	if (isReservedMission
+	// 		// Set reserved for mission to false if the vehicle is not associated with a
+	// 		// mission.
+	// 		&& missionManager.getMissionForVehicle(this) == null) {
+	// 			logger.log(this, Level.FINE, 5000,
+	// 					"Found reserved for an non-existing mission. Untagging it.");
+	// 			setReservedForMission(false);
+	// 	} else if (missionManager.getMissionForVehicle(this) != null) {
+	// 			logger.log(this, Level.FINE, 5000,
+	// 					"On a mission but not registered as mission reserved. Correcting it.");
+	// 			setReservedForMission(true);
+	// 	}
+	// }
+
 	/**
 	 * Gets a collection of people affected by this entity.
-	 * 
+	 *
 	 * @return person collection
 	 */
 	public Collection<Person> getAffectedPeople() {
-		Collection<Person> people = new ConcurrentLinkedQueue<Person>();
+		Collection<Person> people = new HashSet<>();
 
 		// Check all people.
 		Iterator<Person> i = unitManager.getPeople().iterator();
@@ -1476,19 +1390,15 @@ public abstract class Vehicle extends Unit
 			Task task = person.getMind().getTaskManager().getTask();
 
 			// Add all people maintaining this vehicle.
-			if (task instanceof Maintenance) {
-				if (((Maintenance) task).getEntity() == this) {
-					if (!people.contains(person))
-						people.add(person);
-				}
+			if ((task instanceof MaintainBuilding)
+				&& this.equals(((MaintainBuilding) task).getEntity())) {
+				people.add(person);
 			}
 
 			// Add all people repairing this vehicle.
-			if (task instanceof Repair) {
-				if (((Repair) task).getEntity() == this) {
-					if (!people.contains(person))
-						people.add(person);
-				}
+			if ((task instanceof Repair)
+				&& this.equals(((Repair) task).getEntity())) {
+				people.add(person);
 			}
 		}
 
@@ -1497,12 +1407,12 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Gets a collection of people who are available for social conversation in this
-	 * vehicle
-	 * 
+	 * vehicle.
+	 *
 	 * @return person collection
 	 */
 	public Collection<Person> getTalkingPeople() {
-		Collection<Person> people = new ConcurrentLinkedQueue<Person>();
+		Collection<Person> people = new HashSet<>();
 
 		// Check all people.
 		Iterator<Person> i = unitManager.getPeople().iterator();
@@ -1511,15 +1421,8 @@ public abstract class Vehicle extends Unit
 			Task task = person.getMind().getTaskManager().getTask();
 
 			// Add all people having conversation from all places as the task
-			if (task instanceof HaveConversation)
-				if (!people.contains(person))
-					people.add(person);
-
-			// Add all people ready for switching to having conversation as task in this
-			// vehicle.
-//			 if (task instanceof Relax)
-//			 if (!people.contains(person))
-//			 people.add(person);
+			if (task instanceof Conversation)
+				people.add(person);
 		}
 
 		return people;
@@ -1527,11 +1430,11 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Gets a collection of robots affected by this entity.
-	 * 
+	 *
 	 * @return robots collection
 	 */
 	public Collection<Robot> getAffectedRobots() {
-		Collection<Robot> robots = new ConcurrentLinkedQueue<Robot>();
+		Collection<Robot> robots = new HashSet<>();
 
 		// Check all robots.
 		Iterator<Robot> i = unitManager.getRobots().iterator();
@@ -1540,18 +1443,16 @@ public abstract class Vehicle extends Unit
 			Task task = robot.getBotMind().getBotTaskManager().getTask();
 
 			// Add all robots maintaining this vehicle.
-			if (task instanceof Maintenance) {
-				if (((Maintenance) task).getEntity() == this) {
-					if (!robots.contains(robot))
-						robots.add(robot);
+			if (task instanceof MaintainBuilding) {
+				if (((MaintainBuilding) task).getEntity() == this) {
+					robots.add(robot);
 				}
 			}
 
 			// Add all robots repairing this vehicle.
 			if (task instanceof Repair) {
 				if (((Repair) task).getEntity() == this) {
-					if (!robots.contains(robot))
-						robots.add(robot);
+					robots.add(robot);
 				}
 			}
 		}
@@ -1561,7 +1462,7 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Gets the vehicle's trail as a collection of coordinate locations.
-	 * 
+	 *
 	 * @return trail collection
 	 */
 	public Collection<Coordinates> getTrail() {
@@ -1570,7 +1471,7 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Adds a location to the vehicle's trail if appropriate.
-	 * 
+	 *
 	 * @param location location to be added to trail
 	 */
 	public void addToTrail(Coordinates location) {
@@ -1581,33 +1482,42 @@ public abstract class Vehicle extends Unit
 		} else if (trail.size() > 0) {
 			Coordinates lastLocation = trail.get(trail.size() - 1);
 			if (!lastLocation.equals(location) && (lastLocation.getDistance(location) >= 2D))
-				trail.add(new Coordinates(location));
+				trail.add(location);
 		} else
-			trail.add(new Coordinates(location));
+			trail.add(location);
 	}
 
 	/**
-	 * Gets the resource type that this vehicle uses for fuel.
-	 * 
-	 * @return resource type
+	 * Gets the resource type id that this vehicle uses for fuel.
+	 *
+	 * @return resource type id
 	 */
-	public abstract int getFuelType();
-
+	public int getFuelTypeID() {
+		return spec.getFuelType();
+	}
+	
+	/**
+	 * Gets the fuel type of this vehicle.
+	 *
+	 * @return fuel type string
+	 */
+	public String getFuelTypeStr() {
+		return spec.getFuelTypeStr();
+	}
+	
 	/**
 	 * Gets the estimated distance traveled in one sol.
-	 * 
+	 *
 	 * @return distance traveled (km)
 	 */
 	public double getEstimatedTravelDistancePerSol() {
-		// Get estimated average speed (km / hr).
-//    	double estSpeed = baseSpeed / 2D;
 		// Return estimated average speed in km / sol.
-		return baseSpeed * ESTIMATED_NUM_HOURS; // 60D / 60D / MarsClock.convertSecondsToMillisols(1D) * 1000D;
+		return getBaseSpeed() * VehicleSpec.ESTIMATED_TRAVEL_HOURS_PER_SOL;
 	}
 
 	/**
 	 * Checks if the vehicle's emergency beacon is turned on.
-	 * 
+	 *
 	 * @return true if beacon is on.
 	 */
 	public boolean isBeaconOn() {
@@ -1616,7 +1526,7 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Sets the vehicle's emergency beacon on or off.
-	 * 
+	 *
 	 * @param state true if beacon is to be on.
 	 */
 	public void setEmergencyBeacon(boolean state) {
@@ -1628,7 +1538,7 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Checks if the item is salvaged.
-	 * 
+	 *
 	 * @return true if salvaged.
 	 */
 	public boolean isSalvaged() {
@@ -1636,8 +1546,8 @@ public abstract class Vehicle extends Unit
 	}
 
 	/**
-	 * Indicate the start of a salvage process on the item.
-	 * 
+	 * Indicates the start of a salvage process on the item.
+	 *
 	 * @param info       the salvage process info.
 	 * @param settlement the settlement where the salvage is taking place.
 	 */
@@ -1648,7 +1558,7 @@ public abstract class Vehicle extends Unit
 
 	/**
 	 * Gets the salvage info.
-	 * 
+	 *
 	 * @return salvage info or null if item not salvaged.
 	 */
 	public SalvageInfo getSalvageInfo() {
@@ -1656,16 +1566,17 @@ public abstract class Vehicle extends Unit
 	}
 
 	/**
-	 * Set initial parked location and facing at settlement.
+	 * Sets initial parked location and facing at settlement.
 	 */
 	public abstract void findNewParkingLoc();
 
-	public String getTypeOfDessertLoaded() {
-		return typeOfDessertLoaded;
-	}
-
-	public void setTypeOfDessertLoaded(String dessertName) {
-		typeOfDessertLoaded = dessertName;
+	public void relocateVehicle() {
+		if (isInAGarage()) {
+			BuildingManager.removeFromGarage(this);
+		}
+		else {
+			findNewParkingLoc();
+		}
 	}
 
 	public static double getFuelRangeErrorMargin() {
@@ -1680,325 +1591,54 @@ public abstract class Vehicle extends Unit
 		return associatedSettlementID;
 	}
 
+	/**
+	 * Gets the settlement the person is currently associated with.
+	 *
+	 * @return associated settlement or null if none.
+	 */
+	@Override
 	public Settlement getAssociatedSettlement() {
 		return unitManager.getSettlementByID(associatedSettlementID);
 	}
-	
-	@Override
-	public String getImmediateLocation() {
-		return getLocationTag().getImmediateLocation();
-	}
-
-	@Override
-	public String getLocale() {
-		return getLocationTag().getLocale();
-	}
 
 	/**
-	 * Is the vehicle outside of a settlement but within its vicinity
-	 * 
+	 * Is the vehicle outside of a settlement but within its vicinity ?
+	 *
 	 * @return
 	 */
 	public boolean isRightOutsideSettlement() {
-		if (getLocationStateType() == LocationStateType.WITHIN_SETTLEMENT_VICINITY)
-			return true;
-		else
-			return false;
+        return getLocationStateType() == LocationStateType.WITHIN_SETTLEMENT_VICINITY;
 	}
 
-	/**
-	 * Is the vehicle parked inside or right outside of a settlement but within its vicinity
-	 * 
-	 * @return 
-	 */
-	public boolean isParked() {
-		if (getLocationStateType() == LocationStateType.WITHIN_SETTLEMENT_VICINITY
-				|| getLocationStateType() == LocationStateType.INSIDE_SETTLEMENT)
-			return true;
-		else
-			return false;
-	}
-	
+
 	@Override
 	public Building getBuildingLocation() {
-		return this.getGarage();
-	}
-
-	@Override
-	public Unit getUnit() {
-		return this;
+		return getGarage();
 	}
 
 	/**
-	 * Checks if this vehicle is involved in a mission
-	 * 
-	 * @return true if yes
+	 * Checks if this vehicle is involved in a mission.
 	 */
 	public Mission getMission() {
-		Iterator<Mission> i = missionManager.getMissions().iterator();
-		while (i.hasNext()) {
-			Mission mission = i.next();
-			if (!mission.isDone()) {
-				if (mission instanceof VehicleMission) {
-	
-					if (((VehicleMission) mission).getVehicle() == this) {
-						return mission;
-					}
-
-//					if (mission instanceof Mining) {
-//						if (((Mining) mission).getLightUtilityVehicle() == this) {
-//							return mission;
-//						}
-//					}
-
-//					if (mission instanceof Trade) {
-//						Rover towingRover = (Rover) ((Trade) mission).getVehicle();
-//						if (towingRover != null) {
-//							if (towingRover.getTowedVehicle() == this) {
-//								return mission;
-//							}
-//						}
-//					}
-//				} else if (mission instanceof BuildingConstructionMission) {
-//					BuildingConstructionMission construction = (BuildingConstructionMission) mission;
-//					if (construction.getConstructionVehicles() != null) {
-//						if (construction.getConstructionVehicles().contains(this)) {
-//							return mission;
-//						}
-//					}
-//					// else {
-//					// result = null;
-//					// }
-//				} else if (mission instanceof BuildingSalvageMission) {
-//					BuildingSalvageMission salvage = (BuildingSalvageMission) mission;
-//					if (salvage.getConstructionVehicles().contains(this)) {
-//						return mission;
-//					}
-				}
-			}
-		}
-
-		return null;
+		return mission;
 	}
-	
+
+	public void setMission(Mission newMission) {
+		this.mission = newMission;
+	}
+
 	/**
-	 * Checks if this vehicle is involved in a mission
-	 * 
+	 * Checks if this vehicle not in a settlement and is outside on a mission on the surface of Mars.
+	 *
 	 * @return true if yes
 	 */
-	public double getMissionRange(MissionType missiontype) {
-		return getSettlement().getMissionRadius(missiontype);
+	public boolean isOutsideOnMarsMission() {
+		return LocationStateType.MARS_SURFACE == currentStateType;
 	}
-	
-	/**
-	 * Checks if this vehicle is involved in a mission
-	 * 
-	 * @return true if yes
-	 */
-	public double getMissionRange(String missionName) {
-			
-		if (missionName.equalsIgnoreCase(AreologyFieldStudy.DEFAULT_DESCRIPTION)) {
-			return getSettlement().getMissionRadius(0);
-		}
-		
-		if (missionName.equalsIgnoreCase(BiologyFieldStudy.DEFAULT_DESCRIPTION)) {
-			return getSettlement().getMissionRadius(1);
-		}
-		
-		if (missionName.equalsIgnoreCase(CollectIce.DEFAULT_DESCRIPTION)) {
-			return getSettlement().getMissionRadius(2);
-		}
-		
-		if (missionName.equalsIgnoreCase(CollectRegolith.DEFAULT_DESCRIPTION)) {
-			return getSettlement().getMissionRadius(3);
-		}
-		
-		if (missionName.equalsIgnoreCase(EmergencySupply.DEFAULT_DESCRIPTION)) {
-			return getSettlement().getMissionRadius(4);
-		}
-		
-		if (missionName.equalsIgnoreCase(Exploration.DEFAULT_DESCRIPTION)) {
-			return getSettlement().getMissionRadius(5);
-		}
-		
-		if (missionName.equalsIgnoreCase(MeteorologyFieldStudy.DEFAULT_DESCRIPTION)) {
-			return getSettlement().getMissionRadius(6);
-		}
-		
-		if (missionName.equalsIgnoreCase(Mining.DEFAULT_DESCRIPTION)) {
-			return getSettlement().getMissionRadius(7);
-		}
 
-		if (missionName.equalsIgnoreCase(RescueSalvageVehicle.DEFAULT_DESCRIPTION)) {
-			return getSettlement().getMissionRadius(8);
-		}
-		
-		if (missionName.equalsIgnoreCase(Trade.DEFAULT_DESCRIPTION)) {
-			return getSettlement().getMissionRadius(9);
-		}
-		
-		if (missionName.equalsIgnoreCase(TravelToSettlement.DEFAULT_DESCRIPTION)) {
-			return getSettlement().getMissionRadius(10);
-		}
-		
-		
-		return getSettlement().getMaxMssionRange();
-	}
-	
-	/**
-	 * Checks if this vehicle is involved in a mission
-	 * 
-	 * @return true if yes
-	 */
-	public double getMissionRange(Mission mission) {
-		if (!mission.isDone()) {
-			if (mission instanceof VehicleMission) {
-
-				if (mission instanceof AreologyFieldStudy) {
-					if (((AreologyFieldStudy) mission).getVehicle() == this) {
-						return getSettlement().getMissionRadius(0);
-					}
-				}
-				
-				if (mission instanceof BiologyFieldStudy) {
-					if (((BiologyFieldStudy) mission).getVehicle() == this) {
-						return getSettlement().getMissionRadius(1);
-					}
-				}
-				
-				if (mission instanceof CollectIce) {
-					if (((CollectIce) mission).getVehicle() == this) {
-						return getSettlement().getMissionRadius(2);
-					}
-				}
-				
-				if (mission instanceof CollectRegolith) {
-					if (((CollectRegolith) mission).getVehicle() == this) {
-						return getSettlement().getMissionRadius(3);
-					}
-				}
-				
-				if (mission instanceof EmergencySupply) {
-					if (((EmergencySupply) mission).getVehicle() == this) {
-						return getSettlement().getMissionRadius(4);
-					}
-				}
-				
-				if (mission instanceof Exploration) {
-					if (((Exploration) mission).getVehicle() == this) {
-						return getSettlement().getMissionRadius(5);
-					}
-				}
-				
-				if (mission instanceof MeteorologyFieldStudy) {
-					if (((MeteorologyFieldStudy) mission).getVehicle() == this) {
-						return getSettlement().getMissionRadius(6);
-					}
-				}
-				
-				if (mission instanceof Mining) {
-					if (((Mining) mission).getVehicle() == this) {
-						return getSettlement().getMissionRadius(7);
-					}
-				}
-	
-				
-				if (mission instanceof RescueSalvageVehicle) {
-					if (((RescueSalvageVehicle) mission).getVehicle() == this) {
-						return getSettlement().getMissionRadius(8);
-					}
-				}
-				
-				if (mission instanceof Trade) {
-					Rover towingRover = (Rover) ((Trade) mission).getVehicle();
-					if (towingRover != null) {
-						if (towingRover.getTowedVehicle() == this) {
-							return getSettlement().getMissionRadius(9);
-						}
-					}
-				}
-				
-				if (mission instanceof TravelToSettlement) {
-					if (((TravelToSettlement) mission).getVehicle() == this) {
-						return getSettlement().getMissionRadius(10);
-					}
-				}
-				
-//				if (mission instanceof BuildingConstructionMission) {
-//					BuildingConstructionMission construction = (BuildingConstructionMission) mission;
-//					if (construction.getConstructionVehicles() != null) {
-//						if (construction.getConstructionVehicles().contains(this)) {
-//							return true;
-//						}
-//					}
-//				}
-//				
-//				if (mission instanceof BuildingSalvageMission) {
-//					BuildingSalvageMission salvage = (BuildingSalvageMission) mission;
-//					if (salvage.getConstructionVehicles().contains(this)) {
-//						return true;
-//					}
-//				}
-			}
-		}
-			
-		return getSettlement().getMaxMssionRange();
-	}
-	
-	/**
-	 * Checks if this vehicle is involved in a mission
-	 * 
-	 * @return true if yes
-	 */
-	public boolean isOnAMission() {
-		Iterator<Mission> i = missionManager.getMissions().iterator();
-		while (i.hasNext()) {
-			Mission mission = i.next();
-			if (!mission.isDone()) {
-				if (mission instanceof VehicleMission) {
-					if (((VehicleMission) mission).getVehicle() == this) {
-						return true;
-					}
-
-					if (mission instanceof Mining) {
-						if (((Mining) mission).getLightUtilityVehicle() == this) {
-							return true;
-						}
-					}
-
-					if (mission instanceof Trade) {
-						Rover towingRover = (Rover) ((Trade) mission).getVehicle();
-						if (towingRover != null) {
-							if (towingRover.getTowedVehicle() == this) {
-								return true;
-							}
-						}
-					}
-				} else if (mission instanceof BuildingConstructionMission) {
-					BuildingConstructionMission construction = (BuildingConstructionMission) mission;
-					if (construction.getConstructionVehicles() != null) {
-						if (construction.getConstructionVehicles().contains(this)) {
-							return true;
-						}
-					}
-					// else {
-					// result = null;
-					// }
-				} else if (mission instanceof BuildingSalvageMission) {
-					BuildingSalvageMission salvage = (BuildingSalvageMission) mission;
-					if (salvage.getConstructionVehicles().contains(this)) {
-						return true;
-					}
-				}
-			}
-		}
-
-		return false;
-	}
-	
 	/**
 	 * Checks if the person is in a moving vehicle.
-	 * 
+	 *
 	 * @param person the person.
 	 * @return true if person is in a moving vehicle.
 	 */
@@ -2008,51 +1648,587 @@ public abstract class Vehicle extends Unit
 
 		if (person.isInVehicle()) {
 			Vehicle vehicle = person.getVehicle();
-			if (vehicle.haveStatusType(StatusType.MOVING)) {
-				result = true;
-			} else if (vehicle.haveStatusType(StatusType.TOWED)) {
-				Vehicle towingVehicle = vehicle.getTowingVehicle();
-				if (towingVehicle != null 
-						&& (towingVehicle.haveStatusType(StatusType.MOVING) 
-						|| towingVehicle.haveStatusType(StatusType.TOWING))) {
-					result = true;
-				}
-			}
+			result = vehicle.getPrimaryStatus() == StatusType.MOVING;
 		}
 
 		return result;
 	}
-	
+
 	/**
-	 * Reset uniqueCount to the current number of vehicles
+	 * Gets the specific base wear life time of this vehicle (in msols).
+	 *
+	 * @return
 	 */
-	public static void reinitializeIdentifierCount() {
-		uniqueCount = unitManager.getVehiclesNum() + Unit.FIRST_VEHICLE_UNIT_ID;
+	public double getBaseWearLifetime() {
+		return baseWearLifetime;
 	}
 
+	@Override
+	public UnitType getUnitType() {
+		return UnitType.VEHICLE;
+	}
+
+	/**
+	 * Gets the holder's unit instance.
+	 *
+	 * @return the holder's unit instance
+	 */
+	@Override
+	public Unit getHolder() {
+		return this;
+	}
+
+	/**
+	 * Is this unit empty ?
+	 *
+	 * @return true if this unit doesn't carry any resources or equipment
+	 */
+	public boolean isEmpty() {
+		return (eqmInventory.getStoredMass() == 0D);
+	}
+
+	/**
+	 * Gets the total mass on this vehicle (not including vehicle's weight).
+	 *
+	 * @return
+	 */
+	@Override
+	public double getStoredMass() {
+		return eqmInventory.getStoredMass();
+	}
+
+	/**
+	 * Gets the equipment list.
+	 *
+	 * @return
+	 */
+	@Override
+	public Set<Equipment> getEquipmentSet() {
+		if (eqmInventory == null)
+			return new HashSet<>();
+		return eqmInventory.getEquipmentSet();
+	}
+
+	/**
+	 * Finds all of the containers (excluding EVA suit).
+	 *
+	 * @return collection of containers or empty collection if none.
+	 */
+	@Override
+	public Collection<Container> findAllContainers() {
+		return eqmInventory.findAllContainers();
+	}
+
+	/**
+	 * Finds all of the containers of a particular type (excluding EVA suit).
+	 *
+	 * @return collection of containers or empty collection if none.
+	 */
+	@Override
+	public Collection<Container> findContainersOfType(EquipmentType type){
+		return eqmInventory.findContainersOfType(type);
+	}
+
+	/**
+	 * Does this unit possess an equipment of this type ?
+	 *
+	 * @param typeID
+	 * @return
+	 */
+	@Override
+	public boolean containsEquipment(EquipmentType type) {
+		return eqmInventory.containsEquipment(type);
+	}
+
+	/**
+	 * Adds an equipment to this unit.
+	 *
+	 * @param equipment
+	 * @return true if it can be carried
+	 */
+	@Override
+	public boolean addEquipment(Equipment e) {
+		if (eqmInventory.addEquipment(e)) {
+			e.setContainerUnit(this);
+			fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_EQUIPMENT_EVENT, this);
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Removes an equipment.
+	 *
+	 * @param equipment
+	 */
+	@Override
+	public boolean removeEquipment(Equipment equipment) {
+		return eqmInventory.removeEquipment(equipment);
+	}
+
+	/**
+	 * Stores the item resource.
+	 *
+	 * @param resource the item resource
+	 * @param quantity
+	 * @return excess quantity that cannot be stored
+	 */
+	@Override
+	public int storeItemResource(int resource, int quantity) {
+		return eqmInventory.storeItemResource(resource, quantity);
+	}
+
+	/**
+	 * Retrieves the item resource.
+	 *
+	 * @param resource
+	 * @param quantity
+	 * @return quantity that cannot be retrieved
+	 */
+	@Override
+	public int retrieveItemResource(int resource, int quantity) {
+		return eqmInventory.retrieveItemResource(resource, quantity);
+	}
+
+	/**
+	 * Retrieves the resource.
+	 *
+	 * @param resource
+	 * @param quantity
+	 * @return quantity that cannot be retrieved
+	 */
+	@Override
+	public double retrieveAmountResource(int resource, double quantity) {
+		return eqmInventory.retrieveAmountResource(resource, quantity);
+	}
+
+	/**
+	 * Stores the resource.
+	 *
+	 * @param resource
+	 * @param quantity
+	 * @return excess quantity that cannot be stored
+	 */
+	@Override
+	public double storeAmountResource(int resource, double quantity) {
+		return eqmInventory.storeAmountResource(resource, quantity);
+	}
+
+	/**
+	 * Gets the item resource stored.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public int getItemResourceStored(int resource) {
+		return eqmInventory.getItemResourceStored(resource);
+	}
+
+	/**
+	 * Gets the capacity of a particular amount resource.
+	 *
+	 * @param resource
+	 * @return capacity
+	 */
+	@Override
+	public double getAmountResourceCapacity(int resource) {
+		return eqmInventory.getAmountResourceCapacity(resource);
+	}
+
+	/**
+	 * Obtains the remaining storage space of a particular amount resource.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAmountResourceRemainingCapacity(int resource) {
+		return eqmInventory.getAmountResourceRemainingCapacity(resource);
+	}
+
+	/**
+	 * Does it have unused space or capacity for a particular resource ?
+	 * 
+	 * @param resource
+	 * @return
+	 */
+	@Override
+	public boolean hasAmountResourceRemainingCapacity(int resource) {
+		return eqmInventory. hasAmountResourceRemainingCapacity(resource);
+	}
 	
+	/**
+     * Gets the total capacity that it can hold.
+     *
+     * @return total capacity (kg).
+     */
+	@Override
+	public double getCargoCapacity() {
+		return eqmInventory.getCargoCapacity();
+	}
+
+	/**
+	 * Gets the amount resource stored.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAmountResourceStored(int resource) {
+		return eqmInventory.getAmountResourceStored(resource);
+	}
+	/**
+	 * Gets all the amount resource resource stored, including inside equipment.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAllAmountResourceStored(int resource) {
+		return eqmInventory.getAllAmountResourceStored(resource);
+	}
+	
+	/**
+	 * Finds the number of empty containers of a class that are contained in storage and have
+	 * an empty inventory.
+	 *
+	 * @param containerClass  the unit class.
+	 * @param brandNew  does it include brand new bag only
+	 * @return number of empty containers.
+	 */
+	@Override
+	public int findNumEmptyContainersOfType(EquipmentType containerType, boolean brandNew) {
+		return eqmInventory.findNumEmptyContainersOfType(containerType, brandNew);
+	}
+
+	/**
+	 * Finds the number of containers of a particular type
+	 *
+	 * @param containerType the equipment type.
+	 * @return number of empty containers.
+	 */
+	@Override
+	public int findNumContainersOfType(EquipmentType containerType) {
+		return eqmInventory.findNumContainersOfType(containerType);
+	}
+
+	/**
+	 * Finds a container in storage.
+	 *
+	 * @param containerType
+	 * @param empty does it need to be empty ?
+	 * @param resource If -1 then resource doesn't matter
+	 * @return instance of container or null if none.
+	 */
+	@Override
+	public Container findContainer(EquipmentType containerType, boolean empty, int resource) {
+		return eqmInventory.findContainer(containerType, empty, resource);
+	}
+
+
+	/**
+	 * Finds the number of EVA suits (may or may not have resources inside) that are contained in storage.
+	 *
+	 * @return number of EVA suits
+	 */
+	public int findNumEVASuits() {
+		int result = 0;
+		for (Equipment e : eqmInventory.getEquipmentSet()) {
+			if (e.getEquipmentType() == EquipmentType.EVA_SUIT) {
+				result++;
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Gets a set of item resources in storage.
+	 * 
+	 * @return  a set of resources
+	 */
+	@Override
+	public Set<Integer> getItemResourceIDs() {
+		return eqmInventory.getItemResourceIDs();
+	}
+
+	/**
+	 * Gets a set of resources in storage.
+	 * 
+	 * @return  a set of resources
+	 */
+	@Override
+	public Set<Integer> getAmountResourceIDs() {
+		return eqmInventory.getAmountResourceIDs();
+	}
+	/**
+	 * Gets all stored amount resources in eqmInventory, including inside equipment
+	 *
+	 * @return all stored amount resources.
+	 */
+	@Override
+	public Set<Integer> getAllAmountResourceIDs() {
+		return eqmInventory.getAllAmountResourceIDs();
+	}
+	
+	/**
+	 * Obtains the remaining general storage space
+	 *
+	 * @return quantity
+	 */
+	@Override
+	public double getRemainingCargoCapacity() {
+		return eqmInventory.getRemainingCargoCapacity();
+	}
+
+	/**
+	 * Does it have this item resource ?
+	 *
+	 * @param resource
+	 * @return
+	 */
+	@Override
+	public boolean hasItemResource(int resource) {
+		return eqmInventory.hasItemResource(resource);
+	}
+
+	/**
+	 * Gets the remaining quantity of an item resource.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public int getItemResourceRemainingQuantity(int resource) {
+		return eqmInventory.getItemResourceRemainingQuantity(resource);
+	}
+
+	/**
+	 * Sets the unit's container unit.
+	 *
+	 * @param newContainer the unit to contain this unit.
+	 */
+	@Override
+	public void setContainerUnit(Unit newContainer) {
+		if (newContainer != null) {
+			if (newContainer.equals(getContainerUnit())) {
+				return;
+			}
+			// 1. Set Coordinates
+			if (newContainer.getUnitType() == UnitType.MARS) {
+				// Since it's on the surface of Mars,
+				// First set its initial location to its old parent's location as it's leaving its parent.
+				// Later it may move around and updates its coordinates by itself
+				setCoordinates(getContainerUnit().getCoordinates());
+			}
+			else {
+				// Null its coordinates since it's now slaved after its parent
+				setNullCoordinates();
+			}
+			// 2. Set new LocationStateType
+			updateVehicleState(newContainer);
+			// 3. Set containerID
+			setContainerID(newContainer.getIdentifier());
+			// 4. Fire the container unit event
+			fireUnitUpdate(UnitEventType.CONTAINER_UNIT_EVENT, newContainer);
+		}
+	}
+
+	/**
+	 * Updates the location state type of a vehicle.
+	 *
+	 * @apiNote (1) : WITHIN_SETTLEMENT_VICINITY is the intermediate state between being INSIDE_SETTLEMENT (in a garage) and being OUTSIDE_ON_MARS.
+	 *
+	 * @apiNote (2) : WITHIN_SETTLEMENT_VICINITY can be used by a person or a vehicle.
+	 *
+	 * @apiNote (3) : If a vehicle may be in a garage inside a building, this vehicle is INSIDE_SETTLEMENT.
+	 *                If a vehicle is parked right outside a settlement, this vehicle is WITHIN_SETTLEMENT_VICINITY.
+	 *
+	 * @param newContainer
+	 */
+	public void updateVehicleState(Unit newContainer) {
+		if (newContainer == null) {
+			currentStateType = LocationStateType.UNKNOWN;
+			return;
+		}
+
+		currentStateType = getNewLocationState(newContainer);
+	}
+
+	/**
+	 * Updates the location state type directly.
+	 *
+	 * @param type
+	 */
+	public void updateLocationStateType(LocationStateType type) {
+		currentStateType = type;
+	}
+
+	/**
+	 * Gets the location state type based on the type of the new container unit.
+	 *
+	 * @param newContainer
+	 * @return {@link LocationStateType}
+	 */
+	@Override
+	public LocationStateType getNewLocationState(Unit newContainer) {
+
+		if (newContainer.getUnitType() == UnitType.SETTLEMENT) {
+			if (isInAGarage()) {
+				return LocationStateType.INSIDE_SETTLEMENT;
+			}
+			else
+				return LocationStateType.WITHIN_SETTLEMENT_VICINITY;
+		}
+
+//		if (newContainer.getUnitType() == UnitType.BUILDING)
+//			return LocationStateType.INSIDE_SETTLEMENT;
+
+		if (newContainer.getUnitType() == UnitType.VEHICLE)
+			return LocationStateType.INSIDE_VEHICLE;
+
+		if (newContainer.getUnitType() == UnitType.CONSTRUCTION)
+			return LocationStateType.MARS_SURFACE;
+
+		if (newContainer.getUnitType() == UnitType.PERSON)
+			return LocationStateType.ON_PERSON_OR_ROBOT;
+
+		if (newContainer.getUnitType() == UnitType.MARS)
+			return LocationStateType.MARS_SURFACE;
+
+		return null;
+	}
+
+	/**
+	 * Is this unit inside a settlement ?
+	 *
+	 * @return true if the unit is inside a settlement
+	 */
+	@Override
+	public boolean isInSettlement() {
+
+		if (containerID <= MARS_SURFACE_UNIT_ID)
+			return false;
+
+		// if the vehicle is parked in a garage
+		if (LocationStateType.INSIDE_SETTLEMENT == currentStateType)
+			return true;
+
+		// Note: in future, WITHIN_SETTLEMENT_VICINITY will
+		// mean that the vehicle is NOT in the settlement.
+		// But for now, it loosely means the vehicle is still in the settlement.
+
+		// if the vehicle is parked in the vicinity of a settlement
+		if (LocationStateType.WITHIN_SETTLEMENT_VICINITY == currentStateType)
+			return true;
+
+		if (getContainerUnit().getUnitType() == UnitType.SETTLEMENT
+				&& ((Settlement)(getContainerUnit())).containsParkedVehicle((Vehicle)this)) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Transfers the unit from one owner to another owner.
+	 *
+	 * @param origin {@link Unit} the original container unit
+	 * @param destination {@link Unit} the destination container unit
+	 */
+	public boolean transfer(Unit destination) {
+		boolean transferred = false;
+		// Set the old container unit
+		Unit cu = getContainerUnit();
+
+		if (cu.getUnitType() == UnitType.MARS) {
+			transferred = ((MarsSurface)cu).removeVehicle(this);
+		}
+		else if (cu.getUnitType() == UnitType.SETTLEMENT) {
+			Settlement currentBase = (Settlement)cu;
+			transferred = currentBase.removeParkedVehicle(this);
+			this.setCoordinates(currentBase.getCoordinates());
+		}
+
+		if (transferred) {
+			if (destination.getUnitType() == UnitType.MARS) {
+				transferred = ((MarsSurface)destination).addVehicle(this);
+			}
+			else if (cu.getUnitType() == UnitType.SETTLEMENT) {
+				transferred = ((Settlement)destination).addParkedVehicle(this);
+			}
+
+			if (!transferred) {
+				logger.warning(this + " cannot be stored into " + destination + ".");
+				// NOTE: need to revert back the storage action
+			}
+			else {
+				// Set the new container unit (which will internally set the container unit id)
+				setContainerUnit(destination);
+				// Fire the unit event type
+				getContainerUnit().fireUnitUpdate(UnitEventType.INVENTORY_STORING_UNIT_EVENT, this);
+				// Fire the unit event type
+				getContainerUnit().fireUnitUpdate(UnitEventType.INVENTORY_RETRIEVING_UNIT_EVENT, this);
+			}
+		}
+		else {
+			logger.warning(this + " cannot be retrieved from " + cu + ".");
+			// NOTE: need to revert back the retrieval action
+		}
+
+		return transferred;
+	}
+
+    /**
+	 * Gets the amount of fuel (kg) needed for a trip of a given distance (km).
+	 *
+	 * @param tripDistance   the distance (km) of the trip.
+	 * @param useMargin      Apply safety margin when loading resources before embarking if true.
+	 * @return amount of fuel needed for trip (kg)
+	 */
+	public double getFuelNeededForTrip(double tripDistance, boolean useMargin) {
+		return vehicleController.getFuelNeededForTrip(this, tripDistance, 
+				getEstimatedFuelEconomy(), useMargin);
+	}
+	
+	public EquipmentInventory getEquipmentInventory() {
+		return eqmInventory;
+	}
+
+	public VehicleController getController() {
+		return vehicleController;
+	}
+	
+	/** 
+	 * Gets the VehicleSpec instance. 
+	 */
+	public VehicleSpec getVehicleSpec() {
+		return spec;
+	}
+	
+	
+	/**
+	 * Compares if an object is the same as this unit
+	 *
+	 * @param obj
+	 */
+	@Override
 	public boolean equals(Object obj) {
 		if (this == obj) return true;
 		if (obj == null) return false;
 		if (this.getClass() != obj.getClass()) return false;
 		Vehicle v = (Vehicle) obj;
-		return this.getName().equals(v.getName())
-				&& this.identifier == v.getIdentifier()
-				&& this.vehicleType.equals(v.getVehicleType())
-				&& this.associatedSettlementID == v.getAssociatedSettlementID();
+		return this.getIdentifier() == v.getIdentifier();
 	}
-	
+
 	/**
 	 * Gets the hash code value.
-	 * 
+	 *
 	 * @return hash code
 	 */
+	@Override
 	public int hashCode() {
-		int hashCode = getName().hashCode();
-		hashCode *= identifier;
-		hashCode *= associatedSettlementID;
-		hashCode *= vehicleType.hashCode();
-		return hashCode;
+		return getIdentifier() % 32;
 	}
 
 	@Override

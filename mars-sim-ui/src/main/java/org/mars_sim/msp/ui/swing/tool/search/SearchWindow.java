@@ -1,12 +1,13 @@
-/**
+/*
  * Mars Simulation Project
  * SearchWindow.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-05-09
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.search;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
@@ -20,34 +21,33 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import javax.swing.DefaultListModel;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
 import javax.swing.border.EtchedBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.plaf.basic.BasicComboBoxRenderer;
 
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.UnitManagerEvent;
-import org.mars_sim.msp.core.UnitManagerListener;
+import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.JComboBoxMW;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.tool.navigator.NavigatorWindow;
-import org.mars_sim.msp.ui.swing.tool.settlement.SettlementMapPanel;
 import org.mars_sim.msp.ui.swing.tool.settlement.SettlementWindow;
-import org.mars_sim.msp.ui.swing.toolWindow.ToolWindow;
+import org.mars_sim.msp.ui.swing.toolwindow.ToolWindow;
 
-import com.alee.laf.button.WebButton;
-import com.alee.laf.checkbox.WebCheckBox;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.text.WebTextField;
 
 /**
  * The SearchWindow is a tool window that allows the user to search
@@ -59,61 +59,33 @@ extends ToolWindow {
 
 	/** Tool name. */
 	public static final String NAME = Msg.getString("SearchWindow.title"); //$NON-NLS-1$
-
-	/** Unit categories enum. */
-	enum UnitCategory {
-		PEOPLE 			(Msg.getString("SearchWindow.category.people")), //$NON-NLS-1$	
-		SETTLEMENTS 	(Msg.getString("SearchWindow.category.settlements")), //$NON-NLS-1$
-		VEHICLES 		(Msg.getString("SearchWindow.category.vehicles")), //$NON-NLS-1$
-		BOTS 			(Msg.getString("SearchWindow.category.bots")); //$NON-NLS-1$
-		
-		private String name;
-		private UnitCategory(String name) {
-			this.name = name;
-		}
-		public String getName() {
-			return this.name;
-		}
-		public static UnitCategory fromName(String name) {
-		    if (name != null) {
-		        for (UnitCategory b : UnitCategory.values()) {
-		            if (name.equalsIgnoreCase(b.name)) {
-		                return b;
-		            }
-		        }
-		    }
-		    throw new IllegalArgumentException("No UnitCategory with name " + name + " found");
-		}
-	}
+	public static final String ICON = "action/find";
 
 	/** True if unitList selection events should be ignored. */
 	private boolean lockUnitList;
 	/** True if selectTextField events should be ignored. */
 	private boolean lockSearchText;
-	/** Array of category names. */
-	private String[] unitCategoryNames;
-	
-	// Data members
-	private SettlementMapPanel mapPanel;
 	
 	/** Category selector. */
-	private JComboBoxMW<?> searchForSelect;
+	private JComboBoxMW<UnitType> searchForSelect;
 	/** List of selectable units. */
 	private JList<Unit> unitList;
 	/** Model for unit select list. */
 	private UnitListModel unitListModel;
 	/** Selection text field. */
-	private WebTextField selectTextField;
+	private JTextField selectTextField;
 	/** Status label for displaying warnings. */
-	private WebLabel statusLabel;
+	private JLabel statusLabel;
 	/** Checkbox to indicate if unit window is to be opened. */
-	private WebCheckBox openWindowCheck;
+	private JCheckBox openWindowCheck;
 	/** Checkbox to indicate if mars navigator map is to be centered on unit. */
-	private WebCheckBox marsNavCheck;
+	private JCheckBox marsNavCheck;
 	/** Checkbox to indicate if the settlement map is to be centered on unit. */
-	private WebCheckBox settlementCheck;
+	private JCheckBox settlementCheck;
 	/** Button to execute the search of the selected unit. */
-	private WebButton searchButton;
+	private JButton searchButton;
+
+	private UnitManager unitManager;
 
 	/**
 	 * Constructor.
@@ -123,58 +95,53 @@ extends ToolWindow {
 
 		// Use ToolWindow constructor
 		super(NAME, desktop);
-
-//		mapPanel = desktop.getSettlementWindow().getMapPanel();
-		
+		unitManager = desktop.getSimulation().getUnitManager();
+	
 		// Initialize locks
 		lockUnitList = false;
 		lockSearchText = false;
-
-		// Initialize unitCategoryNames
-		unitCategoryNames = new String[4];
-		unitCategoryNames[0] = UnitCategory.PEOPLE.getName();
-		unitCategoryNames[1] = UnitCategory.SETTLEMENTS.getName();
-		unitCategoryNames[2] = UnitCategory.VEHICLES.getName();
-		unitCategoryNames[3] = UnitCategory.BOTS.getName();
 		
 		// Get content pane
-		WebPanel mainPane = new WebPanel(new BorderLayout());
+		JPanel mainPane = new JPanel(new BorderLayout());
 		mainPane.setBorder(new MarsPanelBorder());
 		setContentPane(mainPane);
 
 		// Create search for panel
-		WebPanel searchForPane = new WebPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
+		JPanel searchForPane = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
 		searchForPane.setPreferredSize(new Dimension(240, 26));
 		mainPane.add(searchForPane, BorderLayout.NORTH);
 
 		// Create search for label
-		WebLabel searchForLabel = new WebLabel(Msg.getString("SearchWindow.searchFor")); //$NON-NLS-1$
+		JLabel searchForLabel = new JLabel(Msg.getString("SearchWindow.searchFor")); //$NON-NLS-1$
 		searchForPane.add(searchForLabel);
 
 		// Create search for select
-		String[] categoryStrings = {
-			UnitCategory.PEOPLE.getName(),
-			UnitCategory.SETTLEMENTS.getName(),
-			UnitCategory.VEHICLES.getName(),
-			UnitCategory.BOTS.getName()
+		UnitType[] categories = {
+			UnitType.PERSON,
+			UnitType.SETTLEMENT,
+			UnitType.VEHICLE,
+			UnitType.ROBOT
 		};
-		searchForSelect = new JComboBoxMW<Object>(categoryStrings);
+		searchForSelect = new JComboBoxMW<>(categories);
+		searchForSelect.setRenderer(new UnitTypeRenderer());
 		searchForSelect.setSelectedIndex(0);
 		searchForSelect.addItemListener(new ItemListener() {
 			public void itemStateChanged(ItemEvent event) {
-				changeCategory((String) searchForSelect.getSelectedItem());
+				changeCategory((UnitType) searchForSelect.getSelectedItem());
 			}
 		});
 		searchForPane.add(searchForSelect);
 
 		// Create select unit panel
-		WebPanel selectUnitPane = new WebPanel(new BorderLayout());
+		JPanel selectUnitPane = new JPanel(new BorderLayout());
 		mainPane.add(selectUnitPane, BorderLayout.CENTER);
 
 		// Create select text field
-		selectTextField = new WebTextField();
+		selectTextField = new JTextField();
 		selectTextField.getDocument().addDocumentListener(new DocumentListener() {
-			public void changedUpdate(DocumentEvent event) {}
+			public void changedUpdate(DocumentEvent event) {
+				// Not needed
+			}
 			public void insertUpdate(DocumentEvent event) {
 				searchTextChange();
 				searchButton.setEnabled(true);
@@ -187,10 +154,11 @@ extends ToolWindow {
 		selectUnitPane.add(selectTextField, BorderLayout.NORTH);
 
 		// Create unit list
-		unitListModel = new UnitListModel(UnitCategory.PEOPLE);
-		unitList = new JList<Unit>(unitListModel);
+		unitListModel = new UnitListModel(UnitType.PERSON);
+		unitList = new JList<>(unitListModel);
 		unitList.setSelectedIndex(0);
 		unitList.addMouseListener(new MouseAdapter() {
+			@Override
 			public void mouseReleased(MouseEvent event) {
 				if (event.getClickCount() == 2) search();
 				else if (!lockUnitList) {
@@ -203,40 +171,40 @@ extends ToolWindow {
 				}
 			}
 		});
-		selectUnitPane.add(new WebScrollPane(unitList), BorderLayout.CENTER);
+		selectUnitPane.add(new JScrollPane(unitList), BorderLayout.CENTER);
 
 		// Create bottom panel
-		WebPanel bottomPane = new WebPanel(new BorderLayout());
+		JPanel bottomPane = new JPanel(new BorderLayout());
 		mainPane.add(bottomPane, BorderLayout.SOUTH);
 
 		// Create select options panel
-		WebPanel selectOptionsPane = new WebPanel(new GridLayout(2, 1));
+		JPanel selectOptionsPane = new JPanel(new GridLayout(2, 1));
 		bottomPane.add(selectOptionsPane, BorderLayout.NORTH);
 
 		// Create open the unit window
-		openWindowCheck = new WebCheckBox(Msg.getString("SearchWindow.openWindow")); //$NON-NLS-1$
+		openWindowCheck = new JCheckBox(Msg.getString("SearchWindow.openWindow")); //$NON-NLS-1$
 		openWindowCheck.setSelected(true);
 		selectOptionsPane.add(openWindowCheck);
 
 		// Create open the mars navigator
-		marsNavCheck = new WebCheckBox(Msg.getString("SearchWindow.openNav")); //$NON-NLS-1$
+		marsNavCheck = new JCheckBox(Msg.getString("SearchWindow.openNav")); //$NON-NLS-1$
 		selectOptionsPane.add(marsNavCheck);
 
 		// Create open the settlement map
-		settlementCheck = new WebCheckBox(Msg.getString("SearchWindow.openSettlement")); //$NON-NLS-1$
+		settlementCheck = new JCheckBox(Msg.getString("SearchWindow.openSettlement")); //$NON-NLS-1$
 		selectOptionsPane.add(settlementCheck);
 
 		// Create status label
-		statusLabel = new WebLabel(" ", WebLabel.CENTER); //$NON-NLS-1$
+		statusLabel = new JLabel(" ", JLabel.CENTER); //$NON-NLS-1$
 		statusLabel.setBorder(new EtchedBorder());
 		bottomPane.add(statusLabel, BorderLayout.CENTER);
 
 		// Create search button panel
-		WebPanel searchButtonPane = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+		JPanel searchButtonPane = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		bottomPane.add(searchButtonPane, BorderLayout.SOUTH);
 
 		// Create search button
-		searchButton = new WebButton(Msg.getString("SearchWindow.button.search")); //$NON-NLS-1$
+		searchButton = new JButton(Msg.getString("SearchWindow.button.search")); //$NON-NLS-1$
 		searchButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent event) {
 				search();
@@ -255,45 +223,25 @@ extends ToolWindow {
 	 * Retrieve info on all units of selected category.
 	 */
 	private void search() {
-		Collection<? extends Unit> units = null;
-		String category = (String) searchForSelect.getSelectedItem();
-//		UnitManager unitManager = Simulation.instance().getUnitManager();
-		if (category.equals(UnitCategory.PEOPLE.getName())) {
-			Collection<Person> people = unitManager.getPeople();
-			units = CollectionUtils.sortByName(people);
-		}
-		else if (category.equals(UnitCategory.SETTLEMENTS.getName())) {
-			Collection<Settlement> settlement = unitManager.getSettlements();
-			units = CollectionUtils.sortByName(settlement);
-		}
-		else if (category.equals(UnitCategory.VEHICLES.getName())) {
-			Collection<Vehicle> vehicle = unitManager.getVehicles();
-			units = CollectionUtils.sortByName(vehicle);
-		}
-		else if (category.equals(UnitCategory.BOTS.getName())) {
-			Collection<Robot> bots = unitManager.getRobots();
-			units = CollectionUtils.sortByName(bots);
-		}
+		UnitType category = (UnitType) searchForSelect.getSelectedItem();
 		
-		Iterator<? extends Unit> unitI = units.iterator();
-
 		// If entered text equals the name of a unit in this category, take appropriate action.
 		boolean foundUnit = false;
-		while (unitI.hasNext()) {
-			Unit unit = unitI.next();
-			if (selectTextField.getText().equalsIgnoreCase(unit.getName())) {
-				foundUnit = true;
-				if (openWindowCheck.isSelected()) desktop.openUnitWindow(unit, false);
-				
-				if (marsNavCheck.isSelected())
-					desktop.centerMapGlobe(unit.getCoordinates());
-				
-				if (settlementCheck.isSelected())
-					 openUnit(unit);
+		Unit unit = unitManager.getUnitByName(category, selectTextField.getText());
+		if (unit != null) {
+			foundUnit = true;
+			if (openWindowCheck.isSelected()) desktop.showDetails(unit);
+			
+			if (marsNavCheck.isSelected()) {
+				NavigatorWindow nw = (NavigatorWindow) desktop.openToolWindow(NavigatorWindow.NAME);
+				nw.updateCoordsMaps(unit.getCoordinates());
 			}
+			
+			if (settlementCheck.isSelected())
+				openUnit(unit);
 		}
 
-		String tempName = unitCategoryNames[searchForSelect.getSelectedIndex()];
+		String tempName = category.getName();
 
 		// If not found, display "'Category' Not Found" in statusLabel.
 		if (!foundUnit) statusLabel.setText(Msg.getString("SearchWindow.unitNotFound",tempName)); //$NON-NLS-1$
@@ -304,45 +252,36 @@ extends ToolWindow {
 	}
 
 	public void openUnit(Unit u) {
-
-		mapPanel = desktop.getSettlementWindow().getMapPanel();
 		
-		if (u.isInSettlement()) {
-			
+		if (u.isInSettlement()) {	
 			showPersonRobot(u);
 		}
-
 		else if (u.isInVehicle()) {
-
 			Vehicle vv = u.getVehicle();
 
 			if (vv.getSettlement() == null) {
 				// person is on a mission on the surface of Mars 
-				desktop.openToolWindow(NavigatorWindow.NAME);
-				desktop.centerMapGlobe(u.getCoordinates());
-			} 
-			
+				NavigatorWindow nw = (NavigatorWindow) desktop.openToolWindow(NavigatorWindow.NAME);
+				nw.updateCoordsMaps(vv.getCoordinates());
+			} 	
 			else {
 				// still parked inside a garage or within the premise of a settlement
 				showPersonRobot(u);
 			}
 		}
-
 		else if (u.isOutside()) {
 			Vehicle vv = u.getVehicle();
 
 			if (vv == null) {
 				// if it's not in a vehicle
 				showPersonRobot(u);			
-			}
-			
+			}	
 			else {
 				// if it's in a vehicle			
 				if (vv.getSettlement() != null) {
 					// if the vehicle is in a settlement
 					showPersonRobot(u);
-				}
-				
+				}	
 				else {
 					// person is on a mission on the surface of Mars 
 					desktop.openToolWindow(NavigatorWindow.NAME);
@@ -353,50 +292,29 @@ extends ToolWindow {
 		}
 	}
 	
-	public void showPersonRobot(Unit u) {
-//		Settlement s = u.findSettlementVicinity();
-
+	private void showPersonRobot(Unit u) {
 		// person just happens to step outside the settlement at its
 		// vicinity temporarily
-
-		desktop.openToolWindow(SettlementWindow.NAME);
-		
+		SettlementWindow sw = (SettlementWindow) desktop.openToolWindow(SettlementWindow.NAME);
 		if (u instanceof Person) {
 			Person p = (Person) u;
-			
-			double xLoc = p.getXLocation();
-			double yLoc = p.getYLocation();
-			double scale = mapPanel.getScale();
-			mapPanel.reCenter();
-			mapPanel.moveCenter(xLoc * scale, yLoc * scale);
-			
-			if (mapPanel.getSelectedPerson() != null)
-				mapPanel.displayPerson(p);
+			sw.displayPerson(p);
 		} 
-		
-		else if (u instanceof Robot) {
-			Robot r = (Robot) u;
-			
-			double xLoc = r.getXLocation();
-			double yLoc = r.getYLocation();
-			double scale = mapPanel.getScale();
-			mapPanel.reCenter();
-			mapPanel.moveCenter(xLoc * scale, yLoc * scale);
-				
-			if (mapPanel.getSelectedRobot() != null)
-				mapPanel.selectRobot(r);
+		else { 
+			Robot r = (Robot)u;
+			sw.displayRobot(r);
 		}
-}
+	}
 	
 	
 	/**
 	 * Change the category of the unit list.
 	 * @param category
 	 */
-	private void changeCategory(String category) {
+	private void changeCategory(UnitType category) {
 		// Change unitList to the appropriate category list
 		lockUnitList = true;
-		unitListModel.updateCategory(UnitCategory.fromName(category));
+		unitListModel.updateCategory(category);
 		unitList.setSelectedIndex(0);
 		unitList.ensureIndexIsVisible(0);
 		lockUnitList = false;
@@ -415,7 +333,7 @@ extends ToolWindow {
 			int fitIndex = 0;
 			boolean goodFit = false;
 			for (int x = unitListModel.size() - 1; x > -1; x--) {
-				Unit unit = (Unit) unitListModel.elementAt(x);
+				Unit unit = unitListModel.elementAt(x);
 				String unitString = unit.getName().toLowerCase();
 				if (unitString.startsWith(searchText)) {
 					fitIndex = x;
@@ -435,35 +353,41 @@ extends ToolWindow {
 	}
 
 	@Override
-	public void destroy() {} {
-
+	public void destroy() {
+		super.destroy();
+		
 		if (unitListModel != null) {
-//			UnitManager manager = Simulation.instance().getUnitManager();
-			unitManager.removeUnitManagerListener(unitListModel);
 			unitListModel.clear();
 			unitListModel = null;
 		}
+	
 	}
+	private static class UnitTypeRenderer extends BasicComboBoxRenderer {
+        @Override
+        public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            if (value instanceof UnitType) {
+                setText(((UnitType)value).getName());
+            }
+            return this;
+        }
+    }
 
 	/**
 	 * Inner class list model for categorized units.
 	 */
 	private class UnitListModel
-	extends DefaultListModel<Unit>
-	implements UnitManagerListener {
+	extends DefaultListModel<Unit> {
 
-		/**
-		 *
-		 */
 		private static final long serialVersionUID = 1L;
 		// Data members.
-		private UnitCategory category;
+		private UnitType category;
 
 		/**
 		 * Constructor
 		 * @param initialCategory the initial category to display.
 		 */
-		public UnitListModel(UnitCategory initialCategory) {
+		public UnitListModel(UnitType initialCategory) {
 
 			// Use DefaultListModel constructor.
 			super();
@@ -472,16 +396,13 @@ extends ToolWindow {
 			this.category = initialCategory;
 
 			updateList();
-
-			// Add model as unit manager listener.
-			unitManager.addUnitManagerListener(this);
 		}
 
 		/**
 		 * Updates the category.
 		 * @param category the list category
 		 */
-		private void updateCategory(UnitCategory category) {
+		private void updateCategory(UnitType category) {
 			if (!this.category.equals(category)) {
 				this.category = category;
 
@@ -497,62 +418,28 @@ extends ToolWindow {
 			clear();
 
 			Collection<? extends Unit> units = null;
-//			UnitManager unitManager = unitManager;
-			if (category.equals(UnitCategory.PEOPLE)) {
-
-				if (unitManager.getTotalNumPeople() == 0) {
-					Thread.yield();
-					try {
-						Thread.sleep(2L);
-					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-				}
-				else {
-					Collection<Person> people = unitManager.getPeople();
-					units = CollectionUtils.sortByName(people);
-				}
-			}
-			else if (category.equals(UnitCategory.SETTLEMENTS)) {
-				Collection<Settlement> settlement = unitManager.getSettlements();
-				units = CollectionUtils.sortByName(settlement);
-			}
-			else if (category.equals(UnitCategory.VEHICLES)) {
-				Collection<Vehicle> vehicle = unitManager.getVehicles();
-				units = CollectionUtils.sortByName(vehicle);
-			}
-			else if (category.equals(UnitCategory.BOTS)) {
-				Collection<Robot> bots = unitManager.getRobots();
-				units = CollectionUtils.sortByName(bots);
+			switch(category) {
+				case PERSON:
+					units = CollectionUtils.sortByName(unitManager.getPeople());
+					break;
+				case SETTLEMENT:
+					units = CollectionUtils.sortByName(unitManager.getSettlements());
+					break;
+				case VEHICLE:
+					units = CollectionUtils.sortByName(unitManager.getVehicles());
+					break;
+				case ROBOT:
+					units = CollectionUtils.sortByName(unitManager.getRobots());
+					break;
+				default:
 			}
 			
 			if (units != null && !units.isEmpty()) {
 				Iterator<? extends Unit> unitI = units.iterator();
-	
 				while (unitI.hasNext()) {
 					addElement(unitI.next());
 				}
 			}
-		}
-
-		@Override
-		public void unitManagerUpdate(UnitManagerEvent event) {
-
-			Unit selectedUnit = (Unit) unitList.getSelectedValue();
-			lockUnitList = true;
-
-			updateList();
-
-			if (selectedUnit != null) {
-				int index = indexOf(selectedUnit);
-				if (index >= 0) {
-					unitList.setSelectedIndex(index);
-					unitList.ensureIndexIsVisible(index);
-				}
-			}
-
-			lockUnitList = false;
 		}
 	}
 }

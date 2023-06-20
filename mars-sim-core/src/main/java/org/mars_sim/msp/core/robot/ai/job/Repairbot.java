@@ -1,44 +1,32 @@
-/**
+/*
  * Mars Simulation Project
  * Repairbot.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-01
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.core.robot.ai.job;
 
-import java.io.Serializable;
-
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.MaintainGroundVehicleGarage;
-import org.mars_sim.msp.core.person.ai.task.Maintenance;
-import org.mars_sim.msp.core.person.ai.task.RepairMalfunction;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.RoboticAttributeType;
-import org.mars_sim.msp.core.robot.RoboticAttributeManager;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.building.function.FunctionType;
 
-public class Repairbot extends RobotJob implements Serializable {
+public class Repairbot extends RobotJob  {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
+	private static final double BUILDING_PER_BOT = 10;
+	private static final double VEHICLE_PER_BOT = 30;
 
 	/**
 	 * Constructor.
 	 */
 	public Repairbot() {
 		// Use Job constructor
-		super(Repairbot.class);
-
-		// Add technician-related tasks.
-		jobTasks.add(Maintenance.class);
-		jobTasks.add(MaintainGroundVehicleGarage.class);
-		// jobTasks.add(MaintenanceEVA.class); //check to what extend the walking bug is
-		// affecting the outdoor portion of this task
-		// jobTasks.add(RepairEVAMalfunction.class); //check to what extend the walking
-		// bug is affecting the outdoor portion of this task
-		jobTasks.add(RepairMalfunction.class);
-//		jobTasks.add(RepairEmergencyMalfunction.class);
+		super();
 	}
 
 	/**
@@ -47,16 +35,20 @@ public class Repairbot extends RobotJob implements Serializable {
 	 * @param settlement the settlement in need.
 	 * @return the base need >= 0
 	 */
-	public double getSettlementNeed(Settlement settlement) {
+	@Override
+	public double getOptimalCount(Settlement settlement) {
 
-		double result = 15D;
+		double result = 0;
 
-		// Add number of buildings in settlement.
-		result += settlement.getBuildingManager().getNumBuildings() / 3D;
+		// Add number of buildings in settlement that a robot can enter
+		result += settlement.getBuildingManager().getBuildings(FunctionType.LIFE_SUPPORT).size() / BUILDING_PER_BOT;
 
 		// Add number of vehicles parked at settlement.
-		result += settlement.getParkedVehicleNum() / 3D;
-
+		result += settlement.getAllAssociatedVehicles().size() / VEHICLE_PER_BOT;
+		if (result < 1D) {
+			// Add settlements should have at least 1 repair bot
+			result = 1D;
+		}
 		return result;
 	}
 
@@ -66,6 +58,7 @@ public class Repairbot extends RobotJob implements Serializable {
 	 * @param robot the person to check.
 	 * @return capability.
 	 */
+	@Override
 	public double getCapability(Robot robot) {
 
 		double result = 0D; // robot should be less capable than the person counterpart
@@ -73,8 +66,8 @@ public class Repairbot extends RobotJob implements Serializable {
 		int mechanicSkill = robot.getSkillManager().getSkillLevel(SkillType.MECHANICS);
 		result += mechanicSkill;
 
-		RoboticAttributeManager attributes = robot.getRoboticAttributeManager();
-		int experienceAptitude = attributes.getAttribute(RoboticAttributeType.EXPERIENCE_APTITUDE);
+		NaturalAttributeManager attributes = robot.getNaturalAttributeManager();
+		int experienceAptitude = attributes.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
 		result += result * ((experienceAptitude - 50D) / 100D);
 
 		// if (robot.getPhysicalCondition().hasSeriousMedicalProblems()) result = 0D;

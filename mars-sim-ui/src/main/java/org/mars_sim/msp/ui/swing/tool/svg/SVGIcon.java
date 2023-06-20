@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * SVGIcon.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -22,6 +22,7 @@ package org.mars_sim.msp.ui.swing.tool.svg;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.Image;
 import java.awt.geom.Dimension2D;
 import java.awt.image.BufferedImage;
 
@@ -59,7 +60,8 @@ public class SVGIcon extends UserAgentAdapter implements Icon {
     protected int height;
 
     /**
-     * Create a new SVGIcon object.
+     * Creates a new SVGIcon object.
+     * 
      * @param uri The URI to read the SVG document from.
      */
     public SVGIcon(String uri) throws TranscoderException {
@@ -67,35 +69,25 @@ public class SVGIcon extends UserAgentAdapter implements Icon {
     }
 
     /**
-     * Create a new SVGIcon object.
+     * Creates a new SVGIcon object.
+     * 
      * @param uri The URI to read the SVG document from.
      * @param w The width of the icon.
      * @param h The height of the icon.
      */
     public SVGIcon(String uri, int w, int h) throws TranscoderException {
+       //InputStream source = getClass().getClassLoader().getResourceAsStream(uri);
+
         generateBufferedImage(new TranscoderInput(uri), w, h);
     }
 
-//    /**
-//     * Create a new SVGIcon object.
-//     * @param doc The SVG document.
-//     */
-//    public SVGIcon(Document doc) throws TranscoderException {
-//        this(doc, 0, 0);
-//    }
-
-//    /**
-//     * Create a new SVGIcon object.
-//     * @param doc The SVG document.
-//     * @param w The width of the icon.
-//     * @param h The height of the icon.
-//     */
-//    public SVGIcon(Document doc, int w, int h) throws TranscoderException {
-//        generateBufferedImage(new TranscoderInput(doc), w, h);
-//    }
-
     /**
-     * Generate the BufferedImage.
+     * Generates the BufferedImage.
+     * 
+     * @param in
+     * @param w
+     * @param h
+     * @throws TranscoderException
      */
     protected void generateBufferedImage(TranscoderInput in, int w, int h)
             throws TranscoderException {
@@ -121,6 +113,7 @@ public class SVGIcon extends UserAgentAdapter implements Icon {
 
         /**
          * Creates a new ARGB image with the specified dimension.
+         * 
          * @param width the image width in pixels
          * @param height the image height in pixels
          */
@@ -130,6 +123,7 @@ public class SVGIcon extends UserAgentAdapter implements Icon {
 
         /**
          * Writes the specified image to the specified output.
+         * 
          * @param img the image to write
          * @param output the output where to store the image
          * @param TranscoderException if an error occured while storing the image
@@ -147,12 +141,24 @@ public class SVGIcon extends UserAgentAdapter implements Icon {
         }
 
         /**
-         * Set the dimensions to be used for the image.
+         * Sets the dimensions to be used for the image.
+         * 
+         * @param w
+         * @param h
          */
         public void setDimensions(int w, int h) {
-            hints.put(KEY_WIDTH, new Float(w));
-            hints.put(KEY_HEIGHT, new Float(h));
+            hints.put(KEY_WIDTH, (float) w);
+            hints.put(KEY_HEIGHT, (float) h);
         }
+    }
+
+    /**
+     * Gets the underlying backing image.
+     * 
+     * @return
+     */
+    public Image getImage() {
+        return bufferedImage;
     }
 
     // Icon //////////////////////////////////////////////////////////////////
@@ -172,7 +178,7 @@ public class SVGIcon extends UserAgentAdapter implements Icon {
     }
 
     /**
-     * Draw the icon at the specified location.
+     * Draws the icon at the specified location.
      */
     public void paintIcon(Component c, Graphics g, int x, int y) {
         g.drawImage(bufferedImage, x, y, null);

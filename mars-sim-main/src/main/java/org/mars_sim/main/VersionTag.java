@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * VersionTag.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-17
  * @author Manny Kung
  */
 
@@ -9,7 +9,6 @@ package org.mars_sim.main;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -21,21 +20,25 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /*
- * Automatically generate a a predefined header with proper version 
- * tag and date of publication or update proper version 
- * tag and date of publication
+ * This class automatically generates or updates the header of your files 
+ * with a proper date tag. 
  */
 public class VersionTag {
-
-	private static String versionTagID = "* @version";
-	private static String versionTagString = " * @version 3.1.2 2020-09-02";
 	
-	private static String TOP_DIR = "D:/eclipse/java-2020-06/eclipse/git/mars-sim";
+	// CAUTION: Please test the setting on a set of demo files first and never
+	// run it the first time on files without a proper backup.
+		
+	private static String versionTagID = "* @version";
+	// Please update the following to the next official release date
+	private static String dateTagString = " * @date 2022-07-17"; 
+	// The affected path for the git clone repo on your machine 
+	private static String TOP_DIR = "D:/eclipse/java-2021-03/git/mars-sim/mars-sim";
 			
 	private static String LINE0 = "/**";
 	private static String LINE1 = " * Mars Simulation Project";
 	private static String LINE2 = " * ";
 	private static String DOT_JAVA = ".java";
+	// Update the author name. Note this would affect only new files without header
 	private static String LINE4 = " * @author Manny Kung";
 	private static String LINE5 = " */";
 	
@@ -47,10 +50,8 @@ public class VersionTag {
 	private static List<String> unChangedVersionTagList = new ArrayList<>();
 	private static List<String> noVersionTagList = new ArrayList<>();
 	
-	
 	// ref : https://www.codevscolor.com/java-replace-string-in-file/
 	// ref : http://zetcode.com/java/fileswalk/
-	
 	
 	public static StringBuffer insertVersionTag(String pathName) {
 		StringBuffer inputBuffer = new StringBuffer();
@@ -67,7 +68,7 @@ public class VersionTag {
 		inputBuffer.append(LINE2);
         inputBuffer.append(fileName.toString());
         inputBuffer.append(System.lineSeparator());
-    	inputBuffer.append(versionTagString);
+    	inputBuffer.append(dateTagString);
         inputBuffer.append(System.lineSeparator());	
 		inputBuffer.append(LINE4);
         inputBuffer.append(System.lineSeparator());	
@@ -108,8 +109,7 @@ public class VersionTag {
 
         	
         } catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			System.out.println(e.getMessage());
 		}
         
         System.out.println();
@@ -118,7 +118,7 @@ public class VersionTag {
         if (changedVersionTagList.size() > 0)
         	changedVersionTagList.forEach(System.out::println);
 
-        System.out.println("The new VersionTag is " + versionTagString);
+        System.out.println("The new VersionTag is " + dateTagString);
 
         System.out.println("> # of java files already having the correct version tag : " + unChangedVersionTagList.size());
         
@@ -127,14 +127,12 @@ public class VersionTag {
 
         System.out.println();
 
-        System.out.println("> # of java files adding the new version tag (please check for correctness) : " + noVersionTagList.size());
+        System.out.println("> # of java files being added with a new version tag (please check for correctness) : " + noVersionTagList.size());
         
         if (noVersionTagList.size() > 0)
         	noVersionTagList.forEach(System.out::println);
-        
-        
-        // Should show java file having possible issues with version tag
-        
+              
+        // TODO: Should show java files having possible issues with version tag       
     }
 	
     public static void replaceALine(String f) {
@@ -174,11 +172,11 @@ public class VersionTag {
             	
             		hasVersionTag = true;
             		// Check if this line equals the versionTagString
-            		if (line.equals(versionTagString)) {
+            		if (line.equals(dateTagString)) {
             			hasCorrectVersionTag = true;
             		}
             		else
-            			line = versionTagString;        			
+            			line = dateTagString;        			
             		
             	}
             	            	
@@ -203,17 +201,17 @@ public class VersionTag {
             	String modifiedFileContent = null;
             	
                 if (!hasVersionTag) {
-//    	            System.out.println("> issue : " + f);
-    	            
+//    	            System.out.println("> issue : " + f);            
     	            modifiedFileContent = insertVersionTag(f).toString() + originalFileContent; //.replaceAll(currentReadingLine, versionTagString);
                 }
                 else 
                 	modifiedFileContent = originalFileContent;
                 
-	            writer = new BufferedWriter(new FileWriter(f));
-	
-	            writer.write(modifiedFileContent);
-  
+                try (FileWriter fr = new FileWriter(f)) {
+		            writer = new BufferedWriter(fr);
+		
+		            writer.write(modifiedFileContent);
+                }
             }
 
         } catch (IOException e) {
@@ -234,34 +232,4 @@ public class VersionTag {
             }
         }
     }
-    
-
-	
-	// read file one line at a time
-	// replace line as you read the file and store updated lines in StringBuffer
-	// overwrite the file with the new lines
-	public static void replaceLines() {
-	     try {
-	         // input the (modified) file content to the StringBuffer "input"
-	     BufferedReader file = new BufferedReader(new FileReader("notes.txt"));
-	     StringBuffer inputBuffer = new StringBuffer();
-	     String line;
-	
-	     while ((line = file.readLine()) != null) {
-	//             line =  // replace the line here
-	         inputBuffer.append(line);
-	         inputBuffer.append('\n');
-	     }
-	     file.close();
-	
-	     // write the new string with the replaced line OVER the same file
-	     FileOutputStream fileOut = new FileOutputStream("notes.txt");
-	     fileOut.write(inputBuffer.toString().getBytes());
-	     fileOut.close();
-	
-	 } catch (Exception e) {
-	     System.out.println("Problem reading file.");
-	     }
-	 }
-		
 }

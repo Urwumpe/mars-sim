@@ -1,116 +1,134 @@
-/**
+/*
  * Mars Simulation Project
  * OperateVehicle.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-04-18
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
+import java.util.List;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Direction;
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LogConsolidated;
+import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.environment.TerrainElevation;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.job.Pilot;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionStatus;
-import org.mars_sim.msp.core.person.ai.mission.RoverMission;
+import org.mars_sim.msp.core.person.ai.mission.NavPoint;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskManager;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskManager;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
+import org.mars_sim.msp.core.person.ai.training.TrainingType;
+import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.vehicle.Flyer;
+import org.mars_sim.msp.core.vehicle.GroundVehicle;
 import org.mars_sim.msp.core.vehicle.Rover;
-import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
-import org.mars_sim.msp.core.vehicle.VehicleOperator;
+import org.mars_sim.msp.core.vehicle.VehicleType;
 
 /**
- * The OperateVehicle class is an abstract task for operating a vehicle, 
+ * The OperateVehicle class is an abstract task for operating a vehicle and
  * driving it to a destination.
  */
-public abstract class OperateVehicle extends Task implements Serializable {
-	
+public abstract class OperateVehicle extends Task {
+
     /** default serial id. */
     private static final long serialVersionUID = 1L;
     
-	private static Logger logger = Logger.getLogger(OperateVehicle.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
-
+	// default logger.
+	private static final SimLogger logger = SimLogger.getLogger(OperateVehicle.class.getName());
+	
     /** Task phases. */
     protected static final TaskPhase MOBILIZE = new TaskPhase(Msg.getString(
             "Task.phase.mobilize")); //$NON-NLS-1$
-	
-	/** Comparison to indicate a small but non-zero amount of fuel (methane) in kg that can still work on the fuel cell to propel the engine. */
-    private static final double LEAST_AMOUNT = RoverMission.LEAST_AMOUNT;
-	
-    // Distance buffer for arriving at destination (km).
-    private final static double DESTINATION_BUFFER = .001D;
     
-    // The base percentage chance of an accident while operating vehicle per millisol.
-    public static final double BASE_ACCIDENT_CHANCE = .01D; 
+    /** Need to provide oxygen as fuel oxidizer for the fuel cells. */
+ 	public static final int OXYGEN_ID = ResourceUtil.oxygenID;
+     /** The fuel cells will generate 2.25 kg of water per 1 kg of methane being used. */
+ 	public static final int WATER_ID = ResourceUtil.waterID;
+ 	
+ 	private static final double THRESHOLD_SUNLIGHT = 60;
+ 	private static final double MAX_PERCENT_SPEED = 30;
+ 	
+	/** The ratio of time per experience points. */
+	private static final double EXP = .2D;
+	/** The stress modified per millisol. */
+	private static final double STRESS_MODIFIER = .2D;
+	/** The speed at which the obstacle / winching phase commence. */
+	protected static final double LOW_SPEED = .05;
+	/** Conversion factor : 1 m/s = 3.6 km/h (or kph) */
+	private static final double KPH_CONV = 3.6;
+	/** Half the PI. */
+	private static final double HALF_PI = Math.PI / 2D;
+	/** Comparison to indicate a small but non-zero amount of fuel (methane) in kg that can still work on the fuel cell to propel the engine. */
+    private static final double LEAST_AMOUNT = GroundVehicle.LEAST_AMOUNT;
+    /** The ratio of the amount of oxidizer to fuel. */
+    private static final double RATIO_OXIDIZER_FUEL = 1.5;
+    /** Distance buffer for arriving at destination (km). Good within 20 meters or 0.02 km. */
+    public static final double DESTINATION_BUFFER = .02;
+    /** The base percentage chance of an accident while operating vehicle per millisol. */
+    public static final double BASE_ACCIDENT_CHANCE = .01D;
+    
+    private static final String KM = " km  ";	
+    private static final String KPH = " kph  ";
 	
 	// Data members
-	private double startTripDistance; // The distance (km) to the destination at the start of the trip.
-	   
-	private Vehicle vehicle; // The vehicle to operate.
-	private Coordinates destination; // The location of the destination of the trip.
-	private MarsClock startTripTime; // The time/date the trip is starting.
+	/** The fuel type id of this vehicle. */
+	private int fuelTypeID;
+	/** The distance [km] to the destination at the start of the trip. */
+	private double startTripDistance; 
 	
+	
+	/** The vehicle to operate. */ 
+	private Vehicle vehicle;
+	/** The location of the destination of the trip. */
+	private Coordinates destination;
+	/** The timestamp the trip is starting. */
+	private MarsClock startTripTime;
+	/** The malfunctionManager of this vehicle. */
 	private MalfunctionManager malfunctionManager;
 	
-
 	/**
-	 * Default Constructor
+	 * Constructor for a human pilot.
+	 * 
 	 * @param name the name of the particular task.
 	 * @param person the person performing the task.
 	 * @param vehicle the vehicle to operate.
 	 * @param destination the location of destination of the trip.
 	 * @param startTripTime the time/date the trip is starting.
 	 * @param startTripDistance the distance (km) to the destination at the start of the trip.
-	 * @param stressModifier the modifier for stress on the person performing the task.
-	 * @param hasDuration does the task have a time duration?
 	 * @param duration the time duration (millisols) of the task (or 0 if none).
 	 */
 	public OperateVehicle(String name, Person person, Vehicle vehicle, Coordinates destination, 
-			MarsClock startTripTime, double startTripDistance, double stressModifier, 
-			boolean hasDuration, double duration) {
+			MarsClock startTripTime, double startTripDistance, double duration) {
 		
 		// Use Task constructor
-		super(name, person, false, false, stressModifier, hasDuration, duration);
+		super(name, person, false, false, STRESS_MODIFIER, SkillType.PILOTING, EXP, duration);
 		
-		// Check for valid parameters.
-		if (vehicle == null) {
-		    throw new IllegalArgumentException("vehicle is null");
-		}
+		// Initialize data members.
+		this.vehicle = vehicle;
+		this.destination = destination;
+		this.startTripTime = startTripTime;
+		this.startTripDistance = startTripDistance;
 		
-		// Select the vehicle operator
-		VehicleOperator vo = vehicle.getOperator();
-		Person driver = (Person) vo;
+        fuelTypeID = vehicle.getFuelTypeID();
 		
-        // Check if person is the vehicle operator.
-		if (vo == null) 
-			vehicle.setOperator(person);
-			
-		else if (!person.equals(driver)) {
-        	// Remove the task from the last driver
-	        clearDrivingTask(vo);
-	        // Replace the driver
-			vehicle.setOperator(person);
-		}	
-	
+		malfunctionManager = vehicle.getMalfunctionManager();
+		
 		if (destination == null) {
 		    throw new IllegalArgumentException("destination is null");
 		}
@@ -123,14 +141,19 @@ public abstract class OperateVehicle extends Task implements Serializable {
 		    throw new IllegalArgumentException("startTripDistance is < 0");
 		}
 		
-		// Initialize data members.
-		this.vehicle = vehicle;
-		this.destination = destination;
-		this.startTripTime = startTripTime;
-		this.startTripDistance = startTripDistance;
-		
-//		surface = Simulation.instance().getMars().getSurfaceFeatures();
-		malfunctionManager = vehicle.getMalfunctionManager();
+		// Select the vehicle operator
+		Worker vo = vehicle.getOperator();
+
+		// Check if there is a driver assigned to this vehicle.
+		if (vo == null) 
+			vehicle.setOperator(person);
+			
+		else if (!person.getName().equals(vo.getName())) {
+        	// Remove the task from the last driver
+	        clearDrivingTask(vo);
+	        // Replace the driver
+			vehicle.setOperator(person);
+		}
 		
 		// Walk to operation activity spot in vehicle.
 		if (vehicle instanceof Rover) {
@@ -143,18 +166,32 @@ public abstract class OperateVehicle extends Task implements Serializable {
 		setPhase(MOBILIZE);
 	}
 	
+	/**
+	 * Constructor for a robot pilot.
+	 * 
+	 * @param name
+	 * @param robot
+	 * @param vehicle
+	 * @param destination
+	 * @param startTripTime
+	 * @param startTripDistance
+	 * @param duration
+	 */
 	public OperateVehicle(String name, Robot robot, Vehicle vehicle, Coordinates destination, 
-			MarsClock startTripTime, double startTripDistance, double stressModifier, 
-			boolean hasDuration, double duration) {
+			MarsClock startTripTime, double startTripDistance, double duration) {
 		
 		// Use Task constructor
-		super(name, robot, false, false, stressModifier, hasDuration, duration);
+		super(name, robot, false, false, STRESS_MODIFIER, SkillType.PILOTING, EXP, duration);
 		
+		// Initialize data members.
+		this.vehicle = vehicle;
+		this.destination = destination;
+		this.startTripTime = startTripTime;
+		this.startTripDistance = startTripDistance;
+		
+        fuelTypeID = vehicle.getFuelTypeID();
+        
 		// Check for valid parameters.
-		if (vehicle == null) {
-		    throw new IllegalArgumentException("vehicle is null");
-		}
-		
 		if (destination == null) {
 		    throw new IllegalArgumentException("destination is null");
 		}
@@ -165,14 +202,20 @@ public abstract class OperateVehicle extends Task implements Serializable {
 		    throw new IllegalArgumentException("startTripDistance is < 0");
 		}
 		
-		// Initialize data members.
-		this.vehicle = vehicle;
-		this.destination = destination;
-		this.startTripTime = startTripTime;
-		this.startTripDistance = startTripDistance;
-		
-//		surface = Simulation.instance().getMars().getSurfaceFeatures();
 		malfunctionManager = vehicle.getMalfunctionManager();
+		// Select the vehicle operator
+		Worker vo = vehicle.getOperator();
+	
+		// Check if there is a driver assigned to this vehicle.
+		if (vo == null) 
+			vehicle.setOperator(robot);
+		
+		else if (!robot.equals(vo)) {
+        	// Remove the task from the last driver
+	        clearDrivingTask(vo);
+	        // Replace the driver
+			vehicle.setOperator(robot);
+		}
 		
 		// Walk to operation activity spot in vehicle.
 		if (vehicle instanceof Rover) {
@@ -184,6 +227,16 @@ public abstract class OperateVehicle extends Task implements Serializable {
 		// Set initial phase
 		setPhase(MOBILIZE);
 	}    
+
+	/**
+	 * Walks to an activity spot in the rover.
+	 * 
+	 * @param rover
+	 * @param allowFail
+	 */
+	private void walkToOperatorActivitySpotInRover(Rover rover, boolean allowFail) {
+		walkToActivitySpotInRover(rover, rover.getOperatorActivitySpots(), allowFail);
+	}
 	
     @Override
     protected double performMappedPhase(double time) {
@@ -200,6 +253,7 @@ public abstract class OperateVehicle extends Task implements Serializable {
 	
 	/**
 	 * Gets the vehicle operated with this task.
+	 * 
 	 * @return vehicle
 	 */
 	public Vehicle getVehicle() {
@@ -208,6 +262,7 @@ public abstract class OperateVehicle extends Task implements Serializable {
 	
 	/** 
 	 * Gets the location of the destination of the trip.
+	 * 
 	 * @return location of destination
 	 */
 	public Coordinates getDestination() {
@@ -216,14 +271,17 @@ public abstract class OperateVehicle extends Task implements Serializable {
 	
 	/**
 	 * Sets the location of the destination of this trip.
+	 * 
 	 * @param newDestination location of the destination.
 	 */
 	public void setDestination(Coordinates newDestination) {
 		this.destination = newDestination;
+        vehicle.setCoordinates(destination);
 	}
 	
 	/**
 	 * Gets the time/date the trip was started on.
+	 * 
 	 * @return start time
 	 */
 	protected MarsClock getStartTripTime() {
@@ -232,48 +290,58 @@ public abstract class OperateVehicle extends Task implements Serializable {
 	
 	/**
 	 * Gets the distance to the destination at the start of the trip.
+	 * 
 	 * @return distance (km) to destination.
 	 */
 	protected double getStartTripDistance() {
 		return startTripDistance;
 	}
 	
-	protected void clearDrivingTask(VehicleOperator vo) {
-		if (vo != null) {
-        	// Clear the OperateVehicle task from the last driver
-			TaskManager taskManager = ((Person) vo).getMind().getTaskManager();
-			taskManager.clearSpecificTask(DriveGroundVehicle.class.getSimpleName());
-			taskManager.clearSpecificTask(OperateVehicle.class.getSimpleName());
-        	taskManager.getNewTask();	
-    	}
+	/**
+	 * Clears this task in the task manager.
+	 * 
+	 * @param vo
+	 */
+	protected void clearDrivingTask(Worker vo) {
+    	// Clear the OperateVehicle task from the last driver
+		TaskManager taskManager = vo.getTaskManager();
+		taskManager.clearSpecificTask(DriveGroundVehicle.class.getSimpleName());
+		taskManager.clearSpecificTask(PilotDrone.class.getSimpleName());
+		taskManager.clearSpecificTask(OperateVehicle.class.getSimpleName());
 	}
 	
 	/**
-	 * Perform the mobilize vehicle phase for the amount of time given.
+	 * Performs the mobilize vehicle phase for the amount of time given.
+	 * 
 	 * @param time the amount of time (ms) to perform the phase.
 	 * @return the amount of time left over after performing the phase.
 	 */
 	protected double mobilizeVehiclePhase(double time) {
-		
+	
         // Find current direction and update vehicle.
         vehicle.setDirection(vehicle.getCoordinates().getDirectionToPoint(destination));
         
         // Find current elevation/altitude and update vehicle.
         updateVehicleElevationAltitude();
-
-        // Update vehicle speed.
-        double speed = getSpeed(vehicle.getDirection());
-        vehicle.setSpeed(speed);
-        
+  		
+        if (vehicle.getSpeed() == 0.0d)
+        	vehicle.setSpeed(LOW_SPEED * 1.1);
+        		
         // Mobilize vehicle
-        double timeUsed = time - mobilizeVehicle(time);
-        
+        double mobilizedTime = mobilizeVehicle(time);
+//        double timeUsed = time - mobilizedTime;
+//		logger.log(vehicle, Level.CONFIG, 20_000, 
+//				"time: " +  Math.round(time * 1000.0)/1000.0 + " millisols"
+//				+ "  mobilizedTime: " +  Math.round(mobilizedTime * 1000.0)/1000.0 + " millisols"
+//				+ "  timeUsed: " +  Math.round(timeUsed * 1000.0)/1000.0 + " millisols"
+//				);
+
         // Add experience to the operator
-        addExperience(timeUsed);
+        addExperience(mobilizedTime);
         
         // Check for accident.
         if (!isDone()) {
-            checkForAccident(timeUsed);
+            checkForAccident(mobilizedTime);
         }
         
         // If vehicle has malfunction, end task.
@@ -281,233 +349,271 @@ public abstract class OperateVehicle extends Task implements Serializable {
             endTask();
         }
         
-        return time - timeUsed;
+        return mobilizedTime;
 	}
 	
-	private void turnOnBeacon() {
+	/**
+	 * Turns on the emergency beacon to ask for help.
+	 * 
+	 * @param resource
+	 */
+	private void turnOnBeacon(int resource) {
 		vehicle.setSpeed(0D);
-    	if (!vehicle.haveStatusType(StatusType.OUT_OF_FUEL))
-    		vehicle.addStatus(StatusType.OUT_OF_FUEL);
-    	if (vehicle.haveStatusType(StatusType.MOVING))
-    		vehicle.removeStatus(StatusType.MOVING);
-    	
+        MissionStatus status = MissionStatus.createResourceStatus(resource);
+        	
     	if (!vehicle.isBeaconOn()) {
     		Mission m = vehicle.getMission();
-    		((VehicleMission)m).setEmergencyBeacon(person, vehicle, true, MissionStatus.NO_METHANE.getName());
-    		m.addMissionStatus(MissionStatus.NO_METHANE);
-    		((VehicleMission)m).getHelp();
+    		((VehicleMission)m).getHelp(status);
     	}
 	}
 	
 	/**
-	 * Move the vehicle in its direction at its speed for the amount of time given.
-	 * Stop if reached destination.
+	 * Moves the vehicle in its direction at its speed for the amount of time given.
+	 * Stops if destination reached.
 	 * 
 	 * @param time the amount of time (ms) to drive.
 	 * @return the amount of time (ms) left over after driving (if any)
 	 */
 	protected double mobilizeVehicle(double time) {
-        double result = 0;
-        double distanceTraveled = 0;
-        
-        // Find starting distance to destination.
-        double startingDistanceToDestination = getDistanceToDestination();
-		
-        Inventory vInv = vehicle.getInventory();
-        int fuelType = vehicle.getFuelType();
-        
-        double remainingFuel = vInv.getAmountResourceStored(fuelType, false);
 
-        if (!vehicle.isInSettlement() && remainingFuel < LEAST_AMOUNT) {
-        	// Case 1 : no fuel left
-        	// TODO: need to turn on emergency beacon and ask for rescue here or in RoverMission ?
-	    	LogConsolidated.log(logger, Level.SEVERE, 30_000, sourceName, "[" + vehicle.getName() + "] " 
-					+ "ran out of methane. Cannot drive.");
-
-	    	// Turn on emergency beacon
-	    	turnOnBeacon();
-        	
+        if (worker.getUnitType() == UnitType.ROBOT
+        	&& ((Robot)worker).getSystemCondition().isLowPower()) {
+        	logger.log((Robot)worker, Level.WARNING, 20_000,
+        			". Can't pilot " + getVehicle() + ".");
+	        endTask();
+	        return time;
+        }
+        
+		if (time < 0) {
+			logger.severe(vehicle, "Negative time: " + time);
+        	return 0;
+		}
+    
+        if (vehicle.isInSettlement()) 
+        	return time;
+  	
+        double remainingFuel = -1;
+        
+        double remainingOxidizer = -1;
+        
+        if (fuelTypeID > 0) {
+	        remainingFuel = vehicle.getAmountResourceStored(fuelTypeID);
+	
+	    	if (remainingFuel < LEAST_AMOUNT) {
+	    		logger.log(vehicle, Level.SEVERE, 20_000L, 
+						"Case A: Out of fuel. Cannot drive.");
+	    		// Turn on emergency beacon
+		    	turnOnBeacon(fuelTypeID);
+	        	endTask();
+	        	return time;
+	    	}
+	
+	        remainingOxidizer = vehicle.getAmountResourceStored(OXYGEN_ID);
+	
+	    	if (remainingOxidizer < LEAST_AMOUNT * RATIO_OXIDIZER_FUEL) {
+	    		logger.log(vehicle, Level.SEVERE, 20_000L, 
+						"Case B: Out of fuel oxidizer. Cannot drive.");
+	    		// Turn on emergency beacon
+		    	turnOnBeacon(OXYGEN_ID);
+	        	endTask();
+	        	return time;
+	        }
+        }
+        
+        // Find the distance to destination.
+        double dist2Dest = getDistanceToDestination();
+       
+        if (Double.isNaN(dist2Dest)) {
+    		logger.log(vehicle, Level.SEVERE, 20_000L, 
+					"Case C: Invalid distance.");
         	endTask();
         	return time;
         }
         
-        
-        // Determine the hours used.
+        // Convert time from millisols to hours
         double hrsTime = MarsClock.HOURS_PER_MILLISOL * time;
+              
+        // Case 2: Already arrived
+        if (dist2Dest <= DESTINATION_BUFFER) {
+        	logger.log(vehicle, Level.INFO,  20_000L, "Case I: Arrived at " + getNavpointName()
+        			+ " (dist: " 
+        			+ Math.round(dist2Dest * 1_000.0)/1_000.0 + " km).");
 
-        // Determine distance traveled in time given.
-        distanceTraveled = hrsTime * vehicle.getSpeed();
-        
-        // Consume fuel for distance traveled.
-        double fuelNeeded = distanceTraveled / vehicle.getIFuelEconomy();
-        
-        if (Double.isNaN(distanceTraveled) || Double.isNaN(startingDistanceToDestination)) {
-        	logger.severe("Nan distancedtraveled " + distanceTraveled + ", startingDistance " + startingDistanceToDestination );
-        }
-        
-        if (fuelNeeded > remainingFuel) {
-        	// Case 2 : just used up the last drop of fuel 
-        	fuelNeeded = remainingFuel;
+        	// Note: Need to consider the case in which VehicleMission's determineEmergencyDestination() causes the 
+        	// the vehicle to switch the destination to a settlement when this settlement is within a very short
+        	// distance away.
         	
-        	try {
-		    	vInv.retrieveAmountResource(fuelType, fuelNeeded);
-	    
-		    }
-		    catch (Exception e) {
-		    	LogConsolidated.log(logger, Level.SEVERE, 0, sourceName, "[" + vehicle.getName() + "] " 
-						+ "can't retrieve methane. Cannot drive.");
-
-		    	// Turn on emergency beacon
-		    	turnOnBeacon();
-		    	
-	        	endTask();
-	        	return time;
-		    }
-        	
-        	// Update and reduce the distanceTraveled since there is not enough fuel
-        	distanceTraveled = fuelNeeded * vehicle.getIFuelEconomy();
-        	if (!vehicle.haveStatusType(StatusType.MOVING))
-        		vehicle.addStatus(StatusType.MOVING);
-        	if (vehicle.haveStatusType(StatusType.OUT_OF_FUEL))
-        		vehicle.removeStatus(StatusType.OUT_OF_FUEL);
-        	
-            // Add distance traveled to vehicle's odometer.
-//        	vehicle.addOdometerReading(distanceTraveled);
-            vehicle.addOdometerMileage(distanceTraveled);
-            vehicle.addDistanceLastMaintenance(distanceTraveled);
-        	return time - MarsClock.MILLISOLS_PER_HOUR * distanceTraveled / vehicle.getSpeed();
-        	
+        	// Sets final speed to zero and use regen braking to recharge the battery.
+//        	vehicle.getController().adjustSpeed(hrsTime, dist, 0, remainingFuel, remainingOxidizer);
+   
+        	// Stop the vehicle
+        	haltVehicle();
+       
+            if (isSettlementDestination())
+                determineInitialSettlementParkedLocation();
+            
+			endTask();
+        	return 0;
         }
         
         else {
-        	
-            if (startingDistanceToDestination <= (distanceTraveled + DESTINATION_BUFFER)) {
-                // Case 3 : if starting distance to destination is less than distance traveled, stop at destination.
-                
-            	distanceTraveled = startingDistanceToDestination;
-                
-                // Update the fuel needed for distance traveled.
-                fuelNeeded = distanceTraveled / vehicle.getIFuelEconomy();
-                
-                try {
-    		    	vInv.retrieveAmountResource(fuelType, fuelNeeded);
+        	// Vehicle is moving
+        	return moveVehicle(hrsTime, dist2Dest, remainingFuel, remainingOxidizer) / MarsClock.HOURS_PER_MILLISOL;
+        }
+	} 
+	
+	/**
+	 * Moves the vehicle by engaging its motor controller to compute fuel and energy usage and distance to be traversed.
+	 * 
+	 * @param hrsTime 			time [in hrs]
+	 * @param dist2Dest 		distance to destination [in km]
+	 * @param remainingFuel
+	 * @param remainingOxidizer
+	 * @return remaining hours
+	 */
+	private double moveVehicle(double hrsTime, double dist2Dest, double remainingFuel, double remainingOxidizer) {
+		double remainingHrs = hrsTime;
+    	// Gets initial speed in kph
+    	double uKPH = vehicle.getSpeed(); 
+    	// Gets initial speed in m/s
+    	double uMS = uKPH / KPH_CONV;
+    	// Gets the max allowable accel of this vehicle in m/s2
+    	double maxAccel = vehicle.getAllowedAccel();
    
-    		    }
-    		    catch (Exception e) {
-    		    	LogConsolidated.log(logger, Level.SEVERE, 0, sourceName, "[" + vehicle.getName() + "] " 
-    						+ "can't retrieve methane. Cannot drive.");
-
-    		    	// Turn on emergency beacon
-    		    	turnOnBeacon();
-    		    	
-    	        	endTask();
-    	        	return time;
-    		    }
-                
- 		    	
-		        // Add distance traveled to vehicle's odometer.
-		        vehicle.addOdometerMileage(distanceTraveled);
-		        vehicle.addDistanceLastMaintenance(distanceTraveled);
-		        
-	            vehicle.setCoordinates(destination);
-                vehicle.setSpeed(0D);
-                
-                if (!vehicle.haveStatusType(StatusType.PARKED))
-                	vehicle.addStatus(StatusType.PARKED);
-                if (vehicle.haveStatusType(StatusType.MOVING))
-                	vehicle.removeStatus(StatusType.MOVING);
-                
-                vehicle.setOperator(null);
-                
-                updateVehicleElevationAltitude();
-                
-                if (isSettlementDestination()) {
-                    determineInitialSettlementParkedLocation();
-                }
-//                else {
-//                    double radDir = vehicle.getDirection().getDirection();
-//                    double degDir = radDir * 180D / Math.PI;
-//                    vehicle.setParkedLocation(0D, 0D, degDir);
-//                }
-                
-                // Calculate the remaining time
-                result = time - MarsClock.MILLISOLS_PER_HOUR * distanceTraveled / vehicle.getSpeed();
-//	            endTask();
-	                
-            }
-            
-            else {
-            	
-            	// Case 4 : the rover may use all the prescribed time to drive 
-                distanceTraveled = hrsTime * vehicle.getSpeed();
-                
-             // Update the fuel needed for distance traveled.
-                fuelNeeded = distanceTraveled / vehicle.getIFuelEconomy();
-                
-                try {
-    		    	vInv.retrieveAmountResource(fuelType, fuelNeeded);
-
-    		    }
-    		    catch (Exception e) {
-    		    	LogConsolidated.log(logger, Level.SEVERE, 0, sourceName, "[" + vehicle.getName() + "] " 
-    						+ "can't retrieve methane. Cannot drive.");
-
-    		    	// Turn on emergency beacon
-    		    	turnOnBeacon();
-    		    	
-    	        	endTask();
-    	        	return time;
-    		    }
-                
-		    	
-                // Determine new position.
-                vehicle.setCoordinates(vehicle.getCoordinates().getNewLocation(vehicle.getDirection(), distanceTraveled));
-                
-                // Add distance traveled to vehicle's odometer.
-                vehicle.addOdometerMileage(distanceTraveled);
-                vehicle.addDistanceLastMaintenance(distanceTraveled);
-                
-                // Use up all of the available time
-                result = 0; 
-            }   
+    	double skillMod = getSkillMod();
+    	// Get the sunlight modifier
+		double lightMod = getLightConditionModifier();
+		  
+    	// Get the terrain modifier
+    	double terrainMod = getTerrainModifier(vehicle.getDirection());
+    	
+    	double topSpeedKPH = 0;
+    	
+    	if (vehicle.getVehicleType() == VehicleType.DELIVERY_DRONE) {
+         	// Allow only 50% impact from lightMod
+    		topSpeedKPH = vehicle.getBaseSpeed() * getSkillMod() * (.5 * .5 * lightMod);
+    	}
+    	else {
+        	// Gets top speed in kph allowed by this pilot 
+    		// Allow only 30% impact from lightMod and 30% from terrain
+        	topSpeedKPH = vehicle.getBaseSpeed() * getSkillMod() *(.4 + .3 * lightMod + 3 * terrainMod);
+    	}
+    	
+    	// Gets the ideal speed after acceleration. v^2 = u^2 + 2*a*d
+		double idealSpeedMS = Math.sqrt(uMS * uMS + 2 * maxAccel * dist2Dest);
+    	// Gets the ideal speed in kph
+    	double idealSpeedKPH = idealSpeedMS * KPH_CONV;
+    	// Gets the next speed to be used in kph      	
+    	double nextSpeedKPH = Math.min(idealSpeedKPH, topSpeedKPH);
+    	
+		// Find the new possible speed
+    	double vKPHProposed = Math.max(uKPH, nextSpeedKPH);
+    	
+      	// If staying at the same speed
+    	double dist2Cover = vKPHProposed * hrsTime * KPH_CONV;
+    	
+//    	double newDistToCover = uMS * hrsTime * KPH_CONV;
+    	
+    	// Note that Case I: Arrived at destination in mobilizeVehicle()
+    	
+    	if (dist2Dest <= dist2Cover) {
+    		// Case II: Will overshoot within this prescribed period of time if not slowing down or changing final velocity
+    		// Slowing down the speed to expect to arrive
+    		vKPHProposed = dist2Dest / hrsTime / KPH_CONV;
+    		
+          	logger.log(vehicle, Level.INFO, 1_000,  "Case II: Arriving soon at " + getNavpointName() 
+	       		+ ". Slowing down. dist2Dest: " + Math.round(dist2Dest * 1_000.0)/1_000.0 + KM
+	       		+ "distanceToCover: " + Math.round(dist2Cover * 1_000.0)/1_000.0 + KM
+				+ "uKPH: " + + Math.round(uKPH * 1_000.0)/1_000.0 + KPH
+				+ "vKPHProposed: " + + Math.round(vKPHProposed * 1_000.0)/1_000.0 + KPH  			
+				+ "hrsTime: " + + Math.round(hrsTime * 1_000.0)/1_000.0 + " hrs  "
+	           	+ "Time: " + + Math.round(hrsTime * 3600 * 1_000.0)/1_000.0 + " secs  "
+	           	+ "maxAccel: " + Math.round(maxAccel * 1_000.0)/1_000.0 + " m/s2  "
+	            + "skillMod: " + Math.round(skillMod * 100.0)/100.0 + "  "  
+	            + "lightMod: " + Math.round(lightMod * 100.0)/100.0 + "  "
+	            + "terrainMod: " + Math.round(terrainMod * 100.0)/100.0 + "  "
+	           	+ "idealSpeedMS: " + Math.round(idealSpeedMS * 1_000.0)/1_000.0 + " m/s  "
+	        	+ "topSpeedKPH: " + + Math.round(topSpeedKPH * 1_000.0)/1_000.0 + KPH
+	           	+ "idealSpeedKPH: " + + Math.round(idealSpeedKPH * 1_000.0)/1_000.0 + KPH		
+				+ "nextSpeedKPH: " + + Math.round(nextSpeedKPH * 1_000.0)/1_000.0 + KPH
+    		);
+          	
+          	remainingHrs = vehicle.getController().consumeFuelEnergy(hrsTime, dist2Dest, vKPHProposed, remainingFuel, remainingOxidizer);
+    	}
+     	
+        else {
+        	// Case III: May speed up or slow down to get there, depending on terrain and sunlight
+     	
+          	logger.log(vehicle, Level.INFO, 1_000,  "Case III: Proceeding to " + getNavpointName() 
+	       		+ ". dist2Dest: " + Math.round(dist2Dest * 1_000.0)/1_000.0 + KM
+	       		+ "distanceToCover: " + Math.round(dist2Cover * 1_000.0)/1_000.0 + KM
+				+ "uKPH: " + + Math.round(uKPH * 1_000.0)/1_000.0 + KPH
+				+ "vKPHProposed: " + + Math.round(vKPHProposed * 1_000.0)/1_000.0 + KPH  			
+				+ "hrsTime: " + + Math.round(hrsTime * 1_000.0)/1_000.0 + " hrs  "
+	           	+ "Time: " + + Math.round(hrsTime * 3600 * 1_000.0)/1_000.0 + " secs  "
+	           	+ "maxAccel: " + Math.round(maxAccel * 1_000.0)/1_000.0 + " m/s2  "
+	            + "skillMod: " + Math.round(skillMod * 100.0)/100.0 + "  "  
+	            + "lightMod: " + Math.round(lightMod * 100.0)/100.0 + "  "
+	            + "terrainMod: " + Math.round(terrainMod * 100.0)/100.0 + "  "
+	           	+ "idealSpeedMS: " + Math.round(idealSpeedMS * 1_000.0)/1_000.0 + " m/s  "
+	        	+ "topSpeedKPH: " + + Math.round(topSpeedKPH * 1_000.0)/1_000.0 + KPH
+	           	+ "idealSpeedKPH: " + + Math.round(idealSpeedKPH * 1_000.0)/1_000.0 + KPH		
+				+ "nextSpeedKPH: " + + Math.round(nextSpeedKPH * 1_000.0)/1_000.0 + KPH
+    		);
+          	
+        	remainingHrs = vehicle.getController().consumeFuelEnergy(hrsTime, dist2Cover, vKPHProposed, remainingFuel, remainingOxidizer);	
         }
 
-        return result;
+		return remainingHrs;
 	}
 	
+        
+	/**
+	 * Stops the vehicle.
+	 */
+	public void haltVehicle() {
+		// Note: instead of wasting the momentum/energy, 
+		// calculate the power stored based on regenerative braking
+		
+		// Set speed to zero
+		vehicle.setSpeed(0D);
+		// Determine new position.
+		vehicle.setCoordinates(destination);
+		// Remove the vehicle operator
+		vehicle.setOperator(null);
+
+		updateVehicleElevationAltitude();
+	}	
+
 	/**
 	 * Checks if the destination is at the location of a settlement.
 	 * 
 	 * @return true if destination is at a settlement location.
 	 */
 	private boolean isSettlementDestination() {
-	    if (CollectionUtils.findSettlement(destination) instanceof Settlement)
-	    	return true;
-
-	    return false;
-	}
+        return CollectionUtils.isSettlement(destination);
+    }
 	
 	/**
-	 * Determine the vehicle's initial parked location while traveling to settlement.
+	 * Determines the vehicle's initial parked location.
 	 */
 	private void determineInitialSettlementParkedLocation() {
-	    
-	    Direction oppDir = new Direction(vehicle.getDirection().getDirection() + Math.PI);
-	    double distance = 200D;
-	    double xLoc = 0D - (distance * oppDir.getSinDirection());
-        double yLoc = distance * oppDir.getCosDirection();
+	   
+        // Park 200 meters from the new settlement in the direction of travel
+        LocalPosition parkingPlace = LocalPosition.DEFAULT_POSITION.getPosition(200D, vehicle.getDirection().getDirection() + Math.PI);
         double degDir = vehicle.getDirection().getDirection() * 180D / Math.PI;
 	    
-        vehicle.setParkedLocation(xLoc, yLoc, degDir);
+        vehicle.setParkedLocation(parkingPlace, degDir);
 	}
 	
 	/**
-	 * Update vehicle with its current elevation or altitude.
+	 * Updates vehicle with its current elevation or altitude.
 	 */
 	protected abstract void updateVehicleElevationAltitude();
 	
     /** 
      * Determines the ETA (Estimated Time of Arrival) to the destination.
+     * 
      * @return MarsClock instance of date/time for ETA
      */
     public MarsClock getETA() {
@@ -525,7 +631,7 @@ public abstract class OperateVehicle extends Task implements Serializable {
         // Determine estimated speed in km/hr.
         // Assume the crew will drive the overall 50 % of the time (including the time for stopping by various sites)
         double estimatorConstant = .5D;
-        double estimatedSpeed = estimatorConstant * (vehicle.getBaseSpeed() + getSpeedSkillModifier());
+        double estimatedSpeed = estimatorConstant *  getAverageVehicleSpeed(vehicle, worker);
 
         // Determine final estimated speed in km/hr.
         double tempAvgSpeed = avgSpeed * ((startTripDistance - getDistanceToDestination()) / startTripDistance);
@@ -537,153 +643,241 @@ public abstract class OperateVehicle extends Task implements Serializable {
         double millisolsToDestination = hoursToDestination / MarsClock.HOURS_PER_MILLISOL;// MarsClock.convertSecondsToMillisols(hoursToDestination * 60D * 60D);
 
         // Determine ETA
-        MarsClock eta = (MarsClock) marsClock.clone();
+        MarsClock eta = new MarsClock(marsClock);
         eta.addTime(millisolsToDestination);
 
         return eta;
     }
     
     /**
-     * Check if vehicle has had an accident.
+     * Checks if vehicle has had an accident.
+     * 
      * @param time the amount of time vehicle is driven (millisols)
      */
     protected abstract void checkForAccident(double time);
-    
-    /** 
-     * Determine vehicle speed for a given direction.
-     * @param direction the direction of travel
-     * @return speed in km/hr
+
+    /**
+	 * Gets the lighting condition speed modifier.
+	 * 
+	 * @return speed modifier between 0 and 1
+	 */
+	protected double getLightConditionModifier() {
+		double light = surfaceFeatures.getSolarIrradiance(getVehicle().getCoordinates());
+		// Assume ground vehicles travel at a max of MAX_PERCENT_SPEED at night.
+		return (1 - MAX_PERCENT_SPEED/100) / THRESHOLD_SUNLIGHT * light + MAX_PERCENT_SPEED/100;
+	}
+
+	/**
+	 * Gets the terrain speed modifier.
+	 * 
+	 * @param direction the direction of travel.
+	 * @return speed modifier (0D - 1D)
+	 */
+	protected double getTerrainModifier(Direction direction) {
+		double angleModifier = 0;
+		double result = 0;
+		
+		if (vehicle instanceof Rover) {
+			
+			GroundVehicle vehicle = (GroundVehicle) getVehicle();
+			// Get vehicle's terrain handling capability.
+			double handling = vehicle.getTerrainHandlingCapability();
+		
+			// Determine modifier.
+			angleModifier = handling - 10 + getEffectiveSkillLevel()/2D;
+		
+			if (angleModifier < 0D)
+				angleModifier = Math.abs(1D / angleModifier);
+			else if (angleModifier == 0D) {
+				// Will produce a divide by zero otherwise
+				angleModifier = 1D;
+			}
+		
+			double tempAngle = Math.abs(vehicle.getTerrainGrade(direction) / angleModifier);
+			if (tempAngle > HALF_PI)
+				tempAngle = HALF_PI;
+		
+			result = Math.cos(tempAngle);
+		}
+		
+		else {
+			
+			Flyer vehicle = (Flyer) getVehicle();
+			// Determine modifier.
+			angleModifier = getEffectiveSkillLevel()/2D - 5;
+		
+			if (angleModifier < 0D)
+				angleModifier = Math.abs(1D / angleModifier);
+			else if (angleModifier == 0D) {
+				// Will produce a divide by zero otherwise
+				angleModifier = 1D;
+			}
+		
+			double tempAngle = Math.abs(vehicle.getTerrainGrade(direction) / angleModifier);
+			if (tempAngle > HALF_PI)
+				tempAngle = HALF_PI;
+
+			result = Math.cos(tempAngle);
+		}
+		
+		return result;
+	}
+	
+    /**
+     * Tests the speed.
+     * 
+     * @param direction
+     * @return
      */
-    protected double getSpeed(Direction direction) {
+    protected double testSpeed(Direction direction) {
 
-        double speed = vehicle.getBaseSpeed() + getSpeedSkillModifier();
+    	double speed = getAverageVehicleSpeed(vehicle, worker); 
         if (speed < 0D) {
-            speed = 0D;
+        	speed = 0D;
         }
-
+       
         return speed;
     }
     
     /**
-     * Determine the speed modifier based on the driver's skill level.
-     * @return speed modifier (km/hr)
+     * Gets an operator's average operating speed (modified by skill).
+     * 
+     * @param vehicle the vehicle.
+     * @param operator the vehicle operator.
+     * @return average operating speed (km/h)
      */
-    protected double getSpeedSkillModifier() {
-    	double mod = 0D;
-        double baseSpeed = vehicle.getBaseSpeed();
-        if (getEffectiveSkillLevel() <= 5) {
-            mod = 0D - ((baseSpeed / 4D) * ((5D - getEffectiveSkillLevel()) / 5D));
+    public static double getAverageVehicleSpeed(Vehicle vehicle, Worker operator) {
+    	if (vehicle != null) {
+ 
+    		double baseSpeed = vehicle.getBaseSpeed();
+    		double mod = 1;
+    		
+    		if (operator.getUnitType() == UnitType.PERSON) {
+    			Person p = (Person)operator;
+    			
+    			// If the person's current job is pilot
+    			if (p.getMind().getJob() == JobType.PILOT) {
+    				mod += 0.25; 
+    			}
+  			
+    			// Look up a person's prior pilot related training.
+    			mod += getPilotingMod(p);
+    			
+    			int skill = p.getSkillManager().getEffectiveSkillLevel(SkillType.PILOTING);
+    			if (skill <= 5) {
+    				mod += .1 * skill / 5;
+    	        }
+    	        else {
+    	            double tempSpeed = 1;
+    	            for (int x = 0; x < skill - 5; x++) {
+    	                tempSpeed /= 5;
+    	                mod += tempSpeed;
+    	            }
+    	        }
+    		}
+    		
+    		return baseSpeed * Math.min(1, mod);
+    	}
+    	else
+    		return 0;
+    }
+    
+    /**
+     * Determines the skill modifier based on the driver's skill level.
+     * 
+     * @return dimension-less above 1 
+     */
+    protected double getSkillMod() {
+    	double mod = 1;
+     
+    	if (worker.getUnitType() == UnitType.PERSON) {
+			// If the person's current job is pilot
+			if (person.getMind().getJob() == JobType.PILOT) {
+				mod += 0.25; 
+			}
+			
+			// Look up a person's prior pilot related training.
+			mod += getPilotingMod(person) / 2;
+    	}
+		
+        int skill = getEffectiveSkillLevel();
+        if (skill <= 5) {
+        	mod +=  .1 *  skill / 5;
         }
         else {
-            double tempSpeed = baseSpeed;
-            for (int x=0; x < getEffectiveSkillLevel() - 5; x++) {
-                tempSpeed /= 2D;
+        	double tempSpeed = 1;
+            for (int x = 0; x < skill - 5; x++) {
+                tempSpeed /= 5;
                 mod += tempSpeed;
             }
         }
         
-        if (person.getJobName().equalsIgnoreCase(Pilot.class.getSimpleName())) {
-        	mod += baseSpeed * 0.25; 
-		}
-		
-		// Look up a person's prior pilot related training.
-        mod += baseSpeed * person.getPilotingMod();
-        	
-        // Check for any crew emergency
-//        System.out.println("vehicle : " + vehicle);
-//        System.out.println("vehicle.getMission() : " + vehicle.getMission());
-        if (vehicle.getMission() != null && vehicle.getMission().hasEmergencyAllCrew())
-			mod += baseSpeed * 0.25;
-		
-        return mod;
+        return Math.min(1, mod);
     }
     
+	/**
+	 * Calculates the piloting modifier for a Person based on their training.
+	 * 
+	 * @param operator
+	 * @return a double between 0 and 1 
+	 */
+	private static double getPilotingMod(Person operator) {
+		List<TrainingType> trainings = operator.getTrainings();
+		double mod = 0;
+		if (trainings.contains(TrainingType.AVIATION_CERTIFICATION))
+			mod = .2;
+		if (trainings.contains(TrainingType.FLIGHT_SAFETY))
+			mod = .25;
+		if (trainings.contains(TrainingType.NASA_DESERT_RATS))
+			mod = .15;
+		
+		return mod;
+	}
+	
     /**
      * Gets the distance to the destination.
+     * 
      * @return distance (km)
      */
     protected double getDistanceToDestination() {
     	return vehicle.getCoordinates().getDistance(destination);
     }
     
-    /** Returns the elevation at the vehicle's position.
+    /** 
+     * Returns the elevation of the vehicle on the ground.
+     * 
      *  @return elevation in km.
      */
-    protected double getVehicleElevation() {
-		if (terrainElevation == null)
-			terrainElevation = surfaceFeatures.getTerrainElevation();
-        return terrainElevation.getMOLAElevation(vehicle.getCoordinates());
+    protected double getGroundElevation() {
+        return TerrainElevation.getMOLAElevation(vehicle.getCoordinates());
     }
     
     /**
-     * Ends the task and performs any final actions.
+     * Gets the name of the current navpoint.
+     * 
+     * @return
      */
-    public void endTask() {
-    	if (vehicle != null) {
-    		vehicle.setSpeed(0D);
-//    		VehicleOperator vo = vehicle.getOperator();
-    		// Need to set the vehicle operator to null before clearing the driving task 
-        	if (vehicle != null)
-        		vehicle.setOperator(null);
-//        	if (vo != null)
-//        		clearDrivingTask(vo);
+    private String getNavpointName() {
+    	Mission mission = vehicle.getMission();
+    
+    	if (mission instanceof VehicleMission) {
+    		NavPoint np = ((VehicleMission) mission).getCurrentDestination();
+    		return np.getDescription();
     	}
     	
-    	super.endTask();
+    	return "";
     }
     
     /**
-     * Gets the average operating speed of a vehicle for a given operator.
-     * @param vehicle the vehicle.
-     * @param operator the vehicle operator.
-     * @return average operating speed (km/h)
+     * Stops the vehicle and removes operator.
      */
-    public static double getAverageVehicleSpeed(Vehicle vehicle, VehicleOperator operator, Mission mission) {
+    protected void clearDown() {
     	if (vehicle != null) {
-    		// Need to update this to reflect the particular operator's average speed operating the vehicle.
-    		double baseSpeed = vehicle.getBaseSpeed();
-    		double mod = 0;
-    		Person p = null;
-    		if (operator instanceof Person) {
-    			p = (Person)operator;
-    			if (p.getJobName().equalsIgnoreCase(Pilot.class.getSimpleName())) {
-    				mod += baseSpeed * 0.25; 
-    			}
-    			
-    			// Look up a person's prior pilot related training.
-    			mod += baseSpeed * p.getPilotingMod();
-    			
-    			int skill = p.getSkillManager().getEffectiveSkillLevel(SkillType.PILOTING);
-    			if (skill <= 5) {
-    				mod += 0D - ((baseSpeed / 4D) * ((5D - skill) / 5D));
-    	        }
-    	        else {
-    	            double tempSpeed = baseSpeed;
-    	            for (int x=0; x < skill - 5; x++) {
-    	                tempSpeed /= 2D;
-    	                mod += tempSpeed;
-    	            }
-    	        }
-    			
-    			// TODO: Should account for a person's attributes
-    			
-    			// Check for any crew emergency
-    			if (mission.hasEmergencyAllCrew())
-    				mod += baseSpeed * 0.25;
-    		}
-    		
-    		return baseSpeed + mod;
+    		vehicle.setSpeed(0D);
+    		// Need to set the vehicle operator to null before clearing the driving task 
+        	vehicle.setOperator(null);
     	}
-    	else
-    		return 0;
     }
     
-    @Override
-    public void destroy() {
-        super.destroy();
-        
-        vehicle = null;
-        destination = null;
-        startTripTime = null;
-    }
+
 }

@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * WaitLayerUI.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -62,7 +62,7 @@ public class WaitLayerUI extends LayerUI<JComponent> implements ActionListener {
 		int cx = w / 2;
 		int cy = h / 2;
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g2.setStroke(new BasicStroke(s / 4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+		g2.setStroke(new BasicStroke(s / 4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 		g2.setPaint(Color.white);
 		g2.rotate(Math.PI * mAngle / 180, cx, cy);
 		for (int i = 0; i < 12; i++) {
@@ -121,14 +121,14 @@ public class WaitLayerUI extends LayerUI<JComponent> implements ActionListener {
 	
 	@Override public void installUI(JComponent c) {
 	    super.installUI(c);
-	    ((JLayer)c).setLayerEventMask(
+	    ((JLayer<?>)c).setLayerEventMask(
 	      AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK |
 	      AWTEvent.MOUSE_WHEEL_EVENT_MASK | AWTEvent.KEY_EVENT_MASK |
 	      AWTEvent.FOCUS_EVENT_MASK | AWTEvent.COMPONENT_EVENT_MASK);
 	  }
 	
 	  @Override public void uninstallUI(JComponent c) {
-	    ((JLayer)c).setLayerEventMask(0);
+	    ((JLayer<?>)c).setLayerEventMask(0);
 	    super.uninstallUI(c);
 	  }
 	  

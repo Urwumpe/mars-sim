@@ -1,3 +1,10 @@
+/*
+ * Mars Simulation Project
+ * ConnectCommand.java
+ * @date 2023-06-14
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand;
 
 import java.util.ArrayList;
@@ -13,13 +20,14 @@ import org.mars.sim.console.chat.simcommand.settlement.SettlementChat;
 import org.mars.sim.console.chat.simcommand.vehicle.VehicleChat;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
- * Connects to an entity. This is a singleton
+ * Connects to an entity. This is a singleton.
  */
 public class ConnectCommand extends ChatCommand {
 
@@ -27,20 +35,22 @@ public class ConnectCommand extends ChatCommand {
 	public static final ChatCommand CONNECT = new ConnectCommand();
 
 	private ConnectCommand() {
-		super(TopLevel.SIMULATION_GROUP, "c", "connect", "Connects to an entity sepcfied by name");
+		super(TopLevel.SIMULATION_GROUP, "c", "connect", "Connects to an entity specified by name");
 		setInteractive(true);
 	}
 
 	/**
-	 * Connects to another entity; this will change the Conversation current command to one specific to the
-	 * entity.
+	 * Connects to another entity. 
+	 * This will change the Conversation current command to one specific to the entity.
+	 * 
 	 * @return 
 	 */
 	@Override
 	public boolean execute(Conversation context, String input) {
 		boolean result = false;
 		if ((input == null) || input.isBlank()) {
-			context.println("Sorry, you have to tell what to connect to");
+			context.println("Sorry! You have to tell me clearly what you would like to connect with.");
+			context.println("");
 		}
 		else {
 			context.println("Connecting to " + input + " .....");
@@ -57,20 +67,37 @@ public class ConnectCommand extends ChatCommand {
 				context.println("Sorry there must be 1 match for '" + name + "'");
 			}
 			else {
+				InteractiveChatCommand parent = null;
+				if (context.getCurrentCommand() instanceof ConnectedUnitCommand) {
+					// So user is reconnecting without disconnecting via bye command.
+					// Find the next leve up
+					List<InteractiveChatCommand> layers = context.getCommandStack();
+					if (layers.isEmpty()) {
+						// Hmm what to do. Doesn;t work
+						context.println("Seem to be no parent top level command");
+					}
+					else {
+						parent = layers.get(0);
+					}
+				}
+				else {
+					// Parent is an non-connected interactive command
+					parent = context.getCurrentCommand();
+				}
+
 				Unit match = matched.get(0);
 				
-				// No choice but to use instanceof
-				if (match instanceof Person) {
-					newCommand = new PersonChat((Person) match);
+				if (match.getUnitType() == UnitType.PERSON) {
+					newCommand = new PersonChat((Person) match, parent);
 				}
-				else if (match instanceof Robot) {
-					newCommand = new RobotChat((Robot) match);
+				else if (match.getUnitType() == UnitType.ROBOT) {
+					newCommand = new RobotChat((Robot) match, parent);
 				}
-				else if (match instanceof Vehicle) {
-					newCommand = new VehicleChat((Vehicle) match);
+				else if (match.getUnitType() == UnitType.VEHICLE) {
+					newCommand = new VehicleChat((Vehicle) match, parent);
 				}
-				else if (match instanceof Settlement) {
-					newCommand = new SettlementChat((Settlement) match);
+				else if (match.getUnitType() == UnitType.SETTLEMENT) {
+					newCommand = new SettlementChat((Settlement) match, parent);
 				}
 				else {
 					context.println("Sorry I don't know how to connect " + name);
@@ -88,7 +115,8 @@ public class ConnectCommand extends ChatCommand {
 	}
 
 	/**
-	 * Get all the units in the simulation. Really should come directly off UnitManager.
+	 * Gets all the units in the simulation. Really should come directly off UnitManager.
+	 * 
 	 * @param um
 	 * @return
 	 */
@@ -102,21 +130,18 @@ public class ConnectCommand extends ChatCommand {
 		return units;
 	}
 
-
 	@Override
 	/**
-	 * Find any units where the name matches the inout
+	 * Get the possible Unit names for auto complete.
 	 * @param context Conversation taking place
 	 * @param input Partial input
 	 * @return List of Unit names that match
 	 */
-	public List<String> getAutoComplete(Conversation context, String parameter) {
+	public List<String> getArguments(Conversation context) {
 		UnitManager um = context.getSim().getUnitManager();
 		List<Unit> units = getAllUnits(um);
 		
 		// Filter the Units by name
-		String pattern = parameter.toLowerCase();
-		return units.stream().filter(u -> u.getName().toLowerCase().startsWith(pattern))
-									.map(n -> n.getName()).collect(Collectors.toList());
+		return units.stream().map(Unit::getName).collect(Collectors.toList());
 	}
 }

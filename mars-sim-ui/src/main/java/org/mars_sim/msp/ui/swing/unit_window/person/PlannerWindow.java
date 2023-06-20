@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PlannerWindow.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -16,11 +16,9 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.text.DecimalFormat;
 import java.util.List;
 
 import javax.swing.DefaultListCellRenderer;
-import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
@@ -37,12 +35,12 @@ import javax.swing.table.AbstractTableModel;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskSchedule.OneActivity;
+import org.mars_sim.msp.core.person.ai.task.util.TaskManager;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
+import org.mars_sim.msp.core.person.ai.task.util.TaskManager.OneActivity;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 
 
@@ -56,25 +54,18 @@ implements InternalFrameListener, ActionListener {
 
 	// Data members
 	private JTextField orbit, month, sol, millisols;
-	private JButton add;
 	private JTable table;
 
 	private Unit unit;
-	//private JComboBoxMW<Object> comboBox;
-	//private DefaultComboBoxModel<Object> comboBoxModel;
 	private PlannerTableModel PlannerTableModel;
 
-	//private Person person;
-	//private Robot robot;
 	private JPanel topPanel, panel;
-	private TabPanelSchedule tabPanelSchedule;
 
 	public PlannerWindow(Unit unit, MainDesktopPane desktop, TabPanelSchedule tabPanelSchedule) {
 		// Use JInternalFrame constructor
         super("Personal Planner", false, true, false, false);
 
         this.unit = unit;
-        this.tabPanelSchedule = tabPanelSchedule;
 
 		// Create info panel.
 		//infoPane = new JPanel(new CardLayout());
@@ -161,11 +152,6 @@ implements InternalFrameListener, ActionListener {
 	    //	table.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
 	    //}
 		topPanel.add(scrollPanel, BorderLayout.CENTER);
-
-		// 2015-06-08 Added setTableStyle()
-		TableStyle.setTableStyle(table);
-
-		update();
 	}
 
 	public void addItem(JPanel p, JComponent c, int x, int y, int w, int h, int align) {
@@ -240,15 +226,6 @@ implements InternalFrameListener, ActionListener {
 
 	}
 
-
-	/**
-	 * Updates the info on this panel.
-	 */
-	public void update() {
-		TableStyle.setTableStyle(table);
-		// Update if necessary.
-	}
-
 	class PromptComboBoxRenderer extends DefaultListCellRenderer {
 
 		private static final long serialVersionUID = 1L;
@@ -311,31 +288,18 @@ implements InternalFrameListener, ActionListener {
 		/** default serial id. */
 		private static final long serialVersionUID = 1L;
 
-		private TaskSchedule taskSchedule;
-		//private List<OneTask> tasks;
+		private TaskManager taskSchedule;
 		private List<OneActivity> activities;
-
-		DecimalFormat fmt = new DecimalFormat("0000");
 
 		/**
 		 * hidden constructor.
-		 * @param person {@link Person}
+		 * @param worker {@link Person}
 		 */
-		private PlannerTableModel(Unit unit) {
-	        Person person = null;
-	        Robot robot = null;
-	        if (unit instanceof Person) {
-	         	person = (Person) unit;
-	         	taskSchedule = person.getTaskSchedule();
-	        }
-	        else if (unit instanceof Robot) {
-	        	robot = (Robot) unit;
-	        	taskSchedule = robot.getTaskSchedule();
-	        }
+		private PlannerTableModel(Worker worker) {
+	        
+			taskSchedule = worker.getTaskManager();
 
-	        //tasks = taskSchedule.getTodaySchedule();
 	        activities = taskSchedule.getTodayActivities();
-
 		}
 
 		@Override

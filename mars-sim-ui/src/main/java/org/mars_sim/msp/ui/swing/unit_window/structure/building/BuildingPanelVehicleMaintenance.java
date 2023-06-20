@@ -1,50 +1,43 @@
-/**
+/*
  * Mars Simulation Project
  * BuildingPanelVehicleMaintenance.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-21
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
-import org.apache.commons.collections.CollectionUtils;
+import java.awt.BorderLayout;
+import java.util.Collection;
+
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.structure.building.function.VehicleMaintenance;
+import org.mars_sim.msp.core.vehicle.Flyer;
 import org.mars_sim.msp.core.vehicle.Vehicle;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.unit_window.UnitListPanel;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-
-import javax.swing.DefaultListModel;
-import javax.swing.JList;
 
 /**
  * The BuildingPanelVehicleMaintenance class is a building function panel representing 
  * the vehicle maintenance capabilities of the building.
  */
-public class BuildingPanelVehicleMaintenance
-extends BuildingFunctionPanel
-implements MouseListener {
+@SuppressWarnings("serial")
+public class BuildingPanelVehicleMaintenance extends BuildingFunctionPanel {
 
+	private static final String SUV_ICON = "vehicle";
+	
 	private VehicleMaintenance garage;
-	private WebLabel vehicleNumberLabel;
-	private int vehicleNumberCache = 0;
-	private JList<Vehicle> vehicleList;
-	private DefaultListModel<Vehicle> vehicleListModel;
-	private Collection<Vehicle> vehicleCache;
+	
+	private JLabel vehicleNumberLabel;
+	private JLabel flyerNumberLabel;
+	
+	private UnitListPanel<Vehicle> vehicleList;
+	private UnitListPanel<Flyer> flyerList;
 
 	/**
 	 * Constructor.
@@ -54,101 +47,88 @@ implements MouseListener {
 	public BuildingPanelVehicleMaintenance(VehicleMaintenance garage, MainDesktopPane desktop) {
 
 		// Use BuildingFunctionPanel constructor
-		super(garage.getBuilding(), desktop);
+		super(
+			Msg.getString("BuildingPanelVehicleMaintenance.title"),
+			ImageLoader.getIconByName(SUV_ICON),
+			garage.getBuilding(), 
+			desktop
+		);
 
 		// Initialize data members
 		this.garage = garage;
-
-		// Set panel layout
-		setLayout(new BorderLayout());
+	}
+	
+	/**
+	 * Build the UI
+	 */
+	@Override
+	protected void buildUI(JPanel center) {
 
 		// Create label panel
-		WebPanel labelPanel = new WebPanel(new GridLayout(3, 1, 0, 0));
-		add(labelPanel, BorderLayout.NORTH);
+		AttributePanel labelPanel = new AttributePanel(2,2);
+		center.add(labelPanel, BorderLayout.NORTH);
 		labelPanel.setOpaque(false);
-		labelPanel.setBackground(new Color(0,0,0,128));
-		
-		// Create vehicle maintenance label
-		// 2014-11-21 Changed font type, size and color and label text
-		// 2014-11-21 Added internationalization for labels
-		WebLabel vehicleMaintenanceLabel = new WebLabel(Msg.getString("BuildingPanelVehicleMaintenance.title"), WebLabel.CENTER);
-		vehicleMaintenanceLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		//vehicleMaintenanceLabel.setForeground(new Color(102, 51, 0)); // dark brown
-		labelPanel.add(vehicleMaintenanceLabel);
 
 		// Create vehicle number label
-		vehicleNumberCache = garage.getCurrentVehicleNumber();
-		vehicleNumberLabel = new WebLabel(Msg.getString("BuildingPanelVehicleMaintenance.numberOfVehicles",
-				vehicleNumberCache), WebLabel.CENTER);
-		labelPanel.add(vehicleNumberLabel);
+		vehicleNumberLabel = labelPanel.addTextField(Msg.getString("BuildingPanelVehicleMaintenance.numberOfVehicles"),
+									Integer.toString(garage.getCurrentVehicleNumber()), null);
 
 		// Create vehicle capacity label
 		int vehicleCapacity = garage.getVehicleCapacity();
-		WebLabel vehicleCapacityLabel = new WebLabel(Msg.getString("BuildingPanelVehicleMaintenance.vehicleCapacity",
-				vehicleCapacity), WebLabel.CENTER);
-		labelPanel.add(vehicleCapacityLabel);	
+		labelPanel.addTextField(Msg.getString("BuildingPanelVehicleMaintenance.vehicleCapacity"),
+									Integer.toString(vehicleCapacity), null);
 
+		// Create drone number label
+		flyerNumberLabel = labelPanel.addTextField(Msg.getString("BuildingPanelVehicleMaintenance.numberOfFlyers"),
+									Integer.toString(garage.getCurrentFlyerNumber()), null);
+
+		// Create drone capacity label
+		int droneCapacity = garage.getFlyerCapacity();
+		labelPanel.addTextField(Msg.getString("BuildingPanelVehicleMaintenance.flyerCapacity"),
+									Integer.toString(droneCapacity), null);
+		
 		// Create vehicle list panel
-		WebPanel vehicleListPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		add(vehicleListPanel, BorderLayout.CENTER);
-		vehicleListPanel.setOpaque(false);
-		vehicleListPanel.setBackground(new Color(0,0,0,128));
-		
-		// Create scroll panel for vehicle list
-		WebScrollPane vehicleScrollPanel = new WebScrollPane();
-		vehicleScrollPanel.setPreferredSize(new Dimension(160, 60));
-		vehicleListPanel.add(vehicleScrollPanel);
-		vehicleScrollPanel.setOpaque(false);
-		vehicleScrollPanel.setBackground(new Color(0,0,0,128));
-		vehicleScrollPanel.getViewport().setOpaque(false);
-		vehicleScrollPanel.getViewport().setBackground(new Color(0,0,0,128));
-		
-		// Create vehicle list model
-		vehicleListModel = new DefaultListModel<Vehicle>();
-		vehicleCache = new ArrayList<Vehicle>(garage.getVehicles());
-		Iterator<Vehicle> i = vehicleCache.iterator();
-		while (i.hasNext()) vehicleListModel.addElement(i.next());
+		vehicleList = new UnitListPanel<>(getDesktop()) {
 
-		// Create vehicle list
-		vehicleList = new JList<Vehicle>(vehicleListModel);
-		vehicleList.addMouseListener(this);
-		vehicleScrollPanel.setViewportView(vehicleList);
+			@Override
+			protected Collection<Vehicle> getData() {
+				return garage.getVehicles();
+			}
+		};
+		
+		JPanel listPanel = new JPanel(new BorderLayout());
+		center.add(listPanel, BorderLayout.CENTER);
+		
+		JPanel vehiclePanel = new JPanel();
+		vehiclePanel.add(vehicleList);
+		addBorder(vehicleList, "Vehicles");
+		listPanel.add(vehiclePanel, BorderLayout.NORTH);
+
+		// Create drone list panel
+		flyerList = new UnitListPanel<>(getDesktop()) {
+
+			@Override
+			protected Collection<Flyer> getData() {
+				return garage.getFlyers();
+			}
+		};
+		JPanel flyerPanel = new JPanel();
+		flyerPanel.add(flyerList);
+		addBorder(flyerList, "Drones");
+		listPanel.add(flyerPanel, BorderLayout.CENTER);
 	}
 
 	/**
 	 * Update this panel
 	 */
+	@Override
 	public void update() {
-		// Update vehicle list and vehicle mass label
-
-		if (!CollectionUtils.isEqualCollection(vehicleCache, garage.getVehicles())) {
-			vehicleCache = new ArrayList<Vehicle>(garage.getVehicles());
-			vehicleListModel.clear();
-			Iterator<Vehicle> i = vehicleCache.iterator();
-			while (i.hasNext()) vehicleListModel.addElement(i.next());
-
-			vehicleNumberCache = garage.getCurrentVehicleNumber();
-			vehicleNumberLabel.setText(Msg.getString("BuildingPanelVehicleMaintenance.numberOfVehicles",
-					vehicleNumberCache));
+		// Update vehicle and flyer list
+		if (vehicleList.update()) {
+			vehicleNumberLabel.setText(Integer.toString(vehicleList.getUnitCount()));
+		}
+		if (flyerList.update()) {
+			flyerNumberLabel.setText(Integer.toString(flyerList.getUnitCount()));
 		}
 	}
-
-	/** 
-	 * Mouse clicked event occurs.
-	 * @param event the mouse event
-	 */
-	public void mouseClicked(MouseEvent event) {
-		// If double-click, open vehicle window.
-		if (event.getClickCount() >= 2) {
-			Vehicle vehicle = (Vehicle) vehicleList.getSelectedValue();
-			if (vehicle != null) {
-				desktop.openUnitWindow(vehicle, false);
-			}
-		}
-	}
-
-	public void mousePressed(MouseEvent arg0) {}
-	public void mouseReleased(MouseEvent arg0) {}
-	public void mouseEntered(MouseEvent arg0) {}
-	public void mouseExited(MouseEvent arg0) {}
 }

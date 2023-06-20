@@ -1,16 +1,15 @@
-/**
+/*
  * Mars Simulation Project
  * DestinationSettlementPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
@@ -19,12 +18,14 @@ import javax.swing.event.ListSelectionListener;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 
 /**
  * This is a wizard panel for selecting the mission destination settlement.
  */
+@SuppressWarnings("serial")
 class DestinationSettlementPanel extends WizardPanel {
 
 	/** Wizard panel name. */
@@ -50,9 +51,7 @@ class DestinationSettlementPanel extends WizardPanel {
 		setBorder(new MarsPanelBorder());
 		
 		// Create the select settlement label.
-		JLabel selectSettlementLabel = new JLabel("Select a destination settlement.", JLabel.CENTER);
-		selectSettlementLabel.setFont(selectSettlementLabel.getFont().deriveFont(Font.BOLD));
-		selectSettlementLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		JLabel selectSettlementLabel = createTitleLabel("Select a destination settlement.");
 		add(selectSettlementLabel);
 		
 		// Create the settlement panel.
@@ -70,7 +69,6 @@ class DestinationSettlementPanel extends WizardPanel {
         
         // Create the settlement table.
         settlementTable = new JTable(settlementTableModel);
-		TableStyle.setTableStyle(settlementTable);
         settlementTable.setDefaultRenderer(Object.class, new UnitTableCellRenderer(settlementTableModel));
         settlementTable.setRowSelectionAllowed(true);
         settlementTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -114,10 +112,7 @@ class DestinationSettlementPanel extends WizardPanel {
         settlementScrollPane.setViewportView(settlementTable);
 		
         // Create error message label.
-		errorMessageLabel = new JLabel(" ", JLabel.CENTER);
-		errorMessageLabel.setFont(errorMessageLabel.getFont().deriveFont(Font.BOLD));
-		errorMessageLabel.setForeground(Color.RED);
-		errorMessageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		errorMessageLabel = createErrorLabel();
 		add(errorMessageLabel);
 		
 		// Create a verticle glue for the remainder of the panel.
@@ -217,7 +212,7 @@ class DestinationSettlementPanel extends WizardPanel {
     	public void updateTable() {
     		units.clear();
     		Settlement startingSettlement = getWizard().getMissionData().getStartingSettlement();    		
-    		Collection<Settlement> settlements = unitManager.getSettlements();
+    		Collection<Settlement> settlements = new ArrayList<>(unitManager.getSettlements());
     		settlements.remove(startingSettlement);
     		
     		// Add all settlements sorted by distance from mission starting point.
@@ -252,10 +247,15 @@ class DestinationSettlementPanel extends WizardPanel {
     		
     		if (column == 1) {
     			try {
-    				Settlement startingSettlement = getWizard().getMissionData().getStartingSettlement();
+    				MissionDataBean data = getWizard().getMissionData();
+    				Settlement startingSettlement = data.getStartingSettlement();
     				double distance = startingSettlement.getCoordinates().getDistance(settlement.getCoordinates());
-    				double roverRange = getWizard().getMissionData().getRover().getRange(wizard.getMissionBean().getMissionType());
-    				if (roverRange < distance) result = true;
+    				Vehicle v = data.getRover();
+    				if (v == null) {
+    					v = data.getDrone();
+    				}
+    				double vRange = v.getRange();
+    				if (vRange < distance) result = true;
     			}
     			catch (Exception e) {}
     		}

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * DecompressXZ.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-28
  * @author Manny Kung
  */
 
@@ -45,17 +45,16 @@ public class DecompressXZ {
 		    
 		}
 		catch (IOException ioe){
-		    ioe.printStackTrace();
+			System.out.println("Problems calling decompressMapData(): " + ioe.getMessage());
 		} 
   	}
   	
   	public DecompressXZ(String s) {
 		try {
 		    decompressMapData(s, false);
-
 		}
 		catch (IOException ioe){
-		    ioe.printStackTrace();
+			System.out.println("Problems calling decompressMapData() with string " + s + ": " + ioe.getMessage());
 		} 
   	}
   	
@@ -146,7 +145,7 @@ public class DecompressXZ {
 	                	  //s = s.substring(1, s.length());
 	                	  System.out.println("xz Filename2 : " + s);
 	                	  //s.trim().replaceAll("\\", "/");
-	                	  s.trim().replace("file:/", "");
+	                	  s = s.trim().replace("file:/", "");
 	                	  System.out.println("xz Filename3 : " + s);
 	                	  
 //	              	    path = Paths.get(s);
@@ -180,7 +179,6 @@ public class DecompressXZ {
 	                  } catch (NullPointerException e) {
 	                      System.err.println("XZDecDemo: Cannot open " + name + ": "
 	                                         + e.getMessage());
-	                      e.printStackTrace();
 	                      System.exit(1);
 	
 	                  } finally {
@@ -194,7 +192,6 @@ public class DecompressXZ {
 	      } catch (FileNotFoundException e) {
 	          System.err.println("XZDecDemo: Cannot find the file " + name + ": "
 	                             + e.getMessage());
-	          e.printStackTrace();
 	          System.exit(1);
 	
 	      } catch (EOFException e) {

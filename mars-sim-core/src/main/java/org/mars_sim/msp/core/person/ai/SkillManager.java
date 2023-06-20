@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * SkillManager.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-01
  * @author Scott Davis
  */
 
@@ -16,9 +16,8 @@ import java.util.stream.Collectors;
 
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.TrainingType;
+import org.mars_sim.msp.core.person.ai.training.TrainingType;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.RobotType;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 
@@ -30,90 +29,33 @@ public class SkillManager implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
-//	private static Logger logger = Logger.getLogger(SkillManager.class.getName());
-//	private static String loggerName = logger.getName();
-//	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
-	
+
 	// Data members
-//	/** The person's ID. */
-//	private int personID;
-//	/** The robot's ID. */
-//	private int robotID;
 	/** The person's instance. */
 	private Person person;
 	/** The robot's instance. */
 	private Robot robot;
 //	private CoreMind coreMind;
 	
-	/** A list of the person's skills keyed by name. */
+	/** A list of skills keyed by skill type enum. */
 	private Map<SkillType, Skill> skills;
 
-	/** The unit manager instance. */
-//	private static UnitManager unitManager = Simulation.instance().getUnitManager();
-	
 	/** Constructor. */
-	public SkillManager(Unit unit) {//, CoreMind coreMind) {
-//		personID = -1;
-//		robotID = -1;
-
-//		this.coreMind = coreMind;
-		
+	public SkillManager(Unit unit) {
+	
 		if (unit instanceof Person) {
 			person = (Person)unit;
-//			personID = ((Person)unit).getIdentifier();
 		} else if (unit instanceof Robot) {
 			robot = (Robot)unit;
-//			robotID = ((Robot)unit).getIdentifier();
 		}
 
-		skills = new ConcurrentHashMap<SkillType, Skill>();
+		skills = new ConcurrentHashMap<>();
 	}
 
-	/**
-	 * Sets some random bot skills
-	 */
-	public void setRandomBotSkills(RobotType t) {
-		// Add starting skills randomly for a bot.
-		List<SkillType> skills = new ArrayList<>();
-		if (t == RobotType.MAKERBOT) {
-			skills.add(SkillType.MATERIALS_SCIENCE);
-			skills.add(SkillType.PHYSICS);
-		}
-		else if (t == RobotType.GARDENBOT) {
-			skills.add(SkillType.BOTANY);
-			skills.add(SkillType.BIOLOGY);
-		}
-		else if (t == RobotType.REPAIRBOT) {
-			skills.add(SkillType.MATERIALS_SCIENCE);
-			skills.add(SkillType.MECHANICS);
-		}
-		else if (t == RobotType.CHEFBOT) {
-			skills.add(SkillType.CHEMISTRY);
-			skills.add(SkillType.COOKING);
-		}
-		else if (t == RobotType.MEDICBOT) {
-			skills.add(SkillType.CHEMISTRY);
-			skills.add(SkillType.MEDICINE);
-			skills.add(SkillType.PSYCHOLOGY);
-		}
-		else if (t == RobotType.DELIVERYBOT) {
-			skills.add(SkillType.PILOTING);
-			skills.add(SkillType.TRADING);
-		}
-		else if (t == RobotType.CONSTRUCTIONBOT) {
-			skills.add(SkillType.AREOLOGY);
-			skills.add(SkillType.CONSTRUCTION);
-		}
-		
-		for (SkillType startingSkill : skills) {
-			int skillLevel = 1;
-			addNewSkillNExperience(startingSkill, skillLevel);
-		}
 
-	}
 	
 	/**
-	 * Sets some random skills
+	 * Sets some random skills for a person.
 	 */
 	public void setRandomSkills() {
 		int ageFactor = getPerson().getAge();
@@ -156,27 +98,23 @@ public class SkillManager implements Serializable {
 				int rand = RandomUtil.getRandomInt(0, 3);
 				
 				if (rand == 0) {
-					skillLevel = getInitialSkillLevel(0, (int)(10 + ageFactor/10));
+					skillLevel = getInitialSkillLevel(0, (int)(10 + ageFactor/10.0));
 					addNewSkillNExperience(startingSkill, skillLevel);
 				}
 				else if (rand == 1) {
-					skillLevel = getInitialSkillLevel(1, (int)(5 + ageFactor/8));
+					skillLevel = getInitialSkillLevel(1, (int)(5 + ageFactor/8.0));
 					addNewSkillNExperience(startingSkill, skillLevel);
 				}
 				else if (rand == 2) {
-					skillLevel = getInitialSkillLevel(2, (int)(2.5 + ageFactor/6));
+					skillLevel = getInitialSkillLevel(2, (int)(2.5 + ageFactor/6.0));
 					addNewSkillNExperience(startingSkill, skillLevel);
 				}
-//				else if (rand == 3) {
-//					skillLevel = getInitialSkillLevel(3, (int)(1.25 + ageFactor/4));
-//					addNewSkillNExperience(startingSkill, skillLevel);
-//				}
 			}
 		}
 	}
 	
 	/**
-	 * Adds a new skill at the prescribed level
+	 * Adds a new skill at the prescribed level.
 	 * 
 	 * @param startingSkill
 	 * @param skillLevel
@@ -214,9 +152,9 @@ public class SkillManager implements Serializable {
 	}
 
 	/**
-	 * Returns the number of skills.
+	 * Returns a random skill type.
 	 * 
-	 * @return the number of skills
+	 * @return a skill type
 	 */
 	public SkillType getARandomSkillType() {
 		int rand = RandomUtil.getRandomInt(getSkillNum() - 1);
@@ -224,9 +162,9 @@ public class SkillManager implements Serializable {
 	}
 	
 	/**
-	 * Returns an array of the skills.
+	 * Returns an array of skill types.
 	 * 
-	 * @return an array of the skills
+	 * @return an array of skill types
 	 */
 	public SkillType[] getKeys() {
 		return skills.keySet().toArray(new SkillType[] {});
@@ -269,7 +207,7 @@ public class SkillManager implements Serializable {
 	}
 
 	/**
-	 * Returns the  skill level if it exists in the
+	 * Returns the skill instance if it exists in the
 	 * SkillManager. Returns null otherwise.
 	 * 
 	 * @param skillType {@link SkillType}
@@ -288,7 +226,7 @@ public class SkillManager implements Serializable {
 	 * @param skillType {@link SkillType}
 	 * @return the cumulative experience points
 	 */
-	public double getCumuativeExperience(SkillType skillType) {
+	public double getCumulativeExperience(SkillType skillType) {
 		Skill skill = getSkill(skillType);
 		if (skill != null) {
 			// Calculate exp points at the current level
@@ -306,8 +244,7 @@ public class SkillManager implements Serializable {
 	}
 	
 	/**
-	 * Returns the integer skill experiences from a named skill if it exists in the
-	 * SkillManager. Returns 0 otherwise.
+	 * Returns the integer skill experiences at the current level.
 	 * 
 	 * @param skill {@link SkillType}
 	 * @return {@link Integer} >= 0
@@ -321,8 +258,7 @@ public class SkillManager implements Serializable {
 	}
 	
 	/**
-	 * Returns the integer skill experiences from a named skill if it exists in the
-	 * SkillManager. Returns 0 otherwise.
+	 * Returns the integer skill experiences needed to promote to the next level
 	 * 
 	 * @param skill {@link SkillType}
 	 * @return {@link Integer} >= 0
@@ -352,7 +288,7 @@ public class SkillManager implements Serializable {
 	
 	/**
 	 * Returns the effective integer skill level from a named skill based on
-	 * additional modifiers such as fatigue.
+	 * additional modifiers such as performance.
 	 * 
 	 * @param skillType the skill's type
 	 * @return the skill's effective level
@@ -360,18 +296,13 @@ public class SkillManager implements Serializable {
 	public int getEffectiveSkillLevel(SkillType skillType) {
 		int skill = getSkillLevel(skillType);
 		double performance = 0;
-		// Modify for fatigue
-		// - 1 skill level for every 1000 points of fatigue.
-		if (person != null) { //personID != -1) {
-//			System.out.println("getPerson() is " + getPerson());
+		if (person != null) { 
 			performance = getPerson().getPerformanceRating();
 		}
-		else if (robot != null) {//robotID != -1) {
-//			System.out.println("getRobot() is " + getRobot());
+		else if (robot != null) {
 			performance = getRobot().getPerformanceRating();
 		}
-		int result = (int) Math.round(performance * skill);
-		return result;
+		return (int) Math.round(performance * skill);
 	}
 
 	/**
@@ -408,7 +339,6 @@ public class SkillManager implements Serializable {
 	 * @param experiencePoints the experience points to be added
 	 */
 	public void addExperience(SkillType skillType, double experiencePoints, double time) {
-
 		if (hasSkill(skillType)) {
 			skills.get(skillType).addExperience(experiencePoints);
 			skills.get(skillType).addTime(time);
@@ -417,28 +347,21 @@ public class SkillManager implements Serializable {
 			addNewSkill(new Skill(skillType));
 			addExperience(skillType, experiencePoints, time);
 		}
-
-//		 int finalSkill = getSkillLevel(skillType);
-//		 if (finalSkill > initialSkill) 
-//			 logger.info(person.getName() + " improved " +
-//					 skillName + " skill to " + finalSkill);
 	}
 
 	public Map<String, Integer> getSkillLevelMap() {
 		SkillType[] keys = getKeys();
-		Map<String, Integer> skillLevelMap = new ConcurrentHashMap<String, Integer>();
+		Map<String, Integer> skillLevelMap = new ConcurrentHashMap<>();
 		for (SkillType skill : keys) {
 			int level = getSkillLevel(skill);
-//			if (level > 0) {
-				skillLevelMap.put(skill.getName(), level);
-//			}
+			skillLevelMap.put(skill.getName(), level);
 		}
 		return skillLevelMap;
 	}
 	
 	public Map<String, Integer> getSkillExpMap() {
 		SkillType[] keys = getKeys();
-		Map<String, Integer> skillExpMap = new ConcurrentHashMap<String, Integer>();
+		Map<String, Integer> skillExpMap = new ConcurrentHashMap<>();
 		for (SkillType skill : keys) {
 			int exp = getSkillExp(skill);
 			skillExpMap.put(skill.getName(), exp);
@@ -448,7 +371,7 @@ public class SkillManager implements Serializable {
 	
 	public Map<String, Integer> getSkillDeltaExpMap() {
 		SkillType[] keys = getKeys();
-		Map<String, Integer> skillDeltaExpMap = new ConcurrentHashMap<String, Integer>();
+		Map<String, Integer> skillDeltaExpMap = new ConcurrentHashMap<>();
 		for (SkillType skill : keys) {
 			int exp = getSkillDeltaExp(skill);
 			skillDeltaExpMap.put(skill.getName(), exp);
@@ -458,14 +381,13 @@ public class SkillManager implements Serializable {
 	
 	public Map<String, Integer> getSkillTimeMap() {
 		SkillType[] keys = getKeys();
-		Map<String, Integer> skillTimeMap = new ConcurrentHashMap<String, Integer>();
+		Map<String, Integer> skillTimeMap = new ConcurrentHashMap<>();
 		for (SkillType skill : keys) {
 			int exp = getSkillTime(skill);
 			skillTimeMap.put(skill.getName(), exp);
 		}
 		return skillTimeMap;
 	}
-	
 	
 	/**
 	 * Gets the person's reference.
@@ -474,7 +396,6 @@ public class SkillManager implements Serializable {
 	 */
 	public Person getPerson() {
 		return person;
-//		return unitManager.getPersonByID(personID);
 	}
 	
 	/**
@@ -484,21 +405,21 @@ public class SkillManager implements Serializable {
 	 */
 	public Robot getRobot() {
 		return robot;
-//		return unitManager.getRobotByID(robotID);
 	}
 	
 	/**
-	 * Loads instances
+	 * Loads instances.
 	 */
 	public static void initializeInstances() {
 	}
 			
 	/**
-	 * Prepare object for garbage collection.
+	 * Prepares object for garbage collection.
 	 */
 	public void destroy() {
-//		unitManager = null;
 		skills.clear();
 		skills = null;
+		person = null;
+		robot = null;
 	}
 }

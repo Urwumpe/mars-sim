@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ScientificStudyManager.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.science;
@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -28,14 +29,14 @@ public class ScientificStudyManager // extends Thread
 	private static final Logger logger = Logger.getLogger(ScientificStudyManager.class.getName());
 	
 	// Data members
-	private List<ScientificStudy> studies;
+	private List<ScientificStudy> studies = new ArrayList<>();
 
 	/**
 	 * Constructor.
 	 */
 	public ScientificStudyManager() {
 		// Methods are threadsafe
-		studies = new ArrayList<>();
+//		studies = new ArrayList<>();
 	}
 
 	/**
@@ -46,19 +47,23 @@ public class ScientificStudyManager // extends Thread
 	 * @param difficultyLevel the difficulty level of the study.
 	 * @return the created study.
 	 */
-	public synchronized ScientificStudy createScientificStudy(Person researcher, ScienceType science, int difficultyLevel) {
+	public ScientificStudy createScientificStudy(Person researcher, ScienceType science, int difficultyLevel) {
 		if (researcher == null)
 			throw new IllegalArgumentException("Researcher cannot be null");
 		if (science == null)
 			throw new IllegalArgumentException("Science cannot be null");
 		if (difficultyLevel < 0)
 			throw new IllegalArgumentException("difficultyLevel must be positive value");
+		
+		ScientificStudy study = null;
+		synchronized (studies) {
+			int id = studies.size() + 1;
+			String name = science.getName() + " #" + id;
+			study = new ScientificStudy(id, name, researcher, science, difficultyLevel);
+			studies.add(study);
+		}
 
-		String name = science.getName() + " #" + (studies.size() + 1);
-		ScientificStudy study = new ScientificStudy(name, researcher, science, difficultyLevel);
-		studies.add(study);
-
-		logger.fine(researcher.getName() + " began writing proposal for new " + study.toString());
+		logger.fine(researcher.getName() + " began writing proposal for " + study.getName());
 
 		return study;
 	}
@@ -69,14 +74,9 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	public List<ScientificStudy> getOngoingStudies() {
-		List<ScientificStudy> result = new ArrayList<>();
-		Iterator<ScientificStudy> i = studies.iterator();
-		while (i.hasNext()) {
-			ScientificStudy study = i.next();
-			if (!study.isCompleted())
-				result.add(study);
+		synchronized (studies) {
+			return studies.stream().filter(s -> s.isCompleted() == false).collect(Collectors.toList());
 		}
-		return result;
 	}
 
 	/**
@@ -85,14 +85,7 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	public List<ScientificStudy> getCompletedStudies() {
-		List<ScientificStudy> result = new ArrayList<>();
-		Iterator<ScientificStudy> i = studies.iterator();
-		while (i.hasNext()) {
-			ScientificStudy study = i.next();
-			if (study.isCompleted())
-				result.add(study);
-		}
-		return result;
+		return studies.stream().filter(ScientificStudy::isCompleted).collect(Collectors.toList());
 	}
 
 	/**
@@ -103,43 +96,8 @@ public class ScientificStudyManager // extends Thread
 	 * @return the number of studies.
 	 */
 	public int getNumCompletedPrimaryStudies(Person researcher) {
-		return getCompletedPrimaryStudies(researcher).size();
-	}
-	
-	/**
-	 * Gets all completed scientific studies where researcher was the primary
-	 * researcher.
-	 * 
-	 * @param researcher the primary researcher.
-	 * @return list of studies.
-	 */
-	private List<ScientificStudy> getCompletedPrimaryStudies(Person researcher) {
-		List<ScientificStudy> result = new ArrayList<>();
-		Iterator<ScientificStudy> i = studies.iterator();
-		while (i.hasNext()) {
-			ScientificStudy study = i.next();
-			if (study.isCompleted() && (study.getPrimaryResearcher().equals(researcher)))
-				result.add(study);
-		}
-		return result;
-	}
-
-	/**
-	 * Gets all ongoing scientific studies where researcher is a collaborative
-	 * researcher.
-	 * 
-	 * @param researcher the collaborative researcher.
-	 * @return list of studies.
-	 */
-	public List<ScientificStudy> getOngoingCollaborativeStudies(Person researcher) {
-		List<ScientificStudy> result = new ArrayList<>();
-		Iterator<ScientificStudy> i = studies.iterator();
-		while (i.hasNext()) {
-			ScientificStudy study = i.next();
-			if (!study.isCompleted() && (study.getCollaborativeResearchers().contains(researcher)))
-				result.add(study);
-		}
-		return result;
+		return (int) studies.stream().filter(s -> s.isCompleted()
+				&& s.getPrimaryResearcher().equals(researcher)).count();		
 	}
 
 	/**
@@ -150,19 +108,14 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of studies.
 	 */
 	private List<ScientificStudy> getOngoingCollaborativeStudies(Settlement settlement, ScienceType type) {
-		boolean allSubject = false;
-		if (type == null)
-			allSubject = true;
-		List<ScientificStudy> result = new ArrayList<>();
+		boolean allSubject = type == null;
+        List<ScientificStudy> result = new ArrayList<>();
 
 		List<Person> pList = new ArrayList<>(settlement.getAllAssociatedPeople());
 
 		for (Person p : pList) {
-			Iterator<ScientificStudy> i = studies.iterator();
-			while (i.hasNext()) {
-				ScientificStudy study = i.next();
-				if ((allSubject || type == study.getScience()) &&
-					!study.isCompleted() && study.getCollaborativeResearchers().contains(p)) {
+			for(ScientificStudy study : p.getCollabStudies()) {
+				if (allSubject || (type == study.getScience())) {
 						result.add(study);
 				}
 			}
@@ -178,27 +131,10 @@ public class ScientificStudyManager // extends Thread
 	 * @return a number
 	 */
 	public int getNumCompletedCollaborativeStudies(Person researcher) {
-		return getCompletedCollaborativeStudies(researcher).size();
+		return (int) studies.stream().filter(s -> s.isCompleted()
+				&& s.getCollaborativeResearchers().contains(researcher)).count();			
 	}
 	
-	/**
-	 * Gets all completed scientific studies where researcher was a collaborative
-	 * researcher.
-	 * 
-	 * @param researcher the collaborative researcher.
-	 * @return list of studies.
-	 */
-	private List<ScientificStudy> getCompletedCollaborativeStudies(Person researcher) {
-		List<ScientificStudy> result = new ArrayList<>();
-		Iterator<ScientificStudy> i = studies.iterator();
-		while (i.hasNext()) {
-			ScientificStudy study = i.next();
-			if (study.isCompleted() && (study.getCollaborativeResearchers().contains(researcher)))
-				result.add(study);
-		}
-		return result;
-	}
-
 	/**
 	 * Gets all studies that have open invitations for collaboration for a
 	 * researcher.
@@ -208,14 +144,16 @@ public class ScientificStudyManager // extends Thread
 	 */
 	public List<ScientificStudy> getOpenInvitationStudies(Person collaborativeResearcher) {
 		List<ScientificStudy> result = new ArrayList<>();
-		Iterator<ScientificStudy> i = studies.iterator();
-		while (i.hasNext()) {
-			ScientificStudy study = i.next();
-			if (study.getPhase().equals(ScientificStudy.INVITATION_PHASE)
-					&& study.getInvitedResearchers().contains(collaborativeResearcher)
-					&& !study.hasInvitedResearcherResponded(collaborativeResearcher)) {
-				result.add(study);
-			}
+		synchronized (studies) {
+			Iterator<ScientificStudy> i = studies.iterator();
+			while (i.hasNext()) {
+				ScientificStudy study = i.next();
+				if (study.getPhase().equals(ScientificStudy.INVITATION_PHASE)
+						&& study.getInvitedResearchers().contains(collaborativeResearcher)
+						&& !study.hasInvitedResearcherResponded(collaborativeResearcher)) {
+					result.add(study);
+				}
+			}		
 		}
 		return result;
 	}
@@ -227,26 +165,8 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of scientific studies.
 	 */
 	public List<ScientificStudy> getAllStudies(Person researcher) {
-		List<ScientificStudy> result = new ArrayList<>();
-
-		// Add ongoing primary study.
-		ScientificStudy primaryStudy = researcher.getStudy();
-		if (primaryStudy != null)
-			result.add(primaryStudy);
-
-		// Add any ongoing collaborative studies.
-		List<ScientificStudy> collaborativeStudies = getOngoingCollaborativeStudies(researcher);
-		result.addAll(collaborativeStudies);
-
-		// Add completed primary studies.
-		List<ScientificStudy> completedPrimaryStudies = getCompletedPrimaryStudies(researcher);
-		result.addAll(completedPrimaryStudies);
-
-		// Add completed collaborative studies.
-		List<ScientificStudy> completedCollaborativeStudies = getCompletedCollaborativeStudies(researcher);
-		result.addAll(completedCollaborativeStudies);
-
-		return result;
+		return studies.stream().filter(s -> (s.getPrimaryResearcher().equals(researcher)
+				||  s.getCollaborativeResearchers().contains(researcher))).collect(Collectors.toList());	
 	}
 
 	/**
@@ -256,17 +176,9 @@ public class ScientificStudyManager // extends Thread
 	 * @return list of scientific studies.
 	 */
 	public List<ScientificStudy> getAllStudies(Settlement settlement) {
-		
-		// Add any completed primary studies.
-		List<ScientificStudy> result = new ArrayList<>();
-		Iterator<ScientificStudy> i = studies.iterator();
-		while (i.hasNext()) {
-			ScientificStudy study = i.next();
-				if (settlement.equals(study.getPrimarySettlement()))
-					result.add(study);
-		}
-	
-		return result;
+		return studies.stream().filter(s -> (s.getPrimarySettlement()  == null ?
+									false : s.getPrimarySettlement().equals(settlement)))
+				.collect(Collectors.toList());		
 	}
 
 	private static double getPhaseScore(ScientificStudy ss) {
@@ -320,11 +232,9 @@ public class ScientificStudyManager // extends Thread
 	 * @return the score
 	 */
 	public double getScienceScore(Settlement s, ScienceType type) {
-		boolean allSubject = false;
-		if (type == null)
-			allSubject = true;
+		boolean allSubject = type == null;
 
-		double score = 0;
+        double score = 0;
 		
 		double succeed = 3;	
 		double failed = 1;
@@ -333,10 +243,10 @@ public class ScientificStudyManager // extends Thread
 		if (type == null)
 			allSubject = true;
 		
-		Iterator<ScientificStudy> i = studies.iterator();
+		Iterator<ScientificStudy> i = getAllStudies(s).iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
-			if ((allSubject || type == study.getScience()) && s.equals(study.getPrimarySettlement())) {
+			if (allSubject || (type == study.getScience())) {
 				// Study need counting
 				if (study.getPhase().equals(ScientificStudy.COMPLETE_PHASE)) {
 					// Score on the completion state
@@ -400,14 +310,12 @@ public class ScientificStudyManager // extends Thread
 		// 3 = oPri
 		// 4 = oCol
 
-		boolean allSubject = false;
-		if (type == null)
-			allSubject = true;
-		
-		Iterator<ScientificStudy> i = studies.iterator();
+		boolean allSubject = type == null;
+
+        Iterator<ScientificStudy> i = getAllStudies(s).iterator();
 		while (i.hasNext()) {
 			ScientificStudy study = i.next();
-			if ((allSubject || type == study.getScience()) && s.equals(study.getPrimarySettlement())) {
+			if (allSubject || (type == study.getScience())) {
 				// Study need counting
 				if (study.getPhase().equals(ScientificStudy.COMPLETE_PHASE)) {
 					// Score on the completion state
@@ -450,7 +358,7 @@ public class ScientificStudyManager // extends Thread
 
 		return array;
 	}
-
+	
 	/**
 	 * Prepare object for garbage collection.
 	 */

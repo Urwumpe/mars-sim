@@ -1,3 +1,10 @@
+/*
+ * Mars Simulation Project
+ * EvaCommand.java
+ * @date 2022-08-24
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand.person;
 
 import java.util.Map;
@@ -24,8 +31,8 @@ public class EvaCommand extends AbstractPersonCommand {
 		response.appendTableHeading("Sol", 5, "Millisols");
 
 		Map<Integer, Double> eVATime = person.getTotalEVATaskTimeBySol();
-		int size = context.getSim().getMasterClock().getMarsClock().getMissionSol();
-		for (int i = 0; i < size; i++) {
+		int currentDay = context.getSim().getMasterClock().getMarsTime().getMissionSol();
+		for (int i = (currentDay - eVATime.size()); i <= currentDay; i++) {
 			if (eVATime.containsKey(i)) {
 				double milliSol = eVATime.get(i);
 				milliSol = Math.round(milliSol * 10.0) / 10.0;

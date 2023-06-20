@@ -1,19 +1,14 @@
-/**
+/*
  * Mars Simulation Project
  * Gardenbot.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-01
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.robot.ai.job;
 
-import java.io.Serializable;
-import java.util.Iterator;
-import java.util.List;
-
-import org.mars_sim.msp.core.robot.RoboticAttributeType;
-import org.mars_sim.msp.core.robot.RoboticAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
+import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.TendGreenhouse;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -23,24 +18,20 @@ import org.mars_sim.msp.core.structure.building.function.farming.Farming;
 /**
  * The Gardenbot class represents a job for a gardenbot.
  */
-public class Gardenbot
-extends RobotJob
-implements Serializable {
+public class Gardenbot extends RobotJob {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
+	private static final double M_PER_BOT = 200;
 
-	//private static Logger logger = Logger.getLogger(Botanist.class.getName());
+	//private static final Logger logger = Logger.getLogger(Botanist.class.getName());
 
 	/**
 	 * Constructor.
 	 */
 	public Gardenbot() {
 		// Use Job constructor
-		super(Gardenbot.class);
-
-		jobTasks.add(TendGreenhouse.class);
-
+		super();
 	}
 
 	/**
@@ -48,7 +39,7 @@ implements Serializable {
 	 * @param robot the robot to check.
 	 * @return capability (min 0.0).
 	 */
-	// TODO: use capability of the person who programs it
+	@Override
 	public double getCapability(Robot robot) {
 
 		double result = 10D;
@@ -56,8 +47,8 @@ implements Serializable {
 		int botanySkill = robot.getSkillManager().getSkillLevel(SkillType.BOTANY);
 		result += botanySkill;
 
-		RoboticAttributeManager attributes = robot.getRoboticAttributeManager();
-		int experienceAptitude = attributes.getAttribute(RoboticAttributeType.EXPERIENCE_APTITUDE);
+		NaturalAttributeManager attributes = robot.getNaturalAttributeManager();
+		int experienceAptitude = attributes.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
 		result+= result * ((experienceAptitude - 50D) / 100D);
 
 		//if (robot.getPhysicalCondition().hasSeriousMedicalProblems()) result = 0D;
@@ -70,19 +61,15 @@ implements Serializable {
 	 * @param settlement the settlement in need.
 	 * @return the base need >= 0
 	 */
-	public double getSettlementNeed(Settlement settlement) {
-		double result = 5D;
+	@Override
+	public double getOptimalCount(Settlement settlement) {
+		double growingArea = 0;
 
 		// Add (growing area in greenhouses) / 10
-		List<Building> greenhouseBuildings = settlement.getBuildingManager().getBuildings(FunctionType.FARMING);
-		Iterator<Building> j = greenhouseBuildings.iterator();
-		while (j.hasNext()) {
-			Building building = j.next();
+		for(Building building : settlement.getBuildingManager().getBuildings(FunctionType.FARMING)) {
 			Farming farm = (Farming) building.getFunction(FunctionType.FARMING);
-			result += (farm.getGrowingArea() / 8D); // changed from /10D to /5D
+			growingArea += farm.getGrowingArea();
 		}
-	    //System.out.println("getSettlementNeed() : result is " + result);
-		return result;
+		return growingArea/M_PER_BOT;
 	}
-
 }

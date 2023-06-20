@@ -1,29 +1,36 @@
-/**
+/*
  * Mars Simulation Project
  * Container.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-10-03
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.equipment;
 
-import org.mars_sim.msp.core.resource.PhaseType;
+import org.mars_sim.msp.core.Unit;
 
 /**
  * This interface accounts for units that are considered container for resources
  */
-public interface Container {
+public interface Container extends ResourceHolder {
+
+	public EquipmentType getEquipmentType();
 
 	/**
-	 * Gets the phase of resources this container can hold.
+	 * Containers only support a single resource.
 	 * 
-	 * @return resource phase.
+	 * @return Resource ID assigned to the container.
 	 */
-	public PhaseType getContainingResourcePhase();
+	public int getResource();
+	
+	public double getBaseMass();
+
+	public boolean transfer(Unit newOwner);
+
+	public double getStoredMass();
 
 	/**
-	 * Gets the total capacity of resource that this container can hold.
-	 * 
-	 * @return total capacity (kg).
+	 * Clean the container if empty. This will reset the assigned Resource
 	 */
-	public double getTotalCapacity();
+    public void clean();
+	
 }

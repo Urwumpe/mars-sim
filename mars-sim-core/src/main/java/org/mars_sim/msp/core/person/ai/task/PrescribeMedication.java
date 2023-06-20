@@ -1,41 +1,30 @@
 /**
  * Mars Simulation Project
  * PrescribeMedication.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Inventory;
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.mars.MarsSurface;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
-import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.person.health.AnxietyMedication;
 import org.mars_sim.msp.core.person.health.Medication;
 import org.mars_sim.msp.core.person.health.RadiationExposure;
 import org.mars_sim.msp.core.person.health.RadioProtectiveAgent;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.RoboticAttributeType;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
-import org.mars_sim.msp.core.structure.building.function.Storage;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Crewable;
 import org.mars_sim.msp.core.vehicle.Vehicle;
@@ -43,19 +32,18 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
 /**
  * A task in which a doctor prescribes (and provides) a medication to a patient.
  */
-public class PrescribeMedication
-extends Task
-implements Serializable {
+public class PrescribeMedication extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(PrescribeMedication.class.getName());
-
-    private String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1, logger.getName().length());
+	private static SimLogger logger = SimLogger.getLogger(PrescribeMedication.class.getName());
     
-	/** Task name */
+	/** SImple Task name */
+	static final String SIMPLE_NAME = PrescribeMedication.class.getSimpleName();
+	
+	/** Task description name */
     private static final String NAME = Msg.getString(
             "Task.description.prescribeMedication"); //$NON-NLS-1$
 
@@ -78,7 +66,7 @@ implements Serializable {
 	 */
 	public PrescribeMedication(Person person) {
         // Use task constructor.
-        super(NAME, person, true, false, STRESS_MODIFIER, true, 10D);
+        super(NAME, person, true, false, STRESS_MODIFIER, SkillType.MEDICINE, 100D, 10D);
 
         // Determine patient needing medication.
         //if (patient == null)
@@ -90,12 +78,14 @@ implements Serializable {
             if (person.isOutside())
             	endTask();
             // If in settlement, move doctor to building patient is in.
-            else if (person.isInSettlement() && patient.getBuildingLocation() != null) {
+            else if (person.isInSettlement() && patient.getBuildingLocation() != null
+				&& person.isNominallyFit() && !person.getMind().getTaskManager().hasSameTask(RequestMedicalTreatment.SIMPLE_NAME)) {
+
                 // Walk to patient's building.
-//            	patient.getMind().getTaskManager().clearTask();
-            	patient.getMind().getTaskManager().addTask(new RequestMedicalTreatment(patient), false);
-            	//walkToActivitySpotInBuilding(patient.getBuildingLocation(), FunctionType.MEDICAL_CARE, false);
-                //walkToRandomLocInBuilding(BuildingManager.getBuilding(patient), false);
+            	walkToActivitySpotInBuilding(person.getBuildingLocation(), FunctionType.MEDICAL_CARE, false);
+            	walkToActivitySpotInBuilding(patient.getBuildingLocation(), FunctionType.MEDICAL_CARE, false);
+            	
+            	patient.getMind().getTaskManager().addAPendingTask(RequestMedicalTreatment.SIMPLE_NAME, false);
             }
             else
             	endTask();
@@ -112,7 +102,7 @@ implements Serializable {
 
 	public PrescribeMedication(Robot robot) {
         // Use task constructor.
-        super(NAME, robot, true, false, STRESS_MODIFIER, true, 10D);
+        super(NAME, robot, true, false, STRESS_MODIFIER, SkillType.MEDICINE, 100D, 10D);
 
         // Determine patient needing medication.
         //if (patient == null)
@@ -124,10 +114,12 @@ implements Serializable {
             // If in settlement, move doctor to building patient is in.
             if (robot.isInSettlement() && patient.getBuildingLocation() != null) {
                 // Walk to patient's building.
-//            	patient.getMind().getTaskManager().clearTask();
-            	patient.getMind().getTaskManager().addTask(new RequestMedicalTreatment(patient), false);
-            	//walkToActivitySpotInBuilding(BuildingManager.getBuilding(patient), FunctionType.MEDICAL_CARE, false);
-                //walkToRandomLocInBuilding(BuildingManager.getBuilding(patient), false);
+            	
+                // Walk to patient's building.
+            	walkToActivitySpotInBuilding(robot.getBuildingLocation(), FunctionType.MEDICAL_CARE, false);
+            	walkToActivitySpotInBuilding(patient.getBuildingLocation(), FunctionType.MEDICAL_CARE, false);
+            	
+            	patient.getMind().getTaskManager().addAPendingTask(RequestMedicalTreatment.SIMPLE_NAME, false);
             }
             else
             	endTask();
@@ -355,29 +347,17 @@ implements Serializable {
                     if (needMeds) {
                     	StringBuilder phrase = new StringBuilder();
                         
-                        if (person != null) {
-                        	if (!person.equals(patient)) {
-                        		phrase = phrase.append("[").append(patient.getSettlement())
-                        			.append("] ").append(person.getName()).append(" is prescribing ").append(medication.getName())
-                        			.append(" to ").append(patient.getName()).append(" in ").append(patient.getBuildingLocation().getNickName())
+                    	if (!worker.equals(patient)) {
+                    		phrase = phrase.append("Prescribing ").append(medication.getName())
+                    			.append(" to ").append(patient.getName()).append(" in ").append(patient.getBuildingLocation().getNickName())
+                    			.append("."); 
+                    	}
+                    	else {
+                    		phrase = phrase.append("Is self-prescribing ").append(medication.getName())
+                        			.append(" to onself in ").append(person.getBuildingLocation().getNickName())
                         			.append("."); 
-                        	}
-                        	else {
-                        		phrase = phrase.append("[").append(patient.getSettlement())
-	                        			.append("] ").append(person.getName()).append(" is self-prescribing ").append(medication.getName())
-	                        			.append(" to onself in ").append(person.getBuildingLocation().getNickName())
-	                        			.append("."); 
-                        	}
-                        }
-                        else if (robot != null) {
-                        	phrase = phrase.append("[").append(patient.getSettlement())
-                        			.append("] ").append(person.getName()).append(" is prescribing ").append(medication.getName())
-                        			.append(" to ").append(patient.getName()).append(" in ").append(patient.getBuildingLocation().getNickName())
-                        			.append("."); 
-                        }
-
-                		LogConsolidated.log(logger, Level.INFO, 5000, sourceName, phrase.toString(), null);
-
+                    	}
+                		logger.log(worker, Level.INFO, 5000,  phrase.toString());
                     }
                     
                     produceMedicalWaste();
@@ -389,7 +369,7 @@ implements Serializable {
                // else throw new IllegalStateException("medication is null");
             }
             else 
-            	logger.info(patient.getName() + " is not in a proper place to receive medication.");
+            	logger.info(patient, "Is not in a proper place to receive medication.");
             	//throw new IllegalStateException ("patient is null");
         }
 
@@ -401,60 +381,11 @@ implements Serializable {
 
 
 	public void produceMedicalWaste() {
-	    Unit containerUnit = null;
-		if (person != null)
-		       containerUnit = person.getContainerUnit();
-		else if (robot != null)
-			containerUnit = robot.getContainerUnit();
-
-		if (!(containerUnit instanceof MarsSurface)) {
-            Inventory inv = containerUnit.getInventory();
-            Storage.storeAnResource(AVERAGE_MEDICAL_WASTE, ResourceUtil.toxicWasteID, inv, 
-            		sourceName + "::produceMedicalWaste");
+		if (!worker.isOutside()) {
+            worker.storeAmountResource(ResourceUtil.toxicWasteID, AVERAGE_MEDICAL_WASTE);
         }
 	}
 
-	
-    @Override
-    protected void addExperience(double time) {
-        // Add experience to "Medical" skill
-        // (1 base experience point per 10 millisols of work)
-        // Experience points adjusted by person's "Experience Aptitude" attribute.
-        double newPoints = time / 10D;
-        int experienceAptitude = 0;
-		if (person != null)
-			experienceAptitude = person.getNaturalAttributeManager().getAttribute(
-		            NaturalAttributeType.EXPERIENCE_APTITUDE);
-		else if (robot != null)
-			experienceAptitude = robot.getRoboticAttributeManager().getAttribute(
-					RoboticAttributeType.EXPERIENCE_APTITUDE);
-
-        newPoints += newPoints * ((double) experienceAptitude - 50D) / 100D;
-        newPoints *= getTeachingExperienceModifier();
-		if (person != null)
-			person.getSkillManager().addExperience(SkillType.MEDICINE, newPoints, time);
-		else if (robot != null)
-			robot.getSkillManager().addExperience(SkillType.MEDICINE, newPoints, time);
-
-    }
-
-    @Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> results = new ArrayList<SkillType>(1);
-		results.add(SkillType.MEDICINE);
-        return results;
-    }
-
-    @Override
-    public int getEffectiveSkillLevel() {
-    	SkillManager manager = null;
-		if (person != null)
-		    manager = person.getSkillManager();
-		else if (robot != null)
-			manager = robot.getSkillManager();
-
-		return manager.getEffectiveSkillLevel(SkillType.MEDICINE);
-    }
 
     @Override
     protected double performMappedPhase(double time) {
@@ -467,13 +398,5 @@ implements Serializable {
         else {
             return time;
         }
-    }
-
-    @Override
-    public void destroy() {
-        super.destroy();
-
-        patient = null;
-        //medication = null;
     }
 }

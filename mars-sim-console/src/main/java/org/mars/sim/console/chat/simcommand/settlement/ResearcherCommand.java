@@ -1,8 +1,16 @@
+/**
+ * Mars Simulation Project
+ * ResearcherCommand.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand.settlement;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import org.mars.sim.console.chat.ChatCommand;
 import org.mars.sim.console.chat.Conversation;
@@ -10,7 +18,6 @@ import org.mars.sim.console.chat.simcommand.StructuredResponse;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.science.ScientificStudyManager;
 import org.mars_sim.msp.core.structure.Settlement;
 
 public class ResearcherCommand extends AbstractSettlementCommand {
@@ -25,14 +32,13 @@ public class ResearcherCommand extends AbstractSettlementCommand {
 	protected boolean execute(Conversation context, String input, Settlement settlement) {
 		StructuredResponse response = new StructuredResponse();
 		
-		ScientificStudyManager scientificManager = context.getSim().getScientificStudyManager();
 		List<Person> people = new ArrayList<>(settlement.getAllAssociatedPeople());
 
 		List<ScienceType> sciences = Arrays.asList(ScienceType.values());			
 
 		for (Person p : people) {
-			response.append(System.lineSeparator());
-			response.appendHeading(p.getName() + " - " + p.getJobName());
+			response.appendBlankLine();
+			response.appendHeading(p.getName() + " - " + p.getMind().getJob().getName());
 
 			ScientificStudy ss = p.getStudy();
 			String priName = "None";
@@ -43,9 +49,9 @@ public class ResearcherCommand extends AbstractSettlementCommand {
 			}
 			response.appendLabeledString("Ongoing Primary Study", priName + " - " + priPhase);
 
-			List<ScientificStudy> cols = scientificManager.getOngoingCollaborativeStudies(p);
+			Set<ScientificStudy> cols = p.getCollabStudies();
 			if (!cols.isEmpty()) {
-				response.append(System.lineSeparator());
+				response.appendBlankLine();
 				response.appendTableHeading("Collaborative Study", 22, "Phase");
 				for (ScientificStudy item : cols) {
 					String secName = item.getScience().getName();
@@ -54,7 +60,7 @@ public class ResearcherCommand extends AbstractSettlementCommand {
 				}
 			}
 			
-			response.append(System.lineSeparator());
+			response.appendBlankLine();
 			response.appendTableHeading("Subject", 15, "Achievement Score");
 
 			for (ScienceType t : sciences) {

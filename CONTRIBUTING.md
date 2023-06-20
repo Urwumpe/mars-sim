@@ -1,17 +1,26 @@
-# Contributing
+# $$\color{#D29922}\textsf{\Large\&#x26A0;\kern{0.2cm}\normalsize Contributing}$$ 
 
-We are glad for your help and contributions to mars-sim.
+We are very glad for your help and contributions to mars-sim.
 
- - [Issues and Bugs](#issue)
- - [Submission Guidelines](#submit)
- - [Code Development](#coding)
- - [Further Info](#info)
+## Overview
+### Table of contents 
+* [Discussions](#discussion)
+* [Issues and Bugs](#issue)
+* [Submission Guidelines](#submit)
+* [Code Development](#coding)
+* [Further Info](#info)
+
+## <a name="discussion"></a> Open an Discussion Topic
+
+If you are interested in asking a question or providing a feedback regarding this project, 
+do not hesitate in opening up an discussion topic in the project's GitHub Repository. 
 
 ## <a name="issue"></a> Found an Issue/bug
 
-If you find a bug in the source code or a mistake in the documentation, you can help us by
-submitting an issue to the project's GitHub Repository. Even better you can submit a Pull Request
-with a fix.
+If you spot a bug in the source code or have any technical suggestions, help us by
+submitting an issue in GitHub's [Issues](https://github.com/mars-sim/mars-sim/issues) tab. 
+
+If you have crafted a solution to an existing issue, please submit a Pull Request with a fix.
 
 __Please observe the rules and guidelines below__.
 
@@ -38,4 +47,4 @@ If you would like to become a developer and contribute to coding, see this [wiki
 ## <a name="info"></a> Further Information
 
 You can find out more information about mars-sim [here](
-https://github.com/mars-sim/mars-sim)
+https://github.com/mars-sim/mars-sim).

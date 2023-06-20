@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * AmountResourcePhaseStorage.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Scott Davis 
  */
 

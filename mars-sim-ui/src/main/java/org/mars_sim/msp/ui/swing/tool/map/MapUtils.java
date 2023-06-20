@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MapUtils.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-04-28
  * @author Scott Davis
  */
 
@@ -9,46 +9,40 @@ package org.mars_sim.msp.ui.swing.tool.map;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.IntPoint;
-import org.mars_sim.msp.core.mars.Mars;
 
 /**
  * Static class for map utilities.
  */
 public class MapUtils {
-//	private static final int MAP_OFFSET_X = 300;
-//	private static final int MAP_OFFSET_Y = 300; //map's actual size is 900x900, but 300x300 is shown on the screen, 
-	// upper left corner of view window starts at 301,301
-	// see CannedMarsMap.createMapImageLarge()
 
 	/**
 	 * Private constructor for utility class.
 	 */
 	private MapUtils() {
+		// nothing
 	}
 
 	/**
 	 * Gets a coordinate x, y position on the map image.
 	 * 
 	 * @param coords  location of unit
-	 * @param mapType the type of map.
+	 * @param baseMap the type of map.
 	 * @return display point on map
 	 */
-	public static IntPoint getRectPosition(Coordinates coords, Coordinates mapCenter, String mapType) {
-
-		int mapHeight = CannedMarsMap.MAP_HEIGHT;
-
-		double rho = mapHeight / Math.PI;
-		int halfMap = mapHeight / 2;
-		int low_edge = halfMap - 150;
-		// IntPoint p = Coordinates.findRectPosition(coords, mapCenter, rho, halfMap,
-		// low_edge);
-		// p.setLocation(p.getiX()+MAP_OFFSET_X, p.getiY()+MAP_OFFSET_Y);
-		return Coordinates.findRectPosition(coords, mapCenter, rho, halfMap, low_edge);
+	public static IntPoint getRectPosition(Coordinates coords, Coordinates mapCenter, Map baseMap) {
+		int halfMap = baseMap.getPixelHeight()/2;
+		return Coordinates.findRectPosition(coords, mapCenter, baseMap.getScale(),
+											halfMap, halfMap - (MapPanel.MAP_BOX_HEIGHT/2));
 	}
 
-	public static int getPixelDistance(double distance, String mapType) {
-		int mapWidth = CannedMarsMap.MAP_WIDTH;
-		double distancePerPixel = Mars.MARS_CIRCUMFERENCE / mapWidth;
-		return (int) Math.round(distance / distancePerPixel);
+	/**
+	 * Gets the distance in terms of the number of pixels.
+	 * 
+	 * @param distance
+	 * @param mapType
+	 * @return
+	 */
+	public static int getPixelDistance(double distance, Map baseMap) {
+		return (int) Math.round(distance / Coordinates.MARS_CIRCUMFERENCE * baseMap.getPixelWidth());
 	}
 }

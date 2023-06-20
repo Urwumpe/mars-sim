@@ -1,25 +1,32 @@
-/**
+/*
  * Mars Simulation Project
  * VehicleAirlock.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-05
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.vehicle;
 
-import java.awt.geom.Point2D;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Inventory;
 import org.mars_sim.msp.core.LifeSupportInterface;
 import org.mars_sim.msp.core.LocalAreaUtil;
-import org.mars_sim.msp.core.LogConsolidated;
+import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.structure.Airlock;
+import org.mars_sim.msp.core.structure.AirlockType;
+import org.mars_sim.msp.core.time.ClockPulse;
 
 /**
  * This class represents an airlock for a vehicle.
+ * Note: a vehicle airlock has zone 0, 2, 4 and does NOT have zone 1 and 3
+ * 
  */
 public class VehicleAirlock
 extends Airlock {
@@ -28,29 +35,42 @@ extends Airlock {
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(VehicleAirlock.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
+	private static SimLogger logger = SimLogger.getLogger(VehicleAirlock.class.getName());
+
+	/** Pressurize/depressurize time (millisols). */
+	public static final double CYCLE_TIME = 2D; 
+	/** The maximum number of space in the chamber. */
+	public static final int MAX_SLOTS = 2;
 	
 	// Data members.
+	/** True if airlock's state is in transition of change. */
+	private boolean transitioning;
+	/** True if airlock is activated (may elect an operator or may change the airlock state). */
+	private boolean activated;
+	/** Amount of remaining time for the airlock cycle. (in millisols) */
+	private double remainingCycleTime;
+	
 	/** The vehicle this airlock is for. */
 	private Vehicle vehicle;
-	private Point2D airlockInsidePos;
-	private Point2D airlockInteriorPos;
-	private Point2D airlockExteriorPos;
+
+    private Map<LocalPosition, Integer> airlockInsidePosMap;
+    private Map<LocalPosition, Integer> airlockInteriorPosMap;
+    private Map<LocalPosition, Integer> airlockExteriorPosMap;
 
 	/**
 	 * Constructor.
+	 * 
 	 * @param vehicle the vehicle this airlock of for.
 	 * @param capacity number of people airlock can hold.
 	 */
 	public VehicleAirlock(
-		Vehicle vehicle, int capacity, double xLoc, double yLoc,
-		double interiorXLoc, double interiorYLoc, double exteriorXLoc,
-		double exteriorYLoc
-	) {
+		Vehicle vehicle, int capacity, 
+		LocalPosition loc, 
+		LocalPosition interiorLoc,
+		LocalPosition exteriorLoc) {
+		
 		// User Airlock constructor
-		super(capacity);//, vehicle);
+		super(capacity);
 
 		if (vehicle == null) {
 			throw new IllegalArgumentException(Msg.getString("VehicleAirlock.error.null")); //$NON-NLS-1$
@@ -65,128 +85,80 @@ extends Airlock {
 			this.vehicle = vehicle;
 		}
 
+		activated = false;
+		remainingCycleTime = CYCLE_TIME;
+		
 		// Determine airlock interior position.
-//		airlockInteriorPos = new Point2D.Double(interiorXLoc, interiorYLoc);
-		airlockInteriorPos = LocalAreaUtil.getLocalRelativeLocation(interiorXLoc,interiorYLoc, vehicle);
-
+		airlockInteriorPosMap = buildDoorMap(interiorLoc, vehicle, 0.3, 0.6, 0.5);
+		
 		// Determine airlock exterior position.
-//		airlockExteriorPos = new Point2D.Double(exteriorXLoc, exteriorYLoc);
-		airlockExteriorPos = LocalAreaUtil.getLocalRelativeLocation(exteriorXLoc, exteriorYLoc, vehicle);
+		airlockExteriorPosMap = buildDoorMap(exteriorLoc, vehicle, 0.3, 0.6, 0.5);
 
 		// Determine airlock inside position.
-//		airlockInsidePos = new Point2D.Double(xLoc, yLoc);
-		airlockInsidePos = LocalAreaUtil.getLocalRelativeLocation(xLoc, yLoc, vehicle);
-
+		airlockInsidePosMap = new HashMap<>();
 	}
 
-//	/**
-//	 * Causes a person within the airlock to exit either inside or outside.
-//	 *
-//	 * @param person the person to exit.
-//	 * @throws Exception if person is not in the airlock.
-//	 */
-//	protected boolean exitAirlock(Person person) {
-//    	boolean successful = false;
-//		// TODO: how to detect and bypass going through the airlock if a vehicle is inside a garage in a settlement
-//		// see exitingRoverGaragePhase() in Walk
-//		
-//		if (inAirlock(person)) {
-//			if (AirlockState.PRESSURIZED == getState()) {
-//				// check if the airlock has been sealed from outside and pressurized, ready to 
-//            	// open the inner door to release the person into the vehicle
-//				successful = stepIntoAirlock(person);
-//				
-//			}
-//			else if (AirlockState.DEPRESSURIZED == getState()) {
-//            	// check if the airlock has been de-pressurized, ready to open the outer door to 
-//            	// get exposed to the outside air and release the person
-//				successful = stepIntoMarsSurface(person);
-//
-//			}
-//			else {
-//				logger.severe(Msg.getString("VehicleAirlock.error.badState", getState())); //$NON-NLS-1$
-//			}
-//		}
-//		else {
-//			throw new IllegalStateException(Msg.getString("VehicleAirlock.error.notInAirlock",person.getName(),getEntityName())); //$NON-NLS-1$
-//		}
-//		
-//		return successful;
-//	}
+    /**
+     * Builds a map for the door positions. Creates four positioned around the center offset by the x and y values.
+     * 
+     * @param center Position of the center of the positions.
+     * @param building Building hosting the door
+     * @param x1 First x value
+     * @param x2 Second x value
+     * @param y y values; uses +/- of this.
+     * @return
+     */
+    private static Map<LocalPosition, Integer> buildDoorMap(LocalPosition center, Vehicle vehicle,
+			double x1, double x2, double y) {
+        Map<LocalPosition, Integer> result = new HashMap<>();
 
-   @Override
+        result.put(LocalAreaUtil.getLocalRelativePosition(new LocalPosition(center.getX() + x1, center.getY() + y), vehicle), -1);
+        result.put(LocalAreaUtil.getLocalRelativePosition(new LocalPosition(center.getX() + x1, center.getY() - y), vehicle), -1);
+
+        return result;
+	}
+    
+    @Override
     protected boolean egress(Person person) {
-    	boolean successful = false;
-      	LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-	  				"[" + person.getLocale() 
-	  				 + "] " + person + " was calling egress.");
-      	
-        if (inAirlock(person)) {
-            // check if the airlock has been de-pressurized, ready to open the outer door to 
-            // get exposed to the outside air and release the person
-            successful = stepOnMars(person);
-        }
-        else {
-            throw new IllegalStateException(person.getName() + " not in " + getEntityName());
-        }
-        
-        return successful;
+        return stepOnMars(person);
     }
 
     @Override
     protected boolean ingress(Person person) {
-    	boolean successful = false;
-      	LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-	  				"[" + person.getLocale() 
-	  				 + "] " + person + " was calling ingress.");
-      	
-        if (inAirlock(person)) {
-            // check if the airlock has been sealed from outside and pressurized, ready to 
-            // open the inner door to release the person into the settlement
-            successful = stepInside(person);
-        }
-
-        else {
-            throw new IllegalStateException(person.getName() + " not in airlock of " + getEntityName());
-        }
-        
-        return successful;
+        return stepInside(person);
     }
-	    
-	   /**
-     * Steps back into an airlock of a vehicle
-     * 
+
+    /**
+     * Steps back into the airlock of a vehicle
+     *
      * @param person
      */
     public boolean stepInside(Person person) {
     	boolean successful = false;
-    	if (person.isOutside()) {						
+    	if (person.isOutside()) {
             // 1.1. Transfer a person from the surface of Mars to the vehicle
-    		successful = person.transfer(marsSurface, vehicle);
-        
+    		successful = person.transfer(vehicle);
+
 			if (successful)
-				LogConsolidated.log(logger, Level.FINER, 0, sourceName, 
-					"[" + person.getLocale() + "] "
-					+ person.getName() + " had just stepped inside rover " + vehicle.getName());
+				logger.log(person, Level.FINER, 0,
+					"Just stepped inside rover " + vehicle.getName() + ".");
 			else
-				LogConsolidated.log(logger, Level.SEVERE, 0, sourceName, 
-						"[" + person.getLocale() + "] "
-						+ person.getName() + " could not step inside rover " + vehicle.getName());
+				logger.log(person, Level.SEVERE, 0,
+					"Could not step inside rover " + vehicle.getName() + ".");
 
 		}
-    	
+
 		else if (person.isInSettlement()) {
-			LogConsolidated.log(logger, Level.SEVERE, 0, sourceName, 
-					Msg.getString("VehicleAirlock.error.notOutside", person.getName(), getEntityName()));
-			//throw new IllegalStateException(Msg.getString("VehicleAirlock.error.notOutside",person.getName(),getEntityName())); //$NON-NLS-1$
+			logger.log(person, Level.SEVERE, 0,
+					Msg.getString("VehicleAirlock.error.notOutside", person.getName(), getEntityName()) + ".");
 		}
-    	
+
 		return successful;
     }
-    
+
     /**
-     * Gets outside of the airlock and step into the surface of Mars
-     * 
+     * Goes outside of the airlock and step into the surface of Mars
+     *
      * @param person
      */
     public boolean stepOnMars(Person person) {
@@ -194,46 +166,34 @@ extends Airlock {
 		if (person.isInVehicle()) {
 
             // 5.1. Transfer a person from the vehicle to the surface of Mars
-			successful = person.transfer(vehicle, marsSurface);
-			
+			successful = person.transfer(marsSurface);
+
 			if (successful) {
 				// 5.2 Set the person's coordinates to that of the settlement's
 				person.setCoordinates(vehicle.getCoordinates());
-						
-				LogConsolidated.log(logger, Level.FINER, 0, sourceName, 
-					"[" + person.getLocale() + "] "
-					+ person.getName() + " had just stepped outside rover " + vehicle.getName());
+
+				logger.log(person, Level.FINER, 0,
+					"Just stepped outside rover " + vehicle.getName() + ".");
 			}
 			else
-				LogConsolidated.log(logger, Level.SEVERE, 0, sourceName, 
-						"[" + person.getLocale() + "] "
-						+ person.getName() + " could not step outside rover " + vehicle.getName());
+				logger.log(person, Level.SEVERE, 0,
+					"Could not step outside rover " + vehicle.getName() + ".");
 		}
 		else if (person.isOutside()) {
-			LogConsolidated.log(logger, Level.SEVERE, 0, sourceName, 
-					Msg.getString("VehicleAirlock.error.notInside", person.getName(), getEntityName()));
-			//throw new IllegalStateException(Msg.getString("VehicleAirlock.error.notInside",person.getName(),getEntityName())); //$NON-NLS-1$
+			logger.log(person, Level.SEVERE, 0,
+					Msg.getString("VehicleAirlock.error.notInside", person.getName(), getEntityName()) + ".");
 		}
-		
+
 		return successful;
     }
-    
-    
+
 	/**
 	 * Gets the name of the entity this airlock is attached to.
+	 *
 	 * @return name {@link String}
 	 */
 	public String getEntityName() {
 		return vehicle.getName();
-	}
-
-	/**
-	 * Gets the inventory of the entity this airlock is attached to.
-	 * @return inventory {@link Inventory}
-	 */
-	@Override
-	public Inventory getEntityInventory() {
-		return vehicle.getInventory();
 	}
 
 	@Override
@@ -242,45 +202,456 @@ extends Airlock {
 	}
 
 	@Override
-	public String getLocale() {
-		return vehicle.getLocale();
-	}
-
-	@Override
-	public Point2D getAvailableInteriorPosition(boolean value) {
+	public LocalPosition getAvailableInteriorPosition(boolean pos) {
+		// Note: the param pos is not needed
 		return getAvailableInteriorPosition();
 	}
 
 	@Override
-	public Point2D getAvailableExteriorPosition(boolean value) {
+	public LocalPosition getAvailableExteriorPosition(boolean pos) {
+		// Note: the param pos is not needed
 		return getAvailableExteriorPosition();
 	}
+
+	@Override
+	public LocalPosition getAvailableInteriorPosition() {
+		for (Entry<LocalPosition, Integer> i : airlockInteriorPosMap.entrySet()) {
+			if (i.getValue() == -1) {
+				return i.getKey();
+			}
+		}
+		
+		return null;
+	}
+
+	@Override
+	public LocalPosition getAvailableExteriorPosition() {
+		for (Entry<LocalPosition, Integer> i : airlockExteriorPosMap.entrySet()) {
+			if (i.getValue() == -1) {
+				return i.getKey();
+			}
+		}
+		
+		return null;
+	}
+
+	@Override
+	public LocalPosition getAvailableAirlockPosition() {
+    	for (Entry<LocalPosition, Integer> i : airlockInsidePosMap.entrySet()) {
+			if (i.getValue() == -1) {
+				return i.getKey();
+			}
+		}
+    	
+    	return null;
+	}
+
+	/**
+	 * Gets the person having this particular id
+	 *
+	 * @param id
+	 * @return
+	 */
+	public Person getAssociatedPerson(int id) {
+		return unitManager.getPersonByID(id);
+	}
+
+	/**
+     * Gets a set of occupants from a particular zone
+     *
+     * @param zone the zone of interest
+	 * @return a set of occupants in the zone of the interest
+     */
+	@Override
+    public Set<Integer> getZoneOccupants(int zone) {
+		if (zone == 0)
+			return getAwaitingInnerDoor();
+		else if (zone == 4)
+			return getAwaitingOuterDoor();
+		else if (zone == 1 || zone == 3)
+			return new HashSet<>();
+
+		// if in zone 2
+		return getOccupants();
+    }
+
+    /**
+     * Gets the exact number of occupants who are within the chamber
+     * 
+     * @return
+     */
+    public int getNumInChamber() {
+    	return getNumOccupants();
+    }
+    
+	/**
+	 * Gets the number of occupants currently inside the airlock zone 1, 2, and 3
+	 *
+	 * @return the number of occupants
+	 */
+	@Override
+	public int getNumOccupants() {
+		return getOccupants().size();
+	}
+    
+	/**
+	 * Gets a collection of occupants' ids
+	 *
+	 * @return
+	 */
+	@Override
+	public Set<Integer> getAllInsideOccupants() {
+		return getOccupants();
+	}
+
+	/**
+	 * Checks if all 4 chambers in zone 2 are full.
+	 *
+	 * @return
+	 */
+	@Override
+	public boolean areAll4ChambersFull() {
+		return getInsideChamberNum() >= MAX_SLOTS;
+	}
+
+	/**
+	 * Gets the total number of people occupying the chamber in zone 2
+	 *
+	 * @return a list of occupants inside zone 2
+	 */
+	public int getInsideChamberNum() {
+		int result = 0;
+		loadEVAActivitySpots();
+		for (LocalPosition p : airlockInsidePosMap.keySet()) {
+			if (!airlockInsidePosMap.get(p).equals(-1))
+				result++;
+		}
+		return result;
+	}
 	
+	/**
+	 * Gets the type of airlock
+	 *
+	 * @return AirlockType
+	 */
 	@Override
-	public Point2D getAvailableInteriorPosition() {
-//		if (airlockInteriorPos == null)
-//			airlockInteriorPos = LocalAreaUtil.getLocalRelativeLocation(interiorXLoc, interiorYLoc, vehicle);
-		return airlockInteriorPos;
+	public AirlockType getAirlockType() {
+		return AirlockType.VEHICLE_AIRLOCK;
 	}
 
+    /**
+     * Vacate the person from a particular zone
+     *
+     * @param zone the zone of interest
+     * @param id the person's id
+	 * @return true if the person has been successfully vacated
+     */
 	@Override
-	public Point2D getAvailableExteriorPosition() {
-//		if (airlockExteriorPos == null)
-//			airlockExteriorPos = LocalAreaUtil.getLocalRelativeLocation(airlockExteriorPos.getX(),airlockExteriorPos.getY(),vehicle);
-		return airlockExteriorPos;
+	public boolean vacate(int zone, Integer id) {
+	 	if (zone == 0) {
+    		LocalPosition oldPos = getOldPos(airlockInteriorPosMap, id);
+    		if (oldPos == null)
+    			return false;
+//    		for (int i=0; i<2; i++) {
+//    			LocalPosition pp = outsideInteriorList.get(i);
+    			if (airlockInteriorPosMap.get(oldPos).equals(id)) {
+    				airlockInteriorPosMap.put(oldPos, -1);
+    				return true;
+    			}
+//    		}
+    	}
+
+	   	else if (zone == 1 || zone == 3) {
+				return true;
+	    	}
+
+    	else if (zone == 2) {
+    		LocalPosition oldPos = getOldPos(airlockInsidePosMap, id);
+    		if (oldPos == null)
+    			return false;
+			if (airlockInsidePosMap.get(oldPos).equals(id)) {
+				airlockInsidePosMap.put(oldPos, -1);
+				return true;
+			}
+//    		return true;
+    	}
+
+    	else if (zone == 4) {
+    		LocalPosition oldPos = getOldPos(airlockExteriorPosMap, id);
+    		if (oldPos == null)
+    			return false;
+//    		for (int i=0; i<2; i++) {
+//    			LocalPosition pp = outsideExteriorList.get(i);
+    			if (airlockExteriorPosMap.get(oldPos).equals(id)) {
+    				airlockExteriorPosMap.put(oldPos, -1);
+    				return true;
+    			}
+//    		}
+    	}
+    	return false;
+    }
+	
+	private <K, V> K getOldPos(Map<K, V> map, V value) {
+	    for (Entry<K, V> entry : map.entrySet()) {
+	        if (entry.getValue().equals(value)) {
+	            return entry.getKey();
+	        }
+	    }
+	    return null;
+	}
+	
+	/**
+     * Check if the person is in a particular zone
+     *
+     * @param p the person
+     * @param zone the zone of interest
+	 * @return a list of occupants inside the chamber
+     */
+	@Override
+	public boolean isInZone(Person p, int zone) {
+	   	if (zone == 0) {
+    		LocalPosition p0 = getOldPos(airlockInteriorPosMap, p.getIdentifier());
+    		if (p0 == null)
+    			return false;
+    		for(LocalPosition pt : airlockInteriorPosMap.keySet()) {
+    			if (p0.isClose(pt)) {
+    				return true;
+    			}
+    		}
+    	}
+
+    	else if (zone == 1 || zone == 3) {
+    		return false;
+    	}
+
+    	else if (zone == 2) {
+    		LocalPosition p0 = getOldPos(airlockInsidePosMap, p.getIdentifier());
+    		if (p0 == null)
+    			return false;
+    		for(LocalPosition pt : airlockInsidePosMap.keySet()) {
+    			if (p0.isClose(pt)) {
+    				return true;
+    			}
+    		}
+    	}
+
+    	else if (zone == 4) {
+    		LocalPosition p0 = getOldPos(airlockExteriorPosMap, p.getIdentifier());
+    		if (p0 == null)
+    			return false;
+    		for(LocalPosition pt : airlockExteriorPosMap.keySet()) {
+    			if (p0.isClose(pt)) {
+    				return true;
+    			}
+    		}
+    	}
+
+		return false;
+		
+//		Set<Integer> set = getZoneOccupants(zone);
+//		if (set.contains(p.getIdentifier())) {
+//			return true;
+//		}
+//
+//		return false;
+	}
+	
+	 /**
+     * Occupies a position in a zone.
+     * 
+     * @param zone
+     * @param p
+     * @param id
+     */
+    @Override
+    public boolean occupy(int zone, LocalPosition p, Integer id) {
+    	if (zone == 0) {
+    		// Do not allow the same person who has already occupied a position to take another position
+    		if (airlockInteriorPosMap.values().contains(id))
+    			return false;
+
+    		// If someone is at that position, do not allow to occupy it
+    		if (airlockInteriorPosMap.get(p) != -1)
+    			return false;
+    		
+    		airlockInteriorPosMap.put(p, id);
+    		return true;
+    	}
+    		
+    	else if (zone == 1 || zone == 3) {
+			return false;
+    	}
+    	
+    	else if (zone == 2) {
+    		// Do not allow the same person who has already occupied a position to take another position
+    		if (airlockInsidePosMap.values().contains(id))
+    			return false;
+
+    		// If someone is at that position, do not allow to occupy it
+    		if (airlockInsidePosMap.get(p) != -1)
+    			return false;
+    		
+    		airlockInsidePosMap.put(p, id);
+    		return true;
+    	}
+    	
+    	else if (zone == 4) {
+    		// Do not allow the same person who has already occupied a position to take another position
+    		if (airlockExteriorPosMap.values().contains(id))
+    			return false;
+
+    		// If someone is at that position, do not allow to occupy it
+    		if (airlockExteriorPosMap.get(p) != -1)
+    			return false;
+    		
+    		airlockExteriorPosMap.put(p, id);
+    		return true;
+    	}
+    	
+		return false;
+   	}
+    	
+	/**
+	 * Loads up and converts the native EVA activity spots
+	 */
+	@Override
+	public void loadEVAActivitySpots() {
+		// nothing
+	}
+	
+	/**
+	 * Activates the airlock.
+	 * 
+	 * @param value
+	 */
+	@Override
+	public void setActivated(boolean value) {
+		if (value) {
+			// Reset the cycle count down timer back to the default
+			remainingCycleTime = CYCLE_TIME;
+		}
+		activated = value;
+	}
+	
+	/**
+	 * Cycles the air and consumes the time
+	 * 
+	 * @param time
+	 */
+	@Override
+	protected void cycleAir(double time) {
+		// Ensure not to consume more than is needed
+		double consumed = Math.min(remainingCycleTime, time);
+
+		remainingCycleTime -= consumed;
+		// if the air cycling has been completed
+		if (remainingCycleTime <= 0D) {
+			// Reset remainingCycleTime back to max
+			remainingCycleTime = CYCLE_TIME;
+			// Go to the next steady state
+			goToNextSteadyState();			
+		}
+	}
+	
+	/**
+	 * Checks if the airlock is currently activated.
+	 *
+	 * @return true if activated.
+	 */
+	@Override
+	public boolean isActivated() {
+		return activated;
 	}
 
+	/**
+	 * Allows or disallows the airlock to be transitioning its state.
+	 *
+	 * @param value
+	 */
+	public void setTransitioning(boolean value) {
+		transitioning = value;
+	}
+
+	/**
+	 * Checks if the airlock is allowed to be transitioning its state.
+	 *
+	 * @param value
+	 */
+	public boolean isTransitioning() {
+		return transitioning;
+	}
+	
+	/**
+	 * Gets the remaining airlock cycle time.
+	 *
+	 * @return time (millisols)
+	 */
 	@Override
-	public Point2D getAvailableAirlockPosition() {
-//		if (airlockExteriorPos == null)
-//			airlockExteriorPos = LocalAreaUtil.getLocalRelativeLocation(airlockInsidePos.getX(),airlockInsidePos.getY(),vehicle);
-		return airlockInsidePos;
+	public double getRemainingCycleTime() {
+		return remainingCycleTime;
+	}
+	
+	/**
+	 * Time passing for airlock. Checks for unusual situations and deal with them.
+	 * Called from the unit owning the airlock.
+	 *
+	 * @param pulse
+	 */
+	@Override
+	public void timePassing(ClockPulse pulse) {
+		
+		if (activated) {
+
+			double time = pulse.getElapsed();
+			
+			if (transitioning) {
+				// Starts the air exchange and state transition
+				addTime(time);
+			}
+
+			if (pulse.isNewMSol()) {
+				// Check occupants
+				checkOccupantIDs();
+				// Check the airlock operator
+				checkOperator();
+			}
+		}
+		
+		if (isEmpty())
+			setAirlockMode(AirlockMode.NOT_IN_USE);
+	}
+	
+	/**
+	 * Adds this unit to the set or zone (for zone 0 and zone 4 only).
+	 *
+	 * @param set
+	 * @param id
+	 * @return true if the unit is already inside the set or if the unit can be added into the set
+	 */
+	@Override
+	protected boolean addToZone(Set<Integer> set, Integer id) {
+		if (set.contains(id)) {
+			// this unit is already in the zone
+			return true;
+		}
+		else {
+			// MAX_SLOTS - 1 because it needs to have one vacant spot
+			// for the flow of traffic
+			if (set.size() < MAX_SLOTS - 1) {
+				set.add(id);
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	public void destroy() {
-	    vehicle = null; 
-	    airlockInsidePos = null;
-	    airlockInteriorPos = null;
-	    airlockExteriorPos = null;
+	    vehicle = null;
+	    airlockInsidePosMap.clear();
+	    airlockInteriorPosMap.clear();
+	    airlockExteriorPosMap.clear();
+	    airlockInsidePosMap = null;
+	    airlockInteriorPosMap = null;
+	    airlockExteriorPosMap = null;
 	}
 }

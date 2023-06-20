@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * AmountResourceStorage.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-28
  * @author Scott Davis
  */
 
@@ -14,7 +14,9 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
+
+import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.logging.SimLogger;
 
 /**
  * Storage for amount resources.
@@ -24,24 +26,33 @@ public class AmountResourceStorage implements Serializable {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	private static Logger logger = Logger.getLogger(AmountResourceStorage.class.getName());
+	/* default logger. */
+	private static final SimLogger logger = SimLogger.getLogger(AmountResourceStorage.class.getName());
 
 	// Domain members
+	private Unit owner;
 	private AmountResourceTypeStorage typeStorage = null;
 	private AmountResourcePhaseStorage phaseStorage = null;
 
 	// Cache values
 	private transient Set<Integer> allStoredARCache = null;
-	// private transient Set<AmountResource> allStoredResourcesCache = null;
 	private transient boolean allStoredResourcesCacheDirty = true;
 	private transient double totalResourcesStored = 0D;
 	private transient boolean totalResourcesStoredDirty = true;
-	
-//	private static ResourceUtil resourceUtil = ResourceUtil.getInstance();
+
+	public AmountResourceStorage(Unit owner) {
+		this.owner = owner;
+	}
+
+	public boolean isEmpty() {
+		if (allStoredARCache == null)
+			return true;
+		return allStoredARCache.isEmpty();
+	}
 
 	/**
 	 * Adds capacity for a resource type.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @param capacity the extra capacity amount (kg).
 	 */
@@ -51,7 +62,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Adds capacity for a resource type.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @param capacity the extra capacity amount (kg).
 	 */
@@ -66,7 +77,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Removes capacity for a resource type.
-	 * 
+	 *
 	 * @param resource the resource
 	 * @param capacity capacity the capacity amount (kg).
 	 */
@@ -76,14 +87,15 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Removes capacity for a resource type.
-	 * 
+	 *
 	 * @param resource the resource
 	 * @param capacity capacity the capacity amount (kg).
 	 */
 	public void removeAmountResourceTypeCapacity(int resource, double capacity) {
 
 		if (typeStorage == null) {
-			typeStorage = new AmountResourceTypeStorage();
+			return;
+//			typeStorage = new AmountResourceTypeStorage();
 		}
 
 		typeStorage.removeTypeCapacity(resource, capacity);
@@ -91,7 +103,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Gets the amount resources and the type capacity for them.
-	 * 
+	 *
 	 * @return map of all amount resources that have type capacity.
 	 */
 	public Map<Integer, Double> getAmountResourceTypeCapacities() {
@@ -114,7 +126,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Adds capacity for a resource phase.
-	 * 
+	 *
 	 * @param phase    the phase
 	 * @param capacity the capacity amount (kg).
 	 * @throws ResourceException if error adding capacity.
@@ -130,7 +142,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Gets the phase capacities in storage.
-	 * 
+	 *
 	 * @return map of phases with capacities.
 	 */
 	public Map<PhaseType, Double> getAmountResourcePhaseCapacities() {
@@ -151,7 +163,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Checks if storage has capacity for a resource.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @return true if storage capacity.
 	 */
@@ -170,7 +182,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Checks if storage has capacity for a resource.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @return true if storage capacity.
 	 */
@@ -190,7 +202,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Gets the storage capacity for a resource.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @return capacity amount (kg).
 	 */
@@ -213,17 +225,14 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Gets the storage capacity for a resource.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @return capacity amount (kg).
 	 */
 	public double getAmountResourceCapacity(int resource) {
 		AmountResource ar = ResourceUtil.findAmountResource(resource);
-//		if (ar == null)
-//			System.out.println("resource : " + resource);
-//		if (resource == 281)
-//			System.out.println("resource : " + ar.getName());
-//		System.out.println("resource " + resource + " " + ar.getName());
+//		logger.info(40_000L, ar + " " +
+//				resource + " getAmountResourceCapacity");
 		PhaseType pt = ar.getPhase();
 		double result = 0D;
 
@@ -242,7 +251,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Gets the amount of a resource stored.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @return stored amount (kg).
 	 */
@@ -263,7 +272,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Gets the amount of a resource stored.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @return stored amount (kg).
 	 */
@@ -286,7 +295,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Gets all of the amount resources stored.
-	 * 
+	 *
 	 * @param allowDirty will allow dirty (possibly out of date) results.
 	 * @return set of amount resources.
 	 */
@@ -295,13 +304,13 @@ public class AmountResourceStorage implements Serializable {
 		for (int ar : getAllARStored(allowDirty)) {
 			set.add(ResourceUtil.findAmountResource(ar));
 		}
-		
+
 		return set;
 	}
 
 	/**
 	 * Gets all of the amount resources stored.
-	 * 
+	 *
 	 * @param allowDirty will allow dirty (possibly out of date) results.
 	 * @return set of amount resources.
 	 */
@@ -314,7 +323,7 @@ public class AmountResourceStorage implements Serializable {
 		if (allStoredResourcesCacheDirty && !allowDirty) {
 			updateAllAmountResourcesStored();
 		}
-		
+
 		Set<Integer> s = ConcurrentHashMap.newKeySet();
 		s.addAll(allStoredARCache);
 		return s;
@@ -346,7 +355,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Gets the total amount of resources stored.
-	 * 
+	 *
 	 * @param allowDirty will allow dirty (possibly out of date) results.
 	 * @return stored amount (kg).
 	 */
@@ -382,7 +391,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Gets the remaining capacity available for a resource.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @return remaining capacity amount (kg).
 	 */
@@ -399,7 +408,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Gets the remaining capacity available for a resource.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @return remaining capacity amount (kg).
 	 */
@@ -416,7 +425,7 @@ public class AmountResourceStorage implements Serializable {
 
 	/**
 	 * Store an amount of a resource.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @param amount   the amount (kg).
 	 * @throws ResourceException if error storing resource.
@@ -471,29 +480,27 @@ public class AmountResourceStorage implements Serializable {
 						allStoredResourcesCacheDirty = true;
 						totalResourcesStoredDirty = true;
 					} else {
-						logger.severe("Amount resource " + resource + " of amount: " + amount
-								+ " to store.  Amount remaining capacity: "
-								+ getAmountResourceRemainingCapacity(resource) + " remaining: " + remainingAmount);
+						logger.severe(owner, 30_000, amount + " kg " + resource
+							+ " could not be stored.  Remaining capacity: " + getAmountResourceRemainingCapacity(resource)
+							+ " remaining: " + remainingAmount);
 					}
 				}
 			}
 
 			if (!storable)
-				throw new IllegalStateException("Amount resource: " + resource + " of amount: " + amount
-						+ " could not be stored in inventory.");
+				logger.severe(owner, 30_000, amount + " kg " + resource
+					+ " could not be stored.  Remaining capacity: " + getAmountResourceRemainingCapacity(resource));
 		}
 	}
 
 	/**
 	 * Store an amount of a resource.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @param amount   the amount (kg).
 	 * @throws ResourceException if error storing resource.
 	 */
 	public void storeAmountResource(int resource, double amount) {
-		AmountResource ar = ResourceUtil.findAmountResource(resource);
-		PhaseType pt = ar.getPhase();
 
 		if (amount < 0D) {
 			throw new IllegalStateException("Cannot store negative amount of resource: " + amount);
@@ -522,13 +529,16 @@ public class AmountResourceStorage implements Serializable {
 						}
 					}
 
+					AmountResource ar = ResourceUtil.findAmountResource(resource);
+					PhaseType phase = ar.getPhase();
+
 					// Store resource in phase storage.
 					if ((phaseStorage != null) && (remainingAmount > 0D)) {
 
-						double remainingPhaseCapacity = phaseStorage.getAmountResourcePhaseRemainingCapacity(pt);
+						double remainingPhaseCapacity = phaseStorage.getAmountResourcePhaseRemainingCapacity(phase);
 						if (remainingPhaseCapacity >= remainingAmount) {
 
-							AmountResource resourceTypeStored = phaseStorage.getAmountResourcePhaseType(pt);
+							AmountResource resourceTypeStored = phaseStorage.getAmountResourcePhaseType(phase);
 							if ((resourceTypeStored == null) || ar.equals(resourceTypeStored)) {
 								phaseStorage.storeAmountResourcePhase(ar, remainingAmount);
 							}
@@ -540,23 +550,29 @@ public class AmountResourceStorage implements Serializable {
 						storable = true;
 						allStoredResourcesCacheDirty = true;
 						totalResourcesStoredDirty = true;
-					} else {
-						logger.severe("Amount resource " + ar + " of amount: " + amount
-								+ " to store.  Amount remaining capacity: " + getARRemainingCapacity(resource)
-								+ " remaining: " + remainingAmount);
+					}
+
+					else if (phaseStorage != null) {
+						double cap = Math.round(10_000.0 * phaseStorage.getAmountResourcePhaseCapacity(phase))/10_000.0;
+						double stored = Math.round(10_000.0 * phaseStorage.getTotalAmountResourcePhasesStored(true))/10_000.0;
+						logger.severe(owner, 30_000,
+							"Cannot store "
+							+ Math.round(10_000.0 * amount)/10_000.0 + " kg " + ResourceUtil.findAmountResource(resource)
+							+ ". Cap: " + cap
+							+ " Stored: " + stored);
 					}
 				}
 			}
 
 			if (!storable)
-				throw new IllegalStateException(
-						"Amount resource: " + ar + " of amount: " + amount + " could not be stored in inventory.");
+				logger.severe(owner, 30_000, Math.round(10_000.0 * amount)/10_000.0 + " kg " + ResourceUtil.findAmountResource(resource)
+					+ " could not be stored.  Remaining cap: " + getARRemainingCapacity(resource));
 		}
 	}
 
 	/**
 	 * Retrieves an amount of a resource from storage.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @param amount   the amount (kg).
 	 * @throws ResourceException if error retrieving resource.
@@ -604,23 +620,23 @@ public class AmountResourceStorage implements Serializable {
 			if (remainingAmount == 0D) {
 				retrievable = true;
 			} else {
-				logger.severe("Amount resource " + resource + " of amount: " + amount
-						+ " needed to retrieve.  Amount stored: " + amountStored + " remaining: " + remainingAmount);
+				logger.severe(owner, 30_000, amount + " kg " + resource
+						+ " could not be retrieved.  Amount stored: " + amountStored + " remaining: " + remainingAmount);
 			}
 		} else {
-			logger.severe("Amount resource " + resource + " of amount: " + amount
-					+ " needed to retrieve.  Amount stored: " + amountStored);
+			logger.severe(owner, 30_000, amount + " kg " + resource
+					+ " could not be retrieved.  Amount stored: " + amountStored);
 		}
 
 		if (!retrievable) {
-			throw new IllegalStateException("Amount resource: " + resource + " of amount: " + amount
+			logger.severe(owner, 30_000, amount + " kg " + resource
 					+ " could not be retrieved from inventory.");
 		}
 	}
 
 	/**
 	 * Retrieves an amount of a resource from storage.
-	 * 
+	 *
 	 * @param resource the resource.
 	 * @param amount   the amount (kg).
 	 * @throws ResourceException if error retrieving resource.
@@ -684,15 +700,6 @@ public class AmountResourceStorage implements Serializable {
 		}
 	}
 
-	public void restoreARs(AmountResource[] ars) {
-		if (typeStorage != null)
-			typeStorage.restoreARs(ars);
-	}
-
-	// public AmountResourceTypeStorage getAmountResourceTypeStorage() {
-	// return typeStorage;
-	// }
-
 	/**
 	 * Prepare object for garbage collection.
 	 */
@@ -703,15 +710,13 @@ public class AmountResourceStorage implements Serializable {
 		if (phaseStorage != null)
 			phaseStorage.destroy();
 		phaseStorage = null;
-		// if (allStoredResourcesCache != null) allStoredResourcesCache.clear();
-		// allStoredResourcesCache = null;
 
 		allStoredARCache = null;
 	}
 
 	/**
 	 * Implementing readObject method for serialization.
-	 * 
+	 *
 	 * @param in the input stream.
 	 * @throws IOException            if error reading from input stream.
 	 * @throws ClassNotFoundException if error creating class.

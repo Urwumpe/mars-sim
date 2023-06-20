@@ -1,7 +1,7 @@
 /** 
  * Mars Simulation Project
  * CalendarProgram.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-04-02
  * @author Manny Kung
  */
 
@@ -31,6 +31,7 @@ import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
+@SuppressWarnings("serial")
 public class CalendarProgram{
 	static JLabel lblMonth, lblYear;
 	static JButton btnPrev, btnNext;
@@ -172,7 +173,7 @@ public class CalendarProgram{
 
 		//Draw calendar
 		for (int i=1; i<=nod; i++){
-			int row = Integer.valueOf((i+som-2)/7);
+			int row = (i+som-2)/7;
 			int column  =  (i+som-2)%7;
 			mtblCalendar.setValueAt(i, row, column);
 		}
@@ -184,6 +185,7 @@ public class CalendarProgram{
 		
 	}
 
+	@SuppressWarnings("serial")
 	static class tblCalendarRenderer extends DefaultTableCellRenderer{
 		public Component getTableCellRendererComponent (JTable table, Object value, boolean selected, boolean focused, int row, int column){
 			super.getTableCellRendererComponent(table, value, selected, focused, row, column);

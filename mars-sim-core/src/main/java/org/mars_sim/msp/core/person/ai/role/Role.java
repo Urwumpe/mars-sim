@@ -1,38 +1,29 @@
 /**
  * Mars Simulation Project
  * Role.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.role;
 
 import java.io.Serializable;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.UnitEventType;
+import org.mars_sim.msp.core.data.History;
+import org.mars_sim.msp.core.data.History.HistoryItem;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.time.MarsClock;
 
 public class Role implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
-
-	/** default logger. */
-	private static Logger logger = Logger.getLogger(Role.class.getName());
-	private static String loggerName = logger.getName();
-	private static String sourceName = loggerName.substring(loggerName.lastIndexOf(".") + 1, loggerName.length());
 	
 	private Person person;
 
 	private RoleType roleType;
 
-	private Map<RoleType, MarsClock> roleHistory = new ConcurrentHashMap<>();
-
-	private static MarsClock marsClock = Simulation.instance().getMasterClock().getMarsClock();
+	private History<RoleType> roleHistory = new History<>();
 
 	// TODO: Use more methods of parallel operation in ConcurrentHashMap.
 	// see https://dzone.com/articles/concurrenthashmap-in-java8
@@ -41,8 +32,6 @@ public class Role implements Serializable {
 
 	public Role(Person person) {
 		this.person = person;
-		
-//		marsClock = Simulation.instance().getMasterClock().getMarsClock();
 	}
 
 	/**
@@ -69,7 +58,6 @@ public class Role implements Serializable {
 		}
 	}
 
-
 	/**
 	 * Changes the role type.
 	 *                                                                                                                                                                                                                
@@ -78,10 +66,14 @@ public class Role implements Serializable {
 	public void changeRoleType(RoleType newType) {
 		RoleType oldType = roleType;
 
+		if (newType == null) {
+			throw new IllegalArgumentException("New roletype cannot be null.");
+		}
+
 		if (newType != oldType) {
 			// Note : if this is a leadership role, only one person should occupy this position 
 			List<Person> predecessors = null;
-			if (RoleUtil.isLeadershipRole(newType)) {
+			if (newType.isChief() || newType.isCouncil()) {
 				// Find a list of predecessors who are occupying this role
 				predecessors = person.getAssociatedSettlement().getChainOfCommand().findPeopleWithRole(newType);
 				if (!predecessors.isEmpty()) {
@@ -90,29 +82,27 @@ public class Role implements Serializable {
 				}
 			}
 			
-			// Set the role type of this person to the new role type
-			roleType = newType;
-			
-			// Save the role in the settlement Registry
-			person.getAssociatedSettlement().getChainOfCommand().registerRole(newType);
-
 			// Turn in the old role
 			relinquishOldRoleType();
 
+			// Set the role type of this person to the new role type
+			roleType = newType;
+			roleHistory.add(roleType);
+			
+			// Save the role in the settlement Registry
+			person.getAssociatedSettlement().getChainOfCommand().registerRole(roleType);
+
 			// Records the role change and fire unit update
-			RoleUtil.recordNewRole(person, roleType);
-	
+			person.fireUnitUpdate(UnitEventType.ROLE_EVENT, roleType);
 		}
 	}
 
-	
 	/**
-	 * Adds the new role type in the role history map
-	 * 
-	 * @param roleType
+	 * How has this Perosns role assignment changed over time
+	 * @return
 	 */
-	public void addRoleHistory(RoleType roleType) {
-		roleHistory.put(roleType, marsClock);
+	public List<HistoryItem<RoleType>> getChanges() {
+		return roleHistory.getChanges();
 	}
 	
 	/**
@@ -124,16 +114,7 @@ public class Role implements Serializable {
 		// Find the best role
 		RoleType roleType = RoleUtil.findBestRole(person);	
 		// Finalize setting a person's new role
-		person.getRole().changeRoleType(roleType);
-	}
-	
-	/**
-	 * Reloads instances after loading from a saved sim
-	 * 
-	 * @param clock
-	 */
-	public static void initializeInstances(MarsClock clock) {
-		marsClock = clock;
+		changeRoleType(roleType);
 	}
 	
 	/**
@@ -142,12 +123,5 @@ public class Role implements Serializable {
 	@Override
 	public String toString() {
 		return roleType.getName();
-	}
-
-	public void destroy() {
-		person = null;
-		roleType = null;
-		roleHistory = null;
-		marsClock = null;
 	}
 }

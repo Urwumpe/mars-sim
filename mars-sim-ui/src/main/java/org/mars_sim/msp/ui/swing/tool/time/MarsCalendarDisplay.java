@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
- * GlobeDisplay.java
- * @version 3.1.2 2020-09-02
+ * MarsCalendarDisplay.java
+ * @date 2023-04-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.time;
@@ -12,13 +12,12 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 
+import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 
-import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.MarsTime;
+import org.mars_sim.msp.core.time.MarsTimeFormat;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-
-import com.alee.extended.WebComponent;
-import com.alee.managers.style.StyleId;
 
 
 /**
@@ -26,15 +25,8 @@ import com.alee.managers.style.StyleId;
  * {@link TimeWindow} class.
  */
 @SuppressWarnings("serial")
-public class MarsCalendarDisplay extends WebComponent {
+public class MarsCalendarDisplay extends JComponent {
 
-	// Data members
-	/** The Martian clock instance. */
-	private MarsClock marsTime;
-
-//	private MainDesktopPane desktop;
-
-//	private MainScene mainScene;
 	
 	/** The Sol of month cache. */
 	private int solOfMonthCache;
@@ -42,21 +34,19 @@ public class MarsCalendarDisplay extends WebComponent {
 	private int solHeight;
 	private int solsInMonth;
 	private int solCache;
-	
-//	private int themeCache = -1;
-	
-	private char[] weekLetters = { 'S', 'P', 'D', 'T', 'H', 'V', 'J' };
+
+	// Note: be sure to be in sync with https://github.com/mars-sim/mars-sim/wiki/Timekeeping
+	private char[] weekdayLetters = { 'H', 'N', 'L', 'T', 'V', 'M', 'J' };
 	
 	private FontMetrics solMetrics;
 	private FontMetrics weekMetrics;
 	
 	private Color baseColor = Color.white;
 	private Color headerColor = new Color(218, 165, 32); 
-//	private Color darkColor = new Color(112, 95, 76);
 	private Color lightColor = new Color(255, 222, 173);
 	private Color numberColor = new Color(139, 69, 19);
 
-	private Color numberHighlightColor = Color.orange.darker();//new Color(218, 165, 32);
+	private Color numberHighlightColor = Color.orange.darker();
 	
 	// Pick color at https://www.html.am/html-codes/color/color-scheme.cfm?rgbColor=112,128,144
 	// 99,  125, 150 // dull blue
@@ -83,17 +73,13 @@ public class MarsCalendarDisplay extends WebComponent {
 	 * @param marsTime Martian clock instance
 	 * @param desktop the main desktop
 	 */
-	public MarsCalendarDisplay(MarsClock marsTime, MainDesktopPane desktop) {
+	public MarsCalendarDisplay(MarsTime marsTime, MainDesktopPane desktop) {
 
-		// Initialize data members
-		this.marsTime = marsTime;
-//		this.desktop = desktop;
-//		mainScene = desktop.getMainScene();
-		
+	
 		// Set component size
 		setPreferredSize(new Dimension(140, 100));
-		setMaximumSize(getPreferredSize());
-		setMinimumSize(getPreferredSize());
+		setMaximumSize(new Dimension(140, 100));
+		setMinimumSize(new Dimension(140, 100));
 		
 		// Set up week letter font
 		weekMetrics = getFontMetrics(weekFont);
@@ -104,71 +90,24 @@ public class MarsCalendarDisplay extends WebComponent {
 		solHeight = solMetrics.getAscent();
 		
 		solOfMonthCache = marsTime.getSolOfMonth();
-		solsInMonth = MarsClock.getSolsInMonth(marsTime.getMonth(), marsTime.getOrbit());
+		solsInMonth = MarsTimeFormat.getSolsInMonth(marsTime.getMonth(), marsTime.getOrbit());
 	}
 
 	/**
-	 * Updates the calendar display
+	 * Updates the calendar display.
+	 * 
+	 * @param mc Current Mars time
 	 */
-	public void update() {
-
-//		if (mainScene != null) {
-//			int theme = 0;//MainScene.getTheme();
-//
-//			if (themeCache != theme) {
-//				themeCache = theme;
-//
-//				if (theme == 1) {
-//					// green theme
-//					baseColor = Color.orange;
-//					midColor = new Color(104, 114, 77); // 74, 140, 94
-//					darkColor = new Color(73, 97, 0);
-//				} else if (theme == 2) {
-//					// red theme
-//					baseColor = Color.red;
-//					midColor = new Color(255, 102, 102); // pink orange
-//					darkColor = new Color(51, 25, 0); // dark brown
-//				} else if (theme == 3) {
-//					// brownish theme
-//					baseColor = Color.orange;
-//					midColor = new Color(210, 117, 101); // orange pink
-//					darkColor = new Color(140, 94, 74); // greyish brown pink
-//				}
-//
-//				else if (theme == 4) {
-//					// grey theme
-//					baseColor = Color.gray;
-//					midColor = Color.lightGray;
-//					darkColor = Color.DARK_GRAY;
-//				} else if (theme == 5) {
-//					// purple theme
-//					baseColor = Color.magenta;
-//					midColor = new Color(112, 76, 103);
-//					darkColor = new Color(51, 0, 51);
-//				} else if (theme == 6 || theme == 0) {
-//					// blue theme
-//					baseColor = Color.white;//new Color(85, 152, 212);//Color.cyan;
-//					midColor = new Color(99, 125, 150);
-//					darkColor = new Color(101, 139, 210);
-//				} else if (theme == 7) {
-//					// pale olive theme
-//					baseColor = Color.orange;
-//					midColor = new Color(152, 149, 92);
-//					darkColor = new Color(138, 141, 74);
-//				}
-//
-//				SwingUtilities.invokeLater(() -> repaint());
-//			}
-////		}
+	public void update(MarsTime mc) {
 
 		// check for the passing of each day
-		int newSol = marsTime.getMissionSol();
+		int newSol = mc.getMissionSol();
 		if (solCache != newSol) {
 		
-			if (solOfMonthCache != marsTime.getSolOfMonth()) {
-				solOfMonthCache = marsTime.getSolOfMonth();
+			if (solOfMonthCache != mc.getSolOfMonth()) {
+				solOfMonthCache = mc.getSolOfMonth();
 				
-				solsInMonth = MarsClock.getSolsInMonth(marsTime.getMonth(), marsTime.getOrbit());
+				solsInMonth = MarsTimeFormat.getSolsInMonth(mc.getMonth(), mc.getOrbit());
 				
 				SwingUtilities.invokeLater(() -> repaint());
 			}
@@ -217,8 +156,8 @@ public class MarsCalendarDisplay extends WebComponent {
 		// Draw week letters
 		g.setFont(weekFont);
 		for (int x = 0; x < 7; x++) {
-			int letterWidth = weekMetrics.charWidth(weekLetters[x]);
-			g.drawString("" + weekLetters[x], (20 * x) + 11 - (letterWidth / 2), weekHeight + 1);
+			int letterWidth = weekMetrics.charWidth(weekdayLetters[x]);
+			g.drawString("" + weekdayLetters[x], (20 * x) + 11 - (letterWidth / 2), weekHeight + 1);
 		}
 
 		// Draw sol letters
@@ -244,20 +183,7 @@ public class MarsCalendarDisplay extends WebComponent {
 	}
 
 	@Override
-	public StyleId getDefaultStyleId() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public void updateUI() {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
 	public String getUIClassID() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 }

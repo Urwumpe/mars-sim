@@ -1,86 +1,34 @@
-/**
+/*
  * Mars Simulation Project
  * Physicist.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-27
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.job;
-
-import java.io.Serializable;
-import java.util.Iterator;
-import java.util.List;
 
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.RoverMission;
-import org.mars_sim.msp.core.person.ai.task.AssistScientificStudyResearcher;
-import org.mars_sim.msp.core.person.ai.task.CompileScientificStudyResults;
-import org.mars_sim.msp.core.person.ai.task.ConsolidateContainers;
-import org.mars_sim.msp.core.person.ai.task.InviteStudyCollaborator;
-import org.mars_sim.msp.core.person.ai.task.ManufactureGood;
-import org.mars_sim.msp.core.person.ai.task.PeerReviewStudyPaper;
-import org.mars_sim.msp.core.person.ai.task.PerformLaboratoryExperiment;
-import org.mars_sim.msp.core.person.ai.task.PerformLaboratoryResearch;
-import org.mars_sim.msp.core.person.ai.task.ProposeScientificStudy;
-import org.mars_sim.msp.core.person.ai.task.RespondToStudyInvitation;
+import org.mars_sim.msp.core.person.ai.job.util.Job;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.science.ScienceType;
-import org.mars_sim.msp.core.structure.Lab;
 import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.structure.building.function.FunctionType;
-import org.mars_sim.msp.core.structure.building.function.Research;
-import org.mars_sim.msp.core.vehicle.Rover;
 
 /**
  * The Physicist class represents a job for a physicist.
  */
-public class Physicist
-extends Job
-implements Serializable {
-
-	/** default serial id. */
-	private static final long serialVersionUID = 1L;
-
-	//	private static Logger logger = Logger.getLogger(Physicist.class.getName());
-
-	private final int JOB_ID = 11;
-	
-	private double[] roleProspects = new double[] {5.0, 15.0, 10.0, 10.0, 15.0, 15.0, 30.0};
+public class Physicist extends Job {
 	
 	/** Constructor. */
 	public Physicist() {
 		// Use Job constructor
-		super(Physicist.class);
-
-		// Add physicist-related tasks.
-		jobTasks.add(ManufactureGood.class);
-
-		jobTasks.add(AssistScientificStudyResearcher.class);
-		jobTasks.add(CompileScientificStudyResults.class);
-		jobTasks.add(InviteStudyCollaborator.class);
-		jobTasks.add(PeerReviewStudyPaper.class);
-		jobTasks.add(PerformLaboratoryExperiment.class);
-		jobTasks.add(PerformLaboratoryResearch.class);
-		jobTasks.add(ProposeScientificStudy.class);
-		jobTasks.add(RespondToStudyInvitation.class);
-
-		// Add side tasks
-		jobTasks.add(ConsolidateContainers.class);
-
-		// Add physicist-related missions.
-//		jobMissionJoins.add(BuildingConstructionMission.class);
-//		jobMissionJoins.add(BuildingSalvageMission.class);
+		super(JobType.PHYSICIST, Job.buildRoleMap(5.0, 25.0, 15.0, 10.0, 10.0, 15.0, 15.0, 30.0));
 	}
 
 	@Override
 	public double getCapability(Person person) {
-		double result = 0D;
-
-		int physicsSkill = person.getSkillManager().getSkillLevel(SkillType.PHYSICS);
-		result = physicsSkill;
+		double result = person.getSkillManager().getSkillLevel(SkillType.PHYSICS);
 
 		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
 		int academicAptitude = attributes.getAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
@@ -99,48 +47,13 @@ implements Serializable {
 		int population = settlement.getNumCitizens();
 		
 		// Add (labspace * tech level / 2D) for all labs with physics specialties.
-		List<Building> laboratoryBuildings = settlement.getBuildingManager().getBuildings(FunctionType.RESEARCH);
-		Iterator<Building> i = laboratoryBuildings.iterator();
-		while (i.hasNext()) {
-			Building building = i.next();
-			Research lab = building.getResearch();
-			if (lab.hasSpecialty(ScienceType.PHYSICS)) {
-				result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 12D);
-			}
-		}
+		result += getBuildingScienceDemand(settlement, ScienceType.PHYSICS, 12D);
 
-		Iterator<Mission> k = missionManager.getMissionsForSettlement(settlement).iterator();
-		while (k.hasNext()) {
-			Mission mission = k.next();
-			if (mission instanceof RoverMission) {
-				Rover rover = ((RoverMission) mission).getRover();
-				if ((rover != null) && !settlement.getParkedVehicles().contains(rover)) {
-					if (rover.hasLab()) {
-						Lab lab = rover.getLab();
-						if (lab.hasSpecialty(ScienceType.PHYSICS)) {
-							result += (lab.getLaboratorySize() * lab.getTechnologyLevel() / 12D);
-						}
-					}
-				}
-			}
-		}
+		result += getMissionScienceDemand(settlement, ScienceType.PHYSICS, 12D);
+
 		
 		result = (result + population / 16D) / 2.0;
-		
-//		System.out.println(settlement + " Physicist need: " + result);
-		
+				
 		return result;
-	}
-
-	public double[] getRoleProspects() {
-		return roleProspects;
-	}
-	
-	public void setRoleProspects(int index, int weight) {
-		roleProspects[index] = weight;
-	}
-	
-	public int getJobID() {
-		return JOB_ID;
 	}
 }

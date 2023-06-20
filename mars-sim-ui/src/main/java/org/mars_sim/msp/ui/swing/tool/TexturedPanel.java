@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * TexturedPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -31,6 +31,7 @@ import javax.swing.JPanel;
  * 
  * @author Christopher Bach
  */
+@SuppressWarnings("serial")
 public class TexturedPanel extends JPanel {
 
   private TexturePaint ourPainter = null;

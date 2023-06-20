@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * SalvageTabPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-09
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window;
@@ -29,6 +29,7 @@ import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.manufacture.Salvagable;
 import org.mars_sim.msp.core.manufacture.SalvageInfo;
 import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
@@ -39,9 +40,7 @@ import org.mars_sim.msp.ui.swing.NumberCellRenderer;
 @SuppressWarnings("serial")
 public class SalvageTabPanel extends TabPanel {
 
-    // Data members
-	/** Is UI constructed. */
-	private boolean uiDone = false;
+	private static final String WARN_ICON = "warn";
 	
     private String finishTimeString;
     private JLabel finishTimeLabel;
@@ -54,24 +53,19 @@ public class SalvageTabPanel extends TabPanel {
      */
     public SalvageTabPanel(Unit unit, MainDesktopPane desktop) { 
         // Use the TabPanel constructor
-        super("Salvage", null, "Salvage Info", unit, desktop);
+        super(null, ImageLoader.getIconByName(WARN_ICON), "Salvage Info", unit, desktop);
+	}
 
-		this.unit = unit;
-	}
-	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
-		
+    @Override
+    protected void buildUI(JPanel content) {
+    	
+		Unit unit = getUnit();
         Salvagable salvageItem = (Salvagable) unit;
         SalvageInfo salvageInfo = salvageItem.getSalvageInfo();
-        
+
         // Create the salvage header panel.
         JPanel salvageHeaderPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 10));
-        topContentPanel.add(salvageHeaderPanel);
+        content.add(salvageHeaderPanel);
         
         // Create the salvage header label.
         JLabel salvageHeaderLabel = new JLabel(unit.getName() + " has been salvaged.", JLabel.CENTER);
@@ -79,7 +73,7 @@ public class SalvageTabPanel extends TabPanel {
         
         // Create the salvage info panel.
         JPanel salvageInfoPanel = new JPanel(new BorderLayout(0, 0));
-        topContentPanel.add(salvageInfoPanel);
+        content.add(salvageInfoPanel);
         
         // Create the time panel.
         JPanel timePanel = new JPanel(new GridLayout(2, 1, 0, 0));
@@ -110,7 +104,7 @@ public class SalvageTabPanel extends TabPanel {
         settlementButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent event) {
                 SalvageInfo info = ((Salvagable) getUnit()).getSalvageInfo();
-                getDesktop().openUnitWindow(info.getSettlement(), false);
+                getDesktop().showDetails(info.getSettlement());
             }
         });
         settlementPanel.add(settlementButton);
@@ -118,7 +112,7 @@ public class SalvageTabPanel extends TabPanel {
         // Create the parts panel.
         JPanel partsPanel = new JPanel(new BorderLayout(0, 10));
         partsPanel.setBorder(new MarsPanelBorder());
-        topContentPanel.add(partsPanel);
+        content.add(partsPanel);
         
         // Create the parts label.
         JLabel partsLabel = new JLabel("Salvaged Parts", JLabel.CENTER);
@@ -142,7 +136,7 @@ public class SalvageTabPanel extends TabPanel {
     @Override
     public void update() {
         // Update finish time.
-        SalvageInfo salvageInfo = ((Salvagable) unit).getSalvageInfo();
+        SalvageInfo salvageInfo = ((Salvagable) getUnit()).getSalvageInfo();
         MarsClock finishTime = salvageInfo.getFinishTime();
         String newFinishTimeString = "";
         if (finishTime != null) newFinishTimeString = finishTime.getDateTimeStamp();

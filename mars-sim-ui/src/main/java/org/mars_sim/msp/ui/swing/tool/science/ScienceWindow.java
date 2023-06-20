@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ScienceWindow.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.science;
@@ -9,14 +9,16 @@ package org.mars_sim.msp.ui.swing.tool.science;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.util.List;
+
+import javax.swing.JPanel;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.science.ScientificStudy;
+import org.mars_sim.msp.core.science.ScientificStudyManager;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.toolWindow.ToolWindow;
-
-import com.alee.laf.panel.WebPanel;
+import org.mars_sim.msp.ui.swing.toolwindow.ToolWindow;
 
 /**
  * Window for the science tool.
@@ -29,10 +31,11 @@ extends ToolWindow {
 
 	/** Tool name. */
 	public static final String NAME = Msg.getString("ScienceWindow.title"); //$NON-NLS-1$
+	public static final String ICON = "science";
 
 	// Data members
-	private OngoingStudyListPanel ongoingStudyListPane;
-	private FinishedStudyListPanel finishedStudyListPane;
+	private AbstractStudyListPanel ongoingStudyListPane;
+	private AbstractStudyListPanel finishedStudyListPane;
 	private StudyDetailPanel studyDetailPane;
 	private ScientificStudy selectedStudy;
 
@@ -40,6 +43,7 @@ extends ToolWindow {
 	 * Constructor
 	 * @param desktop the main desktop panel.
 	 */
+	@SuppressWarnings("serial")
 	public ScienceWindow(MainDesktopPane desktop) {
 
 		// Use ToolWindow constructor
@@ -48,28 +52,37 @@ extends ToolWindow {
 		selectedStudy = null;
 
 		// Create content panel.
-		WebPanel mainPane = new WebPanel(new BorderLayout());
+		JPanel mainPane = new JPanel(new BorderLayout());
 		mainPane.setBorder(MainDesktopPane.newEmptyBorder());
 		setContentPane(mainPane);
 
 		// Create lists panel.
-		WebPanel listsPane = new WebPanel(new GridLayout(2, 1));
+		JPanel listsPane = new JPanel(new GridLayout(2, 1, 0, 0));
 		mainPane.add(listsPane, BorderLayout.WEST);
 
+		ScientificStudyManager mgr = desktop.getSimulation().getScientificStudyManager();
+		
 		// Create ongoing study list panel.
-		ongoingStudyListPane = new OngoingStudyListPanel(this);
+		ongoingStudyListPane = new AbstractStudyListPanel(this, "OngoingStudyListPanel") {		
+			@Override
+			protected List<ScientificStudy> getStudies() {
+				return mgr.getOngoingStudies();
+			}
+		};
 		listsPane.add(ongoingStudyListPane);
 
 		// Create finished study list panel.
-		finishedStudyListPane = new FinishedStudyListPanel(this);
+		finishedStudyListPane = new AbstractStudyListPanel(this, "FinishedStudyListPanel") {		
+			@Override
+			protected List<ScientificStudy> getStudies() {
+				return mgr.getCompletedStudies();
+			}
+		};
 		listsPane.add(finishedStudyListPane);
 
 		// Create study detail panel.
 		studyDetailPane = new StudyDetailPanel(this);
 		mainPane.add(studyDetailPane, BorderLayout.CENTER);
-
-		//if (desktop.getMainScene() != null)
-			//setClosable(false);
 
 		setMinimumSize(new Dimension(480, 480));
 		setMaximizable(true);
@@ -86,9 +99,10 @@ extends ToolWindow {
 	 */
 	public void setScientificStudy(ScientificStudy study) {
 		selectedStudy = study;
-		studyDetailPane.displayScientificStudy(study);
-		ongoingStudyListPane.selectScientificStudy(study, true);
-		finishedStudyListPane.selectScientificStudy(study, true);
+		if (studyDetailPane.displayScientificStudy(study)) {
+			ongoingStudyListPane.selectScientificStudy(study, true);
+			finishedStudyListPane.selectScientificStudy(study, true);
+		}
 	}
 
 	/**
@@ -101,20 +115,13 @@ extends ToolWindow {
 
 	/**
 	 * Update the window.
+	 * @param pulse Unused clock pulse; window is time independent
 	 */
 	@Override
-	public void update() {
+	public void update(ClockPulse pulse) {
 		// Update all of the panels.
 		ongoingStudyListPane.update();
 		finishedStudyListPane.update();
 		studyDetailPane.update();
-	}
-
-	/**
-	 * Opens an info window for researcher.
-	 * @param researcher the researcher.
-	 */
-	void openResearcherWindow(Person researcher) {
-		desktop.openUnitWindow(researcher, false);
 	}
 }

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * EllipseLayer.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-08-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.map;
@@ -62,10 +62,11 @@ public class EllipseLayer implements MapLayer {
 	 * Displays the layer on the map image.
 	 * 
 	 * @param mapCenter the location of the center of the map.
-	 * @param mapType   the type of map.
+	 * @param baseMap   the type of map.
 	 * @param g         graphics context of the map display.
 	 */
-	public void displayLayer(Coordinates mapCenter, String mapType, Graphics g) {
+	@Override
+	public void displayLayer(Coordinates mapCenter, Map baseMap, Graphics g) {
 		Graphics2D g2d = (Graphics2D) g;
 		// Display ellipse if flag is true.
 		if (displayEllipse) {

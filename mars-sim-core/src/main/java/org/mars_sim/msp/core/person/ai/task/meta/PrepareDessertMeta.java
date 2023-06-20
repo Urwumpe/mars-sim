@@ -1,51 +1,48 @@
-/**
+/*
  * Mars Simulation Project
  * PrepareDessertMeta.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-22
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
 
-//import java.util.logging.Logger;
-import java.io.Serializable;
-
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.person.FavoriteType;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.job.Job;
+import org.mars_sim.msp.core.person.ai.fav.FavoriteType;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.task.CookMeal;
 import org.mars_sim.msp.core.person.ai.task.PrepareDessert;
-import org.mars_sim.msp.core.person.ai.task.utils.MetaTask;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
+import org.mars_sim.msp.core.person.ai.task.util.FactoryMetaTask;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskProbabilityUtil;
+import org.mars_sim.msp.core.person.ai.task.util.TaskTrait;
 import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.ai.job.Chefbot;
+import org.mars_sim.msp.core.robot.RobotType;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.cooking.PreparingDessert;
-import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
- * Meta task for the PrepareSoymilk task.
+ * Meta task for preparing dessert task.
  */
-public class PrepareDessertMeta implements MetaTask, Serializable {
-
-    /** default serial id. */
-    private static final long serialVersionUID = 1L;
-
+public class PrepareDessertMeta extends FactoryMetaTask {
+	
     /** Task name */
     private static final String NAME = Msg.getString(
             "Task.description.prepareDessertMeta"); //$NON-NLS-1$
 
-    /** default logger. */
-    //private static Logger logger = Logger.getLogger(PrepareDessertMeta.class.getName());
-
+    private static final double VALUE = 1;
+    private static final int MOD = 10;
+    private static final int CAP = 2_000;
+    
     public PrepareDessertMeta() {
-    }
+		super(NAME, WorkerType.BOTH, TaskScope.ANY_HOUR);
+		
+		setFavorite(FavoriteType.COOKING);
+		setTrait(TaskTrait.ARTISTIC);
+		setPreferredJob(JobType.CHEF);
 
-    @Override
-    public String getName() {
-        return NAME;
-    }
+        addPreferredRobot(RobotType.CHEFBOT);
+	}
 
     @Override
     public Task constructInstance(Person person) {
@@ -64,16 +61,11 @@ public class PrepareDessertMeta implements MetaTask, Serializable {
 
         double result = 0D;
         
-        if (person.isInside() && CookMeal.isLocalMealTime(person.getCoordinates(), 10)) {
+        if (person.isInSettlement()) {
             // Desserts should be prepared during meal times.
         	
             // Probability affected by the person's stress and fatigue.
-            PhysicalCondition condition = person.getPhysicalCondition();
-            double fatigue = condition.getFatigue();
-            double stress = condition.getStress();
-            double hunger = condition.getHunger();
-            
-            if (fatigue > 1000 || stress > 50 || hunger > 500)
+            if (!person.getPhysicalCondition().isFitByLevel(1000, 70, 1000))
             	return 0;
             
             // See if there is an available kitchen.
@@ -82,45 +74,32 @@ public class PrepareDessertMeta implements MetaTask, Serializable {
             if (kitchenBuilding != null) {
 
                 PreparingDessert kitchen = kitchenBuilding.getPreparingDessert();
-
                 // Check if there are enough ingredients to prepare a dessert.
-                int numGoodRecipes = kitchen.getAListOfDesserts().size();
-
+                int numGoodRecipes = kitchen.getListDessertsToMake().size();
                 // Check if enough desserts have been prepared at kitchen for this meal time.
                 boolean enoughMeals = kitchen.getMakeNoMoreDessert();
 
-                if ((numGoodRecipes > 0) && !enoughMeals) {
-
-                    result = 20D;
-
-                    // Crowding modifier.
-                    result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(person, kitchenBuilding);
-                    result *= TaskProbabilityUtil.getRelationshipModifier(person, kitchenBuilding);
-
-                    // Effort-driven task modifier.
-                    result *= person.getPerformanceRating();
-
-                    // Job modifier.
-                    Job job = person.getMind().getJob();
-                    if (job != null) {
-                        result *= job.getStartTaskProbabilityModifier(CookMeal.class);
-                    }
-
-                    // Modify if cooking is the person's favorite activity.
-                    if (person.getFavorite().getFavoriteActivity() == FavoriteType.COOKING) {
-                        result += RandomUtil.getRandomInt(1, 20);
-                    }
-
-                    // 2015-06-07 Added Preference modifier
-                    if (result > 0D) {
-                        result = result + result * person.getPreference().getPreferenceScore(this)/5D;
-                    }
-
-        	        if (result < 0) result = 0;
+                if (numGoodRecipes == 0 || enoughMeals) {
+             	   return 0;
                 }
+                
+                result = numGoodRecipes * VALUE;
+                // Crowding modifier.
+                result *= getBuildingModifier(kitchenBuilding, person);
+
+                // Effort-driven task modifier.
+                result *= person.getPerformanceRating();
+                
+        		// If it's meal time, decrease probability
+        		if (CookMeal.isMealTime(person, PrepareDessert.PREP_TIME)) {
+        			result /= MOD;
+        		}
             }
         }
-
+        
+        if (result > CAP)
+        	result = CAP;
+        
         return result;
     }
 
@@ -130,33 +109,38 @@ public class PrepareDessertMeta implements MetaTask, Serializable {
 
        double result = 0D;
 
-       if (CookMeal.isMealTime(robot, 10) && robot.getBotMind().getRobotJob() instanceof Chefbot) {
+       if (CookMeal.isMealTime(robot, PrepareDessert.PREP_TIME)) { 
            // See if there is an available kitchen.
            Building kitchenBuilding = PrepareDessert.getAvailableKitchen(robot);
 
            if (kitchenBuilding != null) {
 
                PreparingDessert kitchen = kitchenBuilding.getPreparingDessert();
-
                // Check if there are enough ingredients to prepare a dessert.
-               int numGoodRecipes = kitchen.getAListOfDesserts().size();
-
+               int numGoodRecipes = kitchen.getListDessertsToMake().size();
                // Check if enough desserts have been prepared at kitchen for this meal time.
                boolean enoughMeals = kitchen.getMakeNoMoreDessert();
 
-               if ((numGoodRecipes > 0) && !enoughMeals) {
-
-                   result = 50D;
-
-                   // Crowding modifier.
-                   result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(robot, kitchenBuilding);
-
-                   // Effort-driven task modifier.
-                   result *= robot.getPerformanceRating();
+               if (numGoodRecipes == 0 || enoughMeals) {
+            	   return 0;
+               }
+               
+               result = numGoodRecipes * VALUE;
+               // Crowding modifier.
+               result *= TaskProbabilityUtil.getCrowdingProbabilityModifier(robot, kitchenBuilding);
+               // Effort-driven task modifier.
+               result *= robot.getPerformanceRating();
+   
+               // If it's meal time, increase probability
+               if (CookMeal.isMealTime(robot, 0)) {
+            	   result *= MOD;
                }
            }
        }
 
+       if (result > CAP)
+       	result = CAP;
+       
        return result;
 	}
 }

@@ -1,3 +1,10 @@
+/**
+ * Mars Simulation Project
+ * RoleCommand.java
+ * @version 3.1.2 2020-12-30
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand.settlement;
 
 import java.util.Comparator;
@@ -6,6 +13,7 @@ import java.util.stream.Collectors;
 
 import org.mars.sim.console.chat.ChatCommand;
 import org.mars.sim.console.chat.Conversation;
+import org.mars.sim.console.chat.simcommand.CommandHelper;
 import org.mars.sim.console.chat.simcommand.StructuredResponse;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -21,7 +29,7 @@ public class RoleCommand extends AbstractSettlementCommand {
 	protected boolean execute(Conversation context, String input, Settlement settlement) {
 		StructuredResponse response = new StructuredResponse();
 		
-		response.appendTableHeading("Role", ROLE_WIDTH, "Name");
+		response.appendTableHeading("Role", CommandHelper.ROLE_WIDTH, "Name");
 		
 		List<Person> list = settlement.getAllAssociatedPeople().stream()
 				.sorted(Comparator.comparing(o -> o.getRole().getType().ordinal())).collect(Collectors.toList());

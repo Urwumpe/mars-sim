@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PausableThreadPoolExecutor.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.tool;
@@ -14,12 +14,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Logger;
 
 public class PausableThreadPoolExecutor extends ThreadPoolExecutor {
 
     /** initialized logger for this class. */
-    private static Logger logger = Logger.getLogger(PausableThreadPoolExecutor.class.getName());
+//    private static final Logger logger = Logger.getLogger(PausableThreadPoolExecutor.class.getName());
 
    private boolean isPaused;
    private ReentrantLock pauseLock = new ReentrantLock();

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ConstructionEvent.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-12-15
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.construction;
@@ -12,6 +12,8 @@ import java.util.EventObject;
  * A construction related event.
  */
 public class ConstructionEvent extends EventObject {
+    /** default serial id. */
+    private static final long serialVersionUID = 1L;
 
     // Data members
     private String type; // The event type.

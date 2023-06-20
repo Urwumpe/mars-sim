@@ -1,18 +1,16 @@
-/**
+/*
  * Mars Simulation Project
  * MembersPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-27
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
@@ -23,6 +21,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
@@ -31,27 +33,21 @@ import javax.swing.event.ListSelectionListener;
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionMember;
 import org.mars_sim.msp.core.person.ai.mission.MissionType;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
-
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
 
 /**
- * A wizard panel to select mission members.
+ * A wizard panel for selecting settlers.
  */
+@SuppressWarnings("serial")
 class MembersPanel
 extends WizardPanel
 implements ActionListener {
 
 	/** The wizard panel name. */
-	private final static String NAME = "Members";
+	private final static String NAME = "Settlers";
 
 	// Data members.
 	private PeopleTableModel peopleTableModel;
@@ -60,11 +56,11 @@ implements ActionListener {
 	private JTable peopleTable;
 	private JTable membersTable;
 	
-	private WebLabel roverCapacityLabel;
-	private WebLabel errorMessageLabel;
+	private JLabel vehicleCapacityLabel;
+	private JLabel errorMessageLabel;
 	
-	private WebButton addButton;
-	private WebButton removeButton;
+	private JButton addButton;
+	private JButton removeButton;
 	
 
 
@@ -83,32 +79,29 @@ implements ActionListener {
 		setBorder(new MarsPanelBorder());
 
 		// Create the select members label.
-		WebLabel selectMembersLabel = new WebLabel("Select members for the mission.", WebLabel.CENTER);
-		selectMembersLabel.setFont(selectMembersLabel.getFont().deriveFont(Font.BOLD));
-		selectMembersLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		JLabel selectMembersLabel = createTitleLabel("Select members for the mission.");
 		add(selectMembersLabel);
 
 		// Create the available people label.
-		WebLabel availablePeopleLabel = new WebLabel("Available People", WebLabel.CENTER);
+		JLabel availablePeopleLabel = new JLabel("Available People", JLabel.CENTER);
 		availablePeopleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(availablePeopleLabel);
 
 		// Create the people panel.
-		WebPanel peoplePane = new WebPanel(new BorderLayout(0, 0));
+		JPanel peoplePane = new JPanel(new BorderLayout(0, 0));
 		peoplePane.setPreferredSize(new Dimension(300, 150));
 		peoplePane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(peoplePane);
 
 		// Create scroll panel for available people list.
-		WebScrollPane peopleScrollPane = new WebScrollPane();
+		JScrollPane peopleScrollPane = new JScrollPane();
 		peoplePane.add(peopleScrollPane, BorderLayout.CENTER);
 
 		// Create the people table model.
 		peopleTableModel = new PeopleTableModel();
 
 		// Create the people table.
-		peopleTable = new ZebraJTable(peopleTableModel);	
-		TableStyle.setTableStyle(peopleTable);
+		peopleTable = new JTable(peopleTableModel);	
 		// Added sorting
 		peopleTable.setAutoCreateRowSorter(true);
 		peopleTable.setDefaultRenderer(Object.class, new UnitTableCellRenderer(peopleTableModel));
@@ -136,7 +129,7 @@ implements ActionListener {
 								}
 								else {
 									// Check if number of rows exceed rover remaining capacity.
-									if (selectedRows.length > getRemainingRoverCapacity()) {
+									if (selectedRows.length > getRemainingVehicleCapacity()) {
 										// Display over capacity message and disable add button.
 										errorMessageLabel.setText("Not enough rover capacity to hold selected people.");
 										addButton.setEnabled(false);
@@ -174,27 +167,25 @@ implements ActionListener {
 		peopleScrollPane.setViewportView(peopleTable);
 
 		// Create the message label.
-		errorMessageLabel = new WebLabel(" ", WebLabel.CENTER);
-		errorMessageLabel.setForeground(Color.RED);
-		errorMessageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		errorMessageLabel = createErrorLabel();
 		add(errorMessageLabel);
 
 		// Add vertical strut to make some UI space.
 		add(Box.createVerticalStrut(10));
 
 		// Create the button panel.
-		WebPanel buttonPane = new WebPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
+		JPanel buttonPane = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
 		buttonPane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(buttonPane);
 
 		// Create the add button.
-		addButton = new WebButton("Add Members");
+		addButton = new JButton("Add Members");
 		addButton.setEnabled(false);
 		addButton.addActionListener(this);
 		buttonPane.add(addButton);
 
 		// Create the remove button.
-		removeButton = new WebButton("Remove Members");
+		removeButton = new JButton("Remove Members");
 		removeButton.setEnabled(false);
 		removeButton.addActionListener(
 				new ActionListener() {
@@ -206,7 +197,7 @@ implements ActionListener {
 							people.add((Person) membersTableModel.getUnit(selectedRow));
 						peopleTableModel.addPeople(people);
 						membersTableModel.removePeople(people);
-						updateRoverCapacityLabel();
+						updateVehicleCapacityLabel();
 					}
 				});
 		buttonPane.add(removeButton);
@@ -215,34 +206,33 @@ implements ActionListener {
 		add(Box.createVerticalStrut(10));
 
 		// Create the rover capacity label.
-		roverCapacityLabel = new WebLabel("Remaining rover capacity: ");
-		roverCapacityLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-		add(roverCapacityLabel);
+		vehicleCapacityLabel = new JLabel("Remaining rover capacity: ");
+		vehicleCapacityLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		add(vehicleCapacityLabel);
 
 		// Add a vertical strut to make UI space.
 		add(Box.createVerticalStrut(10));
 
 		// Create the members label.
-		WebLabel membersLabel = new WebLabel("Mission Members");
+		JLabel membersLabel = new JLabel("Mission Members");
 		membersLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(membersLabel);
 
 		// Create the members panel.
-		WebPanel membersPane = new WebPanel(new BorderLayout(0, 0));
+		JPanel membersPane = new JPanel(new BorderLayout(0, 0));
 		membersPane.setPreferredSize(new Dimension(300, 150));
 		membersPane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(membersPane);
 
 		// Create scroll panel for members list.
-		WebScrollPane membersScrollPane = new WebScrollPane();
+		JScrollPane membersScrollPane = new JScrollPane();
 		membersPane.add(membersScrollPane, BorderLayout.CENTER);
 
 		// Create the members table model.
 		membersTableModel = new MembersTableModel();
 
 		// Create the members table.
-		membersTable = new ZebraJTable(membersTableModel);
-		TableStyle.setTableStyle(membersTable);
+		membersTable = new JTable(membersTableModel);
 		membersTable.setAutoCreateRowSorter(true);
 		membersTable.setRowSelectionAllowed(true);
 		membersTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
@@ -276,17 +266,11 @@ implements ActionListener {
 	 * @retun true if changes can be committed.
 	 */
 	boolean commitChanges() {
-		//Collection<Person> people = new ConcurrentLinkedQueue<Person>();
-		//for (int x = 0; x < membersTableModel.getRowCount(); x++) 
-		//	people.add((Person) membersTableModel.getUnit(x));
-		//getWizard().getMissionData().setMembers(people);
-		
-		Collection<MissionMember> members = new ConcurrentLinkedQueue<MissionMember>();
+		Collection<Worker> members = new ConcurrentLinkedQueue<Worker>();
 		for (int x = 0; x < membersTableModel.getRowCount(); x++) {
-			members.add((MissionMember) membersTableModel.getUnit(x));
+			members.add((Worker) membersTableModel.getUnit(x));
 		}
-		getWizard().getMissionData().setMixedMembers(members);		
-		
+		getWizard().getMissionData().addMixedMembers(members);			
 		return true;
 	}
 
@@ -305,37 +289,48 @@ implements ActionListener {
 	void updatePanel() {
 		peopleTableModel.updateTable();
 		membersTableModel.updateTable();
-		updateRoverCapacityLabel();
+		updateVehicleCapacityLabel();
 	}
 
 	/**
-	 * Updates the rover capacity label.
+	 * Updates the vehicle capacity label.
 	 */
-	void updateRoverCapacityLabel() {
+	void updateVehicleCapacityLabel() {
 		MissionType type = getWizard().getMissionData().getMissionType();
 		if (MissionType.BUILDING_CONSTRUCTION == type) {
-			roverCapacityLabel.setText(" ");
+			vehicleCapacityLabel.setText(" ");
 		}
 		else if (MissionType.BUILDING_SALVAGE == type) { 
-			roverCapacityLabel.setText(" ");
+			vehicleCapacityLabel.setText(" ");
 		}
 		else {
-			roverCapacityLabel.setText("Remaining rover capacity: " + getRemainingRoverCapacity());
+			
+			if (MissionType.DELIVERY == type) {
+				vehicleCapacityLabel.setText("Remaining drone capacity: " + getRemainingVehicleCapacity());
+			}
+			else {
+				vehicleCapacityLabel.setText("Remaining rover capacity: " + getRemainingVehicleCapacity());
+			}
 		}
 	}
 
 	/**
-	 * Gets the remaining rover capacity.
-	 * @return rover capacity.
+	 * Gets the remaining vehicle capacity.
+	 * @return vehicle capacity.
 	 */
-	int getRemainingRoverCapacity() {
+	int getRemainingVehicleCapacity() {
 		MissionType type = getWizard().getMissionData().getMissionType();
 		if (MissionType.BUILDING_CONSTRUCTION == type) return Integer.MAX_VALUE;
 		else if (MissionType.BUILDING_SALVAGE == type) return Integer.MAX_VALUE;
 		else {
-			int roverCapacity = getWizard().getMissionData().getRover().getCrewCapacity();
-			int memberNum = membersTableModel.getRowCount();
-			return roverCapacity - memberNum;
+			if (MissionType.DELIVERY == type) {
+				return 1;
+			}
+			else {
+				int roverCapacity = getWizard().getMissionData().getRover().getCrewCapacity();
+				int memberNum = membersTableModel.getRowCount();
+				return roverCapacity - memberNum;
+			}
 		}
 	}
 
@@ -377,7 +372,7 @@ implements ActionListener {
 					if (column == 0) 
 						result = person.getName();
 					else if (column == 1) 
-						result = person.getMind().getJob().getName(person.getGender());
+						result = person.getMind().getJob().getName();
 					else if (column == 2) {
 						Mission mission = person.getMind().getMission();
 						if (mission != null) result = mission.getName();
@@ -497,7 +492,7 @@ implements ActionListener {
 					if (column == 0) 
 						result = person.getName();
 					else if (column == 1) 
-						result = person.getMind().getJob().getName(person.getGender());
+						result = person.getMind().getJob().getName();
 					else if (column == 2) {
 						Mission mission = person.getMind().getMission();
 						if (mission != null) result = mission.getName();
@@ -578,7 +573,7 @@ implements ActionListener {
 		for (int selectedRow : selectedRows) people.add((Person) peopleTableModel.getUnit(selectedRow));
 		peopleTableModel.removePeople(people);
 		membersTableModel.addPeople(people);
-		updateRoverCapacityLabel();
+		updateVehicleCapacityLabel();
 	}
 	
 }

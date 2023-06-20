@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PhaseType.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 
@@ -40,17 +40,5 @@ public enum PhaseType {
 	@Override
 	public String toString() {
 		return name;
-	}
-	
-	public static PhaseType fromString(String name) {
-		if (name != null) {
-	    	for (PhaseType pt : PhaseType.values()) {
-	    		if (name.equalsIgnoreCase(pt.name)) {
-	    			return pt;
-	    		}
-	    	}
-		}
-		
-		return null;
 	}
 }

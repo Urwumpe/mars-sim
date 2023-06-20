@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * EmotionJSONConfig.java
- * @version 3.1.2 2020-09-02
+ * @date 2023-05-24
  * @author Manny Kung
  */
 
@@ -10,19 +10,25 @@ package org.mars_sim.msp.core.person.ai;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.util.logging.Level;
 
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
- 
+
+import org.mars_sim.msp.core.logging.SimLogger;
+
 public class EmotionJSONConfig implements Serializable {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
  
-    public static final String JSON_FILE="/json/emotions.json";
+	/** default logger. */
+	private static SimLogger logger = SimLogger.getLogger(EmotionJSONConfig.class.getName());
+
+    public static final String JSON_FILE = "/json/emotions.json";
     
-    private String[] emotional_state_names = {
+    private String[] emotionalStates = {
 		"joy",
 		"distress",
 		"happy",
@@ -53,65 +59,60 @@ public class EmotionJSONConfig implements Serializable {
     
     private Settler settler;
     
-    //public static void main(String[] args) {
-	//		new EmotionJSONConfig();
-    //}
+    public static void main(String[] args) {
+		new EmotionJSONConfig();
+    }
     
     public EmotionJSONConfig(){
-    	
-    	// read contents of a file into a single String
-    	//String content = new String(Files.readAllBytes(Paths.get("C:/file.txt")));
-        //System.out.println(content);
     	
         InputStream fis = null;
         JsonReader jsonReader = null;
         fis = this.getClass().getResourceAsStream(JSON_FILE);
         jsonReader = Json.createReader(fis);
-         
-        
+
 //      We can create JsonReader from Factory also
 //      JsonReaderFactory factory = Json.createReaderFactory(null);
 //      jsonReader = factory.createReader(fis);
          
         //get JsonObject from JsonReader
         JsonObject jsonObject = jsonReader.readObject();
-         
+
         //we can close IO resource and JsonReader now
         jsonReader.close();
         try {
 			fis.close();
 		} catch (IOException e1) {
-			e1.printStackTrace();
+          	logger.log(Level.SEVERE, "Cannot close json file :" + e1.getMessage());
 		}
          
-        //Retrieve data from JsonObject and create Employee bean
+        // Retrieve data from JsonObject and create Employee bean
         settler = new Settler();
          
         settler.setName(jsonObject.getString("name"));
      
-        //reading inner object from json object
+        // Read inner object from json object
         JsonObject innerJsonObject = jsonObject.getJsonObject("emotions");
         
         e = new Emotion();
-        
-        int size = emotional_state_names.length;
+        int size = innerJsonObject.size();
+        System.out.println("innerJsonObject size: " + size);
 
+        int size1 = emotionalStates.length;
+        System.out.println("emotionalStates size: " + size1);
+        
         try {
 	        for (int i = 0; i< size; i++) {
-	        	//String s = emotional_state_names[i];
-	        	//System.out.println(innerJsonObject.getJsonNumber(s).intValue());
-	        	e.setEmotions(innerJsonObject.getInt(emotional_state_names[i]), i);
+	        	e.setAnEmotionLevel(innerJsonObject.getInt(emotionalStates[i]), i);
 	        }
         } catch (Exception e1) {
-			e1.printStackTrace();
+          	logger.log(Level.SEVERE, "Cannot get json int objects: " + e1.getMessage());
 		}
         
         settler.setEmotion(e);
-        //System.out.println(settler);     
     }
  
 	public int [] getEmotionalStates() {
-		return e.emotional_states;
+		return e.states;
 	}
 	
     class Settler {
@@ -144,30 +145,31 @@ public class EmotionJSONConfig implements Serializable {
     
     class Emotion {
     
-    	int [] emotional_states = new int[22]; 
+    	int [] states = new int[22]; 
     	// range 1 to 10
 
     	Emotion() {}
-    	void setEmotions(int value, int i) {
-    		emotional_states[i] = value;
+    	
+    	void setAnEmotionLevel(int value, int i) {
+    		states[i] = value;
     	}
     	
     	public int [] getEmotionalStates() {
-    		return emotional_states;
+    		return states;
     	}
     	
     	public String toString() {
     		String result = "{ ";
     		
-    		for (int e : emotional_states) {
-    			result += e + " ";
+    		for (int ee : states) {
+    			result += ee + " ";
     		}
     		
     		return result +"}";
     	}
     	
     	public int[] toPrint() {
-    		return emotional_states;
+    		return states;
     	}
     }
     

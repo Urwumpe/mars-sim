@@ -1,6 +1,13 @@
+/*
+ * Mars Simulation Project
+ * StudyCommand.java
+ * @date 2022-08-24
+ * @author Barry Evans
+ */
+
 package org.mars.sim.console.chat.simcommand.person;
 
-import java.util.List;
+import java.util.Set;
 
 import org.mars.sim.console.chat.ChatCommand;
 import org.mars.sim.console.chat.Conversation;
@@ -8,7 +15,6 @@ import org.mars.sim.console.chat.simcommand.CommandHelper;
 import org.mars.sim.console.chat.simcommand.StructuredResponse;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.science.ScientificStudy;
-import org.mars_sim.msp.core.science.ScientificStudyManager;
 
 /** 
  * Displays any active Scientific Studies for this Person
@@ -28,15 +34,14 @@ public class StudyCommand extends AbstractPersonCommand {
 			response.appendHeading("Primary Study");
 			CommandHelper.outputStudy(response, pristudy);
 		}
-		ScientificStudyManager manager = context.getSim().getScientificStudyManager();
 		
-		List<ScientificStudy> studies = manager.getOngoingCollaborativeStudies(person);
+		Set<ScientificStudy> studies = person.getCollabStudies();
 		if (!studies.isEmpty()) {
-			response.blankLine();
+			response.appendBlankLine();
 			response.appendHeading("Collaborating Studies");
 			for (ScientificStudy study : studies) {
 				CommandHelper.outputStudy(response, study);
-				response.blankLine();
+				response.appendBlankLine();
 			}
 		}
 		context.println(response.getOutput());

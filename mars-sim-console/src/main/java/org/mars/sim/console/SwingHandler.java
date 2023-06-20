@@ -1,17 +1,8 @@
 /*
- * Copyright 2018 the original author or authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Mars Simulation Project
+ * SwingHandler.java
+ * @date 2021-10-02
+ * @author Manny Kung
  */
 package org.mars.sim.console;
 
@@ -23,7 +14,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.beryx.textio.InputReader;
@@ -32,19 +22,20 @@ import org.beryx.textio.ReadHandlerData;
 import org.beryx.textio.StringInputReader;
 import org.beryx.textio.TextIO;
 import org.beryx.textio.swing.SwingTextTerminal;
-import org.mars_sim.msp.core.LogConsolidated;
 
 public class SwingHandler {
-	
-	private static Logger logger = Logger.getLogger(SwingHandler.class.getName());
+
+	private static final Logger logger = Logger.getLogger(SwingHandler.class.getName());
 	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
 			logger.getName().length());
-	
+
+    private static final String BOOKMARK = "bookmark_";
+    
     private final SwingTextTerminal terminal;
     private final Object dataObject;
 
     private final String backKeyStroke;
-    
+
     private final Supplier<StringInputReader> stringInputReaderSupplier;
 
     private final List<Task<?,?,?>> tasks = new ArrayList<>();
@@ -82,7 +73,7 @@ public class SwingHandler {
 
         @Override
         public void run() {
-            
+
             R inputReader = inputReaderSupplier.get();
             if (showPrevious)
             	inputReader.withDefaultValue(defaultValueSupplier.get());
@@ -147,12 +138,12 @@ public class SwingHandler {
     public void execute() {
         int step = 0;
         while(step < tasks.size()) {
-            terminal.setBookmark("bookmark_" + step);
+            terminal.setBookmark(BOOKMARK + step);
             try {
                 tasks.get(step).run();
             } catch (ReadAbortedException e) {
                 if(step > 0) step--;
-                terminal.resetToBookmark("bookmark_" + step);
+                terminal.resetToBookmark(BOOKMARK + step);
                 continue;
             }
             step++;
@@ -163,24 +154,23 @@ public class SwingHandler {
     	// Remove the last task
     	if (tasks.size() > 1)
     		tasks.remove(0);
-        terminal.setBookmark("bookmark_" + 0);
+        terminal.setBookmark(BOOKMARK + 0);
         try {
             if (tasks.get(0) != null)
             	tasks.get(0).run();
         } catch (ReadAbortedException e) {
-            terminal.resetToBookmark("bookmark_" + 0);
+            terminal.resetToBookmark(BOOKMARK + 0);
         } catch (RuntimeException e) {
-			e.printStackTrace();
-			LogConsolidated.flog(Level.SEVERE, 0, sourceName, "RuntimeException detected.");
+			logger.severe(sourceName + ": RuntimeException detected: ");
         }
-        
+
     }
-    
+
     private Field getField(String fieldName) {
         try {
             return dataObject.getClass().getField(fieldName);
         } catch (NoSuchFieldException e) {
-            throw new IllegalArgumentException("Unknown field: " + fieldName);
+            throw new IllegalArgumentException("Unknown field: " + fieldName + ": " + e.getMessage());
         }
     }
 
@@ -189,7 +179,7 @@ public class SwingHandler {
         try {
             return (V) getField(fieldName).get(dataObject);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Cannot retrieve value of " + fieldName, e);
+            throw new IllegalArgumentException("Cannot retrieve value of " + fieldName + ": " + e.getMessage());
         }
     }
 
@@ -197,7 +187,7 @@ public class SwingHandler {
         try {
             getField(fieldName).set(dataObject, value);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Cannot set value of " + fieldName, e);
+            throw new IllegalArgumentException("Cannot set value of " + fieldName + ": " + e.getMessage());
         }
     }
 }

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * MeteorologyStudyFieldMissionCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -12,6 +12,11 @@ import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JProgressBar;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
@@ -25,14 +30,11 @@ import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.tool.science.ScienceWindow;
 
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.progressbar.WebProgressBar;
 
 /**
  * A panel for displaying meteorology study field mission information.
  */
+@SuppressWarnings("serial")
 public class MeteorologyStudyFieldMissionCustomInfoPanel extends MissionCustomInfoPanel
 		implements ScientificStudyListener {
 
@@ -40,9 +42,9 @@ public class MeteorologyStudyFieldMissionCustomInfoPanel extends MissionCustomIn
 	private MainDesktopPane desktop;
 	private ScientificStudy study;
 	private MeteorologyFieldStudy meteorologyMission;
-	private WebLabel studyNameLabel;
-	private WebLabel researcherNameLabel;
-	private WebProgressBar studyResearchBar;
+	private JLabel studyNameLabel;
+	private JLabel researcherNameLabel;
+	private JProgressBar studyResearchBar;
 
 	/**
 	 * Constructor.
@@ -60,15 +62,15 @@ public class MeteorologyStudyFieldMissionCustomInfoPanel extends MissionCustomIn
 		setLayout(new BorderLayout());
 
 		// Create content panel.
-		WebPanel contentPanel = new WebPanel(new GridLayout(3, 1));
+		JPanel contentPanel = new JPanel(new GridLayout(3, 1));
 		add(contentPanel, BorderLayout.NORTH);
 
 		// Create study panel.
-		WebPanel studyPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+		JPanel studyPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		contentPanel.add(studyPanel);
 
 		// Create science tool button.
-		WebButton scienceToolButton = new WebButton(ImageLoader.getIcon(Msg.getString("img.science"))); //$NON-NLS-1$
+		JButton scienceToolButton = new JButton(ImageLoader.getIconByName(ScienceWindow.ICON)); //$NON-NLS-1$
 		scienceToolButton.setMargin(new Insets(1, 1, 1, 1));
 		scienceToolButton
 				.setToolTipText(Msg.getString("MeteorologyStudyFieldMissionCustomInfoPanel.tooltip.openInScienceTool")); //$NON-NLS-1$
@@ -80,38 +82,38 @@ public class MeteorologyStudyFieldMissionCustomInfoPanel extends MissionCustomIn
 		studyPanel.add(scienceToolButton);
 
 		// Create study title label.
-		WebLabel studyTitleLabel = new WebLabel(
+		JLabel studyTitleLabel = new JLabel(
 				Msg.getString("MeteorologyStudyFieldMissionCustomInfoPanel.meteorologyFieldStudy")); //$NON-NLS-1$
 		studyPanel.add(studyTitleLabel);
 
 		// Create study name label.
-		studyNameLabel = new WebLabel(""); //$NON-NLS-1$
+		studyNameLabel = new JLabel(""); //$NON-NLS-1$
 		studyPanel.add(studyNameLabel);
 
 		// Create researcher panel.
-		WebPanel researcherPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+		JPanel researcherPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		contentPanel.add(researcherPanel);
 
 		// Create researcher title label.
-		WebLabel researcherTitleLabel = new WebLabel(
+		JLabel researcherTitleLabel = new JLabel(
 				Msg.getString("MeteorologyStudyFieldMissionCustomInfoPanel.leadResearcher")); //$NON-NLS-1$
 		researcherPanel.add(researcherTitleLabel);
 
 		// Create researcher name label.
-		researcherNameLabel = new WebLabel(""); //$NON-NLS-1$
+		researcherNameLabel = new JLabel(""); //$NON-NLS-1$
 		researcherPanel.add(researcherNameLabel);
 
 		// Create study research panel.
-		WebPanel studyResearchPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+		JPanel studyResearchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		contentPanel.add(studyResearchPanel);
 
 		// Create study research title label.
-		WebLabel studyResearchTitleLabel = new WebLabel(
+		JLabel studyResearchTitleLabel = new JLabel(
 				Msg.getString("MeteorologyStudyFieldMissionCustomInfoPanel.researchCompletion")); //$NON-NLS-1$
 		studyResearchPanel.add(studyResearchTitleLabel);
 
 		// Create study research progress bar.
-		studyResearchBar = new WebProgressBar(0, 100);
+		studyResearchBar = new JProgressBar(0, 100);
 		studyResearchBar.setStringPainted(true);
 		studyResearchPanel.add(studyResearchBar);
 	}
@@ -169,12 +171,9 @@ public class MeteorologyStudyFieldMissionCustomInfoPanel extends MissionCustomIn
 	 * @return true if primary researcher.
 	 */
 	private boolean isStudyPrimaryResearcher(Person researcher, ScientificStudy study) {
-		boolean result = false;
+		boolean result = researcher.equals(study.getPrimaryResearcher());
 
-		if (researcher.equals(study.getPrimaryResearcher()))
-			result = true;
-
-		return result;
+        return result;
 	}
 
 	/**
@@ -185,12 +184,9 @@ public class MeteorologyStudyFieldMissionCustomInfoPanel extends MissionCustomIn
 	 * @return true if collaborative researcher.
 	 */
 	private boolean isStudyCollaborativeResearcher(Person researcher, ScientificStudy study) {
-		boolean result = false;
+		boolean result = study.getCollaborativeResearchers().contains(researcher);
 
-		if (study.getCollaborativeResearchers().contains(researcher))
-			result = true;
-
-		return result;
+        return result;
 	}
 
 	/**
@@ -224,9 +220,8 @@ public class MeteorologyStudyFieldMissionCustomInfoPanel extends MissionCustomIn
 	 */
 	private void displayStudyInScienceTool() {
 		if (study != null) {
-			ScienceWindow scienceToolWindow = (ScienceWindow) desktop.getToolWindow(ScienceWindow.NAME);
+			ScienceWindow scienceToolWindow = (ScienceWindow) desktop.openToolWindow(ScienceWindow.NAME);
 			scienceToolWindow.setScientificStudy(study);
-			desktop.openToolWindow(ScienceWindow.NAME);
 		}
 	}
 }

@@ -1,24 +1,24 @@
-/**
+/*
  * Mars Simulation Project
  * TabPanelCredit.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-09
  * @author Scott Davis
  */
-
 package org.mars_sim.msp.ui.swing.unit_window.structure;
 
 import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.List;
 
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableColumnModel;
 
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Msg;
@@ -27,31 +27,30 @@ import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.UnitManagerEvent;
 import org.mars_sim.msp.core.UnitManagerListener;
+import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.goods.CreditEvent;
+import org.mars_sim.msp.core.goods.CreditListener;
+import org.mars_sim.msp.core.goods.CreditManager;
 import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.structure.goods.CreditEvent;
-import org.mars_sim.msp.core.structure.goods.CreditListener;
-import org.mars_sim.msp.core.structure.goods.CreditManager;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
-
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
+import org.mars_sim.msp.ui.swing.utils.UnitModel;
+import org.mars_sim.msp.ui.swing.utils.UnitTableLauncher;
 
 @SuppressWarnings("serial")
 public class TabPanelCredit
 extends TabPanel {
-
-	/** Is UI constructed. */
-	private boolean uiDone = false;
 	
+	private static final String CREDIT_ICON = "credit";
+
 	/** The Settlement instance. */
 	private Settlement settlement;
-	
+
 	private JTable creditTable;
+
+	private CreditTableModel creditTableModel;
 
 	/**
 	 * Constructor.
@@ -61,97 +60,70 @@ extends TabPanel {
 	public TabPanelCredit(Unit unit, MainDesktopPane desktop) {
 		// Use TabPanel constructor.
 		super(
-			Msg.getString("TabPanelCredit.title"), //$NON-NLS-1$
 			null,
-			Msg.getString("TabPanelCredit.tooltip"), //$NON-NLS-1$
+			ImageLoader.getIconByName(CREDIT_ICON),
+			Msg.getString("TabPanelCredit.title"), //$NON-NLS-1$
 			unit, desktop
 		);
 
 		settlement = (Settlement) unit;
 
 	}
-	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
-		
-		// Prepare credit label panel.
-		WebPanel creditLabelPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(creditLabelPanel);
 
-		// Prepare credit label.
-		WebLabel creditLabel = new WebLabel(Msg.getString("TabPanelCredit.label"), WebLabel.CENTER); //$NON-NLS-1$
-		creditLabel.setFont(new Font("Serif", Font.BOLD, 16));
-		//creditLabel.setForeground(new Color(102, 51, 0)); // dark brown
-		creditLabelPanel.add(creditLabel);
+	@Override
+	protected void buildUI(JPanel content) {
 
 		// Create scroll panel for the outer table panel.
-		WebScrollPane creditScrollPanel = new WebScrollPane();
+		JScrollPane creditScrollPanel = new JScrollPane();
 		creditScrollPanel.setPreferredSize(new Dimension(280, 280));
-		centerContentPanel.add(creditScrollPanel);
+		content.add(creditScrollPanel);
 
 		// Prepare credit table model.
-		CreditTableModel creditTableModel = new CreditTableModel((Settlement) unit);
+		creditTableModel = new CreditTableModel(settlement);
 
 		// Prepare credit table.
-		creditTable = new ZebraJTable(creditTableModel);
+		creditTable = new JTable(creditTableModel);
 		creditScrollPanel.setViewportView(creditTable);
 		creditTable.setRowSelectionAllowed(true);
-		
+		creditTable.addMouseListener(new UnitTableLauncher(getDesktop()));
+
 		creditTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2, true));
-		
-		creditTable.getColumnModel().getColumn(0).setPreferredWidth(100);
-		creditTable.getColumnModel().getColumn(1).setPreferredWidth(120);
-		creditTable.getColumnModel().getColumn(2).setPreferredWidth(50);
-		
-		// Added the two methods below to make all heatTable columns
+		TableColumnModel columnModel = creditTable.getColumnModel();
+		columnModel.getColumn(0).setPreferredWidth(100);
+		columnModel.getColumn(1).setPreferredWidth(120);
+		columnModel.getColumn(2).setPreferredWidth(50);
+
 		// Resizable automatically when its Panel resizes
 		creditTable.setPreferredScrollableViewportSize(new Dimension(225, -1));
-		//creditTable.setAutoResizeMode(WebTable.AUTO_RESIZE_ALL_COLUMNS);
-		// Added sorting
+
+		// Add sorting
 		creditTable.setAutoCreateRowSorter(true);
 
 		// Align the preference score to the center of the cell
 		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
 		renderer.setHorizontalAlignment(SwingConstants.RIGHT);
-		creditTable.getColumnModel().getColumn(0).setCellRenderer(renderer);
-//		creditTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
-		creditTable.getColumnModel().getColumn(2).setCellRenderer(renderer);
-		
-		TableStyle.setTableStyle(creditTable);
+		columnModel.getColumn(0).setCellRenderer(renderer);
+		columnModel.getColumn(2).setCellRenderer(renderer);
 
-	}
-
-	/**
-	 * Updates the info on this panel.
-	 */
-	@Override
-	public void update() {
-		if (!uiDone)
-			this.initializeUI();
-		
-		TableStyle.setTableStyle(creditTable);
+		DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+		centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+		columnModel.getColumn(1).setCellRenderer(centerRenderer);
 	}
 
 	/**
 	 * Internal class used as model for the credit table.
 	 */
 	private static class CreditTableModel extends AbstractTableModel implements CreditListener,
-	UnitManagerListener {
+						UnitManagerListener, UnitModel {
 
 		/** default serial id. */
 		private static final long serialVersionUID = 1L;
 
 		// Data members
-		private CreditManager creditManager = Simulation.instance().getCreditManager();
-
-		private Collection<Settlement> settlements;
+		private List<Settlement> settlements;
 		private Settlement thisSettlement;
 		private UnitManager unitManager = Simulation.instance().getUnitManager();
-		
+
 		/**
 		 * hidden constructor.
 		 * @param thisSettlement {@link Settlement}
@@ -160,16 +132,15 @@ extends TabPanel {
 			this.thisSettlement = thisSettlement;
 
 			// Get collection of all other settlements.
-			settlements = new ConcurrentLinkedQueue<Settlement>();
-			Iterator<Settlement> i = CollectionUtils.sortByName(unitManager.getSettlements()).iterator();
-			while (i.hasNext()) {
-				Settlement settlement = i.next();
-				if (settlement != thisSettlement) settlements.add(settlement);
+			settlements = new ArrayList<>();
+			for(Settlement settlement : unitManager.getSettlements()) {
+				if (settlement != thisSettlement) {
+					settlements.add(settlement);
+					settlement.getCreditManager().addListener(this);
+				}
 			}
 
-			creditManager.addListener(this);
-
-			unitManager.addUnitManagerListener(this);
+			unitManager.addUnitManagerListener(UnitType.SETTLEMENT, this);
 		}
 
 		@Override
@@ -194,7 +165,7 @@ extends TabPanel {
 		@Override
 		public String getColumnName(int columnIndex) {
 			if (columnIndex == 0) return Msg.getString("TabPanelCredit.column.settlement"); //$NON-NLS-1$
-			else if (columnIndex == 1) return Msg.getString("TabPanelCredit.column.valuePoints"); //$NON-NLS-1$
+			else if (columnIndex == 1) return Msg.getString("TabPanelCredit.column.credit"); //$NON-NLS-1$
 			else if (columnIndex == 2) return Msg.getString("TabPanelCredit.column.type"); //$NON-NLS-1$
 			else return null;
 		}
@@ -202,21 +173,20 @@ extends TabPanel {
 		@Override
 		public Object getValueAt(int row, int column) {
 			if (row < getRowCount()) {
-				Settlement settlement = (Settlement) settlements.toArray()[row];
+				Settlement settlement = settlements.get(row);
 				if (column == 0) return settlement.getName();
 				else {
 					double credit = 0D;
 					try {
-						credit = creditManager.getCredit(thisSettlement, settlement);
+						credit = CreditManager.getCredit(thisSettlement, settlement);
 					}
 					catch (Exception e) {
-						e.printStackTrace(System.err);
 					}
 
 					if (column == 1) return Math.round(credit*100.0)/100.0;
 					else if (column == 2) {
-						if (credit > 0D) return Msg.getString("TabPanelCredit.column.credit"); //$NON-NLS-1$
-						else if (credit < 0D) return Msg.getString("TabPanelCredit.column.debt"); //$NON-NLS-1$
+						if (credit > 0D) return Msg.getString("TabPanelCredit.credit"); //$NON-NLS-1$
+						else if (credit < 0D) return Msg.getString("TabPanelCredit.debt"); //$NON-NLS-1$
 						else return null;
 					}
 					else return null;
@@ -227,6 +197,7 @@ extends TabPanel {
 
 		/**
 		 * Catch credit update event.
+		 * 
 		 * @param event the credit event.
 		 */
 		@Override
@@ -240,6 +211,7 @@ extends TabPanel {
 						@Override
 						public void run() {
 							fireTableDataChanged();
+							// FUTURE : update only the affected row
 						}
 					}
 				);
@@ -249,7 +221,7 @@ extends TabPanel {
 		@Override
 		public void unitManagerUpdate(UnitManagerEvent event) {
 
-			if (event.getUnit() instanceof Settlement) {
+			if (event.getUnit().getUnitType() == UnitType.SETTLEMENT) {
 				settlements.clear();
 				Iterator<Settlement> i = CollectionUtils.sortByName(unitManager.
 						getSettlements()).iterator();
@@ -265,28 +237,30 @@ extends TabPanel {
 						@Override
 						public void run() {
 							fireTableDataChanged();
+							// FUTURE : update only the affected row
 						}
 					}
 				);
 			}
 		}
 
-//		/*
-//		 * Prepare for deletion.
-//		 *
-//		 */
-//		public void destroy() {
-//			manager.removeListener(this);
-//			settlements = null;
-//			thisSettlement = null;
-//		}
+		public void destroy() {
+			unitManager.removeUnitManagerListener(UnitType.SETTLEMENT, this);
+		}
 
+		@Override
+		public Unit getAssociatedUnit(int row) {
+			return settlements.get(row);
+		}
 	}
-	
+
 	/**
 	 * Prepare object for garbage collection.
 	 */
+	@Override
 	public void destroy() {
-		creditTable = null;
+		super.destroy();
+
+		creditTableModel.destroy();
 	}
 }

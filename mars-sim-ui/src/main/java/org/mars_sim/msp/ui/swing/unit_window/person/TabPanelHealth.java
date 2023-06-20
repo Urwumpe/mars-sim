@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * TabPanelHealth.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-21
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.person;
@@ -9,42 +9,41 @@ package org.mars_sim.msp.ui.swing.unit_window.person;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
+import java.awt.event.MouseEvent;
 import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import javax.swing.BoxLayout;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.SpringLayout;
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableColumnModel;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.person.CircadianClock;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.person.health.Medication;
 import org.mars_sim.msp.core.person.health.RadiationExposure;
+import org.mars_sim.msp.core.person.health.RadiationExposure.DoseHistory;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.StyleManager;
 import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
-
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.text.WebTextField;
-//import com.alee.managers.language.data.TooltipWay;
-import com.alee.managers.tooltip.TooltipManager;
-import com.alee.managers.tooltip.TooltipWay;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
 /**
  * The HealthTabPanel is a tab panel for a person's health.
@@ -53,492 +52,484 @@ import com.alee.managers.tooltip.TooltipWay;
 public class TabPanelHealth
 extends TabPanel {
 
+	private static final String HEALTH_ICON = "health"; //$NON-NLS-1$
+	
 	private static final String THIRTY_DAY = "30-Day";
 	private static final String ANNUAL = "Annual";
 	private static final String CAREER = "Career";
+	private static final DecimalFormat DECIMAL_MSOLS = new DecimalFormat("0 msols");
 
-	// Data cache
-	/** Is UI constructed. */
-	private boolean uiDone = false;
+
+	private int fatigueCache;
+	private int thirstCache;
+	private int hungerCache;
+	private int energyCache;
+	private int stressCache;
+	private int performanceCache;
+	private int leptinCache;
+	private int leptinTCache;
+	private int ghrelinCache;
+	private int ghrelinTCache;
 	
-	private static int theme;
-	private double fatigueCache;
-	private double thirstCache;
-	private double hungerCache;
-	private double energyCache;
-	private double stressCache;
-	private double performanceCache;
-
-	private WebLabel thirstLabel;
-	private WebLabel fatigueLabel;
-	private WebLabel hungerLabel;
-	private WebLabel energyLabel;
-	private WebLabel stressLabel;
-	private WebLabel performanceLabel;
+	private JLabel thirstLabel;
+	private JLabel fatigueLabel;
+	private JLabel hungerLabel;
+	private JLabel energyLabel;
+	private JLabel stressLabel;
+	private JLabel performanceLabel;
+	
+	private JLabel leptinLabel;
+	private JLabel ghrelinLabel;
+	private JLabel leptinTLabel;
+	private JLabel ghrelinTLabel;
 	
 	/** The sleep hour text field. */	
-	private WebTextField sleepTF;
+	private JTextField sleepTF;
 	
 	private MedicationTableModel medicationTableModel;
 	private HealthProblemTableModel healthProblemTableModel;
 	private RadiationTableModel radiationTableModel;
-	private SleepTableModel sleepTableModel;
+	private SleepExerciseTableModel sleepExerciseTableModel;
+	private FoodTableModel foodTableModel;
 	
 	private JTable radiationTable;
 	private JTable medicationTable;
 	private JTable healthProblemTable;
-	private JTable sleepTable;
-
-	private DecimalFormat formatter = new DecimalFormat(Msg.getString("TabPanelHealth.decimalFormat")); //$NON-NLS-1$
-
+	private JTable sleepExerciseTable;
+	private JTable foodTable;
+	
 	/** The Person instance. */
 	private Person person = null;
 	
 	/** The PhysicalCondition instance. */
 	private PhysicalCondition condition;
-
-	private Font font = new Font("SansSerif", Font.ITALIC, 12);
+	private CircadianClock circadianClock;
 	
-	protected String[] radiationToolTips = {
+	private static String[] RADIATION_TOOL_TIPS = {
 		    "Exposure Interval",
 		    "[Max for BFO]  30-Day :  250; Annual :  500; Career : 1000",
 		    "[Max for Eye]  30-Day : 1000; Annual : 2000; Career : 4000",
 		    "[Max for Skin] 30-Day : 1500; Annual : 3000; Career : 6000"};
 
+
 	/**
 	 * Constructor.
+	 * 
 	 * @param unit the unit to display.
 	 * @param desktop the main desktop.
 	 */
-	public TabPanelHealth(Unit unit, MainDesktopPane desktop) {
+	public TabPanelHealth(Person unit, MainDesktopPane desktop) {
 		// Use the TabPanel constructor
 		super(
-			Msg.getString("TabPanelHealth.title"), //$NON-NLS-1$
 			null,
-			Msg.getString("TabPanelHealth.tooltip"), //$NON-NLS-1$
-			unit, desktop
+			ImageLoader.getIconByName(HEALTH_ICON),
+			Msg.getString("TabPanelHealth.title"), //$NON-NLS-1$
+			desktop
 		);
 
-		person = (Person) unit;
-	}
-	
-	public boolean isUIDone() {
-		return uiDone;
-	}
-	
-	public void initializeUI() {
-		uiDone = true;
-		
+		person = unit;
 		condition = person.getPhysicalCondition();
-		//PhysicalCondition condition = ((Person) unit).getPhysicalCondition();
-		
-		// Create health label panel.
-		WebPanel healthLabelPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(healthLabelPanel, BorderLayout.NORTH);
+		circadianClock = person.getCircadianClock();
+	}
 
-		// Prepare health label
-		WebLabel healthLabel = new WebLabel(Msg.getString("TabPanelHealth.label"), WebLabel.CENTER); //$NON-NLS-1$
-		healthLabel.setFont(new Font("Serif", Font.BOLD, 14));
-		healthLabelPanel.add(healthLabel);
+	@Override
+	protected void buildUI(JPanel content) {
+				
+        JPanel northPanel = new JPanel();
+        northPanel.setLayout(new BoxLayout(northPanel, BoxLayout.Y_AXIS));
 
 		// Prepare condition panel
-		WebPanel conditionPanel = new WebPanel(new SpringLayout());//GridLayout(5, 2, 0, 0));
-//		conditionPanel.setBorder(new MarsPanelBorder());
-		//conditionPanel.setSize(180, 60);
-		topContentPanel.add(conditionPanel, BorderLayout.CENTER);
-
-		// Prepare fatigue name label
-		WebLabel fatigueNameLabel = new WebLabel(Msg.getString("TabPanelHealth.fatigue"), WebLabel.RIGHT); //$NON-NLS-1$
-		conditionPanel.add(fatigueNameLabel);
-
-		// Prepare fatigue label
-		fatigueCache = condition.getFatigue();
-		fatigueLabel = new WebLabel(Msg.getString("TabPanelHealth.millisols", //$NON-NLS-1$
-		        formatter.format(fatigueCache)), WebLabel.LEFT);
-		conditionPanel.add(fatigueLabel);
-
-		// Prepare hunger name label
-		WebLabel thirstNameLabel = new WebLabel(Msg.getString("TabPanelHealth.thirst"), WebLabel.RIGHT); //$NON-NLS-1$
-		conditionPanel.add(thirstNameLabel);
-
-		// Prepare hunger label
-		thirstCache = condition.getThirst();
-		thirstLabel = new WebLabel(Msg.getString("TabPanelHealth.millisols", //$NON-NLS-1$
-		        formatter.format(thirstCache)), WebLabel.LEFT);
-		conditionPanel.add(thirstLabel);
+		AttributePanel conditionPanel = new AttributePanel(5, 2);
+		northPanel.add(conditionPanel);
 		
-		// Prepare hunger name label
-		WebLabel hungerNameLabel = new WebLabel(Msg.getString("TabPanelHealth.hunger"), WebLabel.RIGHT); //$NON-NLS-1$
-		conditionPanel.add(hungerNameLabel);
-
-		// Prepare hunger label
-		hungerCache = condition.getHunger();
-		hungerLabel = new WebLabel(Msg.getString("TabPanelHealth.millisols", //$NON-NLS-1$
-		        formatter.format(hungerCache)), WebLabel.LEFT);
-		conditionPanel.add(hungerLabel);
-
-		//
-		// Prepare energy name label
-		WebLabel energyNameLabel = new WebLabel(Msg.getString("TabPanelHealth.energy"), WebLabel.RIGHT); //$NON-NLS-1$
-		conditionPanel.add(energyNameLabel);
-
-		// Prepare energy label
-		energyCache = condition.getEnergy();
-		energyLabel = new WebLabel(Msg.getString("TabPanelHealth.kJ", //$NON-NLS-1$
-		        formatter.format(energyCache)), WebLabel.LEFT);
-		conditionPanel.add(energyLabel);
-
-
-		// Prepare stress name label
-		WebLabel stressNameLabel = new WebLabel(Msg.getString("TabPanelHealth.stress"), WebLabel.RIGHT); //$NON-NLS-1$
-		conditionPanel.add(stressNameLabel);
-
-		// Prepare stress label
-		stressCache = condition.getStress();
-		stressLabel = new WebLabel(Msg.getString("TabPanelHealth.percentage", //$NON-NLS-1$
-		        formatter.format(stressCache)), WebLabel.LEFT);
-		conditionPanel.add(stressLabel);
-
-		// Prepare performance rating label
-		WebLabel performanceNameLabel = new WebLabel(Msg.getString("TabPanelHealth.performance"), WebLabel.RIGHT); //$NON-NLS-1$
-		conditionPanel.add(performanceNameLabel);
-
-		// Performance rating label
-		performanceCache = person.getPerformanceRating() * 100D;
-		performanceLabel = new WebLabel(Msg.getString("TabPanelHealth.percentage", //$NON-NLS-1$
-		        formatter.format(performanceCache)), WebLabel.LEFT);
-		conditionPanel.add(performanceLabel);
-
-		// Prepare SpringLayout
-		SpringUtilities.makeCompactGrid(conditionPanel,
-		                                3, 4, //rows, cols
-		                                10, 4,        //initX, initY
-		                                15, 3);       //xPad, yPad
+		fatigueCache = (int)condition.getFatigue();
+		fatigueLabel = conditionPanel.addTextField(Msg.getString("TabPanelHealth.fatigue"),
+										DECIMAL_MSOLS.format(fatigueCache), null);
+		thirstCache = (int)condition.getThirst();
+		thirstLabel = conditionPanel.addTextField(Msg.getString("TabPanelHealth.thirst"),
+										DECIMAL_MSOLS.format(thirstCache), null);
+		hungerCache = (int)condition.getHunger();
+		hungerLabel = conditionPanel.addTextField(Msg.getString("TabPanelHealth.hunger"),
+										DECIMAL_MSOLS.format(thirstCache), null);
+		energyCache = (int)condition.getEnergy();
+		energyLabel = conditionPanel.addTextField(Msg.getString("TabPanelHealth.energy"),
+										StyleManager.DECIMAL_PLACES0.format(energyCache) + " kj", null);
+		stressCache = (int)condition.getStress();	
+		stressLabel = conditionPanel.addTextField(Msg.getString("TabPanelHealth.stress"),
+										StyleManager.DECIMAL_PERC.format(stressCache), null);
+		performanceCache = (int)(person.getPerformanceRating() * 100);
+		performanceLabel = conditionPanel.addTextField(Msg.getString("TabPanelHealth.performance"),
+										StyleManager.DECIMAL_PERC.format(performanceCache), null);
+		leptinCache = (int)(circadianClock.getLeptin());
+		leptinLabel = conditionPanel.addTextField(Msg.getString("TabPanelHealth.leptin"),
+										DECIMAL_MSOLS.format(leptinCache), null);
+		ghrelinCache = (int)(circadianClock.getGhrelin());
+		ghrelinLabel = conditionPanel.addTextField(Msg.getString("TabPanelHealth.ghrelin"),
+										DECIMAL_MSOLS.format(ghrelinCache), null);		
+		leptinTCache = (int)(circadianClock.getLeptinT());
+		leptinTLabel = conditionPanel.addTextField(Msg.getString("TabPanelHealth.leptin.threshold"),
+										DECIMAL_MSOLS.format(leptinTCache), null);	
+		ghrelinTCache = (int)(circadianClock.getGhrelinT());
+		ghrelinTLabel = conditionPanel.addTextField(Msg.getString("TabPanelHealth.ghrelin.threshold"),
+										DECIMAL_MSOLS.format(ghrelinTCache), null);	
 		
 
 		// Prepare SpringLayout for info panel.
-		WebPanel springPanel = new WebPanel(new SpringLayout());//GridLayout(4, 2, 0, 0));
-//		infoPanel.setBorder(new MarsPanelBorder());
-		topContentPanel.add(springPanel, BorderLayout.SOUTH);
+		JPanel springPanel = new JPanel(new SpringLayout());
+		northPanel.add(springPanel);
 		
 		// Prepare sleep hour name label
-		WebLabel sleepHrLabel = new WebLabel(Msg.getString("TabPanelFavorite.sleepHour"), WebLabel.RIGHT); //$NON-NLS-1$
-//		sleepLabel.setFont(font);
+		JLabel sleepHrLabel = new JLabel(Msg.getString("TabPanelFavorite.sleepHour"), SwingConstants.RIGHT); //$NON-NLS-1$
+		sleepHrLabel.setFont(StyleManager.getLabelFont());
 		springPanel.add(sleepHrLabel);
-
-		// Checks the two best sleep hours
-    	int bestSleepTime[] = person.getPreferredSleepHours();		
-		WebPanel wrapper5 = new WebPanel(new FlowLayout(0, 0, FlowLayout.LEADING));
-		Arrays.sort(bestSleepTime);
 		
-		// Prepare sleep hour TF
-		String text = "";
-		int size = bestSleepTime.length;
-		for (int i=0; i<size; i++) {
-			text += bestSleepTime[i] + "";
-			if (i != size - 1)
-				text += " and ";
-		}
-		sleepTF = new WebTextField(text);
+		// Prepare sleep time TF
+		StringBuilder text = updateSleepTime();		
+		
+		sleepTF = new JTextField(text.toString());
 		sleepTF.setEditable(false);
-		sleepTF.setColumns(8);
-		//activityTF.requestFocus();
+		sleepTF.setColumns(30);
 		sleepTF.setCaretPosition(0);
+		
+		JPanel wrapper5 = new JPanel(new FlowLayout(0, 0, FlowLayout.LEADING));
 		wrapper5.add(sleepTF);
 		springPanel.add(wrapper5);
 
-		TooltipManager.setTooltip (sleepTF, "Time in millisols", TooltipWay.down); //$NON-NLS-1$
+		sleepTF.setToolTipText("3 best times to go to bed [msol (weight)]"); //$NON-NLS-1$
 				
 		// Prepare SpringLayout
 		SpringUtilities.makeCompactGrid(springPanel,
 		                                1, 2, //rows, cols
-		                                120, 10,        //initX, initY
-		                                7, 3);       //xPad, yPad
+		                                10, 10,        //initX, initY
+		                                5, 3);       //xPad, yPad
 	
+		content.add(northPanel, BorderLayout.NORTH);
 		
-		// Add radiation dose info
-		// Prepare radiation panel
-		WebPanel radiationPanel = new WebPanel(new BorderLayout(0, 0));
-//		radiationPanel.setBorder(new MarsPanelBorder());
-		centerContentPanel.add(radiationPanel, BorderLayout.NORTH);
+		// Panel of vertical tables
+        JPanel tablesPanel = new JPanel(new BorderLayout());
+        tablesPanel.setLayout(new BoxLayout(tablesPanel, BoxLayout.Y_AXIS));
+		content.add(tablesPanel, BorderLayout.CENTER);
 
-		// Prepare radiation label
-		WebLabel radiationLabel = new WebLabel(Msg.getString("TabPanelHealth.rad"), WebLabel.CENTER); //$NON-NLS-1$
-		radiationLabel.setFont(font);
-		radiationPanel.add(radiationLabel, BorderLayout.NORTH);
-		TooltipManager.setTooltip (radiationLabel, Msg.getString("TabPanelHealth.radiation.tooltip"), TooltipWay.down); //$NON-NLS-1$
-			 
-		// Prepare radiation scroll panel
-		WebScrollPane radiationScrollPanel = new WebScrollPane();
-		radiationPanel.add(radiationScrollPanel, BorderLayout.CENTER);
-
-		// Prepare radiation table model
-		radiationTableModel = new RadiationTableModel(person);
-
-		// Create radiation table
-		radiationTable = new ZebraJTable(radiationTableModel);
-//		{
-		    // Implement radiation table header tool tips
-//		    protected JTableHeader createDefaultTableHeader() {
-//		        return new JTableHeader(columnModel) {
-//		            public String getToolTipText(MouseEvent e) {
-//		                //String tip = null;
-//		                java.awt.Point p = e.getPoint();
-//		                int index = columnModel.getColumnIndexAtX(p.x);
-//		                if (index > -1) {
-//			                int realIndex = columnModel.getColumn(index).getModelIndex();
-//			                return radiationToolTips[realIndex];
-//		            	}
-//		                else {
-//		                	return Msg.getString("TabPanelHealth.tooltip");
-//		                }
-//		            }
-//		        };
-//		    }		        
-//		};
-		
-		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
-		renderer.setHorizontalAlignment(SwingConstants.CENTER);
-		radiationTable.getColumnModel().getColumn(0).setCellRenderer(renderer);
-		radiationTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
-		radiationTable.getColumnModel().getColumn(2).setCellRenderer(renderer);
-		radiationTable.getColumnModel().getColumn(3).setCellRenderer(renderer);
-
-		radiationTable.setPreferredScrollableViewportSize(new Dimension(225, 70));
-		radiationTable.getColumnModel().getColumn(0).setPreferredWidth(40);
-		radiationTable.getColumnModel().getColumn(1).setPreferredWidth(100);
-		radiationTable.getColumnModel().getColumn(2).setPreferredWidth(65);
-		radiationTable.getColumnModel().getColumn(3).setPreferredWidth(35);
-		radiationTable.setRowSelectionAllowed(true);
-		radiationScrollPanel.setViewportView(radiationTable);
-
-		// Added sorting
-		radiationTable.setAutoCreateRowSorter(true);
-        //if (!MainScene.OS.equals("linux")) {
-        //	radiationTable.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
-		//}
-		// Add setTableStyle()
-		TableStyle.setTableStyle(radiationTable);
-
-
-		// Prepare table panel.
-		WebPanel tablePanel = new WebPanel(new GridLayout(3, 1));
-		centerContentPanel.add(tablePanel, BorderLayout.SOUTH);
 
 		// Prepare sleep time panel
-		WebPanel sleepPanel = new WebPanel(new BorderLayout(0, 0));
-//		sleepPanel.setBorder(new MarsPanelBorder());
-		tablePanel.add(sleepPanel);
+		JPanel sleepPanel = new JPanel(new BorderLayout(0, 0));
+		tablesPanel.add(sleepPanel, BorderLayout.CENTER);
 
 		// Prepare sleep time label
-		WebLabel sleepLabel = new WebLabel(Msg.getString("TabPanelHealth.sleep"), WebLabel.CENTER); //$NON-NLS-1$
-		sleepLabel.setFont(font);
+		JLabel sleepLabel = new JLabel(Msg.getString("TabPanelHealth.sleepExercise"), SwingConstants.CENTER); //$NON-NLS-1$
+		StyleManager.applySubHeading(sleepLabel);
 		sleepPanel.add(sleepLabel, BorderLayout.NORTH);
 
 		// Prepare sleep time scroll panel
-		WebScrollPane sleepScrollPanel = new WebScrollPane();
+		JScrollPane sleepScrollPanel = new JScrollPane();
 		sleepPanel.add(sleepScrollPanel, BorderLayout.CENTER);
 
 		// Prepare sleep time table model
-		sleepTableModel = new SleepTableModel(person);
+		sleepExerciseTableModel = new SleepExerciseTableModel(circadianClock);
 		
 		// Create sleep time table
-		sleepTable = new ZebraJTable(sleepTableModel);
-		sleepTable.setPreferredScrollableViewportSize(new Dimension(225, 90));
-		sleepTable.getColumnModel().getColumn(0).setPreferredWidth(10);
-		sleepTable.getColumnModel().getColumn(1).setPreferredWidth(100);
-		sleepTable.setRowSelectionAllowed(true);
-		sleepScrollPanel.setViewportView(sleepTable);
+		sleepExerciseTable = new JTable(sleepExerciseTableModel);
+		TableColumnModel sModel = sleepExerciseTable.getColumnModel();
+		sleepExerciseTable.setPreferredScrollableViewportSize(new Dimension(225, 90));
+		sModel.getColumn(0).setPreferredWidth(10);
+		sModel.getColumn(1).setPreferredWidth(70);
+		sModel.getColumn(2).setPreferredWidth(70);
+		
+		sleepExerciseTable.setRowSelectionAllowed(true);
+		sleepScrollPanel.setViewportView(sleepExerciseTable);
 
 		DefaultTableCellRenderer sleepRenderer = new DefaultTableCellRenderer();
 		sleepRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-		sleepTable.getColumnModel().getColumn(0).setCellRenderer(sleepRenderer);
-		sleepTable.getColumnModel().getColumn(1).setCellRenderer(sleepRenderer);
+		sModel.getColumn(0).setCellRenderer(sleepRenderer);
+		sModel.getColumn(1).setCellRenderer(sleepRenderer);
+		sModel.getColumn(2).setCellRenderer(sleepRenderer);
 		
 		// Add sorting
-		sleepTable.setAutoCreateRowSorter(true);
-        //if (!MainScene.OS.equals("linux")) {
-        // 	sleepTable.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
-		//}
-		TableStyle.setTableStyle(sleepTable);
+		sleepExerciseTable.setAutoCreateRowSorter(true);
+	
+		/////////////////////////////////////////////////////////
+		
+		// Prepare exercise time panel
+		JPanel foodPanel = new JPanel(new BorderLayout(0, 0));
+		tablesPanel.add(foodPanel, BorderLayout.SOUTH);
+
+		// Prepare exercise time label
+		JLabel foodLabel = new JLabel(Msg.getString("TabPanelHealth.food"), SwingConstants.CENTER); //$NON-NLS-1$
+		StyleManager.applySubHeading(foodLabel);
+		foodPanel.add(foodLabel, BorderLayout.NORTH);
+
+		// Prepare exercise time scroll panel
+		JScrollPane foodScrollPanel = new JScrollPane();
+		foodPanel.add(foodScrollPanel, BorderLayout.CENTER);
+
+		// Prepare exercise time table model
+		foodTableModel = new FoodTableModel(condition);
+		
+		// Create exercise time table
+		foodTable = new JTable(foodTableModel);
+		foodTable.setPreferredScrollableViewportSize(new Dimension(225, 90));
+		TableColumnModel fModel = foodTable.getColumnModel();
+		fModel.getColumn(0).setPreferredWidth(10);
+		fModel.getColumn(1).setPreferredWidth(50);
+		fModel.getColumn(2).setPreferredWidth(50);
+		fModel.getColumn(3).setPreferredWidth(50);
+		fModel.getColumn(4).setPreferredWidth(50);
+
+		foodTable.setRowSelectionAllowed(true);
+		foodScrollPanel.setViewportView(foodTable);
+
+		DefaultTableCellRenderer foodRenderer = new DefaultTableCellRenderer();
+		foodRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+		fModel.getColumn(0).setCellRenderer(foodRenderer);
+		fModel.getColumn(1).setCellRenderer(foodRenderer);
+		fModel.getColumn(2).setCellRenderer(foodRenderer);
+		fModel.getColumn(3).setCellRenderer(foodRenderer);	
+		fModel.getColumn(4).setCellRenderer(foodRenderer);	
+		
+		// Add sorting
+		foodTable.setAutoCreateRowSorter(true);
+
+		///////////////////////////
 		
 
+		// Add radiation dose info
+		// Prepare radiation panel
+		JPanel radiationPanel = new JPanel(new BorderLayout(0, 0));
+		tablesPanel.add(radiationPanel, BorderLayout.NORTH);
+
+		// Prepare radiation label
+		JLabel radiationLabel = new JLabel(Msg.getString("TabPanelHealth.rad"), SwingConstants.CENTER); //$NON-NLS-1$
+		StyleManager.applySubHeading(radiationLabel);
+		radiationPanel.add(radiationLabel, BorderLayout.NORTH);
+		radiationLabel.setToolTipText(Msg.getString("TabPanelHealth.radiation.tooltip")); //$NON-NLS-1$
+			 
+		// Prepare radiation scroll panel
+		JScrollPane radiationScrollPanel = new JScrollPane();
+		radiationPanel.add(radiationScrollPanel, BorderLayout.CENTER);
+
+		// Prepare radiation table model
+		radiationTableModel = new RadiationTableModel(condition);
+
+		// Create radiation table
+		radiationTable = new JTable(radiationTableModel) {
+
+            //Implement table cell tool tips.           
+            public String getToolTipText(MouseEvent e) {
+                String tip = null;
+                java.awt.Point p = e.getPoint();
+//              int rowIndex = rowAtPoint(p);
+                int colIndex = columnAtPoint(p);
+				if (colIndex < RADIATION_TOOL_TIPS.length) {
+                    tip = RADIATION_TOOL_TIPS[colIndex];
+				}
+                return tip;
+            }
+        };
+	
+		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
+		renderer.setHorizontalAlignment(SwingConstants.CENTER);
+		TableColumnModel rModel = radiationTable.getColumnModel();
+		rModel.getColumn(0).setCellRenderer(renderer);
+		rModel.getColumn(1).setCellRenderer(renderer);
+		rModel.getColumn(2).setCellRenderer(renderer);
+		rModel.getColumn(3).setCellRenderer(renderer);
+
+		radiationTable.setPreferredScrollableViewportSize(new Dimension(225, 75));
+		rModel.getColumn(0).setPreferredWidth(40);
+		rModel.getColumn(1).setPreferredWidth(100);
+		rModel.getColumn(2).setPreferredWidth(65);
+		rModel.getColumn(3).setPreferredWidth(35);
+		radiationTable.setRowSelectionAllowed(true);
+		radiationScrollPanel.setViewportView(radiationTable);
+		
+		// Added sorting
+		radiationTable.setAutoCreateRowSorter(true);
+
+		/////////////////////////////////////////////////////////		
+		
+		// Prepare medication panel.
+		JPanel medicationPanel = new JPanel(new BorderLayout());
+		tablesPanel.add(medicationPanel);
+	
+		// Prepare medication label.
+		JLabel medicationLabel = new JLabel(Msg.getString("TabPanelHealth.medication"), SwingConstants.CENTER); //$NON-NLS-1$
+		StyleManager.applySubHeading(medicationLabel);
+		medicationPanel.add(medicationLabel, BorderLayout.NORTH);
+	
+		// Prepare medication scroll panel
+		JScrollPane medicationScrollPanel = new JScrollPane();
+		medicationPanel.add(medicationScrollPanel, BorderLayout.CENTER);
+	
+		// Prepare medication table model.
+		medicationTableModel = new MedicationTableModel(condition);
+	
+		// Prepare medication table.
+		medicationTable = new JTable(medicationTableModel);
+		medicationTable.setPreferredScrollableViewportSize(new Dimension(225, 90));
+		medicationTable.setRowSelectionAllowed(true);
+		medicationScrollPanel.setViewportView(medicationTable);
+	
+		// Add sorting
+		medicationTable.setAutoCreateRowSorter(true);
+	
+		//////////////////////////////
+		
 		// Prepare health problem panel
-		WebPanel healthProblemPanel = new WebPanel(new BorderLayout(0, 0));
-//		healthProblemPanel.setBorder(new MarsPanelBorder());
-		tablePanel.add(healthProblemPanel);
+		JPanel healthProblemPanel = new JPanel(new BorderLayout(0, 0));
+		tablesPanel.add(healthProblemPanel);
 
 		// Prepare health problem label
-		WebLabel healthProblemLabel = new WebLabel(Msg.getString("TabPanelHealth.healthProblems"), WebLabel.CENTER); //$NON-NLS-1$
-		healthProblemLabel.setPadding(7, 0, 0, 0);
-		healthProblemLabel.setFont(font);
+		JLabel healthProblemLabel = new JLabel(Msg.getString("TabPanelHealth.healthProblems"), SwingConstants.CENTER); //$NON-NLS-1$
+		//healthProblemLabel.setPadding(7, 0, 0, 0);
+		StyleManager.applySubHeading(healthProblemLabel);
 		healthProblemPanel.add(healthProblemLabel, BorderLayout.NORTH);
 
 		// Prepare health problem scroll panel
-		WebScrollPane healthProblemScrollPanel = new WebScrollPane();
+		JScrollPane healthProblemScrollPanel = new JScrollPane();
 		healthProblemPanel.add(healthProblemScrollPanel, BorderLayout.CENTER);
 
 		// Prepare health problem table model
-		healthProblemTableModel = new HealthProblemTableModel(person);
+		healthProblemTableModel = new HealthProblemTableModel(condition);
 
 		// Create health problem table
-		healthProblemTable = new ZebraJTable(healthProblemTableModel);
-		healthProblemTable.setPreferredScrollableViewportSize(new Dimension(225, 10));
+		healthProblemTable = new JTable(healthProblemTableModel);
+		healthProblemTable.setPreferredScrollableViewportSize(new Dimension(225, 90));
 		healthProblemTable.setRowSelectionAllowed(true);
 		healthProblemScrollPanel.setViewportView(healthProblemTable);
 
 		// Add sorting
 		healthProblemTable.setAutoCreateRowSorter(true);
-        //if (!MainScene.OS.equals("linux")) {
-        // 	healthProblemTable.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
-		//}
-		TableStyle.setTableStyle(healthProblemTable);
 		
 		
-		// Prepare medication panel.
-		WebPanel medicationPanel = new WebPanel(new BorderLayout());
-//		medicationPanel.setBorder(new MarsPanelBorder());
-		tablePanel.add(medicationPanel);
-
-		// Prepare medication label.
-		WebLabel medicationLabel = new WebLabel(Msg.getString("TabPanelHealth.medication"), WebLabel.CENTER); //$NON-NLS-1$
-		medicationLabel.setPadding(7, 0, 0, 0);
-		medicationLabel.setFont(font);
-		medicationPanel.add(medicationLabel, BorderLayout.NORTH);
-
-		// Prepare medication scroll panel
-		WebScrollPane medicationScrollPanel = new WebScrollPane();
-		medicationPanel.add(medicationScrollPanel, BorderLayout.CENTER);
-
-		// Prepare medication table model.
-		medicationTableModel = new MedicationTableModel(person);
-
-		// Prepare medication table.
-		medicationTable = new ZebraJTable(medicationTableModel);
-		medicationTable.setPreferredScrollableViewportSize(new Dimension(225, 10));
-		medicationTable.setRowSelectionAllowed(true);
-		medicationScrollPanel.setViewportView(medicationTable);
-
-		// Add sorting
-		medicationTable.setAutoCreateRowSorter(true);
-       //if (!MainScene.OS.equals("linux")) {
-        //	medicationTable.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
-		//}
-		TableStyle.setTableStyle(medicationTable);
-
+		
+		// Update at least one before displaying it
+		update();
 	}
 
+	private StringBuilder updateSleepTime() {	
+		// Checks the 3 best sleep time
+    	int bestSleepTime[] = person.getPreferredSleepHours();
+		Arrays.sort(bestSleepTime);
+		
+		// Prepare sleep time TF
+		StringBuilder text = new StringBuilder();
+		int size = bestSleepTime.length;
+		int lastSleepTime = -1;
+		for (int i=0; i<size; i++) {
+			int sleepTime = bestSleepTime[i];
+			if (lastSleepTime != sleepTime) {
+				if (i != 0) {
+					text.append(",  ");
+				}
+				text.append("@ ").append(sleepTime)
+				.append(" msol (w:")
+				.append(person.getSleepWeight(sleepTime))
+				.append(")");
+				lastSleepTime = sleepTime;
+			}
+		}
+		
+		return text;
+	}
+	
 
 	/**
 	 * Updates the info on this panel.
 	 */
 	@Override
 	public void update() {
-		if (!uiDone)
-			initializeUI();
 
-		int t = 0;//MainScene.getTheme();		
-		if (theme != t) {
-			theme = t;
-			TableStyle.setTableStyle(radiationTable);
-			TableStyle.setTableStyle(medicationTable);
-			TableStyle.setTableStyle(healthProblemTable);
-			TableStyle.setTableStyle(sleepTable);
-		}
-		
 		// Update fatigue if necessary.
-		double newF = Math.round(condition.getFatigue()* 1.0)/1.0;
-		//if (fatigueCache *.95 > newF || fatigueCache *1.05 < newF) {
+		int newF = (int)condition.getFatigue();
 		if (fatigueCache != newF) {
 			fatigueCache = newF;
-			fatigueLabel.setText(Msg.getString("TabPanelHealth.millisols", //$NON-NLS-1$
-			        formatter.format(fatigueCache)));
+			fatigueLabel.setText(DECIMAL_MSOLS.format(newF));
 		}
 
 		// Update thirst if necessary.
-		double newT = Math.round(condition.getThirst()* 1.0)/1.0;
-		//if (thirstCache *.95 > newT || thirstCache *1.05 < newT) {
+		int newT = (int)condition.getThirst();
 		if (thirstCache != newT) {
 			thirstCache = newT;
-			thirstLabel.setText(Msg.getString("TabPanelHealth.millisols", //$NON-NLS-1$
-			        formatter.format(thirstCache)));
+			thirstLabel.setText(DECIMAL_MSOLS.format(newT));
 		}
 		
 		// Update hunger if necessary.
-		double newH = Math.round(condition.getHunger()* 1.0)/1.0;
-		//if (hungerCache *.95 > newH || hungerCache *1.05 < newH) {
+		int newH = (int)condition.getHunger();
 		if (hungerCache != newH) {
 			hungerCache = newH;
-			hungerLabel.setText(Msg.getString("TabPanelHealth.millisols", //$NON-NLS-1$
-			        formatter.format(hungerCache)));
+			hungerLabel.setText(DECIMAL_MSOLS.format(newH));
 		}
 
 		// Update energy if necessary.
-		double newEnergy = Math.round(condition.getEnergy()* 1.0)/1.0;
-		//if (energyCache *.98 > newEnergy || energyCache *1.02 < newEnergy   ) {
+		int newEnergy = (int)condition.getEnergy();
 		if (energyCache != newEnergy) {
 			energyCache = newEnergy;
-			energyLabel.setText(Msg.getString("TabPanelHealth.kJ", //$NON-NLS-1$
-			        formatter.format(energyCache)));
+			energyLabel.setText(StyleManager.DECIMAL_PLACES0.format(energyCache) + " kj");
 		}
 
 		// Update stress if necessary.
-		double newS = Math.round(condition.getStress()* 1.0)/1.0;
-		//if (stressCache *.95 > newS || stressCache*1.05 < newS) {
+		int newS = (int)condition.getStress();
 		if (stressCache != newS) {
 			stressCache = newS;
-			stressLabel.setText(Msg.getString("TabPanelHealth.percentage", //$NON-NLS-1$
-			        formatter.format(stressCache)));
+			stressLabel.setText(StyleManager.DECIMAL_PERC.format(newS));
 		}
 
 		// Update performance cache if necessary.
-		double newP = Math.round(condition.getPerformanceFactor() * 100)/1.0;
-		//if (performanceCache *95D > newP || performanceCache *105D < newP) {
+		int newP = (int)(condition.getPerformanceFactor() * 100);
 		if (performanceCache != newP) {
 			performanceCache = newP;
-			performanceLabel.setText(Msg.getString("TabPanelHealth.percentage", //$NON-NLS-1$
-			        formatter.format(performanceCache)));
+			performanceLabel.setText(StyleManager.DECIMAL_PERC.format(newP));
 		}
 		
-		// Checks the two best sleep hours
-    	int bestSleepTime[] = person.getPreferredSleepHours();		
-		Arrays.sort(bestSleepTime);
+		// Update leptin if necessary.
+		int newL = (int)(circadianClock.getLeptin());
+		if (leptinCache != newL) {
+			leptinCache = newL;
+			leptinLabel.setText(DECIMAL_MSOLS.format(newL));
+		}		
 		
-		// Prepare sleep hour TF
-		String text = "";
-		int size = bestSleepTime.length;
-		for (int i=0; i<size; i++) {
-			text += bestSleepTime[i] + "";
-			if (i != size - 1)
-				text += " and ";
+		// Update ghrelin if necessary.
+		int newG = (int)(circadianClock.getGhrelin());
+		if (ghrelinCache != newG) {
+			ghrelinCache = newG;
+			ghrelinLabel.setText(DECIMAL_MSOLS.format(newG));
+		}		
+		
+		// Update leptin threshold if necessary.
+		int newLT = (int)(circadianClock.getLeptinT());
+		if (leptinTCache != newLT) {
+			leptinTCache = newLT;
+			leptinTLabel.setText(DECIMAL_MSOLS.format(newLT));
+		}		
+		
+		// Update ghrelin threshold if necessary.
+		int newGT = (int)(circadianClock.getGhrelinT());
+		if (ghrelinTCache != newGT) {
+			ghrelinTCache = newGT;
+			ghrelinTLabel.setText(DECIMAL_MSOLS.format(newGT));
 		}
-		sleepTF.setText(text);
+
+		// Update sleep time TF
+		StringBuilder text = updateSleepTime();
+
+		if (!sleepTF.getText().equalsIgnoreCase(text.toString()))
+			sleepTF.setText(text.toString());
 		
 		// Update medication table model.
-		medicationTableModel.update();
+		medicationTableModel.update(condition);
 
 		// Update health problem table model.
-		healthProblemTableModel.update();
+		healthProblemTableModel.update(condition);
 
 		// Update radiation dose table model
 		radiationTableModel.update();
 		
 		// Update sleep time table model
-		sleepTableModel.update();
-    	
+		sleepExerciseTableModel.update(circadianClock);
+		
+		// Update food table model
+		foodTableModel.update(condition);
 	}
-
-//	public class IconTextCellRenderer extends DefaultTableCellRenderer {
-//	    public Component getTableCellRendererComponent(WebTable table,
-//	                                  Object value,
-//	                                  boolean isSelected,
-//	                                  boolean hasFocus,
-//	                                  int row,
-//	                                  int column) {
-//	        super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-//	        return this;
-//	    }
-//	}
 
 	/**
 	 * Internal class used as model for the radiation dose table.
@@ -551,10 +542,10 @@ extends TabPanel {
 
 		private RadiationExposure radiation;
 
-		private double dose[][];
+		private DoseHistory[] dose;
 
-		private RadiationTableModel(Person person) {
-			radiation = person.getPhysicalCondition().getRadiationExposure();
+		private RadiationTableModel(PhysicalCondition condition) {
+			radiation = condition.getRadiationExposure();
 			dose = radiation.getDose();
 
 		}
@@ -612,8 +603,17 @@ extends TabPanel {
 				else if (row == 2)
 					str = CAREER;
 			}
-			else
-				str = Math.round(dose[row][column-1] * 100.0D)/100.0D + "";
+			else {
+				DoseHistory active = dose[column-1];
+				double value = switch(row) {
+					case 0 -> active.getThirtyDay();
+					case 1 -> active.getAnnual();
+					case 2 -> active.getCareer();
+					default -> 0D;
+				};
+			
+				str = Math.round(value * 100.0D)/100.0D + "";
+			}
 			return str;
 		}
 
@@ -621,7 +621,6 @@ extends TabPanel {
 			dose = radiation.getDose();
 			fireTableDataChanged();
 		}
-
 	}
 
 
@@ -631,14 +630,10 @@ extends TabPanel {
 	private static class HealthProblemTableModel
 	extends AbstractTableModel {
 
-		/** default serial id. */
-		private static final long serialVersionUID = 1L;
-
-		private PhysicalCondition condition;
 		private Collection<?> problemsCache;
+		private boolean isDead;
 
-		private HealthProblemTableModel(Person person) {
-			condition = person.getPhysicalCondition();
+		private HealthProblemTableModel(PhysicalCondition condition) {
 			problemsCache = condition.getProblems();
 		}
 
@@ -693,7 +688,7 @@ extends TabPanel {
 				}
 				else if (column == 1) {
 					String conditionStr = problem.getStateString();
-					if (!condition.isDead()) {
+					if (!isDead) {
 					    conditionStr = Msg.getString("TabPanelHealth.healthRating", //$NON-NLS-1$
 					            conditionStr, Integer.toString(problem.getHealthRating()));
 					}
@@ -708,11 +703,12 @@ extends TabPanel {
 			}
 		}
 
-		public void update() {
+		public void update(PhysicalCondition condition) {
 			// Make sure problems cache is current.
 			if (!problemsCache.equals(condition.getProblems())) {
 				problemsCache = condition.getProblems();
 			}
+			isDead = condition.isDead();
 
 			fireTableDataChanged();
 		}
@@ -722,28 +718,29 @@ extends TabPanel {
 	/**
 	 * Internal class used as model for the sleep time table.
 	 */
-	private static class SleepTableModel
+	private static class SleepExerciseTableModel
 	extends AbstractTableModel {
 
-		/** default serial id. */
-		private static final long serialVersionUID = 1L;
+		private static final String SLEEP_TIME = "Sleep";
+		private static final String EXERCISE_TIME = "Exercise";
+		
+		private static final String MISSION_SOL = "Sol";
 
-		private DecimalFormat fmt = new DecimalFormat("0.0");
-
-		private CircadianClock circadian;
 		private Map<Integer, Double> sleepTime;
+		private Map<Integer, Double> exerciseTime;
+		private int solOffset = 1;
+		private int rowCount = 0;
 
-		private SleepTableModel(Person person) {
-			circadian = person.getCircadianClock();
-			sleepTime = circadian.getSleepTime();
+		private SleepExerciseTableModel(CircadianClock circadian) {
+			update(circadian);
 		}
 
 		public int getRowCount() {
-			return sleepTime.size();
+			return rowCount;
 		}
 
 		public int getColumnCount() {
-			return 2;
+			return 3;
 		}
 
 		public Class<?> getColumnClass(int columnIndex) {
@@ -751,42 +748,186 @@ extends TabPanel {
 			if (columnIndex == 0) {
 			    dataType = Integer.class;
 			}
-			else if (columnIndex == 1) {
-			    dataType = Double.class;
+			else {
+			    dataType = String.class;
 			}
 			return dataType;
 		}
 
 		public String getColumnName(int columnIndex) {
 			if (columnIndex == 0) {
-			    return "Mission Sol"; 
+			    return MISSION_SOL; 
 			}
 			else if (columnIndex == 1) {
-			    return "Sleep Time [in millisols]";
+			    return SLEEP_TIME;
 			}
-			else {
-			    return null;
+			else if (columnIndex == 2) {
+			    return EXERCISE_TIME;
 			}
+			return null;
 		}
 
 		public Object getValueAt(int row, int column) {
 			Object result = null;
 			if (row < getRowCount()) {
+				int rowSol = row + solOffset;
 				if (column == 0) {
-				    result = row + 1;
+				    result = rowSol;
 				}
 				else if (column == 1) {
-					if (sleepTime.containsKey(row + 1))
-						result = fmt.format(sleepTime.get(row + 1));
+					if (sleepTime.containsKey(rowSol))
+						result = StyleManager.DECIMAL_PLACES1.format(sleepTime.get(rowSol));
 					else
-						result = fmt.format(0);
+						result = StyleManager.DECIMAL_PLACES1.format(0);
+				}
+				else if (column == 2) {
+					if (exerciseTime.containsKey(rowSol))
+						result = StyleManager.DECIMAL_PLACES1.format(exerciseTime.get(rowSol));
+					else
+						result = StyleManager.DECIMAL_PLACES1.format(0);
 				}
 			}
 			return result;
 		}
 
-		public void update() {
-			sleepTime = circadian.getSleepTime();
+		public void update(CircadianClock circadian) {
+			sleepTime = circadian.getSleepHistory();
+			exerciseTime = circadian.getExerciseHistory();
+			
+			Set<Integer> largestSet;
+			if (sleepTime.size() > exerciseTime.size()) {
+				largestSet = sleepTime.keySet();
+			}
+			else {
+				largestSet = exerciseTime.keySet();
+			}
+
+			// Find the lowest sol day in the data
+			solOffset = largestSet.stream()
+					.mapToInt(v -> v)               
+	                .min()                          
+	                .orElse(Integer.MAX_VALUE);
+			rowCount = largestSet.size();
+
+			fireTableDataChanged();
+		}
+	}
+	
+	/**
+	 * Internal class used as model for the food time table.
+	 */
+	private static class FoodTableModel
+	extends AbstractTableModel {
+
+		private static final String FOOD_AMOUNT = "Food";
+		private static final String MEAL_AMOUNT = "Meal";
+		private static final String DESSERT_AMOUNT = "Dessert";
+		private static final String WATER_AMOUNT = "Water";
+		
+		private static final String MISSION_SOL = "Sol"; 
+
+		private Map<Integer, Map<Integer, Double>> map;
+
+		private int solOffset = 1;
+
+		private FoodTableModel(PhysicalCondition pc) {
+			map = pc.getConsumptionHistory();
+		}
+
+		public int getRowCount() {
+			return map.size();
+		}
+
+		public int getColumnCount() {
+			return 5;
+		}
+
+		public Class<?> getColumnClass(int columnIndex) {
+			Class<?> dataType = super.getColumnClass(columnIndex);
+			if (columnIndex == 0) {
+			    dataType = Integer.class;
+			}
+			else {
+			    dataType = String.class;
+			}
+			
+			return dataType;
+		}
+
+		public String getColumnName(int columnIndex) {
+			if (columnIndex == 0) {
+			    return MISSION_SOL; 
+			}
+			else if (columnIndex == 1) {
+			    return FOOD_AMOUNT;
+			}
+			else if (columnIndex == 2) {
+			    return MEAL_AMOUNT;
+			}
+			else if (columnIndex == 3) {
+			    return DESSERT_AMOUNT;
+			}
+			else if (columnIndex == 4) {
+			    return WATER_AMOUNT;
+			}
+			return null;
+		}
+
+		public Object getValueAt(int row, int column) {
+			Object result = null;
+			if (row < getRowCount()) {
+				int rowSol = row + solOffset;
+				if (column == 0) {
+					return rowSol;
+				}
+				else if (column == 1) {
+					if (map.containsKey(rowSol))
+						result = StyleManager.DECIMAL_PLACES3.format(returnAmount(rowSol, 0));
+					else
+						result = StyleManager.DECIMAL_PLACES3.format(0);
+				}
+				else if (column == 2) {
+					if (map.containsKey(rowSol))
+						result = StyleManager.DECIMAL_PLACES3.format(returnAmount(rowSol, 1));
+					else
+						result = StyleManager.DECIMAL_PLACES3.format(0);
+				}
+				else if (column == 3) {
+					if (map.containsKey(rowSol))
+						result = StyleManager.DECIMAL_PLACES3.format(returnAmount(rowSol, 2));
+					else
+						result = StyleManager.DECIMAL_PLACES3.format(0);
+				}
+				else if (column == 4) {
+					if (map.containsKey(rowSol))
+						result = StyleManager.DECIMAL_PLACES3.format(returnAmount(rowSol, 3));
+					else
+						result = StyleManager.DECIMAL_PLACES3.format(0);
+				}
+			}
+			return result;
+		}
+
+		private double returnAmount(int rowSol, int type) {
+			if (map.containsKey(rowSol)) {
+				Map<Integer, Double> map1 = map.get(rowSol);
+				Double amount = map1.get(type);
+				if (amount != null)
+					return amount.doubleValue();
+			}
+			return 0;
+		}
+		
+		
+		public void update(PhysicalCondition pc) {
+			// The size of map needs to be updated
+			map = pc.getConsumptionHistory();
+			
+			// Find the lowest sol day in the data
+			solOffset = map.keySet().stream()
+					.mapToInt(v -> v)               
+	                .min()                          
+	                .orElse(Integer.MAX_VALUE);
 			
 			fireTableDataChanged();
 		}
@@ -798,14 +939,9 @@ extends TabPanel {
 	private static class MedicationTableModel
 	extends AbstractTableModel {
 
-		/** default serial id. */
-		private static final long serialVersionUID = 1L;
-
-		private PhysicalCondition condition;
 		private List<Medication> medicationCache;
 
-		private MedicationTableModel(Person person) {
-			condition = person.getPhysicalCondition();
+		private MedicationTableModel(PhysicalCondition condition) {
 			medicationCache = condition.getMedicationList();
 		}
 
@@ -853,7 +989,7 @@ extends TabPanel {
 			return result;
 		}
 
-		public void update() {
+		public void update(PhysicalCondition condition) {
 			// Make sure medication cache is current.
 			if (!medicationCache.equals(condition.getMedicationList())) {
 				medicationCache = condition.getMedicationList();

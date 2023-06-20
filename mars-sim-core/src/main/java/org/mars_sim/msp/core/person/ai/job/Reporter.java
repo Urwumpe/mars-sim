@@ -1,62 +1,32 @@
-/**
+/*
  * Mars Simulation Project
  * Reporter.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-27
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.job;
 
-import java.io.Serializable;
 import java.util.Iterator;
 
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.mission.Trade;
-import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
-import org.mars_sim.msp.core.person.ai.task.ConnectWithEarth;
-import org.mars_sim.msp.core.person.ai.task.ConsolidateContainers;
-import org.mars_sim.msp.core.person.ai.task.HaveConversation;
-import org.mars_sim.msp.core.person.ai.task.MeetTogether;
-import org.mars_sim.msp.core.person.ai.task.RecordActivity;
+import org.mars_sim.msp.core.person.ai.job.util.Job;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.structure.Settlement;
 
-public class Reporter extends Job implements Serializable {
-
-	/** default serial id. */
-	private static final long serialVersionUID = 1L;
-
-	private final int JOB_ID = 15;
+public class Reporter extends Job {
 	
-	private double[] roleProspects = new double[] {5.0, 5.0, 30.0, 30.0, 20.0, 5.0, 5.0};
-
-	private static double TRADING_RANGE = 1500D;
-	private static double SETTLEMENT_MULTIPLIER = 1D;
+	private static final double TRADING_RANGE = 1500D;
+	private static final double SETTLEMENT_MULTIPLIER = 1D;
 
 	/**
 	 * Constructor.
 	 */
 	public Reporter() {
 		// Use Job constructor.
-		super(Reporter.class);
-
-		// Add main tasks.
-		jobTasks.add(MeetTogether.class);
-		jobTasks.add(ConnectWithEarth.class);
-		jobTasks.add(HaveConversation.class);
-		jobTasks.add(RecordActivity.class);
-
-		// Add side tasks
-		jobTasks.add(ConsolidateContainers.class);
-
-		// Add reporter-related missions.
-		jobMissionStarts.add(Trade.class);
-		jobMissionJoins.add(Trade.class);
-		jobMissionStarts.add(TravelToSettlement.class);
-		jobMissionJoins.add(TravelToSettlement.class);
-
-		// Add missions
+		super(JobType.REPORTER, Job.buildRoleMap(5.0, 0.0, 5.0, 30.0, 30.0, 20.0, 5.0, 5.0));
 	}
 
 	/**
@@ -67,23 +37,13 @@ public class Reporter extends Job implements Serializable {
 	 */
 	public double getCapability(Person person) {
 
-		double result = 0D;
-		
-		int reportSkill = person.getSkillManager().getSkillLevel(SkillType.REPORTING);
-		result = reportSkill;
+		double result = person.getSkillManager().getSkillLevel(SkillType.REPORTING);
 		
 		NaturalAttributeManager attributes = person.getNaturalAttributeManager();
-
-//		if (attributes == null)
-//			attributes = person.getNaturalAttributeManager();
 
 		// Add experience aptitude.
 		int experienceAptitude = attributes.getAttribute(NaturalAttributeType.EXPERIENCE_APTITUDE);
 		result += result * ((experienceAptitude - 50D) / 100D);
-
-		// Add leadership aptitude.
-//		int leadershipAptitude = attributes.getAttribute(NaturalAttributeType.LEADERSHIP);
-//		result += result * ((leadershipAptitude - 50D) / 100D);
 
 		// Add conversation.
 		int conversation = attributes.getAttribute(NaturalAttributeType.CONVERSATION);
@@ -123,21 +83,7 @@ public class Reporter extends Job implements Serializable {
 		}
 
 		result = (result + population / 24D) / 2.0;
-		
-//		System.out.println(settlement + " Reporter need: " + result);
-		
+				
 		return result;
-	}
-
-	public double[] getRoleProspects() {
-		return roleProspects;
-	}
-	
-	public void setRoleProspects(int index, int weight) {
-		roleProspects[index] = weight;
-	}
-	
-	public int getJobID() {
-		return JOB_ID;
 	}
 }

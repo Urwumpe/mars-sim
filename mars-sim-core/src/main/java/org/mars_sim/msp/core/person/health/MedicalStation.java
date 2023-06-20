@@ -1,27 +1,23 @@
-/**
+/*
  * Mars Simulation Project
  * MedicalStation.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-06-30
  * @author Scott Davis
  * Based on Barry Evan's SickBay class
  */
 package org.mars_sim.msp.core.person.health;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.structure.building.Building;
-import org.mars_sim.msp.core.vehicle.Vehicle;
 
 /**
  * This class represents a medical station. It provides a number of treatments
@@ -33,10 +29,7 @@ public class MedicalStation implements MedicalAid, Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(MedicalStation.class.getName());
-
-	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-			logger.getName().length());
+	private static final SimLogger logger = SimLogger.getLogger(MedicalStation.class.getName());
 
 	/** Treatment level of the facility. */
 	private int level;
@@ -51,15 +44,10 @@ public class MedicalStation implements MedicalAid, Serializable {
 	/** Treatments supported by the medical station. */
 	private List<Treatment> supportedTreatments;
 
-//	private MedicalCare medicalCare;
-
-	private Vehicle vehicle;
-
-	private Building building;
-
-	private static MedicalManager medManager;
+	private String name;
 	
-//    private Map<Person, Point2D> bedMap = new HashMap<>();
+	private static MedicalManager medManager;
+
 
 	/**
 	 * Constructor.
@@ -67,46 +55,36 @@ public class MedicalStation implements MedicalAid, Serializable {
 	 * @param level    The treatment level of the medical station.
 	 * @param sickBeds Number of sickbeds.
 	 */
-	public MedicalStation(int level, int sickBeds) {
-//		this.medicalCare = medicalCare;
+	public MedicalStation(String name, int level, int sickBeds) {
+		this.name = name;
 		this.level = level;
 		this.sickBeds = sickBeds;
-		problemsBeingTreated = new CopyOnWriteArrayList<HealthProblem>();
-		problemsAwaitingTreatment = new CopyOnWriteArrayList<HealthProblem>();
-		restingRecoveryPeople = new CopyOnWriteArrayList<Person>();
+		problemsBeingTreated = new CopyOnWriteArrayList<>();
+		problemsAwaitingTreatment = new CopyOnWriteArrayList<>();
+		restingRecoveryPeople = new CopyOnWriteArrayList<>();
 
-		// Get all supported treatments.
+
 		if (medManager == null) {
-//			System.out.println("medManager is null");
 			medManager = Simulation.instance().getMedicalManager();
 		}
-//		else {
-//			System.out.println("medManager is NOT null");
-//		}
+		
+		// Get all supported treatments at this medical station
 		supportedTreatments = medManager.getSupportedTreatments(level);
-	}
-
-	public void setVehicle(Vehicle v) {
-		vehicle = v;
-	}
-
-	public void setBuilding(Building b) {
-		building = b;
 	}
 
 	@Override
 	public List<HealthProblem> getProblemsAwaitingTreatment() {
-		return new CopyOnWriteArrayList<HealthProblem>(problemsAwaitingTreatment);
+		return new ArrayList<>(problemsAwaitingTreatment);
 	}
 
 	@Override
 	public List<HealthProblem> getProblemsBeingTreated() {
-		return new CopyOnWriteArrayList<HealthProblem>(problemsBeingTreated);
+		return new ArrayList<>(problemsBeingTreated);
 	}
 
 	@Override
 	public List<Person> getRestingRecoveryPeople() {
-		return new CopyOnWriteArrayList<Person>(restingRecoveryPeople);
+		return new ArrayList<>(restingRecoveryPeople);
 	}
 
 	/**
@@ -128,15 +106,12 @@ public class MedicalStation implements MedicalAid, Serializable {
 	}
 
 	/**
-	 * Checks if there are any empty beds for new patients
+	 * Checks if there are any empty beds for new patients.
 	 * 
 	 * @return true or false
 	 */
 	public boolean hasEmptyBeds() {
-		if (getPatientNum() < getSickBedNum())
-			return true;
-		else
-			return false;
+        return getPatientNum() < getSickBedNum();
 	}
 	
 	/**
@@ -203,23 +178,10 @@ public class MedicalStation implements MedicalAid, Serializable {
 
 		// Check if treatment is supported here.
 		if (canTreatProblem(problem)) {
-
 			// Add the problem to the waiting queue.
 			problemsAwaitingTreatment.add(problem);
 		} else {
-			String loc0 = null;
-			String loc1 = null;
-			if (building != null) {
-				loc0 = building.getNickName();
-				loc1 = building.getLocationTag().getSettlementName();
-			} else if (vehicle != null) {
-				loc0 = vehicle.getName();
-				loc1 = loc0;
-			}
-
-			LogConsolidated.log(logger, Level.INFO, 2000, sourceName,
-					"[" + loc0 + "] " + problem.getIllness() + " cannot be treated in " + loc1 + "'s medical station.",
-					null);
+			logger.info("[" + name + "] " + problem.getIllness() + " cannot be treated in medical station.");
 		}
 	}
 
@@ -234,7 +196,7 @@ public class MedicalStation implements MedicalAid, Serializable {
 		if (problemsAwaitingTreatment.contains(problem)) {
 			problemsAwaitingTreatment.remove(problem);
 		} else {
-			logger.severe("Health problem " + problem.getIllness()
+			logger.severe("[" + name + "] " + "Health problem " + problem.getIllness()
 					+ " request cannot be canceled as it is not awaiting response.");
 		}
 	}
@@ -251,18 +213,8 @@ public class MedicalStation implements MedicalAid, Serializable {
 			problemsBeingTreated.add(problem);
 			problemsAwaitingTreatment.remove(problem);
 		} else {
-			String loc0 = null;
-			String loc1 = null;
-			if (building != null) {
-				loc0 = building.getNickName();
-				loc1 = building.getLocationTag().getSettlementName();
-			} else if (vehicle != null) {
-				loc0 = vehicle.getName();
-				loc1 = loc0;
-			}
-
-			LogConsolidated.log(logger, Level.INFO, 2000, sourceName, "[" + loc0 + "] " + problem.getIllness()
-					+ " cannot be treated in " + loc1 + "'s medical station is not equipped to handle.", null);
+			logger.warning("[" + name + "] " + problem.getIllness()
+					+ " cannot be treated in medical station is not equipped to handle.");
 		}
 	}
 
@@ -279,7 +231,7 @@ public class MedicalStation implements MedicalAid, Serializable {
 				problemsAwaitingTreatment.add(problem);
 			}
 		} else {
-			logger.severe("Health problem " + problem.getIllness() + " not currently being treated.");
+			logger.severe("[" + name + "] " + "Health problem " + problem.getIllness() + " not currently being treated.");
 		}
 	}
 
@@ -312,12 +264,8 @@ public class MedicalStation implements MedicalAid, Serializable {
 		return level;
 	}
 
-//	public MedicalCare getMedicalCare() {
-//		return medicalCare;
-//	}
-
 	/**
-	 * Prepare object for garbage collection.
+	 * Prepares object for garbage collection.
 	 */
 	public void destroy() {
 		problemsBeingTreated.clear();

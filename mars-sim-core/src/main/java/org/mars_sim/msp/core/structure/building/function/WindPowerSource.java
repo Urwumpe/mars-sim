@@ -1,12 +1,10 @@
 /**
  * Mars Simulation Project
  * WindPowerSource.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function;
-
-import java.io.Serializable;
 
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
@@ -16,9 +14,7 @@ import org.mars_sim.msp.core.structure.building.Building;
  * Assume each Vertical Axis Wind Turbine (VAWT) is capable of provides 
  * up to 2 kW of power if the wind speed is as much as 20 m/s.	
  */
-public class WindPowerSource
-extends PowerSource
-implements Serializable {
+public class WindPowerSource extends PowerSource {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -29,7 +25,9 @@ implements Serializable {
 	// - http://spectrum.library.concordia.ca/36176/1/low_reynolds_number.doc
 	// - https://www.researchgate.net/publication/245526020_Low_Reynolds_Number_Vertical_Axis_Wind_Turbine_for_Mars
 
-	/** Assume the turbine is designed to capture up to 20 m/s wind speed. */
+	// Note : 1 mile per hour (mph) = 0.44704 meter per sec (m/s)
+	
+	/** Assume the turbine is designed to capture up to the threshold of 20 m/s wind speed. */
 	private static final double WIND_SPEED_THRESHOLD = 20D; // [in m/s]
 	//private static final double AVERAGE_WIND_SPEED = 7D; // [in m/s]
 	private static final double AIR_DENSITY_MARTIAN_ATM = 0.0156D; // [in kg / m^3]
@@ -44,6 +42,7 @@ implements Serializable {
 
 	/**
 	 * Constructor.
+	 * 
 	 * @param maxPower the maximum generated power.
 	 */
 	public WindPowerSource(double maxPower) {
@@ -58,7 +57,7 @@ implements Serializable {
 
 	@Override
 	public double getCurrentPower(Building building) {
-		// TODO: Make power generated to be based on current wind speed at location.
+		// Make power generated to be based on current wind speed at location.
 		double speed = Math.min(HEIGHT_FACTOR * weather.getWindSpeed(building.getCoordinates()), WIND_SPEED_THRESHOLD); 
 
 		return Math.min(getMaxPower(), numModules * getPowerOutput(speed));			

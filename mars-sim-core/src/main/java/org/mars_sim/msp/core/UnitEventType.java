@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * UnitEventType.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-07-01
  * @author stpa
  */
 
@@ -34,7 +34,11 @@ public enum UnitEventType {
 	
 	ADD_ASSOCIATED_EQUIPMENT_EVENT		("add associated equipment"),
 	REMOVE_ASSOCIATED_EQUIPMENT_EVENT	("remove associated equipment"),
-	
+
+
+	BACKLOG_EVENT						("backlog event"),
+
+
 //	ASSOCIATED_SETTLEMENT_EVENT		("associated settlement"),
 
 	// For PhysicalCondition
@@ -44,15 +48,17 @@ public enum UnitEventType {
 	STRESS_EVENT					("stress event"),
 	EMOTION_EVENT					("emotion event"),
 	PERFORMANCE_EVENT				("performance event"),
+	
+	// Others
 	ILLNESS_EVENT					("illness event"),
 	DEATH_EVENT						("death event"),
 	BURIAL_EVENT					("burial event"),
 	RADIATION_EVENT					("radiation event"),
-
-
+	METEORITE_EVENT					("meteorite event"),
+	
 	// For MalfunctionManager
 	MALFUNCTION_EVENT				("malfunction"),
-
+	
 	// For TaskManager
 	TASK_EVENT						("task"),
 
@@ -82,6 +88,9 @@ public enum UnitEventType {
 	END_TRANSPORT_WIZARD_EVENT		("end transport wizard"),
 	FINISH_BUILDING_PLACEMENT_EVENT	("finish building placement"),
 
+	// For Cooking and PreparingDessert
+	FOOD_EVENT						("food event"),
+	
 	// For Farming
 	CROP_EVENT						("crop event"),
 	
@@ -96,8 +105,9 @@ public enum UnitEventType {
 	MISSION_EVENT					("mission event"),
 
 	// For GoodsManager
-	GOODS_VALUE_EVENT				("goods values"),
-
+	GOODS_VALUE_EVENT				("values of goods"),
+	PRICE_EVENT						("price of goods"),
+	
 	// For Vehicle
 	STATUS_EVENT					("vehicle status"),
 	SPEED_EVENT						("vehicle speed"),
@@ -105,6 +115,8 @@ public enum UnitEventType {
 	EMERGENCY_BEACON_EVENT			("vehicle emergency beacon event"),
 	RESERVED_EVENT					("vehicle reserved event"),
 
+	CONSUMING_COMPUTING_EVENT		("consuming computing units"),
+	
 	// For power grid
 	POWER_MODE_EVENT				("power mode"),
 	GENERATED_POWER_EVENT			("generated power"),
@@ -112,6 +124,7 @@ public enum UnitEventType {
 	STORED_POWER_CAPACITY_EVENT		("stored power capacity"),
 	REQUIRED_POWER_EVENT			("required power"),
 	POWER_VALUE_EVENT				("power value"),
+	BATTERY_EVENT					("battery event"),
 
 	// For thermal/heating system
 	HEAT_MODE_EVENT					("heat mode"),
@@ -124,7 +137,7 @@ public enum UnitEventType {
 	// For settlement sensor detection grid
 	BASELINE_EVENT					("baseline radiation event"),
 	SEP_EVENT						("SEP event"),	
-	GCR_EVENT						("GCR event"),
+	GCR_EVENT						("GCR event")
 	;
 	
 	private String name;
@@ -134,12 +147,10 @@ public enum UnitEventType {
 	}
 
 	public String getName() {
-		// TODO change all names to i18n-keys for accessing messages.properties
 		return this.name;
 	}
 
 	public String toString() {
-		// TODO change all names to i18n-keys for accessing messages.properties
 		return this.name;
 	}
 	

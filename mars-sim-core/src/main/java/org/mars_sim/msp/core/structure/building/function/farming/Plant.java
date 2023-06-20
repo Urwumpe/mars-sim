@@ -1,6 +1,13 @@
+/*
+ * Mars Simulation Project
+ * Plant.java
+ * @date 2021-09-20
+ * @author Manny Kung
+ */
+
 // File: Plant.java from the package edu.colorado.simulations
 // Complete documentation is available from the Plant link in
-//   http://www.cs.colorado.edu/~main/docs/
+// http://www.cs.colorado.edu/~main/docs/
 
 package org.mars_sim.msp.core.structure.building.function.farming;
 
@@ -16,14 +23,17 @@ package org.mars_sim.msp.core.structure.building.function.farming;
 * @author Michael Main 
 *   <A HREF="mailto:main@colorado.edu"> (main@colorado.edu) </A>
 *
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
 *
 * @see Organism
 ******************************************************************************/
 
-public class Plant extends Organism
-{ 
-   /**
+public class Plant extends Organism { 
+
+	private static final long serialVersionUID = 1L;
+
+
+/**
    * Construct a <CODE>Plant</CODE> with a specified size and growth rate.
    * @param initSize
    *   the initial size of this <CODE>Plant</CODE>, in ounces

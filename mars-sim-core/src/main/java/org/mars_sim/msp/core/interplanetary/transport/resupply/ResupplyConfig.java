@@ -1,21 +1,24 @@
-/**
+/*
  * Mars Simulation Project
  * ResupplyConfig.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-09-25
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.interplanetary.transport.resupply;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.jdom2.Document;
 import org.jdom2.Element;
+import org.mars_sim.msp.core.BoundedObject;
+import org.mars_sim.msp.core.configuration.ConfigHelper;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.Part;
@@ -35,12 +38,8 @@ public class ResupplyConfig implements Serializable {
     // Element names
     private static final String RESUPPLY = "resupply";
     private static final String NAME = "name";
+    private static final String ZONE = "zone";
     private static final String BUILDING = "building";
-    private static final String WIDTH = "width";
-    private static final String LENGTH = "length";
-    private static final String X_LOCATION = "x-location";
-    private static final String Y_LOCATION = "y-location";
-    private static final String FACING = "facing";
     private static final String VEHICLE = "vehicle";
     private static final String EQUIPMENT = "equipment";
     private static final String PERSON = "person";
@@ -52,7 +51,7 @@ public class ResupplyConfig implements Serializable {
     private static final String AMOUNT = "amount";
 
     // Data members
-    Collection<ResupplyTemplate> resupplyTemplates;
+    private Collection<SupplyManifest> resupplyTemplates;
 
     /**
      * Constructor
@@ -63,144 +62,133 @@ public class ResupplyConfig implements Serializable {
     public ResupplyConfig(Document resupplyDoc,
             PartPackageConfig partPackageConfig) {
 
-    	// Initialize amountResourceConfig in this constructor
-    	ResourceUtil.getInstance().initializeNewSim();
-
-        resupplyTemplates = new CopyOnWriteArrayList<ResupplyTemplate>();
+        resupplyTemplates = new ArrayList<>();
         loadResupplyTemplates(resupplyDoc, partPackageConfig);
     }
 
     /**
      * Loads the resupply templates.
+     * 
      * @param resupplyDoc DOM document for resupply configuration.
      * @param partPackageConfig the part package configuration.
      */
     private void loadResupplyTemplates(Document resupplyDoc,
             PartPackageConfig partPackageConfig) {
+    	
+    	if (resupplyTemplates.isEmpty()) {
+	        Element root = resupplyDoc.getRootElement();
+	        List<Element> resupplyNodes = root.getChildren(RESUPPLY);
+	        for (Element resupplyElement : resupplyNodes) {
+	
+	            String name = resupplyElement.getAttributeValue(NAME);
+                int people = ConfigHelper.getOptionalAttributeInt(resupplyElement, PERSON, 0);
+                int zone = ConfigHelper.getOptionalAttributeInt(resupplyElement, ZONE, 0);
+	            	
+	            // Load buildings
+                List<BuildingTemplate> buildings = new ArrayList<>();
+	            List<Element> buildingNodes = resupplyElement.getChildren(BUILDING);
+	            for (Element buildingElement : buildingNodes) {
+	                String buildingType = buildingElement.getAttributeValue(TYPE);
+	                BoundedObject bounds = ConfigHelper.parseBoundedObject(buildingElement);
+	
+	                buildings.add(new BuildingTemplate(0, zone, buildingType,
+	                        buildingType, bounds));
+	
+	            }
+	
+	            // Load vehicles
+                Map<String,Integer> vehicles = new HashMap<>();
+	            List<Element> vehicleNodes = resupplyElement.getChildren(VEHICLE);
+	            for (Element vehicleElement : vehicleNodes) {
+	                String vehicleType = vehicleElement.getAttributeValue(TYPE);
+	                int vehicleNumber = Integer.parseInt(vehicleElement
+	                        .getAttributeValue(NUMBER));
+	                if (vehicles.containsKey(vehicleType))
+	                    vehicleNumber += vehicles.get(vehicleType);
+	                vehicles.put(vehicleType, vehicleNumber);
+	            }
+	
+	            // Load equipment
+                Map<String,Integer> equipment = new HashMap<>();
+	            List<Element> equipmentNodes = resupplyElement
+	                    .getChildren(EQUIPMENT);
+	            for (Element equipmentElement : equipmentNodes) {
+	                String equipmentType = equipmentElement.getAttributeValue(TYPE);
+	                int equipmentNumber = Integer.parseInt(equipmentElement
+	                        .getAttributeValue(NUMBER));
+	                if (equipment.containsKey(equipmentType))
+	                    equipmentNumber += equipment.get(equipmentType);
+	                equipment.put(equipmentType, equipmentNumber);
+	            }
 
-        Element root = resupplyDoc.getRootElement();
-        List<Element> resupplyNodes = root.getChildren(RESUPPLY);
-        for (Element resupplyElement : resupplyNodes) {
-            ResupplyTemplate template = new ResupplyTemplate();
-            resupplyTemplates.add(template);
+	            // Load resources
+                Map<AmountResource, Double> resources = new HashMap<>();
+	            List<Element> resourceNodes = resupplyElement.getChildren(RESOURCE);
+	            for (Element resourceElement : resourceNodes) {
+	                String resourceName = resourceElement.getAttributeValue(NAME);
 
-            template.name = resupplyElement.getAttributeValue(NAME);
+	                AmountResource resource = ResourceUtil.findAmountResource(resourceName);
+	                if (resource == null) {
+	                	throw new IllegalStateException(
+								"ResupplyConfig detected a null resource entry in resupply.xml. resourceName: " + resourceName);
+	                }
+	                
+	                double resourceAmount = Double.parseDouble(resourceElement
+	                        .getAttributeValue(AMOUNT));
+	                
+	                if (resources.containsKey(resource))
+	                    resourceAmount += resources.get(resource);
+	                
+	                resources.put(resource, resourceAmount);
+	            }
+	
+	            // Load parts
+                Map<Part,Integer> parts = new HashMap<>();
+	            List<Element> partNodes = resupplyElement.getChildren(PART);
+	            for (Element partElement : partNodes) {
+	                String partType = partElement.getAttributeValue(TYPE);
+	                Part part = (Part) (ItemResourceUtil.findItemResource(partType));
+	                int partNumber = Integer.parseInt(partElement
+	                        .getAttributeValue(NUMBER));
+	                if (parts.containsKey(part))
+	                    partNumber += parts.get(part);
+	                parts.put(part, partNumber);
+	            }
+	
+	            // Load part packages
+	            List<Element> partPackageNodes = resupplyElement
+	                    .getChildren(PART_PACKAGE);
+	
+	            for (Element partPackageElement : partPackageNodes) {
+	                String packageName = partPackageElement.getAttributeValue(NAME);
+	                int packageNumber = Integer.parseInt(partPackageElement
+	                        .getAttributeValue(NUMBER));
+	                if (packageNumber > 0) {
+	                    for (int z = 0; z < packageNumber; z++) {
+	                        Map<Part, Integer> partPackage = partPackageConfig
+	                                .getPartsInPackage(packageName);
+	                        Iterator<Part> i = partPackage.keySet().iterator();
+	                        while (i.hasNext()) {
+	                            Part part = i.next();
+	                            int partNumber = partPackage.get(part);
+	                            if (parts.containsKey(part))
+	                                partNumber += parts.get(part);
+	                            parts.put(part, partNumber);
+	                        }
+	                    }
+	                }
+	            }
 
-            // Load buildings
-            List<Element> buildingNodes = resupplyElement.getChildren(BUILDING);
-            for (Element buildingElement : buildingNodes) {
-                String buildingType = buildingElement.getAttributeValue(TYPE);
-                double width = -1D;
-                if (buildingElement.getAttribute(WIDTH) != null) {
-                    width = Double.parseDouble(buildingElement
-                            .getAttributeValue(WIDTH));
-                }
-
-                // Determine optional length attribute value. "-1" if it doesn't
-                // exist.
-                double length = -1D;
-                if (buildingElement.getAttribute(LENGTH) != null) {
-                    length = Double.parseDouble(buildingElement
-                            .getAttributeValue(LENGTH));
-                }
-
-                double xLoc = Double.parseDouble(buildingElement
-                        .getAttributeValue(X_LOCATION));
-                double yLoc = Double.parseDouble(buildingElement
-                        .getAttributeValue(Y_LOCATION));
-                double facing = Double.parseDouble(buildingElement
-                        .getAttributeValue(FACING));
-
-                String scenario = "A";
-                //if (NAME.toLowerCase().equals("Mars Direct Base Resupply 3".toLowerCase()))
-                //	scenario = "A";
-                // TODO: need to rework how "scenario" and "scenarioID" are applied
-
-                template.buildings.add(new BuildingTemplate(template.name, 0, scenario, buildingType,
-                        buildingType, width, length, xLoc, yLoc, facing));
-
-            }
-
-            // Load vehicles
-            List<Element> vehicleNodes = resupplyElement.getChildren(VEHICLE);
-            for (Element vehicleElement : vehicleNodes) {
-                String vehicleType = vehicleElement.getAttributeValue(TYPE);
-                int vehicleNumber = Integer.parseInt(vehicleElement
-                        .getAttributeValue(NUMBER));
-                if (template.vehicles.containsKey(vehicleType))
-                    vehicleNumber += template.vehicles.get(vehicleType);
-                template.vehicles.put(vehicleType, vehicleNumber);
-            }
-
-            // Load equipment
-            List<Element> equipmentNodes = resupplyElement
-                    .getChildren(EQUIPMENT);
-            for (Element equipmentElement : equipmentNodes) {
-                String equipmentType = equipmentElement.getAttributeValue(TYPE);
-                int equipmentNumber = Integer.parseInt(equipmentElement
-                        .getAttributeValue(NUMBER));
-                if (template.equipment.containsKey(equipmentType))
-                    equipmentNumber += template.equipment.get(equipmentType);
-                template.equipment.put(equipmentType, equipmentNumber);
-            }
-
-            // Load people
-            List<Element> personNodes = resupplyElement.getChildren(PERSON);
-            for (Element personElement : personNodes) {
-                int personNumber = Integer.parseInt(personElement
-                        .getAttributeValue(NUMBER));
-                template.people += personNumber;
-            }
-
-            // Load resources
-            List<Element> resourceNodes = resupplyElement.getChildren(RESOURCE);
-            for (Element resourceElement : resourceNodes) {
-                String resourceName = resourceElement.getAttributeValue(NAME);
-                //System.out.println("resourceName is " + resourceName);
-                AmountResource resource = ResourceUtil.findAmountResource(resourceName);
-                double resourceAmount = Double.parseDouble(resourceElement
-                        .getAttributeValue(AMOUNT));
-                if (template.resources.containsKey(resource))
-                    resourceAmount += template.resources.get(resource);
-                template.resources.put(resource, resourceAmount);
-            }
-
-            // Load parts
-            List<Element> partNodes = resupplyElement.getChildren(PART);
-            for (Element partElement : partNodes) {
-                String partType = partElement.getAttributeValue(TYPE);
-                Part part = (Part) (ItemResourceUtil.findItemResource(partType));
-                int partNumber = Integer.parseInt(partElement
-                        .getAttributeValue(NUMBER));
-                if (template.parts.containsKey(part))
-                    partNumber += template.parts.get(part);
-                template.parts.put(part, partNumber);
-            }
-
-            // Load part packages
-            List<Element> partPackageNodes = resupplyElement
-                    .getChildren(PART_PACKAGE);
-
-            for (Element partPackageElement : partPackageNodes) {
-                String packageName = partPackageElement.getAttributeValue(NAME);
-                int packageNumber = Integer.parseInt(partPackageElement
-                        .getAttributeValue(NUMBER));
-                if (packageNumber > 0) {
-                    for (int z = 0; z < packageNumber; z++) {
-                        Map<Part, Integer> partPackage = partPackageConfig
-                                .getPartsInPackage(packageName);
-                        Iterator<Part> i = partPackage.keySet().iterator();
-                        while (i.hasNext()) {
-                            Part part = i.next();
-                            int partNumber = partPackage.get(part);
-                            if (template.parts.containsKey(part))
-                                partNumber += template.parts.get(part);
-                            template.parts.put(part, partNumber);
-                        }
-                    }
-                }
-            }
-        }
+                // Build the 
+                SupplyManifest template = new SupplyManifest(name, people,
+                                            Collections.unmodifiableList(buildings),
+                                            Collections.unmodifiableMap(vehicles),
+                                            Collections.unmodifiableMap(equipment),
+                                            Collections.unmodifiableMap(resources),
+                                            Collections.unmodifiableMap(parts) );
+	            resupplyTemplates.add(template);
+	        }
+    	}
     }
 
     /**
@@ -208,97 +196,18 @@ public class ResupplyConfig implements Serializable {
      * @param resupplyName the resupply mission name.
      * @return the resupply template.
      */
-    private ResupplyTemplate getResupplyTemplate(String resupplyName) {
+    public SupplyManifest getSupplyManifest(String resupplyName) {
 
-        ResupplyTemplate result = null;
-
-        Iterator<ResupplyTemplate> i = resupplyTemplates.iterator();
+        Iterator<SupplyManifest> i = resupplyTemplates.iterator();
         while (i.hasNext()) {
-            ResupplyTemplate template = i.next();
+            SupplyManifest template = i.next();
             if (template.name.equals(resupplyName)) {
-                result = template;
+                return template;
             }
         }
 
-        if (result == null)
-            throw new IllegalArgumentException("resupplyName: " + resupplyName
+        throw new IllegalArgumentException("resupplyName: " + resupplyName
                     + " not found.");
-
-        return result;
-    }
-
-    /**
-     * Gets a list of all building templates in the resupply mission.
-     * @param resupplyName the resupply mission name.
-     * @return list of building templates.
-     */
-    public List<BuildingTemplate> getResupplyBuildings(String resupplyName) {
-
-        List<BuildingTemplate> result = new CopyOnWriteArrayList<BuildingTemplate>();
-        ResupplyTemplate foundTemplate = getResupplyTemplate(resupplyName);
-        if (foundTemplate != null) {
-            result = new CopyOnWriteArrayList<BuildingTemplate>(foundTemplate.buildings);
-        }
-        return result;
-    }
-
-    /**
-     * Gets a list of vehicle types in the resupply mission.
-     * @param resupplyName name of the resupply mission.
-     * @return list of vehicle types as strings.
-     */
-    public List<String> getResupplyVehicleTypes(String resupplyName) {
-
-        ResupplyTemplate foundTemplate = getResupplyTemplate(resupplyName);
-        List<String> result = new CopyOnWriteArrayList<String>();
-        Iterator<String> j = foundTemplate.vehicles.keySet().iterator();
-        while (j.hasNext()) {
-            String vehicleType = j.next();
-            int vehicleNumber = foundTemplate.vehicles.get(vehicleType);
-            for (int x = 0; x < vehicleNumber; x++)
-                result.add(vehicleType);
-        }
-        return result;
-    }
-
-    /**
-     * Gets the equipment types in a resupply mission.
-     * @param resupplyName the name of the resupply mission.
-     * @return map of equipment types and number.
-     */
-    public Map<String, Integer> getResupplyEquipment(String resupplyName) {
-        ResupplyTemplate foundTemplate = getResupplyTemplate(resupplyName);
-        return new ConcurrentHashMap<String, Integer>(foundTemplate.equipment);
-    }
-
-    /**
-     * Gets the number of immigrants in a resupply mission.
-     * @param resupplyName name of the resupply mission.
-     * @return number of immigrants
-     */
-    public int getNumberOfResupplyImmigrants(String resupplyName) {
-        ResupplyTemplate foundTemplate = getResupplyTemplate(resupplyName);
-        return foundTemplate.people;
-    }
-
-    /**
-     * Gets a map of parts and their number in a resupply mission.
-     * @param resupplyName the name of the resupply mission.
-     * @return map of parts and their numbers.
-     */
-    public Map<Part, Integer> getResupplyParts(String resupplyName) {
-        ResupplyTemplate foundTemplate = getResupplyTemplate(resupplyName);
-        return new ConcurrentHashMap<Part, Integer>(foundTemplate.parts);
-    }
-
-    /**
-     * Gets a map of resources and their amounts in a resupply mission.
-     * @param resupplyName the name of the resupply mission.
-     * @return map of resources and their amounts (Double).
-     */
-    public Map<AmountResource, Double> getResupplyResources(String resupplyName) {
-        ResupplyTemplate foundTemplate = getResupplyTemplate(resupplyName);
-        return new ConcurrentHashMap<AmountResource, Double>(foundTemplate.resources);
     }
 
     /**
@@ -306,47 +215,17 @@ public class ResupplyConfig implements Serializable {
      */
     public void destroy() {
 
-        Iterator<ResupplyTemplate> i = resupplyTemplates.iterator();
-        while (i.hasNext()) {
-            ResupplyTemplate template = i.next();
-            template.name = null;
-            template.buildings.clear();
-            template.buildings = null;
-            template.vehicles.clear();
-            template.vehicles = null;
-            template.equipment.clear();
-            template.equipment = null;
-            template.resources.clear();
-            template.resources = null;
-            template.parts.clear();
-            template.parts = null;
-        }
         resupplyTemplates.clear();
         resupplyTemplates = null;
     }
 
     /**
-     * Private inner class for resupply template.
+     * Definition of a Supply Manifest used in a resupply mission
      */
-    private static class ResupplyTemplate implements Serializable {
-
-        /** default serial id. */
-        private static final long serialVersionUID = 1L;
-
-        private String name;
-        private List<BuildingTemplate> buildings;
-        private Map<String, Integer> vehicles;
-        private Map<String, Integer> equipment;
-        private int people;
-        private Map<AmountResource, Double> resources;
-        private Map<Part, Integer> parts;
-
-        private ResupplyTemplate() {
-            buildings = new CopyOnWriteArrayList<BuildingTemplate>();
-            vehicles = new ConcurrentHashMap<String, Integer>();
-            equipment = new ConcurrentHashMap<String, Integer>();
-            resources = new ConcurrentHashMap<AmountResource, Double>();
-            parts = new ConcurrentHashMap<Part, Integer>();
-        }
-    }
+    public static record SupplyManifest(String name, int people, List<BuildingTemplate> buildings,
+                                            Map<String, Integer> vehicles,
+                                            Map<String, Integer> equipment,
+                                            Map<AmountResource, Double> resources,
+                                            Map<Part, Integer> parts)
+                        implements Serializable {};
 }

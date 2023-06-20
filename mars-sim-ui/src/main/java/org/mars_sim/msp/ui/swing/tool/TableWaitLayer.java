@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * TableWaitLayer.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-09-20
  * @author Manny Kung
  */
 
@@ -23,9 +23,11 @@ import javax.swing.SwingWorker;
 import javax.swing.WindowConstants;
 import javax.swing.table.DefaultTableModel;
 
+@SuppressWarnings("serial")
 public class TableWaitLayer {
 	private final String[] columnNames = { "String", "Integer", "Boolean" };
 	private final Object[][] data = { { "aaa", 12, true }, { "bbb", 5, false }, { "ccc", 9, false }, };
+
 	private final DefaultTableModel model = new DefaultTableModel(data, columnNames) {
 		@Override
 		public Class<?> getColumnClass(int column) {
@@ -50,6 +52,8 @@ public class TableWaitLayer {
 							try {
 								Thread.sleep(50);
 							} catch (InterruptedException ie) {
+						        // Restore interrupted state
+						        Thread.currentThread().interrupt();
 								return "Interrupted";
 							}
 							publish(new Object[] { "aaa", current++, false });
@@ -75,8 +79,10 @@ public class TableWaitLayer {
 						} else {
 							try {
 								text = get();
+							} catch (InterruptedException e) {
+								// Restore interrupted state...
+								Thread.currentThread().interrupt();							
 							} catch (Exception ex) {
-								ex.printStackTrace();
 								text = "Exception";
 							}
 						}

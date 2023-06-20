@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * ModalInternalFrame.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-28
  * @author Scott Davis
  */
 
@@ -11,13 +11,9 @@ import java.awt.AWTEvent;
 import java.awt.ActiveEvent;
 import java.awt.Component;
 import java.awt.EventQueue;
-import java.awt.Image;
 import java.awt.MenuComponent;
-import java.awt.Toolkit;
-import java.awt.event.MouseEvent;
-import java.net.URL;
+import java.util.logging.Logger;
 
-import javax.swing.ImageIcon;
 import javax.swing.JInternalFrame;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
@@ -30,19 +26,22 @@ import javax.swing.SwingUtilities;
 @SuppressWarnings("serial")
 public abstract class ModalInternalFrame extends JInternalFrame {
 
+    /** default logger. */
+    private static final Logger logger = Logger.getLogger(ModalInternalFrame.class.getName());
+
 	// Data members
 	boolean modal = false;
 
 	/**
 	 * Constructor
-	 * 
+	 *
 	 * @param title
 	 *            the title of the frame.
 	 */
 	public ModalInternalFrame(String title) {
 		// Call JInternalFrame constructor.
 		super(title, false, false, false, false);
-		
+
 		setFrameIcon(MainWindow.getLanderIcon());
 	}
 
@@ -50,7 +49,7 @@ public abstract class ModalInternalFrame extends JInternalFrame {
 			boolean iconifiable) {
 		// Call JInternalFrame constructor.
 		super(title, resizable, closable, maximizable, iconifiable);
-		
+
 		setFrameIcon(MainWindow.getLanderIcon());
 	}
 
@@ -90,22 +89,19 @@ public abstract class ModalInternalFrame extends JInternalFrame {
 					Object source = event.getSource();
 					boolean dispatch = true;
 
-					if (event instanceof MouseEvent) {
-						MouseEvent e = (MouseEvent) event;
-						MouseEvent m = SwingUtilities.convertMouseEvent((Component) e.getSource(), e, this);
-
+//					if (event instanceof MouseEvent) {
+//						MouseEvent e = (MouseEvent) event;
+//						MouseEvent m = SwingUtilities.convertMouseEvent((Component) e.getSource(), e, this);
 						// Implement this bug fix posted in
 						// https://community.oracle.com/thread/1358431?start=0&tstart=0
-						//
-						if (!this.contains(m.getPoint()) && e.getID() != MouseEvent.MOUSE_DRAGGED
-								&& !e.getSource().getClass().getName().equals("javax.swing.Popup$HeavyWeightWindow")
-								&& e.getID() != MouseEvent.MOUSE_RELEASED) {
-							dispatch = false;
+//						if (!this.contains(m.getPoint()) && e.getID() != MouseEvent.MOUSE_DRAGGED
+//								&& !e.getSource().getClass().getName().equals("javax.swing.Popup$HeavyWeightWindow")
+//								&& e.getID() != MouseEvent.MOUSE_RELEASED) {
+//							dispatch = false;
+//						}
+//					}
 
-						}
-					} 
-					
-					else if (event instanceof ActiveEvent) {
+					if (event instanceof ActiveEvent) {
 						ActiveEvent activeEvent = (ActiveEvent) event;
 						activeEvent.dispatch();
 					}
@@ -132,20 +128,22 @@ public abstract class ModalInternalFrame extends JInternalFrame {
 				}
 			}
 		} catch (InterruptedException e) {
-			e.printStackTrace();
+			logger.config("Problem in startModal's EventQueue" + e.getMessage());
+		    // Restore interrupted state
+		    Thread.currentThread().interrupt();
 		}
 	}
 
 	/**
-	 * Stop the modal behavior.
+	 * Stops the modal behavior.
 	 */
 	private synchronized void stopModal() {
 		notifyAll();
 	}
 
 	/**
-	 * Set if the frame is modal.
-	 * 
+	 * Sets if the frame is modal.
+	 *
 	 * @param modal
 	 *            true if frame is modal.
 	 */
@@ -155,25 +153,18 @@ public abstract class ModalInternalFrame extends JInternalFrame {
 
 	/**
 	 * Checks if the frame is modal.
-	 * 
+	 *
 	 * @return true if frame is modal.
 	 */
 	public boolean isModal() {
 		return this.modal;
 	}
-	
+
 	/**
 	 * Sets the icon image for the main window.
 	 */
 	public void setIconImage() {
-
-		String fullImageName = MainWindow.LANDER_PNG;
-		URL resource = ImageLoader.class.getResource(fullImageName);
-		Toolkit kit = Toolkit.getDefaultToolkit();
-		Image img = kit.createImage(resource).getScaledInstance(16, 16, Image.SCALE_DEFAULT);
-//		ImageIcon icon = new ImageIcon(ClassLoader.getSystemResource("Iconos/icono.png"));
-		ImageIcon icon = new ImageIcon(img);
-		super.setFrameIcon(icon);
+		super.setFrameIcon(MainWindow.getLanderIcon());
 	}
-	
+
 }

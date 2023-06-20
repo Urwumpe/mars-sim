@@ -1,28 +1,27 @@
-/**
+/*
  * Mars Simulation Project
  * RespondToStudyInvitation.java
- * @version 3.1.2 2020-09-02
+ * @date 2022-06-11
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.mars_sim.msp.core.LogConsolidated;
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.job.Job;
-import org.mars_sim.msp.core.person.ai.social.Relationship;
-import org.mars_sim.msp.core.person.ai.task.utils.Task;
-import org.mars_sim.msp.core.person.ai.task.utils.TaskPhase;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
+import org.mars_sim.msp.core.person.ai.social.RelationshipUtil;
+import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
+import org.mars_sim.msp.core.science.ScienceConfig;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -35,16 +34,13 @@ import org.mars_sim.msp.core.vehicle.Rover;
 /**
  * A task for responding to an invitation to collaborate on a scientific study.
  */
-public class RespondToStudyInvitation extends Task implements Serializable {
+public class RespondToStudyInvitation extends Task {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static Logger logger = Logger.getLogger(RespondToStudyInvitation.class.getName());
-
-	private static String sourceName = logger.getName().substring(logger.getName().lastIndexOf(".") + 1,
-			logger.getName().length());
+	private static SimLogger logger = SimLogger.getLogger(RespondToStudyInvitation.class.getName());
 
 	/** Task name */
 	private static final String NAME = Msg.getString("Task.description.respondToStudyInvitation"); //$NON-NLS-1$
@@ -62,17 +58,26 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 	/** The scientific study. */
 	private ScientificStudy study;
 
-//	private static Map<Integer, Person> lookupPerson = unitManager.getLookupPerson();
-	
 	/**
 	 * Constructor
-	 * 
+	 *
 	 * @param person the person performing the task.
 	 */
 	public RespondToStudyInvitation(Person person) {
-		super(NAME, person, false, true, STRESS_MODIFIER, true, DURATION);
+		// Skill determined based on person job type
+		super(NAME, person, false, true, STRESS_MODIFIER, null, 25D, DURATION);
+		setExperienceAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
 
-//        ScientificStudyManager manager = Simulation.instance().getScientificStudyManager();
+//		if (person.getPhysicalCondition().computeFitnessLevel() < 2) {
+//			logger.fine(person, "Ended responding to study invitation. Not feeling well.");
+//			endTask();
+//		}
+
+		ScienceType scienceType = ScienceType.getJobScience(person.getMind().getJob());
+		if (scienceType != null) {
+			addAdditionSkill(scienceType.getSkill());
+		}
+
 		List<ScientificStudy> invitedStudies = scientificStudyManager.getOpenInvitationStudies(person);
 		if (invitedStudies.size() > 0) {
 			study = invitedStudies.get(0);
@@ -80,10 +85,10 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 			// If person is in a settlement, try to find an administration building.
 			boolean adminWalk = false;
 			if (person.isInSettlement()) {
-				Building adminBuilding = getAvailableAdministrationBuilding(person);
-				if (adminBuilding != null) {
-					// Walk to administration building.
-					walkToTaskSpecificActivitySpotInBuilding(adminBuilding, false);
+				Building b = BuildingManager.getAvailableBuilding(study, person);
+				if (b != null) {
+					// Walk to that building.
+                	walkToResearchSpotInBuilding(b, false);
 					adminWalk = true;
 				}
 			}
@@ -101,8 +106,7 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 				}
 			}
 		} else {
-			LogConsolidated.log(logger, Level.SEVERE, 0, sourceName, "[" + person.getLocationTag().getLocale() + "] "
-					+ person.getName() + " could not find any openly invited studies.");
+			logger.log(person, Level.SEVERE, 0, "Could not find any openly invited studies.");
 			endTask();
 		}
 
@@ -113,7 +117,7 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 
 	/**
 	 * Gets an available administration building that the person can use.
-	 * 
+	 *
 	 * @param person the person
 	 * @return available administration building or null if none.
 	 */
@@ -123,7 +127,7 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 
 		if (person.isInSettlement()) {
 			BuildingManager manager = person.getSettlement().getBuildingManager();
-			List<Building> administrationBuildings = manager.getBuildings(FunctionType.ADMINISTRATION);
+			Set<Building> administrationBuildings = manager.getBuildingSet(FunctionType.ADMINISTRATION);
 			administrationBuildings = BuildingManager.getNonMalfunctioningBuildings(administrationBuildings);
 			administrationBuildings = BuildingManager.getLeastCrowdedBuildings(administrationBuildings);
 
@@ -137,20 +141,22 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 		return result;
 	}
 
-	@Override
-	public FunctionType getLivingFunction() {
-		return FunctionType.ADMINISTRATION;
-	}
-
 	/**
 	 * Performs the responding to invitation phase.
-	 * 
+	 *
 	 * @param time the time (millisols) to perform the phase.
 	 * @return the remaining time (millisols) after performing the phase.
 	 */
 	private double respondingToInvitationPhase(double time) {
 
+		if (person.getPhysicalCondition().computeFitnessLevel() < 2) {
+			logger.fine(person, "Ended responding to study invitation. Not feeling well.");
+			endTask();
+			return time;
+		}
+
 		if (isDone()) {
+			endTask();
 			return time;
 		}
 
@@ -158,42 +164,40 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 		if (getDuration() <= (getTimeCompleted() + time)) {
 
 			study.respondingInvitedResearcher(person);
-			Job job = person.getMind().getJob();
+
+			// LImit how many studies a person can do
+			int studyCount = (person.getStudy() != null ? 1 : 0);
+			studyCount += person.getCollabStudies().size();
+			if (studyCount >= ScienceConfig.getMaxStudies()) {
+				logger.warning(person, "Doing too many studies to accept " + study.getName());
+				endTask();
+				return time;
+			}
+
+			JobType job = person.getMind().getJob();
 
 			// Get relationship between invitee and primary researcher.
 			Person primaryResearcher = study.getPrimaryResearcher();
-//            RelationshipManager relationshipManager = Simulation.instance().getRelationshipManager();
-			Relationship relationship = relationshipManager.getRelationship(person, primaryResearcher);
 
 			// Decide response to invitation.
 			if (decideResponse()) {
 				ScienceType science = ScienceType.getJobScience(job);
 				study.addCollaborativeResearcher(person, science);
 
-				// Add 10 points to primary researcher's opinion of invitee for accepting
+				// Add 5 points to primary researcher's opinion of invitee for accepting
 				// invitation.
-				if (relationship != null) {
-					double currentOpinion = relationship.getPersonOpinion(primaryResearcher);
-					relationship.setPersonOpinion(primaryResearcher, currentOpinion + 10D);
-				}
+		        RelationshipUtil.changeOpinion(primaryResearcher, person, RandomUtil.getRandomDouble(2));
 
-				LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-						"[" + person.getLocationTag().getLocale() + "] " + person.getName()
-								+ " accepted invitation from " + primaryResearcher.getName() + " to collaborate on "
-								+ study.toString());
+				logger.log(person, Level.FINE, 0, "Accepted invitation from " + primaryResearcher.getName()
+							+ " to collaborate on "	+ study.getName() + ".");
 			} else {
 
-				// Subtract 10 points from primary researcher's opinion of invitee for rejecting
+				// Subtract 5 points from primary researcher's opinion of invitee for rejecting
 				// invitation.
-				if (relationship != null) {
-					double currentOpinion = relationship.getPersonOpinion(primaryResearcher);
-					relationship.setPersonOpinion(primaryResearcher, currentOpinion - 10D);
-				}
+		        RelationshipUtil.changeOpinion(primaryResearcher, person, RandomUtil.getRandomDouble(-2));
 
-				LogConsolidated.log(logger, Level.INFO, 0, sourceName,
-						"[" + person.getLocationTag().getLocale() + "] " + person.getName()
-								+ " rejected invitation from " + primaryResearcher.getName() + " to collaborate on "
-								+ study.toString());
+				logger.log(person, Level.FINE, 0, "Rejected invitation from " + primaryResearcher.getName()
+							+ " to collaborate on "	+ study.getName() + ".");
 			}
 		}
 
@@ -202,7 +206,7 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 
 	/**
 	 * Decides is the researcher accepts or rejects invitation.
-	 * 
+	 *
 	 * @return true if accepts, false if rejects.
 	 */
 	private boolean decideResponse() {
@@ -229,15 +233,14 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 						acceptChance += (partner.getKey().getScientificAchievement(collaborativeScience) / 2D);
 
 				}
-				
+
 				// Modify if researcher's job science is collaborative.
 				if (isCollaborativeScience) {
 					acceptChance /= 2D;
 				}
 
 				// Modify by how many studies researcher is already collaborating on.
-				int numCollabStudies = scientificStudyManager.getOngoingCollaborativeStudies(person).size();
-				acceptChance /= (numCollabStudies + 1D);
+				acceptChance /= (person.getCollabStudies().size() + 1D);
 
 				// Modify based on difficulty level of study vs researcher's skill.
 				SkillType skill = jobScience.getSkill();
@@ -252,7 +255,7 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 				acceptChance *= ((double) difficultyLevel / (double) skillLevel);
 
 				// Modify based on researchers opinion of primary researcher.
-				double researcherOpinion = relationshipManager.getOpinionOfPerson(person, study.getPrimaryResearcher());
+				double researcherOpinion = RelationshipUtil.getOpinionOfPerson(person, study.getPrimaryResearcher());
 				acceptChance *= (researcherOpinion / 50D);
 
 				// Modify based on if researcher and primary researcher are at same settlement.
@@ -270,37 +273,6 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 	}
 
 	@Override
-	protected void addExperience(double time) {
-		// Add experience to relevant science skill
-		// 1 base experience point per 25 millisols of proposal writing time.
-		double newPoints = time / 25D;
-
-		// Experience points adjusted by person's "Academic Aptitude" attribute.
-		int academicAptitude = person.getNaturalAttributeManager().getAttribute(NaturalAttributeType.ACADEMIC_APTITUDE);
-		newPoints += newPoints * ((double) academicAptitude - 50D) / 100D;
-		newPoints *= getTeachingExperienceModifier();
-
-		ScienceType jobScience = ScienceType.getJobScience(person.getMind().getJob());
-		person.getSkillManager().addExperience(jobScience.getSkill(), newPoints, time);
-	}
-
-	@Override
-	public List<SkillType> getAssociatedSkills() {
-		List<SkillType> result = new ArrayList<SkillType>(1);
-		ScienceType jobScience = ScienceType.getJobScience(person.getMind().getJob());
-		if (jobScience != null) {
-			result.add(jobScience.getSkill());
-		}
-		return result;
-	}
-
-	@Override
-	public int getEffectiveSkillLevel() {
-		ScienceType jobScience = ScienceType.getJobScience(person.getMind().getJob());
-		return person.getSkillManager().getEffectiveSkillLevel(jobScience.getSkill());
-	}
-
-	@Override
 	protected double performMappedPhase(double time) {
 		if (getPhase() == null) {
 			throw new IllegalArgumentException("Task phase is null");
@@ -309,12 +281,5 @@ public class RespondToStudyInvitation extends Task implements Serializable {
 		} else {
 			return time;
 		}
-	}
-
-	@Override
-	public void destroy() {
-		super.destroy();
-
-		study = null;
 	}
 }

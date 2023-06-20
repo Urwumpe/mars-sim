@@ -1,16 +1,14 @@
 /**
  * Mars Simulation Project
  * ConstructionVehiclePanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.ArrayList;
@@ -29,16 +27,13 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.mars_sim.msp.core.CollectionUtils;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.GroundVehicle;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 /**
  * A wizard panel for selecting the construction vehicles for a mission.
@@ -55,9 +50,7 @@ class ConstructionVehiclePanel extends WizardPanel {
     private JLabel requiredLabel;
     private JLabel selectedLabel;
     private JLabel errorMessageLabel;
-    
-	private static MissionManager missionManager;
-	
+    	
     /**
      * Constructor
      * @param wizard the create mission wizard.
@@ -65,9 +58,7 @@ class ConstructionVehiclePanel extends WizardPanel {
     ConstructionVehiclePanel(final CreateMissionWizard wizard) {
         // User WizardPanel constructor.
         super(wizard);
-        
-		missionManager = Simulation.instance().getMissionManager();
-		
+        		
         // Set the layout.
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         
@@ -75,10 +66,7 @@ class ConstructionVehiclePanel extends WizardPanel {
         setBorder(new MarsPanelBorder());
         
         // Create the select vehicle label.
-        JLabel selectVehicleLabel = new JLabel("Select the light utility vehicles for the mission.", 
-                JLabel.CENTER);
-        selectVehicleLabel.setFont(selectVehicleLabel.getFont().deriveFont(Font.BOLD));
-        selectVehicleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JLabel selectVehicleLabel = createTitleLabel("Select the light utility vehicles for the mission.");
         add(selectVehicleLabel);
         
         requiredLabel = new JLabel("Required vehicles: ");
@@ -105,7 +93,6 @@ class ConstructionVehiclePanel extends WizardPanel {
         
         // Create the vehicle table.
         vehicleTable = new JTable(vehicleTableModel);
-		TableStyle.setTableStyle(vehicleTable);
 		vehicleTable.setAutoCreateRowSorter(true);		
         vehicleTable.setDefaultRenderer(Object.class, new UnitTableCellRenderer(vehicleTableModel));
         vehicleTable.setRowSelectionAllowed(true);
@@ -157,10 +144,7 @@ class ConstructionVehiclePanel extends WizardPanel {
         vehicleScrollPane.setViewportView(vehicleTable);
         
         // Create the error message label.
-        errorMessageLabel = new JLabel(" ", JLabel.CENTER);
-        errorMessageLabel.setFont(errorMessageLabel.getFont().deriveFont(Font.BOLD));
-        errorMessageLabel.setForeground(Color.RED);
-        errorMessageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        errorMessageLabel = createErrorLabel();
         add(errorMessageLabel);
         
         // Add a vertical glue.
@@ -244,8 +228,8 @@ class ConstructionVehiclePanel extends WizardPanel {
                     else if (column == 1) 
                         result = vehicle.printStatusTypes();
                     else if (column == 2) {
-                        Mission mission = missionManager.getMissionForVehicle(vehicle);
-                        if (mission != null) result = mission.getDescription();
+                        Mission mission = vehicle.getMission();
+                        if (mission != null) result = mission.getName();
                         else result = "None";
                     }
                 }
@@ -282,11 +266,11 @@ class ConstructionVehiclePanel extends WizardPanel {
             LightUtilityVehicle vehicle = (LightUtilityVehicle) getUnit(row);
             
             if (column == 1) {
-				if (!vehicle.haveStatusType(StatusType.PARKED) && !vehicle.haveStatusType(StatusType.GARAGED))
+				if ((vehicle.getPrimaryStatus() != StatusType.PARKED) && (vehicle.getPrimaryStatus() != StatusType.GARAGED))
                 	result = true;
             }
             else if (column == 2) {
-                Mission mission = missionManager.getMissionForVehicle(vehicle);
+                Mission mission = vehicle.getMission();
                 if (mission != null) result = true;
             }
             

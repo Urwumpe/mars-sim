@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * ExplorationCustomInfoPanel.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
@@ -15,6 +15,10 @@ import java.util.Map;
 import java.util.TreeSet;
 
 import javax.swing.Box;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JProgressBar;
+import javax.swing.JScrollPane;
 import javax.swing.SwingConstants;
 
 import org.mars_sim.msp.core.person.ai.mission.Exploration;
@@ -23,14 +27,12 @@ import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
 import org.mars_sim.msp.core.person.ai.mission.MissionEventType;
 import org.mars_sim.msp.core.tool.Conversion;
 
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.progressbar.WebProgressBar;
-import com.alee.laf.scroll.WebScrollPane;
+
 
 /**
  * A panel for displaying exploration mission information.
  */
+@SuppressWarnings("serial")
 public class ExplorationCustomInfoPanel
 extends MissionCustomInfoPanel {
 
@@ -49,7 +51,7 @@ extends MissionCustomInfoPanel {
 		setLayout(new BorderLayout());
 
 		// Create the main scroll panel.
-		WebScrollPane mainScrollPane = new WebScrollPane();
+		JScrollPane mainScrollPane = new JScrollPane();
 		add(mainScrollPane, BorderLayout.NORTH);
 
 		// Create main panel.
@@ -116,14 +118,14 @@ extends MissionCustomInfoPanel {
 	 * Inner class panel for displaying exploration site info.
 	 */
 	private class ExplorationSitePanel
-	extends WebPanel {
+	extends JPanel {
 
 		/** default serial id. */
 		private static final long serialVersionUID = 1L;
 
 		// Data members
 		private double completion;
-		private WebProgressBar completionBar;
+		private JProgressBar completionBar;
 
 		/**
 		 * Constructor
@@ -138,19 +140,19 @@ extends MissionCustomInfoPanel {
 
 			setLayout(new GridLayout(1, 2, 3, 3));
 
-			WebPanel namePanel = new WebPanel(new FlowLayout(FlowLayout.RIGHT, 3, 3));
+			JPanel namePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 3, 3));
 			namePanel.setAlignmentX(CENTER_ALIGNMENT);
 			add(namePanel);
 
-			WebLabel nameLabel = new WebLabel("  " + Conversion.capitalize(siteName), SwingConstants.RIGHT);
+			JLabel nameLabel = new JLabel("  " + Conversion.capitalize(siteName), SwingConstants.RIGHT);
 			nameLabel.setAlignmentX(CENTER_ALIGNMENT);
 			namePanel.add(nameLabel);
 
-			WebPanel barPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
+			JPanel barPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
 			barPanel.setAlignmentX(CENTER_ALIGNMENT);
 			add(barPanel);
 
-			completionBar = new WebProgressBar(0, 100);
+			completionBar = new JProgressBar(0, 100);
 			completionBar.setAlignmentX(CENTER_ALIGNMENT);
 			completionBar.setStringPainted(true);
 			completionBar.setValue((int) (completion * 100D));

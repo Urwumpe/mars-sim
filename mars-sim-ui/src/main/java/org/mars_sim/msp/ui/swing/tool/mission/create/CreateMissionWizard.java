@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * CreateMissionWizard.java
- * @version 3.1.2 2020-09-02
+ * @date 2021-08-28
  * @author Scott Davis
  */
 
@@ -27,6 +27,7 @@ import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
 /**
  * A wizard for creating new missions.
  */
+@SuppressWarnings("serial")
 public class CreateMissionWizard
 extends ModalInternalFrame
 implements ActionListener {
@@ -49,12 +50,13 @@ implements ActionListener {
 
 	/**
 	 * Constructor.
+	 * 
 	 * @param missionWindow The owner frame.
 	 */
 	public CreateMissionWizard(MainDesktopPane desktop, MissionWindow missionWindow) {
 		// Use ModalInternalFrame constructor
         super("Create Mission Wizard");
-        //2016-09-24 Added missionWindow param
+
         this.missionWindow = missionWindow;
         this.desktop = desktop;
         
@@ -119,20 +121,11 @@ implements ActionListener {
 		// Finish and display wizard.
 		//pack();
         setSize(new Dimension(700, 600));
-		//setLocationRelativeTo(owner);
-		//setResizable(false);
-		//setVisible(true);
-
+        
 		// Set the icon
 		setIconImage();
 		
-        // Add to its own tab pane
-//        if (desktop.getMainScene() != null)
-//        	desktop.add(this);
-//        	//desktop.getMainScene().getDesktops().get(1).add(this);
-//        else 
-        	desktop.add(this);
-        
+        desktop.add(this); 
         	
 		Dimension desktopSize = desktop.getParent().getSize();
 	    Dimension jInternalFrameSize = this.getSize();
@@ -149,6 +142,7 @@ implements ActionListener {
 
 	/**
 	 * Gets the current displayed wizard panel.
+	 * 
 	 * @return wizard panel.
 	 */
 	private WizardPanel getCurrentWizardPanel() {
@@ -165,7 +159,6 @@ implements ActionListener {
 			wizardPanels.remove(1);
 
 		// Add mission type appropriate final panels.
-
 		if (missionBean.isRemoteMission()) {
 			addWizardPanel(new StartingSettlementPanel(this));
 		}
@@ -178,13 +171,19 @@ implements ActionListener {
 			addWizardPanel(new LeadResearcherPanel(this));
 		}
 		if (missionBean.isRemoteMission()) {
-			addWizardPanel(new VehiclePanel(this));
+			if (missionBean.isDeliveryMission())
+				addWizardPanel(new FlyerPanel(this));
+			else
+				addWizardPanel(new VehiclePanel(this));
 		}
 		
-		// TODO: Change members panel to use lead researcher as member.
+		// Note: Change members panel to use lead researcher as member.
 		addWizardPanel(new MembersPanel(this));
-		//addWizardPanel(new BotMembersPanel(this));
 		
+		if (missionBean.isDeliveryMission()) {
+			addWizardPanel(new BotMembersPanel(this));
+		}
+	
 		// Choose the remote location of the mission
 		if (missionBean.requiresFieldSite()) {
 			addWizardPanel(new FieldSitePanel(this));
@@ -208,6 +207,9 @@ implements ActionListener {
 		} else if (missionBean.isTradeMission()) {
 			addWizardPanel(new TradeGoodsPanel(this, false));
 			addWizardPanel(new TradeGoodsPanel(this, true));
+		} else if (missionBean.isDeliveryMission()) {
+			addWizardPanel(new DeliveryGoodsPanel(this, false));
+			addWizardPanel(new DeliveryGoodsPanel(this, true));			
 		}
 		
 		// Set building construction or building salvage projects
@@ -218,107 +220,6 @@ implements ActionListener {
 			addWizardPanel(new SalvageProjectPanel(this));
             addWizardPanel(new SalvageVehiclePanel(this));
 		}
-
-//        if (missionBean.getType().equals(MissionDataBean.AREOLOGY_FIELD_MISSION)) {
-//            addWizardPanel(new StudyPanel(this));
-//            addWizardPanel(new LeadResearcherPanel(this));
-//            addWizardPanel(new VehiclePanel(this));
-//            // TODO: Change members panel to use lead researcher as member.
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new FieldSitePanel(this));
-//        }
-//        else if (missionBean.getType().equals(MissionDataBean.BIOLOGY_FIELD_MISSION)) {
-//            addWizardPanel(new StudyPanel(this));
-//            addWizardPanel(new LeadResearcherPanel(this));
-//            addWizardPanel(new VehiclePanel(this));
-//            // TODO: Change members panel to use lead researcher as member.
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new FieldSitePanel(this));
-//        }
-//        else if (missionBean.getType().equals(MissionDataBean.METEOROLOGY_FIELD_MISSION)) {
-//            addWizardPanel(new StudyPanel(this));
-//            addWizardPanel(new LeadResearcherPanel(this));
-//            addWizardPanel(new VehiclePanel(this));
-//            // TODO: Change members panel to use lead researcher as member.
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new FieldSitePanel(this));
-//        }
-//        else if (missionBean.getType().equals(MissionDataBean.CONSTRUCTION_MISSION)) {
-//            addWizardPanel(new ConstructionSettlementPanel(this));
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new ConstructionProjectPanel(this));
-//            addWizardPanel(new ConstructionVehiclePanel(this));
-//        }
-//        else if (missionBean.getType().equals(MissionDataBean.EMERGENCY_SUPPLY_MISSION)) {
-//            addWizardPanel(new StartingSettlementPanel(this));
-//            addWizardPanel(new VehiclePanel(this));
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new DestinationSettlementPanel(this));
-//            addWizardPanel(new EmergencySupplyPanel(this));
-//        }
-//		else if (missionBean.getType().equals(MissionDataBean.EXPLORATION_MISSION)) {
-//            addWizardPanel(new StartingSettlementPanel(this));
-//            addWizardPanel(new VehiclePanel(this));
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new ExplorationSitesPanel(this));
-//        }
-//		else if (missionBean.getType().equals(MissionDataBean.ICE_MISSION)) {
-//            addWizardPanel(new StartingSettlementPanel(this));
-//            addWizardPanel(new VehiclePanel(this));
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new ProspectingSitePanel(this));
-//        }
-//		else if (missionBean.getType().equals(MissionDataBean.MINING_MISSION)) {
-//            addWizardPanel(new StartingSettlementPanel(this));
-//            addWizardPanel(new VehiclePanel(this));
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new LightUtilityVehiclePanel(this));
-//			addWizardPanel(new MiningSitePanel(this));
-//		}
-//		else if (missionBean.getType().equals(MissionDataBean.REGOLITH_MISSION)) {
-//            addWizardPanel(new StartingSettlementPanel(this));
-//            addWizardPanel(new VehiclePanel(this));
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new ProspectingSitePanel(this));
-//        }
-//		else if (missionBean.getType().equals(MissionDataBean.RESCUE_MISSION)) {
-//            addWizardPanel(new StartingSettlementPanel(this));
-//            addWizardPanel(new VehiclePanel(this));
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new RendezvousVehiclePanel(this));
-//        }
-//	    else if (missionBean.getType().equals(MissionDataBean.TRAVEL_MISSION)) {
-//            addWizardPanel(new StartingSettlementPanel(this));
-//            addWizardPanel(new VehiclePanel(this));
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new DestinationSettlementPanel(this));
-//        }
-//		else if (missionBean.getType().equals(MissionDataBean.TRADE_MISSION)) {
-//            addWizardPanel(new StartingSettlementPanel(this));
-//            addWizardPanel(new VehiclePanel(this));
-//            //addWizardPanel(new MembersPanel(this));
-//			addWizardPanel(new DestinationSettlementPanel(this));
-//			addWizardPanel(new TradeGoodsPanel(this, false));
-//			addWizardPanel(new TradeGoodsPanel(this, true));
-//		}
-//        else if (missionBean.getType().equals(MissionDataBean.SALVAGE_MISSION)) {
-//            addWizardPanel(new SalvageSettlementPanel(this));
-//            addWizardPanel(new MembersPanel(this));
-//            //addWizardPanel(new BotMembersPanel(this));
-//            addWizardPanel(new SalvageProjectPanel(this));
-//            addWizardPanel(new SalvageVehiclePanel(this));
-//        }
 	}
 
 	/**
@@ -365,7 +266,9 @@ implements ActionListener {
 		else if (source == finalButton) buttonClickedFinal();
 	}
 
-	/** Go to previous wizard panel. */
+	/** 
+	 * Go to previous wizard panel. 
+	 */
 	public void buttonClickedPrev() {
 		getCurrentWizardPanel().clearInfo();
 		displayPanelIndex--;
@@ -375,7 +278,9 @@ implements ActionListener {
 		if (displayPanelIndex == 0) prevButton.setEnabled(false);
 	}
 
-	/** Go to next wizard panel. */
+	/** 
+	 * Go to next wizard panel. 
+	 */
 	public void buttonClickedNext() {
 		if (getCurrentWizardPanel().commitChanges()) {
 			displayPanelIndex++;

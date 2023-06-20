@@ -1,7 +1,7 @@
 /**
  * Mars Simulation Project
  * PlanetExp.java
- * @version 3.1.2 2020-09-02
+ * @version 3.2.0 2021-06-20
  * @author Manny Kung
  */
 
@@ -9,7 +9,6 @@
  * Planet Position by Expansion
  */
 package org.mars_sim.msp.core.astroarts;
-import org.mars_sim.msp.core.astroarts.UdMath;
 
 /**
  * planet position by expansion
@@ -632,6 +631,8 @@ public class PlanetExp {
 		case Planet.NEPTUNE:
 		case Planet.PLUTO:
 			return getPosExp3(planetNo, atime.getT2());
+		 default:
+		    break;			
 		}
 		return null;
 	}
