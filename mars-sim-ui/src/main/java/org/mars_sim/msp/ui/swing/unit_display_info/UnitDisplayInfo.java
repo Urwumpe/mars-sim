@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * UnitDisplayInfo.java
- * @version 3.2.0 2021-06-20
+ * @date 2023-04-28
  * @author Scott Davis
  */
 
@@ -12,6 +12,7 @@ import java.awt.Font;
 
 import javax.swing.Icon;
 
+import org.mars_sim.mapdata.MapMetaData;
 import org.mars_sim.msp.core.Unit;
 
 /**
@@ -28,29 +29,14 @@ public interface UnitDisplayInfo {
 	public boolean isMapDisplayed(Unit unit);
 
 	/**
-	 * Gets display icon for the surface navigator map.
+	 * Gets display icon for the map
 	 * 
 	 * @param unit the unit to display
+	 * @param type Meta data about base Map
 	 * @return icon
 	 */
-	public Icon getSurfMapIcon(Unit unit);
-
-	/**
-	 * Gets display icon for topo navigator map.
-	 * 
-	 * @param unit the unit to display
-	 * @return icon
-	 */
-	public Icon getTopoMapIcon(Unit unit);
-
-	/**
-	 * Gets display icon for geology navigator map.
-	 * 
-	 * @param unit the unit to display
-	 * @return icon
-	 */
-	public Icon getGeologyMapIcon(Unit unit);
-
+	public Icon getMapIcon(Unit unit, MapMetaData type);
+	
 	/**
 	 * Checks if the map icon should blink on and off.
 	 * 
@@ -60,25 +46,11 @@ public interface UnitDisplayInfo {
 	public boolean isMapBlink(Unit unit);
 
 	/**
-	 * Gets the label color for surface navigator map.
-	 * 
+	 * Gets the label color for navigator map.
+	 * @param type Meta data about base Map
 	 * @return color
 	 */
-	public Color getSurfMapLabelColor();
-
-	/**
-	 * Gets the label color for topo navigator map.
-	 * 
-	 * @return color
-	 */
-	public Color getTopoMapLabelColor();
-
-	/**
-	 * Gets the label color for geo navigator map.
-	 * 
-	 * @return color
-	 */
-	public Color getGeologyMapLabelColor();
+	public Color getMapLabelColor(MapMetaData type);
 
 	/**
 	 * Gets the label font for navigator map.
@@ -103,25 +75,11 @@ public interface UnitDisplayInfo {
 	public boolean isGlobeDisplayed(Unit unit);
 
 	/**
-	 * Gets display color for surface globe.
-	 * 
+	 * Gets display color for globe.
+	 * @param type Meta data about base Map
 	 * @return color
 	 */
-	public Color getSurfGlobeColor();
-
-	/**
-	 * Gets display color for topo globe.
-	 * 
-	 * @return color
-	 */
-	public Color getTopoGlobeColor();
-
-	/**
-	 * Gets display color for geology globe.
-	 * 
-	 * @return color
-	 */
-	public Color getGeologyGlobeColor();
+	public Color getGlobeColor(MapMetaData type);
 
 	/**
 	 * Gets icon for unit button.

@@ -1,38 +1,34 @@
 /*
  * Mars Simulation Project
  * MonitorWindow.java
- * @date 2022-07-02
+ * @date 2023-05-27
  * @author Barry Evans
  */
-
 package org.mars_sim.msp.ui.swing.tool.monitor;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Properties;
 
 import javax.swing.BorderFactory;
-import javax.swing.DefaultListCellRenderer;
-import javax.swing.JList;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.JButton;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
-import javax.swing.JTable;
-import javax.swing.JViewport;
 import javax.swing.SwingConstants;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 
+import org.mars_sim.msp.core.Coordinates;
+import org.mars_sim.msp.core.Entity;
 import org.mars_sim.msp.core.GameManager;
 import org.mars_sim.msp.core.GameManager.GameMode;
 import org.mars_sim.msp.core.Msg;
@@ -41,29 +37,21 @@ import org.mars_sim.msp.core.UnitManagerEventType;
 import org.mars_sim.msp.core.UnitManagerListener;
 import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.logging.SimLogger;
-import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.ui.swing.ConfigurableWindow;
 import org.mars_sim.msp.ui.swing.ImageLoader;
+import org.mars_sim.msp.ui.swing.JComboBoxMW;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.toolwindow.ToolWindow;
-import org.mars_sim.msp.ui.swing.unit_window.UnitWindow;
-
-import com.alee.laf.button.WebButton;
-import com.alee.laf.combobox.WebComboBox;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.tabbedpane.WebTabbedPane;
-import com.alee.managers.style.StyleId;
-import com.alee.managers.tooltip.TooltipManager;
-import com.alee.managers.tooltip.TooltipWay;
 
 /**
  * The MonitorWindow is a tool window that displays a selection of tables each
  * of which monitor a set of Units.
  */
 @SuppressWarnings("serial")
-public class MonitorWindow extends ToolWindow implements TableModelListener, ActionListener{
+public class MonitorWindow extends ToolWindow
+			implements ConfigurableWindow, TableModelListener, ActionListener{
 
 	/** default logger. */
 	private static SimLogger logger = SimLogger.getLogger(MonitorWindow.class.getName());
@@ -72,50 +60,45 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	private static final int WIDTH = 1366;
 	private static final int HEIGHT = 640;
 
-	public static final String TITLE = Msg.getString("MonitorWindow.title"); //$NON-NLS-1$
+	public static final String NAME = Msg.getString("MonitorWindow.title"); //$NON-NLS-1$
+	public static final String ICON = "monitor";
 
 	// Added an custom icon for each tab
-	public static final String COLONY_ICON = Msg.getString("icon.colony"); //$NON-NLS-1$
-	public static final String MARS_ICON = Msg.getString("icon.mars"); //$NON-NLS-1$
-	public static final String BOT_ICON = Msg.getString("icon.robot"); //$NON-NLS-1$
-	public static final String MISSION_ICON = Msg.getString("icon.mission"); //$NON-NLS-1$
-	public static final String VEHICLE_ICON = Msg.getString("icon.vehicle"); //$NON-NLS-1$
-	public static final String CROP_ICON = Msg.getString("icon.crop"); //$NON-NLS-1$
-	public static final String EVENT_ICON = Msg.getString("icon.event"); //$NON-NLS-1$
-	public static final String FOOD_ICON = Msg.getString("icon.food"); //$NON-NLS-1$
-	public static final String PEOPLE_ICON = Msg.getString("icon.people"); //$NON-NLS-1$
-	public static final String ANALYTICS_ICON = Msg.getString("icon.analytics"); //$NON-NLS-1$
-	public static final String TRADE_ICON = Msg.getString("icon.trade"); //$NON-NLS-1$
-	public static final String BUILDING_ICON = Msg.getString("icon.building"); //$NON-NLS-1$
+	private static final String COLONY_ICON = "settlement";
+	private static final String MARS_ICON = "mars";
+	private static final String BOT_ICON = "robot";
+	private static final String VEHICLE_ICON = "vehicle";
+	private static final String CROP_ICON = "crop";
+	private static final String PEOPLE_ICON = "people";
+	private static final String BUILDING_ICON = "building"; 
 
-	public static final String TRASH_ICON = Msg.getString("icon.trash"); //$NON-NLS-1$
-	public static final String LOCATE_ICON = Msg.getString("icon.locate"); //$NON-NLS-1$
-	public static final String FIND_ICON = Msg.getString("icon.find"); //$NON-NLS-1$
-	public static final String COLUMN_ICON = Msg.getString("icon.column"); //$NON-NLS-1$
-	public static final String FILTER_ICON = Msg.getString("icon.filter"); //$NON-NLS-1$
+	private static final String TRASH_ICON = "action/trash";
+	private static final String LOCATE_ICON = "action/locate";
+	private static final String DETAILS_ICON = "details";
+	private static final String COLUMN_ICON = "action/column";
+	private static final String FILTER_ICON = "action/filter";
 
-	public static final String BAR_ICON = Msg.getString("icon.bar"); //$NON-NLS-1$
-	public static final String PIE_ICON = Msg.getString("icon.pie"); //$NON-NLS-1$
+	private static final String SETTLEMENT_PROP = "SETTLEMENT";
+	private static final String TAB_PROP = "TAB";
 
 	// Data members
-	private WebTabbedPane tabsSection;
+	private JTabbedPane tabsSection;
 	// Note: may use JideTabbedPane instead
-	private WebLabel rowCount;
+	private JLabel rowCount;
 	/** The Tab showing historical events. */
 	private EventTab eventsTab;
 
-	private WebButton buttonPie;
-	private WebButton buttonBar;
-	private WebButton buttonRemoveTab;
-	private WebButton buttonMap;
-	private WebButton buttonDetails;
-	private WebButton buttonMissions;
-	private WebButton buttonFilter;
-	private WebButton buttonProps;
+	private JButton buttonPie;
+	private JButton buttonBar;
+	private JButton buttonRemoveTab;
+	private JButton buttonMap;
+	private JButton buttonDetails;
+	private JButton buttonFilter;
+	private JButton buttonProps;
 
 	/** Settlement Combo box */
-	private WebComboBox settlementComboBox;
-	private WebPanel statusPanel;
+	private JComboBoxMW<Settlement> settlementComboBox;
+	private JPanel statusPanel;
 
 	private Settlement selectedSettlement;
 
@@ -132,42 +115,50 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	 */
 	public MonitorWindow(MainDesktopPane desktop) {
 		// Use TableWindow constructor
-		super(TITLE, desktop);
+		super(NAME, desktop);
 
 		unitManager = desktop.getSimulation().getUnitManager();
 		
 		// Get content pane
-		WebPanel mainPane = new WebPanel(new BorderLayout(5, 5));
+		JPanel mainPane = new JPanel(new BorderLayout(5, 5));
 		mainPane.setBorder(new MarsPanelBorder());
 		setContentPane(mainPane);
-		// Create top pane
-		WebPanel topPane = new WebPanel(new GridLayout(1, 5));
-		topPane.setPreferredHeight(30);
-		mainPane.add(topPane, BorderLayout.NORTH);
+
+		// Get any saved props
+		Properties savedProps = desktop.getMainWindow().getConfig().getInternalWindowProps(NAME);
 
 		// Set up settlements
 		List<Settlement> initialSettlements = setupSettlements();
-		
+		if (!initialSettlements.isEmpty()) {
+			String defaultSettlement = (savedProps != null ? savedProps.getProperty(SETTLEMENT_PROP) : null);
+			if (defaultSettlement != null) {
+				for(Settlement s : initialSettlements) {
+					if (s.getName().equals(defaultSettlement)) {
+						selectedSettlement = s;
+					}
+				}
+			}
+
+			if (selectedSettlement == null) {
+				selectedSettlement = initialSettlements.get(0);
+			}
+		}
+
 		// Create the settlement combo box
         buildSettlementNameComboBox(initialSettlements);
 
-		// Create settlement pane
-		WebPanel settlementPane = new WebPanel(new BorderLayout(5, 5));
-        settlementPane.setSize(getNameLength() * 14, 30);
-		settlementPane.add(settlementComboBox, BorderLayout.CENTER);
-		topPane.add(new JPanel());
-		topPane.add(new JPanel());
-		topPane.add(settlementPane);
-		topPane.add(new JPanel());
-		topPane.add(new JPanel());
+		// Create top pane
+		JPanel topPane = new JPanel(new FlowLayout());
+		topPane.add(settlementComboBox);
+
+		mainPane.add(topPane, BorderLayout.NORTH);
 
 		// Create tabbed pane for the table
-		tabsSection = new WebTabbedPane(StyleId.tabbedpane, SwingConstants.LEFT, JTabbedPane.SCROLL_TAB_LAYOUT);
-		// May choose WRAP_TAB_LAYOUT
-		tabsSection.setForeground(Color.DARK_GRAY);
+		tabsSection = new JTabbedPane(SwingConstants.LEFT, JTabbedPane.SCROLL_TAB_LAYOUT);
 		
 		// Add all the tabs
-		addAllTabs(initialSettlements);
+		addAllTabs(initialSettlements,
+					(savedProps != null ? savedProps.getProperty(TAB_PROP) : null));
 		
 		// Hide settlement box at startup since the all settlement tab is being selected by default
 		setSettlementBox(true);
@@ -177,13 +168,9 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		tabsSection.addChangeListener(e -> updateTab());
 		
 		mainPane.add(tabsSection, BorderLayout.CENTER);
-		
-		// Open the Events tab at the start of the sim
-//		May call tabsSection.setSelectedIndex(2)
-//		May call table.repaint()
 
 		// Create a status panel
-		statusPanel = new WebPanel();
+		statusPanel = new JPanel();
 		statusPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 1, 1));
 		mainPane.add(statusPanel, BorderLayout.SOUTH);
 	
@@ -197,12 +184,6 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 
 		setSize(new Dimension(WIDTH, HEIGHT));	
 		setMinimumSize(new Dimension(640, 256));
-		Dimension desktopSize = desktop.getMainWindow().getFrame().getSize();
-		Dimension windowSize = getSize();
-
-		int width = (desktopSize.width - windowSize.width) / 2;
-		int height = (desktopSize.height - windowSize.height - 100) / 2;
-		setLocation(width, height);
 		
 		// Lastly activate the default tab
 		selectNewTab(getSelectedTab());
@@ -211,33 +192,39 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	/**
 	 * Adds all the tabs.
 	 */
-	private void addAllTabs(List<Settlement> initialSettlements) {
-		// Add tabs into the table
-		if (!initialSettlements.isEmpty())
-			this.selectedSettlement = initialSettlements.get(0);
-		
+	private void addAllTabs(List<Settlement> initialSettlements, String defaultTabName) {
+		List<MonitorTab> newTabs = new ArrayList<>();
+
+		// Add tabs into the table	
 		if (initialSettlements.size() > 1) {
-			addTab(new UnitTab(this, new SettlementTableModel(), true, MARS_ICON));
+			newTabs.add(new UnitTab(this, new SettlementTableModel(), true, MARS_ICON));
 		}
 		
-		addTab(new UnitTab(this, new SettlementTableModel(selectedSettlement), true, COLONY_ICON));
-		addTab(new UnitTab(this, new PersonTableModel(selectedSettlement, true), true, PEOPLE_ICON));
-		addTab(new UnitTab(this, new RobotTableModel(selectedSettlement, true), true, BOT_ICON));
-		addTab(new UnitTab(this, new BuildingTableModel(selectedSettlement), true, BUILDING_ICON));
-		addTab(new UnitTab(this, new CropTableModel(selectedSettlement), true, CROP_ICON));
+		newTabs.add(new UnitTab(this, new SettlementTableModel(selectedSettlement), true, COLONY_ICON));
+		newTabs.add(new UnitTab(this, new PersonTableModel(selectedSettlement, true), true, PEOPLE_ICON));
+		newTabs.add(new UnitTab(this, new RobotTableModel(selectedSettlement, true), true, BOT_ICON));
+		newTabs.add(new UnitTab(this, new BuildingTableModel(selectedSettlement), true, BUILDING_ICON));
+		newTabs.add(new UnitTab(this, new CropTableModel(selectedSettlement), true, CROP_ICON));
 		
-		addTab(new FoodInventoryTab(selectedSettlement, this));
-		addTab(new BacklogTab(selectedSettlement, this));
+		newTabs.add(new FoodInventoryTab(selectedSettlement, this));
+		newTabs.add(new BacklogTab(selectedSettlement, this));
 
 		
-		addTab(new TradeTab(selectedSettlement, this));
+		newTabs.add(new TradeTab(selectedSettlement, this));
 		
 		eventsTab = new EventTab(this, desktop);
-		addTab(eventsTab);
+		newTabs.add(eventsTab);
 		
-		addTab(new MissionTab(this));
-		addTab(new UnitTab(this, new VehicleTableModel(selectedSettlement), true, VEHICLE_ICON));
+		newTabs.add(new MissionTab(this));
+		newTabs.add(new UnitTab(this, new VehicleTableModel(selectedSettlement), true, VEHICLE_ICON));
 
+		// Add the enw tabs an search for default
+		for(MonitorTab m : newTabs) {
+			addTab(m);
+			if (m.getName().equals(defaultTabName)) {
+				tabsSection.setSelectedComponent(m);
+			}
+		}
 	}
 
 	/**
@@ -245,54 +232,46 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	 */
 	private void addBottomBar() {
 		// Prepare row count label
-		rowCount = new WebLabel("  ");
+		rowCount = new JLabel("  ");
 		rowCount.setPreferredSize(new Dimension(120, STATUS_HEIGHT));
 		rowCount.setHorizontalAlignment(SwingConstants.LEFT);
 		rowCount.setBorder(BorderFactory.createLoweredBevelBorder());
 		statusPanel.add(rowCount);
 
 		// Create graph button
-		buttonPie = new WebButton(ImageLoader.getNewIcon(PIE_ICON));
-		TooltipManager.setTooltip(buttonPie, Msg.getString("MonitorWindow.tooltip.singleColumnPieChart"), //$NON-NLS-1$
-				TooltipWay.up);
+		buttonPie = new JButton(ImageLoader.getIconByName(PieChartTab.ICON));
+		buttonPie.setToolTipText(Msg.getString("MonitorWindow.tooltip.singleColumnPieChart")); //$NON-NLS-1$
 		buttonPie.addActionListener(this);
 		statusPanel.add(buttonPie);
 
-		buttonBar = new WebButton(ImageLoader.getNewIcon(BAR_ICON));
-		TooltipManager.setTooltip(buttonBar, Msg.getString("MonitorWindow.tooltip.multipleColumnBarChart"), //$NON-NLS-1$
-				TooltipWay.up);
+		buttonBar = new JButton(ImageLoader.getIconByName(BarChartTab.ICON));
+		buttonBar.setToolTipText(Msg.getString("MonitorWindow.tooltip.multipleColumnBarChart")); //$NON-NLS-1$
 		buttonBar.addActionListener(this);
 		statusPanel.add(buttonBar);
 
-		buttonRemoveTab = new WebButton(ImageLoader.getNewIcon(TRASH_ICON)); // $NON-NLS-1$
-		TooltipManager.setTooltip(buttonRemoveTab, Msg.getString("MonitorWindow.tooltip.tabRemove"), //$NON-NLS-1$
-				TooltipWay.up);
+		buttonRemoveTab = new JButton(ImageLoader.getIconByName(TRASH_ICON)); // $NON-NLS-1$
+		buttonRemoveTab.setToolTipText(Msg.getString("MonitorWindow.tooltip.tabRemove")); //$NON-NLS-1$
 		buttonRemoveTab.addActionListener(this);
 		statusPanel.add(buttonRemoveTab);
 
 		// Create buttons based on selection
-		buttonMap = new WebButton(ImageLoader.getNewIcon(LOCATE_ICON)); // $NON-NLS-1$
-		TooltipManager.setTooltip(buttonMap, Msg.getString("MonitorWindow.tooltip.centerMap"), TooltipWay.up); //$NON-NLS-1$
+		buttonMap = new JButton(ImageLoader.getIconByName(LOCATE_ICON)); // $NON-NLS-1$
+		buttonMap.setToolTipText(Msg.getString("MonitorWindow.tooltip.centerMap")); //$NON-NLS-1$
 		buttonMap.addActionListener(this);
 		statusPanel.add(buttonMap);
 
-		buttonDetails = new WebButton(ImageLoader.getNewIcon(FIND_ICON)); // $NON-NLS-1$
-		TooltipManager.setTooltip(buttonDetails, Msg.getString("MonitorWindow.tooltip.showDetails"), TooltipWay.up); //$NON-NLS-1$
+		buttonDetails = new JButton(ImageLoader.getIconByName(DETAILS_ICON)); // $NON-NLS-1$
+		buttonDetails.setToolTipText(Msg.getString("MonitorWindow.tooltip.showDetails")); //$NON-NLS-1$
 		buttonDetails.addActionListener(this);
 		statusPanel.add(buttonDetails);
 
-		buttonMissions = new WebButton(ImageLoader.getNewIcon(MISSION_ICON)); // $NON-NLS-1$
-		TooltipManager.setTooltip(buttonMissions, Msg.getString("MonitorWindow.tooltip.mission"), TooltipWay.up); //$NON-NLS-1$
-		buttonMissions.addActionListener(this);
-		statusPanel.add(buttonMissions);
-
-		buttonProps = new WebButton(ImageLoader.getNewIcon(COLUMN_ICON)); // $NON-NLS-1$
-		TooltipManager.setTooltip(buttonProps, Msg.getString("MonitorWindow.tooltip.preferences"), TooltipWay.up); //$NON-NLS-1$
+		buttonProps = new JButton(ImageLoader.getIconByName(COLUMN_ICON)); // $NON-NLS-1$
+		buttonProps.setToolTipText(Msg.getString("MonitorWindow.tooltip.preferences")); //$NON-NLS-1$
 		buttonProps.addActionListener(this);
 		statusPanel.add(buttonProps);
 
-		buttonFilter = new WebButton(ImageLoader.getNewIcon(FILTER_ICON));
-		TooltipManager.setTooltip(buttonFilter, Msg.getString("MonitorWindow.tooltip.categoryFilter"), TooltipWay.up); //$NON-NLS-1$
+		buttonFilter = new JButton(ImageLoader.getIconByName(FILTER_ICON));
+		buttonFilter.setToolTipText(Msg.getString("MonitorWindow.tooltip.categoryFilter")); //$NON-NLS-1$
 		buttonFilter.addActionListener(this);
 		statusPanel.add(buttonFilter);
 
@@ -310,9 +289,10 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		if (index != -1)
 			tabsSection.setSelectedIndex(index);
 		else {
-			logger.severe(model + " not found.");
 			try {
-				addTab(new UnitTab(this, model, false, UnitWindow.USER));
+				UnitTab newTab = new UnitTab(this, model, false,"usertab");
+				addTab(newTab);
+				tabsSection.setSelectedComponent(newTab);
 			} catch (Exception e) {
 				logger.severe(model + " cannot be added.");
 			}
@@ -343,18 +323,16 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	/**
 	 * Builds the settlement combo box/
 	 */
-	@SuppressWarnings("unchecked")
 	private void buildSettlementNameComboBox(List<Settlement> startingSettlements) {
 
-		settlementComboBox = new WebComboBox(StyleId.comboboxHover, startingSettlements);
-		settlementComboBox.setWidePopup(true);
-		settlementComboBox.setSize(getNameLength() * 12, 30);
+		DefaultComboBoxModel<Settlement> model = new DefaultComboBoxModel<>();
+		model.addAll(startingSettlements);
+		model.setSelectedItem(selectedSettlement);
+		settlementComboBox = new JComboBoxMW<Settlement>(model);
 		settlementComboBox.setOpaque(false);
-		settlementComboBox.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 16));
-		settlementComboBox.setForeground(Color.ORANGE.darker());
 		settlementComboBox.setToolTipText(Msg.getString("SettlementWindow.tooltip.selectSettlement")); //$NON-NLS-1$
-		settlementComboBox.setRenderer(new PromptComboBoxRenderer());
-
+		settlementComboBox.setPreferredSize(new Dimension(100, 25));
+	
 		// Set the item listener only after the setup is done
 		settlementComboBox.addItemListener(event -> {
 			Settlement newSettlement = (Settlement) event.getItem();
@@ -369,7 +347,7 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		// Listen for new Settlements
 		umListener = event -> {
 			if (event.getEventType() == UnitManagerEventType.ADD_UNIT) {
-				settlementComboBox.addItem(event.getUnit());
+				settlementComboBox.addItem((Settlement) event.getUnit());
 			}
 		};
 		unitManager.addUnitManagerListener(UnitType.SETTLEMENT, umListener);
@@ -398,22 +376,6 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		settlementComboBox.setEnabled(!isOpaque);
 		settlementComboBox.setVisible(!isOpaque);
 	}
-	
-    /**
-     * Gets the length of the most lengthy settlement name/
-     *
-     * @return
-     */
-    private int getNameLength() {
-    	Collection<Settlement> list = unitManager.getSettlements();
-    	int max = 12;
-    	for (Settlement s: list) {
-    		int size = s.getName().length();
-    		if (max < size)
-    			max = size;
-    	}
-    	return max;
-    }
 
 	/**
 	 * Gets the index of the monitor tab with the model.
@@ -421,10 +383,9 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	 * @param model the model to check for.
 	 * @return tab index or -1 if none.
 	 */
-	public int getModelIndex(UnitTableModel<?> model) {
+	private int getModelIndex(UnitTableModel<?> model) {
 		for (Component c: tabsSection.getComponents()) {
-			if (c instanceof MonitorTab) {
-				MonitorTab tab = (MonitorTab)c;
+			if (c instanceof MonitorTab tab) {
 				if (model.equals(tab.getModel())) {
 					return tabsSection.indexOfComponent(c);
 				}
@@ -498,61 +459,14 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	 */
 	private void selectNewTab(MonitorTab selectedTab) {
 		
-		// Disable all buttons
-		boolean enableMap = false;
-		boolean enableDetails = false;
-		boolean enableMission = false;
-		boolean enableFilter = false;
-		boolean enableSettlement = true;
-		
 		MonitorModel tabTableModel = selectedTab.getModel();
 
-		if (selectedTab instanceof UnitTab) {
-			// Enable these buttons
-			enableDetails = true;
-			enableMap = true;
-
-			// Is select by Settlement supported ?
-			enableSettlement = tabTableModel.setSettlementFilter(selectedSettlement);
-			
-		}
-		else if (selectedTab instanceof MissionTab) {
-			// Enable these buttons
-			enableDetails = true;
-			enableMission = true;
-
-			// Hide the settlement box
-			enableSettlement = false;
-
-		}
-		else if (selectedTab instanceof EventTab) {
-			// Enable these buttons
-			enableDetails = true;
-			enableFilter = true;
-
-			// Hide the settlement box
-			enableSettlement = false;
-		}
-		else if (selectedTab instanceof BacklogTab) {
-			tabTableModel.setSettlementFilter(selectedSettlement);
-		}
-		else if (selectedTab instanceof FoodInventoryTab) {
-			tabTableModel.setSettlementFilter(selectedSettlement);
-
-		} else if (selectedTab instanceof TradeTab) {
-			// Enable these buttons
-			enableFilter = true;
-			
-			int rowIndex = ((TradeTab)selectedTab).getTable().getSelectedRow();
-			tabTableModel.setSettlementFilter(selectedSettlement);
-
-			scrollToVisible(((TradeTab)selectedTab).getTable(), rowIndex, 0);
-		}
-		else {
-			// Hide the settlement box
-			enableSettlement = false;
-		}
-
+		// Disable all buttons
+		boolean enableMap = selectedTab.isNavigatable();
+		boolean enableDetails = selectedTab.isEntityDriven();
+		boolean enableFilter = selectedTab.isFilterable();
+		boolean enableSettlement = tabTableModel.setSettlementFilter(selectedSettlement);
+		
 		boolean enableBar = false;
 		boolean enablePie = false;
 		if (selectedTab instanceof TableTab) {
@@ -587,29 +501,13 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		
 		// Set the opaqueness of the settlement box
 		setSettlementBox(!enableSettlement);
-		buttonRemoveTab.setEnabled(!selectedTab.getMandatory());
+		buttonRemoveTab.setEnabled(!selectedTab.isMandatory());
 		buttonBar.setEnabled(enableBar);
 		buttonPie.setEnabled(enablePie);
 		buttonMap.setEnabled(enableMap);
 		buttonDetails.setEnabled(enableDetails);
-		buttonMissions.setEnabled(enableMission);
 		buttonFilter.setEnabled(enableFilter);
 	}
-
-	/**
-	 * Scrolls the mouse cursor to a particular row and column.
-	 * 
-	 * @param table
-	 * @param rowIndex
-	 * @param vColIndex
-	 */
-	private static void scrollToVisible(JTable table, int rowIndex, int vColIndex) {
-        if (!(table.getParent() instanceof JViewport)) {
-            return;
-        }
-        
-        table.scrollRectToVisible(table.getCellRect(rowIndex, vColIndex, true));
-    }
 
 	@Override
 	public void tableChanged(TableModelEvent e) {
@@ -656,29 +554,19 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 	private void centerMap() {
 		MonitorTab selected = getSelectedTab();
 		if (selected != null) {
-			selected.centerMap(desktop);
+			Coordinates place = selected.getSelectedCoordinates();
+			if (place != null) {
+				desktop.centerMapGlobe(place);
+			}
 		}
 	}
 
-	public void displayDetails() {
+	void displayDetails() {
 		MonitorTab selected = getSelectedTab();
-		if (selected != null) {
-			selected.displayDetails(desktop);
-		}
-	}
-
-	/**
-	 * Finds and highlights the mission in Mission Tool.
-	 */
-	private void displayMission() {
-		MonitorTab selected = getSelectedTab();
-		if (selected instanceof MissionTab) {
-			List<?> rows = selected.getSelection();
-			Iterator<?> it = rows.iterator();
-			while (it.hasNext()) {
-				Object row = it.next();
-				if (row instanceof Mission) {
-					((MissionTab) selected).displayMission(desktop, (Mission) row);
+		if (selected instanceof TableTab tt) {
+			for(Object row : tt.getSelection()) {
+				if (row instanceof Entity ent) {
+					desktop.showDetails(ent);
 				}
 			}
 		}
@@ -707,15 +595,13 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 			createBarChart();
 		} else if (source == this.buttonRemoveTab) {
 			MonitorTab selected = getSelectedTab();
-			if (selected != null && !selected.getMandatory()) {
+			if (selected != null && !selected.isMandatory()) {
 				removeTab(getSelectedTab());
 			}
 		} else if (source == this.buttonDetails) {
 			displayDetails();
 		} else if (source == this.buttonMap) {
 			centerMap();
-		} else if (source == this.buttonMissions) {
-			displayMission();
 		} else if (source == this.buttonProps) {
 			displayProps();
 		} else if (source == this.buttonFilter) {
@@ -723,6 +609,16 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		}
 	}
 
+	/** 
+	 * Get the details of which tab is selected
+	 */
+	@Override
+	public Properties getUIProps() {
+		Properties result = new Properties();
+		result.setProperty(SETTLEMENT_PROP, selectedSettlement.getName());
+		result.setProperty(TAB_PROP, getSelectedTab().getName());
+		return result;
+	}
 
 	/**
 	 * Prepares tool window for deletion.
@@ -732,40 +628,5 @@ public class MonitorWindow extends ToolWindow implements TableModelListener, Act
 		super.destroy();
 
 		unitManager.removeUnitManagerListener(UnitType.SETTLEMENT, umListener);
-	}
-
-	class PromptComboBoxRenderer extends DefaultListCellRenderer {
-
-		private static final long serialVersionUID = 1L;
-		private String prompt;
-
-		public PromptComboBoxRenderer(){
-		    setHorizontalAlignment(CENTER);
-		}
-
-		public PromptComboBoxRenderer(String prompt){
-				this.prompt = prompt;
-		}
-
-		@Override
-		public Component getListCellRendererComponent(JList<?> list, Object value,
-	            int index, boolean isSelected, boolean cellHasFocus) {
-			Component c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-
-			if (value == null) {
-				setText(prompt);
-				return this;
-			}
-
-			if (isSelected) {
-	        	  c.setForeground(Color.black);
-	        	  c.setBackground(new Color(255,229,204,50)); // pale orange
-	          } else {
-					c.setForeground(Color.black);
-			        c.setBackground(new Color(184,134,11,50)); // mud orange
-	          }
-
-	        return c;
-	    }
 	}
 }

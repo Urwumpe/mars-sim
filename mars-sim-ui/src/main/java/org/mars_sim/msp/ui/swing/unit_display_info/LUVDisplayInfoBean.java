@@ -7,11 +7,8 @@
 
 package org.mars_sim.msp.ui.swing.unit_display_info;
 
-import java.awt.Color;
-
 import javax.swing.Icon;
 
-import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 import org.mars_sim.msp.core.vehicle.StatusType;
@@ -24,7 +21,8 @@ import org.mars_sim.msp.ui.swing.sound.SoundConstants;
 public class LUVDisplayInfoBean extends VehicleDisplayInfoBean {
 
 	// Data members
-	private Icon buttonIcon = ImageLoader.getIcon(Msg.getString("ico.luv"), ImageLoader.VEHICLE_ICON_DIR);
+	private Icon buttonIcon = ImageLoader.getIconByName("unit/luv");
+
 
 	/**
 	 * Constructor
@@ -59,27 +57,6 @@ public class LUVDisplayInfoBean extends VehicleDisplayInfoBean {
     	else return "";
 	}
 
-
-	@Override
-	public Icon getGeologyMapIcon(Unit unit) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-
-	@Override
-	public Color getGeologyMapLabelColor() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-
-	@Override
-	public Color getGeologyGlobeColor() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-	
 	@Override
 	public boolean isMapDisplayed(Unit unit) {
         return false;

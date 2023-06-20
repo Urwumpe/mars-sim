@@ -10,6 +10,7 @@ import java.awt.Dimension;
 import java.util.List;
 
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
@@ -24,16 +25,12 @@ import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
-
-import com.alee.laf.scroll.WebScrollPane;
 
 @SuppressWarnings("serial")
 public class TabPanelGoods extends TabPanel {
 
-	private static final String CART_ICON = Msg.getString("icon.cart"); //$NON-NLS-1$
+	private static final String GOOD_ICON = "trade";
 	
 	// Data members
 	private JTable goodsTable;
@@ -48,7 +45,7 @@ public class TabPanelGoods extends TabPanel {
 		// Use TabPanel constructor.
 		super(
 			null,
-			ImageLoader.getNewIcon(CART_ICON),
+			ImageLoader.getIconByName(GOOD_ICON),
 			Msg.getString("TabPanelGoods.title"), //$NON-NLS-1$
 			unit, desktop
 		);
@@ -58,7 +55,7 @@ public class TabPanelGoods extends TabPanel {
 	protected void buildUI(JPanel content) {
 		
  		// Create scroll panel for the outer table panel.
-		WebScrollPane goodsScrollPane = new WebScrollPane();
+		JScrollPane goodsScrollPane = new JScrollPane();
 		goodsScrollPane.setPreferredSize(new Dimension(250, 300));
 		// increase vertical mousewheel scrolling speed for this one
 		goodsScrollPane.getVerticalScrollBar().setUnitIncrement(16);
@@ -68,7 +65,7 @@ public class TabPanelGoods extends TabPanel {
 		goodsTableModel = new GoodsTableModel(((Settlement) getUnit()).getGoodsManager());
 
 		// Prepare goods table.
-		goodsTable = new ZebraJTable(goodsTableModel);
+		goodsTable = new JTable(goodsTableModel);
 		goodsScrollPane.setViewportView(goodsTable);
 		goodsTable.setRowSelectionAllowed(true);
 		
@@ -81,25 +78,14 @@ public class TabPanelGoods extends TabPanel {
 		// Added the two methods below to make all heatTable columns
 		// Resizable automatically when its Panel resizes
 		goodsTable.setPreferredScrollableViewportSize(new Dimension(225, -1));
-		//goodsTable.setAutoResizeMode(WebTable.AUTO_RESIZE_ALL_COLUMNS);
 
 		// Align the preference score to the center of the cell
 		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
 		renderer.setHorizontalAlignment(SwingConstants.RIGHT);
 		goodsTable.getColumnModel().getColumn(0).setCellRenderer(renderer);
-//		goodsTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
 
 		// Added sorting
 		goodsTable.setAutoCreateRowSorter(true);
-
-		TableStyle.setTableStyle(goodsTable);
-
-     	// Added goodsSearchable
-//     	TableSearchable searchable = SearchableUtils.installSearchable(goodsTable);
-//        searchable.setPopupTimeout(5000);
-//     	searchable.setCaseSensitive(false);
-//        searchable.setMainIndex(0); // -1 = search for all columns
-
 	}
 
 	/**
@@ -107,7 +93,6 @@ public class TabPanelGoods extends TabPanel {
 	 */
 	@Override
 	public void update() {
-		TableStyle.setTableStyle(goodsTable);
 		goodsTableModel.update();
 	}
 
@@ -122,8 +107,6 @@ public class TabPanelGoods extends TabPanel {
 		// Data members
 		GoodsManager manager;
 		List<?> goods;
-
-		//private DecimalFormat twoDecimal = new DecimalFormat("#,###,##0.00");
 
 		private GoodsTableModel(GoodsManager manager) {
 			this.manager = manager;
@@ -163,8 +146,6 @@ public class TabPanelGoods extends TabPanel {
 				if (column == 0) return good.getName();
 				else if (column == 1) {
 					try {
-						// Note: twoDecimal format is in conflict with Table column number sorting
-						//return twoDecimal.format(manager.getGoodValuePerItem(good));
 						return manager.getGoodValuePoint(good.getID());
 					}
 					catch (Exception e) {

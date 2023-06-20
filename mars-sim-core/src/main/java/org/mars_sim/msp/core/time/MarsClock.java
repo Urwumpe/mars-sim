@@ -38,8 +38,6 @@ public class MarsClock implements Serializable {
 
 	// Martian calendar static members
 
-
-	
 	static final int SOLS_PER_MONTH_SHORT = 27;
 
 	private static final int SOLS_PER_ORBIT_LEAPYEAR = 669;
@@ -49,7 +47,7 @@ public class MarsClock implements Serializable {
 	public static final int SOLS_PER_MONTH_LONG = 28;
 	public static final int NUM_SOLS_SIX_MONTHS = SOLS_PER_MONTH_LONG * 5 + SOLS_PER_MONTH_SHORT;
 
-	public static final double AVERAGE_SOLS_PER_ORBIT_NON_LEAPYEAR = ClockUtils.SOLS_PER_ORBIT;
+	public static final double AVERAGE_SOLS_PER_ORBIT_NON_LEAPYEAR = 668.5921;
 
 	// Mars is at aphelion (its greatest distance from the Sun, 249 million
 	// kilometers, where it moves most slowly) at Ls = 70 , near the northern
@@ -69,6 +67,8 @@ public class MarsClock implements Serializable {
 	public static final double HOURS_PER_MILLISOL  = SECONDS_PER_MILLISOL / 3600D;
 	/** Number of millisols per hour. */
 	public static final double MILLISOLS_PER_HOUR  = 3600D / SECONDS_PER_MILLISOL;
+	/** Number of millisols per day. */	
+	public static final double MILLISOLS_PER_DAY = MILLISOLS_PER_HOUR * 24;
 
 	// Mars is near perihelion when it is summer in the southern hemisphere and
 	// winter in the north, and near aphelion when it is winter in the southern
@@ -88,8 +88,8 @@ public class MarsClock implements Serializable {
 	private int solOfMonth;
 	/** The mission sol since the start of the sim. */
 	private int missionSol;
-	/** The rounded millisol of the day. */
-	private int msolInt;
+	/** The truncated integer millisols (NOT a rounded millisol) of the day. */
+	private int intMillisol;
 	/** The millisol of the day. */
 	private double millisol;
 	/** The total Millisols */
@@ -236,7 +236,7 @@ public class MarsClock implements Serializable {
 		this.millisol = millisol;
 		this.missionSol = missionSol;
 		this.totalMillisols = calculateTotalMillisols(orbit, month, sol, millisol);
-		this.msolInt = (int) millisol;
+		this.intMillisol = (int) millisol;
 	}
 
 	/**
@@ -251,7 +251,7 @@ public class MarsClock implements Serializable {
 		this.millisol = marsClock.getMillisol();
 		this.missionSol = marsClock.getMissionSol();
 		this.totalMillisols = MarsClock.calculateTotalMillisols(orbit, month, solOfMonth, millisol);
-		this.msolInt = marsClock.getMillisolInt();		
+		this.intMillisol = marsClock.getMillisolInt();		
 	}
 	
 	/**
@@ -336,7 +336,7 @@ public class MarsClock implements Serializable {
 			}
 		}
 
-		msolInt = (int) millisol;
+		intMillisol = (int) millisol;
 	}
 
 	/**
@@ -475,12 +475,12 @@ public class MarsClock implements Serializable {
 	}
 
 	/**
-	 * Returns the rounded millisols.
+	 * Returns the truncated integer millisols (NOT a rounded millisol).
 	 *
 	 * @return the millisol as an int
 	 */
 	public int getMillisolInt() {
-		return msolInt;
+		return intMillisol;
 	}
 
 	/**

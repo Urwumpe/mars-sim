@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 
 import org.mars_sim.msp.core.Msg;
@@ -55,6 +56,7 @@ public class PeerReviewStudyPaper extends Task {
 
 	/**
 	 * Constructor.
+	 * 
 	 * @param person the person performing the task.
 	 */
 	public PeerReviewStudyPaper(Person person) {
@@ -79,6 +81,14 @@ public class PeerReviewStudyPaper extends Task {
                 	// Walk to that building.
                 	walkToResearchSpotInBuilding(b, false);
                     adminWalk = true;
+                }
+                else {
+                	b = getAvailableAdministrationBuilding(person);
+                	if (b != null) {
+                     	// Walk to that building.
+                     	walkToResearchSpotInBuilding(b, false);
+                     	adminWalk = true;
+                	}
                 }
             }
 
@@ -118,7 +128,7 @@ public class PeerReviewStudyPaper extends Task {
 
         if (person.isInSettlement()) {
             BuildingManager manager = person.getSettlement().getBuildingManager();
-            List<Building> administrationBuildings = manager.getBuildings(FunctionType.ADMINISTRATION);
+            Set<Building> administrationBuildings = manager.getBuildingSet(FunctionType.ADMINISTRATION);
             administrationBuildings = BuildingManager.getLeastCrowdedBuildings(
             		BuildingManager.getNonMalfunctioningBuildings(administrationBuildings));
 
@@ -134,6 +144,7 @@ public class PeerReviewStudyPaper extends Task {
 
     /**
      * Determines the scientific study that will be reviewed.
+     * 
      * @return study or null if none available.
      */
     private ScientificStudy determineStudy(Person person) {
@@ -142,7 +153,6 @@ public class PeerReviewStudyPaper extends Task {
         List<ScientificStudy> possibleStudies = new ArrayList<>();
 
         // Get all studies in the peer review phase.
-//        ScientificStudyManager studyManager = Simulation.instance().getScientificStudyManager();
         Iterator<ScientificStudy> i = scientificStudyManager.getOngoingStudies().iterator();
         while (i.hasNext()) {
             ScientificStudy study = i.next();

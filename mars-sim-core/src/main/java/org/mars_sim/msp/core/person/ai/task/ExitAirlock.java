@@ -576,11 +576,16 @@ public class ExitAirlock extends Task {
 	
 			setPhase(STEP_THRU_INNER_DOOR);
 				
-			AirlockMode airlockMode = airlock.getAirlockMode();
+//			AirlockMode airlockMode = airlock.getAirlockMode();
+//			
+//			if (airlockMode != AirlockMode.EGRESS
+//				&& (airlock.isEmpty() || airlockMode != AirlockMode.INGRESS))
+//					airlock.setAirlockMode(AirlockMode.EGRESS);
 			
-			if (airlockMode != AirlockMode.EGRESS
-				&& (airlock.isEmpty() || airlockMode != AirlockMode.INGRESS))
-					airlock.setAirlockMode(AirlockMode.EGRESS);
+			if (airlock.isEmpty())
+				airlock.setAirlockMode(AirlockMode.NOT_IN_USE);
+			else
+				airlock.setAirlockMode(AirlockMode.EGRESS);
 		}
 		
 		return 0;
@@ -665,6 +670,8 @@ public class ExitAirlock extends Task {
 					"Just entered through the inner door into "
 					+ airlock.getEntity().toString() + ".");
 
+			airlock.setAirlockMode(AirlockMode.EGRESS);
+			
 			// Add experience
 			addExperience(time);
 
@@ -773,22 +780,22 @@ public class ExitAirlock extends Task {
 	 */
 	private double donEVASuit(double time) {
 
+		if (!isFit()) {
+			walkAway(person, NOT_FIT + " to don an EVA suit.");
+			return time;
+		}
+
+		if (isOccupantHalfPrebreathed()) {
+			walkAway(person, "Can't don an EVA suit - " + PREBREATH_HALF_DONE);
+			return time;
+		}
+		
 		boolean canProceed = false;
 
 		// Gets the suit instance
 		EVASuit suit = person.getSuit();
 		
 		if (suit == null) {
-			
-			if (!isFit()) {
-				walkAway(person, NOT_FIT + " to don an EVA suit.");
-				return time;
-			}
-	
-			if (isOccupantHalfPrebreathed()) {
-				walkAway(person, "Can't don an EVA suit - " + PREBREATH_HALF_DONE);
-				return time;
-			}
 			
 			if (!airlock.isPressurized()) {
 				// Go back to the previous phase
@@ -875,6 +882,16 @@ public class ExitAirlock extends Task {
 	 */
 	private double prebreathe(double time) {
 
+		if (!isFit()) {
+			walkAway(person, NOT_FIT + " to prebreath.");
+			return time;
+		}
+
+		if (isOccupantHalfPrebreathed()) {
+			walkAway(person, "Can't don an EVA suit - " + PREBREATH_HALF_DONE);
+			return time;
+		}		
+		
 		boolean canProceed = false;
 		
 		if (person.getSuit() == null) {
@@ -884,7 +901,7 @@ public class ExitAirlock extends Task {
 		}
 
 		PhysicalCondition pc = person.getPhysicalCondition();
-
+		
 		// Continue pre-breathing
 		pc.reduceRemainingPrebreathingTime(time);
 

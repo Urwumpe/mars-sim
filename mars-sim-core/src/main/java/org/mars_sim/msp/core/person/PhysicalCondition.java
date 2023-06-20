@@ -54,7 +54,6 @@ public class PhysicalCondition implements Serializable {
 
 	/** The maximum number of sols for storing stats. */
 	public static final int MAX_NUM_SOLS = 7;
-	
 	/** The maximum number of sols in fatigue [millisols]. */
 	public static final int MAX_FATIGUE = 40_000;
 	/** The maximum number of sols in hunger [millisols]. */
@@ -77,7 +76,6 @@ public class PhysicalCondition implements Serializable {
 	public static final int FATIGUE_MIN = 150;
 	/** The amount of stress threshold [millisols]. */
 	private static final int STRESS_THRESHOLD = 60;
-
 	/** Life support minimum value. */
 	private static final int MIN_VALUE = 0;
 	/** Life support maximum value. */
@@ -112,7 +110,9 @@ public class PhysicalCondition implements Serializable {
 	public static final double MAXIMUM_AIR_PRESSURE = 68D; // Assume 68 kPa time dependent
 	/** Period of time (millisols) over which random ailments may happen. */
 	private static final double RANDOM_AILMENT_PROBABILITY_TIME = 100_000D;
-
+	/** The standard pre-breathing time in the EVA suit. */
+	private static final double STANDARD_PREBREATHING_TIME = 40;
+	
 	private static final double O2_CONSUMPTION;
 	private static final double H2O_CONSUMPTION;
 	private static final double MIN_AIR_PRESSURE;
@@ -127,9 +127,6 @@ public class PhysicalCondition implements Serializable {
 	private static final String TBD = "(To be determined)";
 	private static final String SUICIDE = "Suicide";
 	private static final String INSTRUCTED = " committed suicide as instructed.";
-
-	/** The standard pre-breathing time in the EVA suit. */
-	private static final double STANDARD_PREBREATHING_TIME = 40;
 
 	/** True if person is starving. */
 	private boolean isStarving;
@@ -292,7 +289,6 @@ public class PhysicalCondition implements Serializable {
 		alive = true;
 
 		radiation = new RadiationExposure(newPerson);
-		radiation.initializeWithRandomDose();
 
 		deathDetails = null;
 
@@ -2213,11 +2209,19 @@ public class PhysicalCondition implements Serializable {
 	}
 	
 	/**
-	 * Records the amount of food consumption in kg
+	 * Records the amount of food/water consumption in kg.
+	 * Types :
+	 * 0 = preserved food
+	 * 1 = meal
+	 * 2 = dessert
+	 * 3 = water
 	 * 
 	 * @param amount in kg
+	 * @param type
 	 */
 	public void recordFoodConsumption(double amount, int type) {
+//		if (type == 0)
+//			logger.info(person, "Eaten " + Math.round(amount * 1000D)/1000D + " kg preserved food.");
 		consumption.increaseDataPoint(type, amount);
 	}
 	

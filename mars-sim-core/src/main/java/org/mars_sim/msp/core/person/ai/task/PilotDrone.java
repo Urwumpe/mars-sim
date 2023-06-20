@@ -18,7 +18,6 @@ import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.building.function.Computation;
-import org.mars_sim.msp.core.time.ClockUtils;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Flyer;
@@ -41,8 +40,6 @@ public class PilotDrone extends OperateVehicle {
 	/** Task phases. */
 	private static final TaskPhase AVOID_COLLISION = new TaskPhase(Msg.getString("Task.phase.avoidObstacle")); //$NON-NLS-1$
 
-	/** The stress modified per millisol. */
-	private static final double STRESS_MODIFIER = .2D;
 	/** The speed at which the obstacle / winching phase commence. */
 	private static final double LOW_SPEED = .5;
 	/** The computing resources [in CUs] needed per km. */
@@ -71,7 +68,7 @@ public class PilotDrone extends OperateVehicle {
 			double startTripDistance) {
 
 		// Use OperateVehicle constructor
-		super(NAME, person, flyer, destination, startTripTime, startTripDistance, STRESS_MODIFIER, 
+		super(NAME, person, flyer, destination, startTripTime, startTripDistance, 
 				150D + RandomUtil.getRandomDouble(10D) - RandomUtil.getRandomDouble(10D));
 		
 		// Set initial parameters
@@ -85,8 +82,7 @@ public class PilotDrone extends OperateVehicle {
 			double startTripDistance) {
 
 		// Use OperateVehicle constructor
-		super(NAME, robot, flyer, destination, startTripTime, startTripDistance, STRESS_MODIFIER, true,
-				1000D);
+		super(NAME, robot, flyer, destination, startTripTime, startTripDistance, 1000D);
 		
 		// Set initial parameters
 		setDescription(Msg.getString("Task.description.pilotDrone.detail", flyer.getName())); // $NON-NLS-1$
@@ -109,8 +105,7 @@ public class PilotDrone extends OperateVehicle {
 			double startTripDistance, TaskPhase startingPhase) {
 
 		// Use OperateVehicle constructor
-		super(NAME, person, flyer, destination, startTripTime, startTripDistance, STRESS_MODIFIER, 
-				100D + RandomUtil.getRandomDouble(-20D, 20D));
+		super(NAME, person, flyer, destination, startTripTime, startTripDistance, 100D + RandomUtil.getRandomDouble(-20D, 20D));
 		
 		// Set initial parameters
 		setDescription(Msg.getString("Task.description.pilotDrone.detail", flyer.getName())); // $NON-NLS-1$
@@ -128,8 +123,7 @@ public class PilotDrone extends OperateVehicle {
 			double startTripDistance, TaskPhase startingPhase) {
 
 		// Use OperateVehicle constructor
-		super(NAME, robot, flyer, destination, startTripTime, startTripDistance, STRESS_MODIFIER, true,
-				250D);
+		super(NAME, robot, flyer, destination, startTripTime, startTripDistance, 250D);
 		
 		// Set initial parameters
 		setDescription(Msg.getString("Task.description.pilotDrone.detail", flyer.getName())); // $NON-NLS-1$
@@ -175,13 +169,7 @@ public class PilotDrone extends OperateVehicle {
 	 * @return the amount of time (ms) left over after driving (if any)
 	 */
 	protected double mobilizeVehicle(double time) {
-		// If speed is less than or equal to the .5 kph, change to avoiding obstacle phase.
-//		if ((getVehicle().getSpeed() <= LOW_SPEED) 
-//				&& !AVOID_COLLISION.equals(getPhase())) {
-//			setPhase(AVOID_COLLISION);
-//			return (time);
-//		} else
-			return super.mobilizeVehicle(time);
+		return super.mobilizeVehicle(time);
 	}
 
 	/**
@@ -327,7 +315,7 @@ public class PilotDrone extends OperateVehicle {
 		if (!horizontalMovement)
 			mod = 4;
 			
-		double currentE = ((Flyer)getVehicle()).getHoveringElevation();
+		double currentE = ((Flyer)getVehicle()).getHoveringHeight();
 		double oldGroundE = ((Flyer)getVehicle()).getElevation();
 		double newGroundE = getGroundElevation();
 		
@@ -336,14 +324,14 @@ public class PilotDrone extends OperateVehicle {
 		
 		if (ascentE > 0) {
 			// Future: Use Newton's law to determine the amount of height the flyer can climb 
-			double tSec = time * ClockUtils.SECONDS_PER_MILLISOL;
+			double tSec = time * MarsClock.SECONDS_PER_MILLISOL;
 			double speed = .0025 * mod;
 			climbE = speed * tSec;
 			
 		}
 		else if (ascentE < 0) {
 			// Future: Use Newton's law to determine the amount of height the flyer can climb 
-			double tSec = time * ClockUtils.SECONDS_PER_MILLISOL;
+			double tSec = time * MarsClock.SECONDS_PER_MILLISOL;
 			double speed = -.02 * mod;
 			climbE = speed * tSec;
 		}

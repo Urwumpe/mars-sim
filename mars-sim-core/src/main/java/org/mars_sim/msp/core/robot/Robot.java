@@ -1,18 +1,22 @@
 /*
  * Mars Simulation Project
  * Robot.java
- * @date 2022-07-23
+ * @date 2023-05-09
  * @author Manny Kung
  */
 
 package org.mars_sim.msp.core.robot;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Coordinates;
@@ -49,7 +53,6 @@ import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.RoboticStation;
 import org.mars_sim.msp.core.structure.building.function.SystemType;
 import org.mars_sim.msp.core.time.ClockPulse;
-import org.mars_sim.msp.core.time.EarthClock;
 import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Crewable;
@@ -93,11 +96,7 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	/** The building the robot is at. */
 	private int currentBuildingInt;
 	/** The year of birth of this robot. */
-	private int year;
-	/** The month of birth of this robot. */
-	private int month;
-	/** The day of birth of this robot. */
-	private int day;
+	private LocalDate birthDate;
 	/** The age of this robot. */
 	private int age;
 	/** The settlement the robot is currently associated with. */
@@ -177,17 +176,16 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	 */
 	public void initialize() {
 
-		unitManager = sim.getUnitManager();
-
 		// Add this robot to be owned by the settlement
-		unitManager.getSettlementByID(associatedSettlementID).addOwnedRobot(this);
-		// Set the container unit
-//		setContainerUnit(settlement);
+		Settlement s = unitManager.getSettlementByID(associatedSettlementID);
+		s.addOwnedRobot(this);
+
 		// Put robot in proper building.
-		BuildingManager.addRobotToRandomBuilding(this, associatedSettlementID);
+		BuildingManager.addRobotToRandomBuilding(this, s);
 
 		// Add scope to malfunction manager.
 		malfunctionManager = new MalfunctionManager(this, WEAR_LIFETIME, MAINTENANCE_TIME);
+		// Add system type to malfunction manager scope
 		malfunctionManager.addScopeString(SystemType.ROBOT.getName());
 
 		// Set up the time stamp for the robot
@@ -209,28 +207,11 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	 *
 	 */
 	private void createBirthDate() {
-		// Set a birth time for the person
-		year = EarthClock.getCurrentYear(earthClock) - RandomUtil.getRandomInt(22, 62);
-		month = RandomUtil.getRandomInt(11) + 1;
-		if (month == 2) {
-			if (((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0)) {
-				day = RandomUtil.getRandomInt(28) + 1;
-			} else {
-				day = RandomUtil.getRandomInt(27) + 1;
-			}
-		}
-		else if (month == 1 || month == 3 || month == 5 || month == 7 || month == 8 || month == 10 || month == 12) {
-			day = RandomUtil.getRandomInt(30) + 1;
-		}
-		else {
-			day = RandomUtil.getRandomInt(29) + 1;
-		}
+		// Remove a random number of days from the current earth date
+		int daysPast = RandomUtil.getRandomInt(31, 5*365);
+		birthDate = masterClock.getEarthTime().minusDays(daysPast).toLocalDate();
 
-		// TODO: find out why sometimes day = 0 as seen on
-		if (day == 0) {
-			logger.warning(this, "date of birth is on the day 0th. Incrementing to the 1st.");
-			day = 1;
-		}
+		updateAge(masterClock.getEarthTime());
 	}
 
 	/**
@@ -281,7 +262,7 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	@Override
 	public Settlement getSettlement() {
 
-		if (getContainerID() == Unit.MARS_SURFACE_UNIT_ID)
+		if (getContainerID() <= Unit.MARS_SURFACE_UNIT_ID)
 			return null;
 
 		Unit c = getContainerUnit();
@@ -360,11 +341,8 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 
 		if (pulse.isNewSol()) {
 			// Check if a person's age should be updated
-			EarthClock earthTime = pulse.getEarthTime();
-			age = earthTime.getYear() - year - 1;
-			if (earthTime.getMonth() >= month)
-				if (earthTime.getDayOfMonth() >= day)
-					age++;
+			updateAge(pulse.getMasterClock().getEarthTime());
+
 		}
 		return true;
 	}
@@ -416,12 +394,8 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	 *
 	 * @return the robot's age
 	 */
-	public int updateAge(EarthClock earthTime) {
-		age = earthTime.getYear() - year - 1;
-		if (earthTime.getMonth() >= month)
-			if (earthTime.getDayOfMonth() >= day)
-				age++;
-
+	private int updateAge(LocalDateTime earthTime) {
+		age = (int)ChronoUnit.YEARS.between(birthDate, earthTime);
 		return age;
 	}
 
@@ -440,18 +414,7 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	 * @return the robot's birth date
 	 */
 	public String getBirthDate() {
-		StringBuilder s = new StringBuilder();
-		s.append(year).append("-");
-		if (month < 10)
-			s.append("0").append(month).append("-");
-		else
-			s.append(month).append("-");
-		if (day < 10)
-			s.append("0").append(day);
-		else
-			s.append(day);
-
-		return s.toString();
+		return birthDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT));
 	}
 
     /**
@@ -668,9 +631,11 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	}
 
 	public Settlement findSettlementVicinity() {
-		return getLocationTag().findSettlementVicinity();
+		if (isRightOutsideSettlement())
+			return getLocationTag().findSettlementVicinity();
+		else
+			return null;
 	}
-
 	/**
 	 * Returns a reference to the robot's skill manager
 	 *
@@ -809,15 +774,14 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	}
 
 	/**
-	 * Adds an equipment to this person
+	 * Adds an equipment to this robot.
 	 *
 	 * @param equipment
-	 * @return true if this person can carry it
+	 * @return true if this robot can carry it
 	 */
 	@Override
 	public boolean addEquipment(Equipment e) {
 		if (eqmInventory.addEquipment(e)) {
-			e.setCoordinates(getCoordinates());
 			e.setContainerUnit(this);
 			fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_EQUIPMENT_EVENT, this);
 			return true;
@@ -826,7 +790,7 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	}
 
 	/**
-	 * Remove an equipment
+	 * Removes an equipment.
 	 *
 	 * @param equipment
 	 */
@@ -836,7 +800,7 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	}
 
 	/**
-	 * Stores the item resource
+	 * Stores the item resource.
 	 *
 	 * @param resource the item resource
 	 * @param quantity
@@ -949,6 +913,17 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	}
 
 	/**
+	 * Gets all the amount resource resource stored, including inside equipment.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAllAmountResourceStored(int resource) {
+		return eqmInventory.getAllAmountResourceStored(resource);
+	}
+	
+	/**
 	 * Gets all stored amount resources
 	 *
 	 * @return all stored amount resources.
@@ -958,6 +933,16 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 		return eqmInventory.getAmountResourceIDs();
 	}
 
+	/**
+	 * Gets all stored amount resources in eqmInventory, including inside equipment
+	 *
+	 * @return all stored amount resources.
+	 */
+	@Override
+	public Set<Integer> getAllAmountResourceIDs() {
+		return eqmInventory.getAllAmountResourceIDs();
+	}
+	
 	/**
 	 * Gets all stored item resources
 	 *
@@ -1049,11 +1034,20 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 				return;
 			}
 			// 1. Set Coordinates
-			setCoordinates(newContainer.getCoordinates());
+			if (newContainer.getUnitType() == UnitType.MARS) {
+				// Since it's on the surface of Mars,
+				// First set its initial location to its old parent's location as it's leaving its parent.
+				// Later it may move around and updates its coordinates by itself
+				setCoordinates(getContainerUnit().getCoordinates());
+			}
+			else {
+				// Null its coordinates since it's now slaved after its parent
+				setNullCoordinates();
+			}
 			// 2. Set LocationStateType
 			updateRobotState(newContainer);
 			// 3. Set containerID
-			// Q: what to set for a deceased person ?
+			// TODO: what to set for a decommissioned robot ?
 			setContainerID(newContainer.getIdentifier());
 			// 4. Fire the container unit event
 			fireUnitUpdate(UnitEventType.CONTAINER_UNIT_EVENT, newContainer);
@@ -1098,7 +1092,7 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 		if (newContainer.getUnitType() == UnitType.PERSON)
 			return LocationStateType.ON_PERSON_OR_ROBOT;
 
-		if (newContainer.getUnitType() == UnitType.PLANET)
+		if (newContainer.getUnitType() == UnitType.MARS)
 			return LocationStateType.MARS_SURFACE;
 
 		return null;
@@ -1112,7 +1106,7 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	@Override
 	public boolean isInSettlement() {
 
-		if (containerID == MARS_SURFACE_UNIT_ID)
+		if (containerID <= MARS_SURFACE_UNIT_ID)
 			return false;
 
 		if (LocationStateType.INSIDE_SETTLEMENT == currentStateType)
@@ -1188,7 +1182,7 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 				logger.warning(this, "Not possible to be retrieved from " + cu + ".");
 			}
 		}
-		else if (ut == UnitType.PLANET) {
+		else if (ut == UnitType.MARS) {
 			transferred = ((MarsSurface)cu).removeRobot(this);
 		}
 		else if (ut == UnitType.BUILDING) {
@@ -1211,7 +1205,7 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 					logger.warning(this, "Not possible to be stored into " + cu + ".");
 				}
 			}
-			else if (destination.getUnitType() == UnitType.PLANET) {
+			else if (destination.getUnitType() == UnitType.MARS) {
 				transferred = ((MarsSurface)destination).addRobot(this);
 			}
 			else if (destination.getUnitType() == UnitType.SETTLEMENT) {
@@ -1277,11 +1271,11 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	public void setCoordinates(Coordinates newLocation) {
 		super.setCoordinates(newLocation);
 
-		if (getEquipmentSet() != null && !getEquipmentSet().isEmpty()) {
-			for (Equipment e: getEquipmentSet()) {
-				e.setCoordinates(newLocation);
-			}
-		}
+//		if (getEquipmentSet() != null && !getEquipmentSet().isEmpty()) {
+//			for (Equipment e: getEquipmentSet()) {
+//				e.setCoordinates(newLocation);
+//			}
+//		}
 	}
 	
 	/** 
@@ -1289,6 +1283,10 @@ public class Robot extends Unit implements Salvagable, Temporal, Malfunctionable
 	 */
 	public double getcurrentEnergy() {
 		return health.getcurrentEnergy();
+	}
+	
+	public EquipmentInventory getEquipmentInventory() {
+		return eqmInventory;
 	}
 	
 	/**

@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
@@ -28,6 +27,8 @@ import org.mars_sim.msp.core.person.ai.role.Role;
 import org.mars_sim.msp.core.person.ai.task.util.Task;
 import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.ShiftSlot;
+import org.mars_sim.msp.core.structure.ShiftSlot.WorkStatus;
 import org.mars_sim.msp.core.vehicle.Crewable;
 
 /**
@@ -38,8 +39,6 @@ import org.mars_sim.msp.core.vehicle.Crewable;
 @SuppressWarnings("serial")
 public class PersonTableModel extends UnitTableModel<Person> {
 
-	 private static final Logger logger =  Logger.getLogger(PersonTableModel.class.getName());
-
 	// Column indexes
 	private static final int NAME = 0;
 	private static final int TASK = 1;
@@ -48,17 +47,16 @@ public class PersonTableModel extends UnitTableModel<Person> {
 	private static final int ROLE = 4;
 	private static final int SHIFT = 5;
 	private static final int LOCATION = 6;
-	private static final int LOCALE = 7;
-	private static final int HEALTH = 8;
-	private static final int ENERGY = 9;
-	private static final int WATER = 10;
-	private static final int FATIGUE = 11;
-	private static final int STRESS = 12;
-	private static final int PERFORMANCE = 13;
-	private static final int EMOTION = 14;
+	private static final int HEALTH = 7;
+	private static final int ENERGY = 8;
+	private static final int WATER = 9;
+	private static final int FATIGUE = 10;
+	private static final int STRESS = 11;
+	private static final int PERFORMANCE = 12;
+	private static final int EMOTION = 13;
 
 	/** The number of Columns. */
-	private static final int COLUMNCOUNT = 15;
+	private static final int COLUMNCOUNT = 14;
 	/** Names of Columns. */
 	private static String[] columnNames;
 	/** Types of Columns. */
@@ -92,8 +90,6 @@ public class PersonTableModel extends UnitTableModel<Person> {
 		columnTypes[EMOTION] = String.class;
 		columnNames[LOCATION] = Msg.getString("PersonTableModel.column.location"); //$NON-NLS-1$
 		columnTypes[LOCATION] = String.class;
-		columnNames[LOCALE] = Msg.getString("PersonTableModel.column.locale"); //$NON-NLS-1$
-		columnTypes[LOCALE] = String.class;
 		columnNames[ROLE] = Msg.getString("PersonTableModel.column.role"); //$NON-NLS-1$
 		columnTypes[ROLE] = String.class;
 		columnNames[JOB] = Msg.getString("PersonTableModel.column.job"); //$NON-NLS-1$
@@ -140,8 +136,6 @@ public class PersonTableModel extends UnitTableModel<Person> {
 	private UnitListener crewListener;
 	private UnitListener settlementListener;
 	private MissionListener missionListener;
-
-	private boolean allAssociated;
 
 	/**
 	 * Constructs a PersonTableModel object that displays all people from the
@@ -228,10 +222,16 @@ public class PersonTableModel extends UnitTableModel<Person> {
 		}
 
 		if (settlementListener != null) {
-			settlement.removeUnitListener(settlementListener);
+			if (settlement != null) {
+				settlement.removeUnitListener(settlementListener);
+			}
+			settlementListener = null;
 		}
 
 		this.settlement = filter;
+		if (settlement == null)
+			return false;
+		
 		if (sourceType == ValidSourceType.SETTLEMENT_ALL_ASSOCIATED_PEOPLE) {
 			resetEntities(settlement.getAllAssociatedPeople());
 			settlementListener = new PersonChangeListener(UnitEventType.ADD_ASSOCIATED_PERSON_EVENT,
@@ -368,18 +368,13 @@ public class PersonTableModel extends UnitTableModel<Person> {
 			}
 				break;
 
-			case LOCALE: {
-				result = person.getLocationTag().getLocale();
-			}
-				break;
-
 			case ROLE: {
 				if (person.getPhysicalCondition().isDead())
-					result = "N/A";
+					result = "";
 				else {
 					Role role = person.getRole();
 					if (role != null) {
-						result = role.getType();
+						result = role.getType().getName();
 					} else {
 						result = null;
 					}
@@ -405,7 +400,14 @@ public class PersonTableModel extends UnitTableModel<Person> {
 				if (person.getPhysicalCondition().isDead())
 					result = "";
 				else {
-					result = person.getShiftSlot().getShift().getName();
+					ShiftSlot shift = person.getShiftSlot();
+		
+					if (shift.getStatus() == WorkStatus.ON_CALL) {
+						result = "On Call";
+					}
+					else {
+						result = shift.getShift().getName();
+					}
 				}
 			}
 		}
@@ -447,14 +449,14 @@ public class PersonTableModel extends UnitTableModel<Person> {
 		 */
 		public void missionUpdate(MissionEvent event) {
 			Object target = event.getTarget();
-			if (target instanceof Person) {
+			if (target instanceof Person p) {
 				MissionEventType eventType = event.getType();
 
 				if (eventType == MissionEventType.ADD_MEMBER_EVENT) {
-					addEntity((Person) target);
+					addEntity(p);
 				}
 				else if (eventType == MissionEventType.REMOVE_MEMBER_EVENT) {
-					removeEntity((Person) target);
+					removeEntity(p);
 				}
 			}
 		}
@@ -480,15 +482,13 @@ public class PersonTableModel extends UnitTableModel<Person> {
 		 */
 		public void unitUpdate(UnitEvent event) {
 			Object target = event.getTarget();
-			UnitEventType eventType = event.getType();
-			if (eventType == addEvent) {
-				if (target instanceof Person) {
-					addEntity((Person) target);
+			if (target instanceof Person p) {
+				UnitEventType eventType = event.getType();
+				if (eventType == addEvent) {
+					addEntity(p);
 				}
-			}
-			else if (eventType == removeEvent) {
-				if (target instanceof Person) {
-					removeEntity((Person) target);
+				else if (eventType == removeEvent) {
+					removeEntity(p);
 				}
 			}
 		}

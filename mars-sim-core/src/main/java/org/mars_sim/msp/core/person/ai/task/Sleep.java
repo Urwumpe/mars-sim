@@ -6,13 +6,13 @@
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 
 import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.data.UnitSet;
 import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.CircadianClock;
 import org.mars_sim.msp.core.person.Person;
@@ -238,8 +238,9 @@ public class Sleep extends Task {
 
 					//////////////////// Case 0 /////////////////////////
 					// Case 0 : if a person is in the astronomy observatory, no need of looking for a bed
-					if (person.getBuildingLocation().hasFunction(FunctionType.ASTRONOMICAL_OBSERVATION)
-						|| person.isAdjacentBuilding(FunctionType.ASTRONOMICAL_OBSERVATION)) {
+					Building building = person.getBuildingLocation();
+					if (building != null && building.hasFunction(FunctionType.ASTRONOMICAL_OBSERVATION)
+						|| BuildingManager.isAdjacentBuilding(FunctionType.ASTRONOMICAL_OBSERVATION, person, building)) {
 						return;
 					}
 					
@@ -441,17 +442,15 @@ public class Sleep extends Task {
 //			if (b.getBuildingType().equalsIgnoreCase(Building.ASTRONOMY_OBSERVATORY))
 //				return b;
 
-			List<Building> quartersBuildings = person.getSettlement().getBuildingManager()
-					.getBuildings(FunctionType.LIVING_ACCOMMODATIONS);
+			Set<Building> quartersBuildings = person.getSettlement().getBuildingManager()
+					.getBuildingSet(FunctionType.LIVING_ACCOMMODATIONS);
 			quartersBuildings = BuildingManager.getNonMalfunctioningBuildings(quartersBuildings);
 			quartersBuildings = getQuartersWithEmptyBeds(quartersBuildings, unmarked);
 			if (quartersBuildings.size() > 0) {
 				quartersBuildings = BuildingManager.getLeastCrowdedBuildings(quartersBuildings);
 			}
-			if (quartersBuildings.size() == 1) {
-				return quartersBuildings.get(0);
-			}
-			else if (quartersBuildings.size() > 1) {
+			
+			if (quartersBuildings.size() >= 1) {
 				Map<Building, Double> quartersBuildingProbs = BuildingManager.getBestRelationshipBuildings(person,
 						quartersBuildings);
 				b = RandomUtil.getWeightedRandomObject(quartersBuildingProbs);
@@ -471,8 +470,8 @@ public class Sleep extends Task {
 	 *                     or not.
 	 * @return list of buildings with empty beds.
 	 */
-	private static List<Building> getQuartersWithEmptyBeds(List<Building> buildingList, boolean unmarked) {
-		List<Building> result = new ArrayList<Building>();
+	private static Set<Building> getQuartersWithEmptyBeds(Set<Building> buildingList, boolean unmarked) {
+		Set<Building> result = new UnitSet<>();
 
 		for (Building building : buildingList) {
 			LivingAccommodations quarters = building.getLivingAccommodations();

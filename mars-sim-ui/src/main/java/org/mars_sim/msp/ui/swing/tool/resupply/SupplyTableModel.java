@@ -21,6 +21,7 @@ import javax.swing.table.AbstractTableModel;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.equipment.EquipmentType;
 import org.mars_sim.msp.core.interplanetary.transport.resupply.Resupply;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.Part;
 import org.mars_sim.msp.core.resource.ResourceUtil;
@@ -32,6 +33,8 @@ import org.mars_sim.msp.core.vehicle.VehicleConfig;
 @SuppressWarnings("serial")
 public class SupplyTableModel
 extends AbstractTableModel {
+
+ 	private static SimLogger logger = SimLogger.getLogger(SupplyTableModel.class.getName());
 
 	// Supply categories.
 	public final static String BUILDING = "Building";
@@ -73,48 +76,49 @@ extends AbstractTableModel {
 	private void populateSupplies(Resupply resupply) {
 
 		// Populate buildings.
-		List<String> buildingList = new ArrayList<>(resupply.getNewBuildings().size());
-		Iterator<BuildingTemplate> l = resupply.getNewBuildings().iterator();
+		List<String> buildingList = new ArrayList<>(resupply.getBuildings().size());
+		Iterator<BuildingTemplate> l = resupply.getBuildings().iterator();
 		while(l.hasNext()) {
 			buildingList.add(l.next().getBuildingType());
 		}
 		populateSupplyTypeList(BUILDING, buildingList);
 
 		// Populate vehicles.
-		populateSupplyTypeList(VEHICLE, resupply.getNewVehicles());
+		Map<String, Integer> newVehicles = resupply.getVehicles();
+		List<String> sortVehicles = new ArrayList<>(newVehicles.keySet());
+		Collections.sort(sortVehicles);
+		for(String vechType : sortVehicles) {
+			int num = newVehicles.get(vechType);
+			SupplyItem supplyItem = new SupplyItem(VEHICLE, vechType, num);
+			supplyList.add(supplyItem);
+		}
 
 		// Populate equipment.
-		List<String> sortEquipment =
-				new ArrayList<>(resupply.getNewEquipment().keySet());
+		Map<String, Integer> newEquipment = resupply.getEquipment();
+		List<String> sortEquipment = new ArrayList<>(newEquipment.keySet());
 		Collections.sort(sortEquipment);
-		Iterator<String> i = sortEquipment.iterator();
-		while (i.hasNext()) {
-			String equipmentType = i.next();
-			int num = resupply.getNewEquipment().get(equipmentType);
+		for(String equipmentType : sortEquipment) {
+			int num = newEquipment.get(equipmentType);
 			SupplyItem supplyItem = new SupplyItem(EQUIPMENT, equipmentType, num);
 			supplyList.add(supplyItem);
 		}
 
 		// Populate resources.
-		List<AmountResource> sortResources =
-				new ArrayList<>(resupply.getNewResources().keySet());
+		Map<AmountResource, Double> newResources = resupply.getResources();
+		List<AmountResource> sortResources = new ArrayList<>(newResources.keySet());
 		Collections.sort(sortResources);
-		Iterator<AmountResource> j = sortResources.iterator();
-		while (j.hasNext()) {
-			AmountResource resource = j.next();
-			double amount = resupply.getNewResources().get(resource);
+		for(AmountResource resource : sortResources) {
+			double amount = newResources.get(resource);
 			SupplyItem supplyItem = new SupplyItem(RESOURCE, resource.getName(), amount);
 			supplyList.add(supplyItem);
 		}
 
 		// Populate parts.
-		List<Part> sortParts =
-					new ArrayList<>(resupply.getNewParts().keySet());
+		Map<Part, Integer> newParts = resupply.getParts();
+		List<Part> sortParts = new ArrayList<>(newParts.keySet());
 		Collections.sort(sortParts);
-		Iterator<Part> k = sortParts.iterator();
-		while (k.hasNext()) {
-			Part part = k.next();
-			int num = resupply.getNewParts().get(part);
+		for(Part part : sortParts) {
+			int num = newParts.get(part);
 			SupplyItem supplyItem = new SupplyItem(PART, part.getName(), num);
 			supplyList.add(supplyItem);
 		}
@@ -215,7 +219,7 @@ extends AbstractTableModel {
 					item.number = (Integer) value;
 				}
 				catch (NumberFormatException e) {
-					e.printStackTrace(System.err);
+					logger.severe("SupplyTableModel Quantity invalid: " + e.getMessage());
 				}
 			}
 			fireTableCellUpdated(row, col);

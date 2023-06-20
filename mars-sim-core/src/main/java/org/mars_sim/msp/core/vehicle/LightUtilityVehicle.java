@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * LightUtilityVehicle.java
- * @date 2021-10-16
+ * @date 2023-04-16
  * @author Sebastien Venot
  */
 package org.mars_sim.msp.core.vehicle;
@@ -26,6 +26,8 @@ public class LightUtilityVehicle extends GroundVehicle implements Crewable {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
+	public static final int METHANOL_ID = ResourceUtil.methanolID;
+	
 	/** Vehicle name. */
 	public static final String NAME = VehicleType.LUV.getName();
 
@@ -45,12 +47,10 @@ public class LightUtilityVehicle extends GroundVehicle implements Crewable {
 	/** The robot occupants. */
 	private List<Robot> robotOccupants = new ArrayList<>();
 	
-	public LightUtilityVehicle(String name, String type, Settlement settlement) {
+	public LightUtilityVehicle(String name, VehicleSpec spec, Settlement settlement) {
 		// Use GroundVehicle constructor.
-		super(name, type, settlement, MAINTENANCE_WORK_TIME);
+		super(name, spec, settlement, MAINTENANCE_WORK_TIME);
 		
-		VehicleConfig vehicleConfig = simulationConfig.getVehicleConfiguration();
-		VehicleSpec spec = vehicleConfig.getVehicleSpec(type);
 		if (spec.hasPartAttachments()) {
 			attachments = spec.getAttachableParts();
 			slotNumber = spec.getPartAttachmentSlotNumber();
@@ -64,8 +64,8 @@ public class LightUtilityVehicle extends GroundVehicle implements Crewable {
 	}
 
 	@Override
-	public int getFuelType() {
-		return ResourceUtil.methaneID;
+	public int getFuelTypeID() {
+		return METHANOL_ID;
 	}
 
 	/**

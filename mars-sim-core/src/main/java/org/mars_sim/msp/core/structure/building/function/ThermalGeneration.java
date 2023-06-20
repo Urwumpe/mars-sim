@@ -92,13 +92,10 @@ public class ThermalGeneration extends Function {
 		boolean removedBuilding = false;
 
 		for (Building building : settlement.getBuildingManager().getBuildings(FunctionType.THERMAL_GENERATION)) {
-			if (!newBuilding
-					&& building.getBuildingType().equalsIgnoreCase(buildingName)
-					&& !removedBuilding) {
+			if (!newBuilding && building.getBuildingType().equalsIgnoreCase(buildingName) && !removedBuilding) {
 				removedBuilding = true;
 			} else {
-				double wearModifier = (building.getMalfunctionManager()
-						.getWearCondition() / 100D) * .75D + .25D;
+				double wearModifier = (building.getMalfunctionManager().getWearCondition() / 100D) * .75D + .25D;
 				supply += getHeatSourceSupply(building.getThermalGeneration().heatSources) * wearModifier;
 			}
 		}
@@ -213,10 +210,13 @@ public class ThermalGeneration extends Function {
 			    	heatSource.setPercentagePower(sparePercentage);
 			    	result += heatSource.getCurrentPower(getBuilding());
 			    }
-			    // only if there's not enough power
+			   
 			    else if (heatSource.getType().equals(HeatSourceType.FUEL_HEATING)) {
+			    	 // if there's not enough electrical power
 				    if (!sufficientPower) {
 				    	heatSource.setPercentagePower(sparePercentage);
+				    	// Note: could be cheating if the mechanism of conversion is NOT properly defined
+				    	// Convert heat to electricity
 				    	result += heatSource.getCurrentPower(getBuilding());
 				    }
 			    }	
@@ -244,6 +244,8 @@ public class ThermalGeneration extends Function {
 			// Set heatGenerated at the building the furnace belongs
 			if (building.getPowerMode() == PowerMode.FULL_POWER) {
 				heatGenerated = calculateGeneratedHeat(pulse.getElapsed());		
+				// Note: could be cheating if the mechanism of conversion is NOT properly defined
+		    	// Convert heat to electricity to help out
 				powerGenerated = calculateGeneratedPower();
 			}
 			

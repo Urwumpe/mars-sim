@@ -56,8 +56,6 @@ public final class ManufactureUtil {
 	private static final int EQUIPMENT_VALUE = 40;
 	private static final int VEHICLE_VALUE = 60;
 	
-	private static final double WORK_EFFORT_MULTIPLIER = 0.05;
-	
 	private static final SimulationConfig simulationConfig = SimulationConfig.instance();
 	private static final ManufactureConfig manufactureConfig = simulationConfig.getManufactureConfiguration();
 	private static final VehicleConfig vehicleConfig = simulationConfig.getVehicleConfiguration();
@@ -430,6 +428,8 @@ public final class ManufactureUtil {
 			} else if (ItemType.PART.equals(item.getType())) {
 				int id = ItemResourceUtil.findIDbyItemResourceName(item.getName());
 				result = (settlement.getItemResourceStored(id) >= (int) item.getAmount());
+				if (!result)
+					return false;
 			} else
 				throw new IllegalStateException("Manufacture process input: " + item.getType() + " not a valid type.");
 		}

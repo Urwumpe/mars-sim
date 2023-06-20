@@ -8,15 +8,12 @@
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import org.mars_sim.msp.core.CollectionUtils;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
@@ -40,8 +37,6 @@ extends WizardPanel {
 	private JTable vehicleTable;
 	private JLabel errorMessageLabel;
 	
-	private static MissionManager missionManager;
-
 	/**
 	 * Constructor.
 	 * @param wizard the create mission wizard.
@@ -49,9 +44,7 @@ extends WizardPanel {
 	public LightUtilityVehiclePanel(CreateMissionWizard wizard) {
 		// User WizardPanel constructor.
 		super(wizard);
-		
-		missionManager = Simulation.instance().getMissionManager();
-		
+				
 		// Set the layout.
 		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 		
@@ -59,10 +52,7 @@ extends WizardPanel {
 		setBorder(new MarsPanelBorder());
 		
 		// Create the select vehicle label.
-		JLabel selectVehicleLabel = new JLabel("Select a light utility vehicle for the mission.", 
-				JLabel.CENTER);
-		selectVehicleLabel.setFont(selectVehicleLabel.getFont().deriveFont(Font.BOLD));
-		selectVehicleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		JLabel selectVehicleLabel = createTitleLabel("Select a light utility vehicle for the mission.");
 		add(selectVehicleLabel);
 		
 		// Create the vehicle panel.
@@ -80,7 +70,6 @@ extends WizardPanel {
         
         // Create the vehicle table.
         vehicleTable = new JTable(vehicleTableModel);
-		TableStyle.setTableStyle(vehicleTable);
 		vehicleTable.setAutoCreateRowSorter(true);		
         vehicleTable.setDefaultRenderer(Object.class, new UnitTableCellRenderer(vehicleTableModel));
         vehicleTable.setRowSelectionAllowed(true);
@@ -112,10 +101,7 @@ extends WizardPanel {
         vehicleScrollPane.setViewportView(vehicleTable);
 		
         // Create the error message label.
-		errorMessageLabel = new JLabel(" ", JLabel.CENTER);
-		errorMessageLabel.setFont(errorMessageLabel.getFont().deriveFont(Font.BOLD));
-		errorMessageLabel.setForeground(Color.RED);
-		errorMessageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		errorMessageLabel = createErrorLabel();
 		add(errorMessageLabel);
 		
 		// Add a vertical glue.
@@ -133,7 +119,8 @@ extends WizardPanel {
 
 	/**
 	 * Commits changes from this wizard panel.
-	 * @retun true if changes can be committed.
+	 * 
+	 * @return true if changes can be committed.
 	 */
 	boolean commitChanges() {
 		int selectedIndex = vehicleTable.getSelectedRow();
@@ -197,7 +184,7 @@ extends WizardPanel {
 					else if (column == 1) 
 						result = vehicle.printStatusTypes();
 					else if (column == 2) {
-						Mission mission = missionManager.getMissionForVehicle(vehicle);
+						Mission mission = vehicle.getMission();
 						if (mission != null) result = mission.getName();
 						else result = "None";
 					}
@@ -239,7 +226,7 @@ extends WizardPanel {
 					result = true;
 			}
 			else if (column == 2) {
-				Mission mission = missionManager.getMissionForVehicle(vehicle);
+				Mission mission = vehicle.getMission();
 				if (mission != null) result = true;
 			}
 

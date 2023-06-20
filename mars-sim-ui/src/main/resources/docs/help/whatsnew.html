@@ -6,33 +6,44 @@
 <LINK rel="stylesheet" href="../msp.css">
 </HEAD>
 <BODY>
-<div id="my_message"><H2>What's New in v3.4.1</H2></div>
-<center>3 Jan 2023</center>
+<div id="my_message"><H2> What's New </H2></div>
 
-<H4> CORE ENGINE IMPROVEMENTS :</H4>
+<H3> Version pre-3.6.0 (16 Jun 2023) </H3>
+
+<H4>A. CORE ENGINE IMPROVEMENTS :</H4>
 <OL>
-  <LI>   Battery : Standardize battery capacity. </LI>
-  <LI>    Events : Supports future scheduled events to better handle periodic actions on the entities. </LI>    
-  <LI>   Mission : Add deadline on rover mission departure. Split embarking phase into loading & departing. </LI> 
-  <LI>     Parts : Add silica aerogel as transparent rooftop tiles. </LI>  
-  <LI>     Robot : Define specifications using RobotSpec class. </LI>  
-  <LI>     Shift : Add shift manager to handle work shift change and add on leave status. </LI> 
-  <LI> Stock Cap : Increase general/cargo capacities and specific resource storage capacity. </LI>
-  <LI>   Storage : Allow selection of storage bin in DigLocal task based on building resource capacity. </LI>
-  <LI>      Task : Define SettlementMetaTask and track a pool of shared tasks. </LI>  
+  <LI>Crop       : Add a new category herbs. </LI>
+  <LI>Earth Time : Model using the standard Java LocalDateTime class.</LI>
+  <LI>Elevation  : Adopt higher resolution height data.</LI>  
+  <LI>Fuel       : Enable the use of methanol as fuel for vehicles.</LI>
+  <LI>Mission    : Retains reference to Vehicle after Mission completed.</LI>  
+  <LI>Power      : Model nuclear reactors with more parameters.</LI>
+    
+  <LI>Resupplies : Define resupply missions with a repeating schedule.</LI>
+  <LI>Resources  : Allow alternate resources for manufacturing.</LI>
+  <LI>Settlement : Keep track of settlement preference task/mission/science modifiers. </LI>
+  <LI>Vehicle    : Enable regen braking and encapsulate propulsion calculations in motor controller class.</LI>
+  <LI>Vehicle    : Maintains own reference to assigned Mission.</LI>
 </OL>
   
-<H4> UI IMPROVEMENT :</H4>
+<H4>B. UI IMPROVEMENT :</H4>
 <OL>
-  <LI>Row Count : Correct row count on Monitor Window. </LI> 
-  <LI>      Tab : Add new tab to the Monitor Tool to show task backlog of each settlement. </LI>
+  <LI>Events     : Events in the Monitor Window are clickable to drill down into the details of the entity.</LI>
+  <LI>Mars Map   : Use a variety of resolutions of surface maps.</LI>
+  <LI>Resupply   : Showcase resupply missions by settlements under a tree.</LI>
+  <LI>    Role   : Restore previous role if change is not confirmed.</LI>
+  <LI>Settlement : Display settlement preference task/mission/science modifiers and allow players to edit scores. </LI>
+
 </OL>  
 
-<H4> FIXES :</H4>
+<H4>C. RUNTIME ENVIRONMENT :</H4>
 <OL>
- <LI> EVA Suit : Allow suit repair in a vehicle using Repair task. </LI>
- <LI> Jar file : Make settlement template name readable by using lowercase. </LI>
- <LI>    Robot : Correct robot battery status to be based on percentage, instead of actual KWh. </LI>
+</OL>
+
+<H4>D. FIXES :</H4>
+<OL>
+	<LI>Resources : Correct displaying amount resources stored in Inventory Tab.</LI>
+
 <OL>
 
 <br>

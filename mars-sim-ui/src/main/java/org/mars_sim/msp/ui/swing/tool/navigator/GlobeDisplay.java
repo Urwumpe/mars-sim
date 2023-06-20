@@ -1,11 +1,12 @@
 /*
  * Mars Simulation Project
  * GlobeDisplay.java
- * @date 2022-08-02
+ * @date 2023-06-03
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.navigator;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -15,12 +16,14 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
+import java.awt.Stroke;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Iterator;
 
 import javax.swing.JComponent;
 
+import org.mars_sim.mapdata.MapMetaData;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.IntPoint;
 import org.mars_sim.msp.core.Msg;
@@ -33,6 +36,7 @@ import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.tool.map.MapPanel;
 import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfo;
 import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfoFactory;
 
@@ -42,49 +46,62 @@ import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfoFactory;
  */
 @SuppressWarnings("serial")
 public class GlobeDisplay extends JComponent implements ClockListener {
-
-	public static final int GLOBE_BOX_HEIGHT = NavigatorWindow.HORIZONTAL_SURFACE_MAP;
-	public static final int GLOBE_BOX_WIDTH = GLOBE_BOX_HEIGHT;
-	public static final int RATIO = GLOBE_BOX_HEIGHT / 300; 
-	/** The max amount of pixels in each mouse drag that the globe will update itself. */
-	public static final int LIMIT = 60 * RATIO; 
-
-	private static final double HALF_PI = Math.PI / 2;
-	private static final double TWO_PI = Math.PI * 2;
-	private static final int lowEdge = 0;
 	
-	private static int halfMap;
-	private static int dragx;
-	private static int dragy;
-	private static int dxCache = 0;
-	private static int dyCache = 0;
-
+//	private static final Logger logger = Logger.getLogger(GlobeDisplay.class.getName());
+	
 	// Data members
-	/** The Map type. 0 = surface, 1 = topo, 2 = geology. */
-	private int mapType;
 	/** <code>true</code> if globe needs to be regenerated */
 	private boolean recreate;
-	/** width of the globe display component. */
-	private int globeBoxWidth;
-	/** height of the globe display component. */
-	private int globeBoxHeight;
-	/** <code>true</code> if USGS surface map is to be used. */
-	private boolean useUSGSMap;
-	/** Array used to generate day/night shading image. */
-	private int[] shadingArray;
-//	/** <code>true</code> if day/night shading is to be used. */
-//	private boolean showDayNightShading;
+	
+	private int surfaceMapWidth = 1440;
+	
+	private final int STANDARD_GLOBE_BOX_HEIGHT = 300;
+	
+	private final int NEW_GLOBE_BOX_HEIGHT = MapPanel.MAP_BOX_HEIGHT; // 450
 
-	/** Real surface sphere object. */
-	private MarsMap marsSphere;
-	/** Topographical sphere object. */
-	private MarsMap topoSphere;
-	/** Geological sphere object. */
-	private MarsMap geoSphere;
+//	private final double BLACK_PADDING_RATIO = 0.6;
+	
+	private final double RATIO_EXPANSION = 1.0 * NEW_GLOBE_BOX_HEIGHT / STANDARD_GLOBE_BOX_HEIGHT; // 1.5
+	// The radius of the standard old surface map
+	private double RHO_SURFACE = surfaceMapWidth / Math.PI / 2; // 458.37
+	// The standard rho ratio for the old surface map
+//	private double RHO_STANDARD_RATIO;
+//	// The scale of the old surface map
+//	private double rhoSurfaceCache = RHO_SURFACE; // 458.37
+//	// The width on the surface map outside of the zoom box
+//	private double outsideZoomBoxWidth; 
+//	// The measured black padding width of the empty space around the mars globe. Based on surfaceMapHeight of 1440.
+//	private double blackPaddingWidth;
+//	// The globe length ratio. Based on surfaceMapHeight of 1440.
+//	private double globeFullLength;
+//	// The globe height ratio. Based on surfaceMapHeight of 1440.
+//	private double globeBoxRatio;
+//	// The scale of the globe map. It's height pixels divided by pi
+	private double rhoGlobe = NEW_GLOBE_BOX_HEIGHT / Math.PI;
+//	// The ratio of the new surface map scale to the old. This number will change when zooming in and out of surface map
+//	private double rhoMapRatio = rhoSurfaceCache / RHO_SURFACE;
+//	
+//	// The width of the zoom box over the globe
+//	private int widthZoomBox;
+//	// The padding space before the zoom box over the globe	
+//	private int paddingZoomBox;
+	// Half of the map pixel height / 2 
+	private final int halfMap = NEW_GLOBE_BOX_HEIGHT / 2;
+	// lower edge = pixel height / 2 - map box height / 2
+	private final int lowEdge = halfMap - NEW_GLOBE_BOX_HEIGHT / 2;	
+
+	private final double HALF_PI = Math.PI / 2;
+
+	private int dragx;
+	
+	private int dragy;
+	
+	/** The Map type. 0: surface, 1: topo, 2: geology, 3: regional, 4: viking */
+	private MapMetaData mapType;
+
+	private GlobeMap globeMap;
 	/** Spherical coordinates for globe center. */
 	private Coordinates centerCoords;
-	/** A mouse adapter class. */
-	private Dragger dragger;
 	
 	private Graphics dbg;
 	private Image dbImage = null;
@@ -94,34 +111,34 @@ public class GlobeDisplay extends JComponent implements ClockListener {
 	 * Stores the font for drawing lon/lat strings in
 	 * {@link #drawCrossHair(Graphics)}.
 	 */
-	private Font positionFont = new Font("Helvetica", Font.PLAIN, (int)(16 * RATIO / 1.4));
+	private Font positionFont = new Font("Helvetica", Font.PLAIN, (int)(16 * RATIO_EXPANSION / 1.4));
 	/** measures the pixels needed to display text. */
 	private FontMetrics positionMetrics = getFontMetrics(positionFont);
 
-	private double globeCircumference;
-	private double rho;
-	
+
 	/**
-	 * stores the internationalized string for reuse in
+	 * Stores the internationalized string for reuse in
 	 * {@link #drawCrossHair(Graphics)}.
 	 */
 	private String longitude = Msg.getString("direction.longitude"); //$NON-NLS-1$
 	/**
-	 * stores the internationalized string for reuse in
+	 * Stores the internationalized string for reuse in
 	 * {@link #drawCrossHair(Graphics)}.
 	 */
 	private String latitude = Msg.getString("direction.latitude"); //$NON-NLS-1$
 
 	/**
-	 * stores the position for drawing lon/lat strings in
+	 * Stores the position for drawing lon/lat strings in
 	 * {@link #drawCrossHair(Graphics)}.
 	 */
 	private int leftWidth = positionMetrics.stringWidth(latitude);
 	/**
-	 * stores the position for drawing lon/lat strings in
+	 * Stores the position for drawing lon/lat strings in
 	 * {@link #drawCrossHair(Graphics)}.
 	 */
 	private int rightWidth = positionMetrics.stringWidth(longitude);
+	
+	private NavigatorWindow navwin;
 	
 	private MainDesktopPane desktop;
 
@@ -133,138 +150,147 @@ public class GlobeDisplay extends JComponent implements ClockListener {
 	 * @param globeBoxHeight the height of the globe display
 	 */
 	public GlobeDisplay(final NavigatorWindow navwin) {
+		this.navwin = navwin;
 		this.desktop = navwin.getDesktop();
 
-		// Initialize data members
-		globeBoxWidth = GLOBE_BOX_WIDTH;
-		globeBoxHeight = GLOBE_BOX_HEIGHT;
-
-		globeCircumference = globeBoxHeight * 2D;
-		rho = globeCircumference / TWO_PI;
-		halfMap = globeBoxWidth / 2;
-
-		starfield = ImageLoader.getImage(Msg.getString("img.mars.starfield")); //$NON-NLS-1$
+		starfield = ImageLoader.getImage("map/starfield");
 	
 		// Set component size
-		setPreferredSize(new Dimension(globeBoxWidth, globeBoxHeight));
+		setPreferredSize(new Dimension(NEW_GLOBE_BOX_HEIGHT, NEW_GLOBE_BOX_HEIGHT));
 		setMaximumSize(getPreferredSize());
-
-		// Construct sphere objects for surface, geo and topographical modes
-		marsSphere = new MarsMap(MarsMapType.SURFACE_MID, this);
-		topoSphere = new MarsMap(MarsMapType.TOPO_MID, this);
-		geoSphere = new MarsMap(MarsMapType.GEO_MID, this);
-
+		
 		// Initialize global variables
 		centerCoords = new Coordinates(HALF_PI, 0D);
-//		update = true;
-		mapType = 0;
 		recreate = true;
-		useUSGSMap = false;
-		shadingArray = new int[globeBoxWidth * globeBoxHeight * 2 * 2];
-//		showDayNightShading = true;
+		
+		// Set the mouse dragger
+		setMouseDragger(navwin);
 
-		addMouseListener(new MouseAdapter() {
-			// Note: must use MouseAdapter's mousePressed separately from Dragger
-			// Use mousePressed in Dragger would result in jumpy dragging
-            @Override
-            public void mousePressed(MouseEvent e) {
-    			dragx = e.getX();
-    			dragy = e.getY();
-                repaint();
-            }
-        });
-		
-		dragger = new Dragger(navwin);
-		
-		addMouseMotionListener(dragger);
-
-		// Initially show real surface globe
-		showSurf();
-		
 		// Add listener once fully constructed
 		desktop.getSimulation().getMasterClock().addClockListener(this, 1000L);
 	}
 	
-	public class Dragger extends MouseAdapter {
-		NavigatorWindow navwin;
-		
-		public Dragger (NavigatorWindow navwin) {
-			this.navwin = navwin;
-	    }
-	    
-		@Override
-		public void mouseDragged(MouseEvent e) {
-			int x = e.getX();
-			int y = e.getY();
+//	public void updateWidth(int width, double scale) {
+//		surfaceMapWidth = width;
+//		updateMapScale(scale);
+//		computeZoomBox();
+//	}
+//	
+//	/**
+//	 * Gets the scale of the Mars surface map.
+//	 * 
+//	 * @param value
+//	 */
+//    public void setMapScale(double value) {
+//    	rhoSurfaceCache = value;
+//    	rhoMapRatio = rhoSurfaceCache / RHO_SURFACE / RHO_STANDARD_RATIO;
+//    }
+//    
+//	/**
+//	 * Gets the scale of the Mars surface map.
+//	 * 
+//	 * @param value
+//	 */
+//    public void updateMapScale(double value) {
+//    	rhoSurfaceCache = value;
+//    	RHO_STANDARD_RATIO = rhoSurfaceCache / RHO_SURFACE;
+//       	rhoMapRatio = rhoSurfaceCache / RHO_SURFACE / RHO_STANDARD_RATIO;
+//    }
+    
+//	public void computeZoomBox() {
+//		blackPaddingWidth =  BLACK_PADDING_RATIO * rhoGlobe ;/// BLACK_PADDING_RATIO; // 261.92
+//		outsideZoomBoxWidth = blackPaddingWidth surfaceMapWidth / rhoMapRatio * 0.1;
+//		globeFullLength = 2 * (surfaceMapWidth * rhoMapRatio + outsideZoomBoxWidth); // 1440.58
+//		globeBoxRatio = globeFullLength / NEW_GLOBE_BOX_HEIGHT; // 3.20
+//
+//		widthZoomBox = (int) (2 * NEW_GLOBE_BOX_HEIGHT * RATIO_EXPANSION / globeBoxRatio); // 140.57
+//		paddingZoomBox = (int) (NEW_GLOBE_BOX_HEIGHT - widthZoomBox) / 2; // 154.72
+//		
+//		logger.info("rRatio: " + Math.round(rhoMapRatio * 10.0)/10.0
+////				+ "  BLACK_PADDING_RATIO: " + Math.round(BLACK_PADDING_RATIO * 10.0)/10.0
+////				+ "  rhoSurfaceCache: " + Math.round(rhoSurfaceCache * 10.0)/10.0
+//				+ "  B: " + Math.round(blackPaddingWidth  * 10.0)/10.0
+//				+ "  O: " + Math.round(outsideZoomBoxWidth * 10.0)/10.0
+//				+ "  globeFullLength: " + Math.round(globeFullLength * 10.0)/10.0
+//				+ "  globeBoxRatio: " + Math.round(globeBoxRatio * 10.0)/10.0
+//				+ "  widthZoomBox: " + Math.round(widthZoomBox * 10.0)/10.0
+//				+ "  paddingZoomBox: " + Math.round(paddingZoomBox * 10.0)/10.0
+//				);
+//	}
+//
+//	/**
+//	 * Updates the position of the zoom box.
+//	 */
+//	public void updateZoomBox() {
+//		if (navwin.getMapPanel() != null) {
+//			surfaceMapWidth = navwin.getMapPanel().getMap().getPixelWidth();	
+//			computeZoomBox();
+//		}
+//	}
+    
+	/*
+	 * Sets up the mouse dragging capability.
+	 */
+	public void setMouseDragger(NavigatorWindow navwin) {
 
-			int dx = dragx - x;
-			int dy = dragy - y;
+		// Note: need navWin prior to calling addMouseMotionListener()
+		addMouseMotionListener(new MouseAdapter() {
+			@Override
+			public void mouseDragged(MouseEvent e) {
+				int dx, dy, x = e.getX(), y = e.getY();
 
-			if ((dx != 0 || dy != 0)// (dx < -2 || dx > 2) || (dy < -2 || dy > 2)) {
-				&& dx > -LIMIT && dx < LIMIT && dy > -LIMIT && dy < LIMIT
-				&& ((dxCache - dx) > -LIMIT) && ((dxCache - dx) < LIMIT) 
-				&& ((dyCache - dy) > -LIMIT) && ((dyCache - dy) < LIMIT)
-				&& x > 50 * RATIO && x < 245 * RATIO && y > 50 * RATIO && y < 245 * RATIO) {
-					setCursor(new Cursor(Cursor.HAND_CURSOR));
+				dx = dragx - x;
+				dy = dragy - y;
 
-					centerCoords = centerCoords.convertRectToSpherical((double) dx, (double) dy, rho);
-					navwin.updateCoords(centerCoords);				
+				if ((dx != 0 || dy != 0) 
+					 && x > 0 && x < NEW_GLOBE_BOX_HEIGHT 
+					 && y > 0 && y < NEW_GLOBE_BOX_HEIGHT) {
+					
+					centerCoords = centerCoords.convertRectToSpherical((double) dx, (double) dy, rhoGlobe);
+					navwin.updateCoordsMaps(centerCoords);				
 					recreate = false;
 					// Regenerate globe if recreate is true, then display
 					drawSphere();
+				}
+
+				dragx = x;
+				dragy = y;
+			}
+		});
+		
+		addMouseListener(new MouseAdapter() {
+			@Override
+			public void mousePressed(MouseEvent e) {
+				dragx = e.getX();
+				dragy = e.getY();
+				setCursor(new Cursor(Cursor.MOVE_CURSOR));
 			}
 
-			dxCache = dx;
-			dyCache = dy;
-
-			dragx = x;
-			dragy = y;
-
-			e.consume();
-		}
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				dragx = 0;
+				dragy = 0;
+				navwin.updateCoordsMaps(centerCoords);
+				setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+			}
+		});
 	}
 	
 	/**
-	 * Displays real surface globe, regenerating if necessary
+	 * Displays topographical globe, regenerating if necessary.
 	 */
-	public void showSurf() {
-		if (mapType != 0) {
+	public void setMapType(MapMetaData newMapType) {
+		if (!newMapType.equals(mapType)) {
+			globeMap = new GlobeMap(this, newMapType, this);
 			recreate = true;
 		}
-		mapType = 0;
-		showGlobe(centerCoords);
-	}
-
-	public int getMapType() {
-		return mapType;
-	}
-
-	/**
-	 * Displays topographical globe, regenerating if necessary
-	 */
-	public void showTopo() {
-		if (mapType != 1) {
-			recreate = true;
-		}
-		mapType = 1;
-		showGlobe(centerCoords);
-	}
-
-
-	/**
-	 * Displays geological globe, regenerating if necessary
-	 */
-	public void showGeo() {
-		if (mapType != 2) {
-			recreate = true;
-		}
-		mapType = 2;
+		mapType = newMapType;
 		showGlobe(centerCoords);
 	}
 	
 	
 	/**
-	 * Displays globe at given center regardless of mode, regenerating if necessary
+	 * Displays globe at given center regardless of mode, regenerating if necessary.
 	 *
 	 * @param newCenter the center location for the globe
 	 */
@@ -280,34 +306,32 @@ public class GlobeDisplay extends JComponent implements ClockListener {
 	 * Draws the sphere.
 	 */
 	public void updateDisplay() {
-		if (recreate)
-			recreate = false;
+		if (globeMap != null) {
+			if (recreate) {
+				recreate = false;
+			}
 		
-		// Regenerate globe
-		drawSphere();
-	}
-
-	public void drawSphere() {
-
-		if (mapType == 0) {
-			marsSphere.drawSphere(centerCoords);
-		} else if (mapType == 1) {
-			topoSphere.drawSphere(centerCoords);
-		} else if (mapType == 2) {
-			geoSphere.drawSphere(centerCoords);
+			// Updates the position of the zoom box
+//			updateZoomBox();
+			
+			// Regenerate globe
+			drawSphere();
 		}
-		
+	}
+	
+	public void drawSphere() {
+		globeMap.drawSphere(centerCoords);
 		paintDoubleBuffer();
 		repaint();
 	}
 
 	/*
 	 * Uses double buffering to draws into its own graphics object dbg before
-	 * calling paintComponent()
+	 * calling paintComponent().
 	 */
 	public void paintDoubleBuffer() {
 		if (dbImage == null) {
-			dbImage = createImage(globeBoxWidth, globeBoxHeight);
+			dbImage = createImage(NEW_GLOBE_BOX_HEIGHT, NEW_GLOBE_BOX_HEIGHT);
 			if (dbImage == null) {
 				return;
 			} else
@@ -322,37 +346,22 @@ public class GlobeDisplay extends JComponent implements ClockListener {
 
 		g2d.setColor(Color.black);
 		// dbg.fillRect(0, 0, 150, 150);
-		g2d.fillRect(0, 0, globeBoxWidth, globeBoxHeight);
+		g2d.fillRect(0, 0, NEW_GLOBE_BOX_HEIGHT, NEW_GLOBE_BOX_HEIGHT);
 		// Image starfield = ImageLoader.getImage("starfield.gif");
 		g2d.drawImage(starfield, 0, 0, Color.black, null);
-
-		// Draw real, topo or geo globe
-		MarsMap globe = null;
 		
-		if (mapType == 0) {
-			globe = marsSphere;
-		} else if (mapType == 1) {
-			globe = topoSphere;
-		} else if (mapType == 2) {
-			globe = geoSphere;
-		}
-		
-		if (globe == null)
+		if (globeMap == null)
 			return;
 		
-		Image image = globe.getGlobeImage();
+		Image image = globeMap.getGlobeImage();
 		if (image != null) {
-			if (globe.isImageDone()) {
+			if (globeMap.isImageDone()) {
 				g2d.drawImage(image, 0, 0, this);
 			} else {
 				return;
 			}
 		}
-
-//		if (showDayNightShading) {
-//			drawShading(g2d);
-//		}
-
+		
 		drawUnits(g2d);
 		drawCrossHair(g2d);
 
@@ -366,66 +375,14 @@ public class GlobeDisplay extends JComponent implements ClockListener {
 		g2d.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 		if (dbImage != null)
 			g2d.drawImage(dbImage, 0, 0, this);
+		
+		// Get rid of the copy
+		g2d.dispose();
 	}
 
-//	/**
-//	 * Draws the day/night shading on the globe.
-//	 * 
-//	 * @param g graphics context
-//	 */
-//	protected void drawShading(Graphics2D g) {
-//		int centerX = globeBoxWidth / 2;
-//		int centerY = globeBoxHeight / 2;
-//
-//		for (int x = 0; x < globeBoxWidth * 2; x++) {
-//			for (int y = 0; y < globeBoxHeight * 2; y++) {
-//				int xDiff = x - centerX;
-//				int yDiff = y - centerY;
-//				if (Math.sqrt((xDiff * xDiff) + (yDiff * yDiff)) <= 47.74648293D) {
-//					Coordinates location = centerCoords.convertRectToSpherical(xDiff, yDiff, 47.74648293D);
-//
-//					double sunlight = 1D;
-//					try {
-//						sunlight = surfaceFeatures.getSurfaceSunlightRatio(location);
-//					} catch (NullPointerException e) {
-//						// Do nothing.
-//						// This may be caused if simulation hasn't been fully initialized yet.
-//					}
-//
-//					if (sunlight > 1D) {
-//						sunlight = 1D;
-//					}
-//					int sunlightInt = (int) (127 * sunlight);
-//					shadingArray[x + (y * globeBoxWidth)] = ((127 - sunlightInt) << 24) & 0xFF000000;
-//				} else if (Math.sqrt((xDiff * xDiff) + (yDiff * yDiff)) <= 49D) {
-//					// Draw black opaque pixel at boundary of Mars.
-//					shadingArray[x + (y * globeBoxHeight)] = 0xFF000000;
-//				} else {
-//					// Draw transparent pixel so background stars will show through.
-//					shadingArray[x + (y * globeBoxHeight)] = 0x00000000;
-//				}
-//			}
-//		}
-//
-//		// Create shading image for map
-//		Image shadingMap = this.createImage(new MemoryImageSource(globeBoxWidth, globeBoxHeight, shadingArray, 0, globeBoxWidth));
-//		// NOTE: Replace MediaTracker with faster method
-//		// Use BufferedImage image = ImageIO.read() ? 
-//		MediaTracker mt = new MediaTracker(this);
-//		mt.addImage(shadingMap, 0);
-//		try {
-//			mt.waitForID(0);
-//		} catch (InterruptedException e) {
-//			logger.log(Level.SEVERE, Msg.getString("GlobeDisplay.log.shadingInterrupted", e.toString()) //$NON-NLS-1$
-//			);
-//		}
-//
-//		// Draw the shading image
-//		g.drawImage(shadingMap, 0, 0, this);
-//	}
 
 	/**
-	 * draw the dots on the globe that identify units
+	 * Draws the dots on the globe that identify units.
 	 * 
 	 * @param g graphics context
 	 */
@@ -447,13 +404,7 @@ public class GlobeDisplay extends JComponent implements ClockListener {
 			if (displayInfo != null && displayInfo.isGlobeDisplayed(unit)) {
 				Coordinates unitCoords = unit.getCoordinates();
 				if (centerCoords.getAngle(unitCoords) < HALF_PI) {
-					if (mapType == 0) {
-						g.setColor(displayInfo.getSurfGlobeColor());
-					} else if (mapType == 1) {
-						g.setColor(displayInfo.getTopoGlobeColor());
-					} else if (mapType == 2) {
-						g.setColor(displayInfo.getGeologyGlobeColor());
-					}
+					g.setColor(displayInfo.getGlobeColor(mapType));
 					
 					IntPoint tempLocation = getUnitDrawLocation(unitCoords);
 					g.fillRect(tempLocation.getiX(), tempLocation.getiY(), 3, 3);
@@ -463,41 +414,20 @@ public class GlobeDisplay extends JComponent implements ClockListener {
 	}
 
 	/**
-	 * Draw green rectangles and lines (cross-hair type thingy), and write the
+	 * Draws green rectangles and lines (cross-hair type thingy), and write the
 	 * latitude and longitude of the center point of the current globe view.
 	 * 
 	 * @param g graphics context
 	 */
 	protected void drawCrossHair(Graphics2D g) {
-		g.setColor(Color.orange);
-
-//		// If USGS map is used, use small crosshairs.
-//		if (useUSGSMap && mapType == 0) {
-//			g.drawRect(72, 72, 6, 6);
-//			g.drawLine(0, 75, 71, 75);
-//			g.drawLine(79, 75, 149, 75);
-//			g.drawLine(75, 20, 75, 71);
-//			g.drawLine(75, 79, 75, 149);
-//		}
-//		// If not USGS map, use large crosshairs.
-//		else {
-			g.drawRect(118 * RATIO, 118 * RATIO,  66 * RATIO,  66 * RATIO);
-			// Draw left horizontal line
-			g.drawLine(15, 			150 * RATIO, 117 * RATIO, 150 * RATIO);
-			// Draw right horizontal line
-			g.drawLine(184 * RATIO, 150 * RATIO, 285 * RATIO, 150 * RATIO);
-			// Draw top vertical line
-			g.drawLine(150 * RATIO,  15 * RATIO, 150 * RATIO, 117 * RATIO);
-			// Draw bottom vertical line
-			g.drawLine(150 * RATIO, 185 * RATIO, 150 * RATIO, 285 * RATIO);	
-//		}
+		g.setColor(Color.orange.brighter());
 
 		// use prepared font
 		g.setFont(positionFont);
 
 		// Draw longitude and latitude strings using prepared measurements
-		g.drawString(latitude, 25 * RATIO, 30 * RATIO);
-		g.drawString(longitude, 275 * RATIO - rightWidth, 30 * RATIO);
+		g.drawString(latitude, (int)(25 * RATIO_EXPANSION), (int) (30 * RATIO_EXPANSION));
+		g.drawString(longitude, (int)((STANDARD_GLOBE_BOX_HEIGHT - 25) * RATIO_EXPANSION - rightWidth), (int)(30 * RATIO_EXPANSION));
 
 		String latString = centerCoords.getFormattedLatitudeString();
 		String longString = centerCoords.getFormattedLongitudeString();
@@ -505,42 +435,52 @@ public class GlobeDisplay extends JComponent implements ClockListener {
 		int latWidth = positionMetrics.stringWidth(latString);
 		int longWidth = positionMetrics.stringWidth(longString);
 
-		int latPosition = ((leftWidth - latWidth) / 2) + 25 * RATIO;
-		int longPosition = 275 * RATIO - rightWidth + ((rightWidth - longWidth) / 2);
+		int latPosition = (int)(((leftWidth - latWidth) / 2) + 25 * RATIO_EXPANSION);
+		int longPosition = (int)(NEW_GLOBE_BOX_HEIGHT - latPosition - longWidth - 2.5 * RATIO_EXPANSION);
 
-		g.drawString(latString, latPosition, 50 * RATIO);
-		g.drawString(longString, longPosition, 50 * RATIO);
+		g.drawString(latString, latPosition, (int)(50 * RATIO_EXPANSION));
+		g.drawString(longString, longPosition, (int)(50 * RATIO_EXPANSION));
+		
+//		g.setColor(Color.black);
 
+//		g.drawRect(paddingZoomBox, paddingZoomBox, widthZoomBox, widthZoomBox);
+//
+//		// Draw a diagonal line from top left of the zoom box to top left of the right panel	
+//		drawDashedLine(g, paddingZoomBox, paddingZoomBox, NEW_GLOBE_BOX_HEIGHT, 0);
+//		// Draw a diagonal line from top right of the zoom box to top left of the right panel	
+//		drawDashedLine(g, paddingZoomBox + widthZoomBox, paddingZoomBox, NEW_GLOBE_BOX_HEIGHT, 0);
+//		// Draw a diagonal line from bottom left of the zoom box to bottom left of the right panel	
+//		drawDashedLine(g, paddingZoomBox, paddingZoomBox + widthZoomBox, NEW_GLOBE_BOX_HEIGHT, NEW_GLOBE_BOX_HEIGHT);
+//		// Draw a diagonal line from bottom right of the zoom box to bottom left of the right panel	
+//		drawDashedLine(g, paddingZoomBox + widthZoomBox, paddingZoomBox + widthZoomBox, NEW_GLOBE_BOX_HEIGHT, NEW_GLOBE_BOX_HEIGHT);
 	}
 
+	public void drawDashedLine(Graphics g, int x1, int y1, int x2, int y2){
+
+		  // Create a copy of the Graphics instance
+		  Graphics2D g2d = (Graphics2D) g.create();
+
+		  // Set the stroke of the copy, not the original 
+		  Stroke dashed = new BasicStroke(1, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{9}, 0);
+		  g2d.setStroke(dashed);
+
+		  // Draw to the copy
+		  g2d.drawLine(x1, y1, x2, y2);
+
+		  // Get rid of the copy
+		  g2d.dispose();
+	}
+	
 	/**
 	 * Returns unit x, y position on globe panel
 	 * 
 	 * @param unitCoords the unit's location
 	 * @return x, y position on globe panel
 	 */
-	private IntPoint getUnitDrawLocation(Coordinates unitCoords) {
-		return Coordinates.findRectPosition(unitCoords, centerCoords, rho, halfMap, lowEdge);
+	private IntPoint getUnitDrawLocation(Coordinates unitCoords) {	
+		return Coordinates.findRectPosition(unitCoords, centerCoords, rhoGlobe, halfMap, lowEdge);
 	}
-
-	/**
-	 * Set USGS as surface map
-	 * 
-	 * @param useUSGSMap true if using USGS map.
-	 */
-	public void setUSGSMap(boolean useUSGSMap) {
-		this.useUSGSMap = useUSGSMap;
-	}
-
-//	/**
-//	 * Sets day/night tracking to on or off.
-//	 * 
-//	 * @param showDayNightShading true if globe is to use day/night tracking.
-//	 */
-//	public void setDayNightTracking(boolean showDayNightShading) {
-//		this.showDayNightShading = showDayNightShading;
-//	}
-
+    
 	/**
 	 * Gets the center coordinates of the globe.
 	 * 
@@ -561,6 +501,10 @@ public class GlobeDisplay extends JComponent implements ClockListener {
 		}
 	}
 
+	public NavigatorWindow getNavigatorWindow() {
+		return navwin;
+	}
+	
 	@Override
 	public void clockPulse(ClockPulse pulse) {
 		if (desktop.isToolWindowOpen(NavigatorWindow.NAME)) {
@@ -579,14 +523,9 @@ public class GlobeDisplay extends JComponent implements ClockListener {
 	public void destroy() {
 		MasterClock masterClock = desktop.getSimulation().getMasterClock();
 		masterClock.removeClockListener(this);
-		removeMouseListener(dragger);
-		dragger = null;
 		desktop  = null;
-
-		marsSphere = null;
-		topoSphere = null;
+		globeMap = null;		
 		centerCoords = null;
-
 		dbg = null;
 		dbImage = null;
 		starfield = null;

@@ -1,6 +1,6 @@
 # Only a packing stage. JAR must be available
 # Package stage
-FROM openjdk:11.0.16-jre-slim
+FROM amazoncorretto:20
 WORKDIR /app
 
 # Version name

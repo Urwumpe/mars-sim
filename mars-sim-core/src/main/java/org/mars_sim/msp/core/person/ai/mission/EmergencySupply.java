@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.InventoryUtil;
@@ -61,7 +62,7 @@ public class EmergencySupply extends RoverMission {
 	private static final double VEHICLE_FUEL_REMAINING_MODIFIER = 2D;
 	private static final double MINIMUM_EMERGENCY_SUPPLY_AMOUNT = 100D;
 
-	private static final int METHANE_ID = ResourceUtil.methaneID;
+	private static final int METHANOL_ID = ResourceUtil.methanolID;
 
 	public static final double BASE_STARTING_PROBABILITY = 20D;
 
@@ -93,7 +94,8 @@ public class EmergencySupply extends RoverMission {
 	public EmergencySupply(Person startingPerson, boolean needsReview) {
 		// Use RoverMission constructor.
 		super(MissionType.EMERGENCY_SUPPLY, startingPerson, null);
-
+		setPriority(5);
+		
 		if (isDone()) {
 			return;
 		}
@@ -520,7 +522,7 @@ public class EmergencySupply extends RoverMission {
 
 				// Check if settlement is within rover range.
 				double settlementRange = Coordinates.computeDistance(settlement.getCoordinates(), startingSettlement.getCoordinates());
-				if (settlementRange <= (rover.getRange(MissionType.EMERGENCY_SUPPLY) * .8D)) {
+				if (settlementRange <= (rover.getRange() * .8D)) {
 
 					// Find what emergency supplies are needed at settlement.
 					Map<Integer, Double> emergencyResourcesNeeded = getEmergencyAmountResourcesNeeded(settlement);
@@ -614,7 +616,7 @@ public class EmergencySupply extends RoverMission {
 			int numPeople = startingSettlement.getNumCitizens();
 			result = numPeople * amountNeededOrbit;
 		} else {
-			if (resource.equals(METHANE_ID)) {
+			if (resource.equals(METHANOL_ID)) {
 				Iterator<Vehicle> i = startingSettlement.getAllAssociatedVehicles().iterator();
 				while (i.hasNext()) {
 					double fuelDemand = i.next().getAmountResourceCapacity(resource);
@@ -728,15 +730,15 @@ public class EmergencySupply extends RoverMission {
 
 		// Determine methane amount needed.
 		double methaneAmountNeeded = VEHICLE_FUEL_DEMAND;
-		double methaneAmountAvailable = settlement.getAmountResourceStored(METHANE_ID);
+		double methaneAmountAvailable = settlement.getAmountResourceStored(METHANOL_ID);
 
-		methaneAmountAvailable += getResourcesOnMissions(settlement, METHANE_ID);
+		methaneAmountAvailable += getResourcesOnMissions(settlement, METHANOL_ID);
 		if (methaneAmountAvailable < methaneAmountNeeded) {
 			double methaneAmountEmergency = methaneAmountNeeded - methaneAmountAvailable;
 			if (methaneAmountEmergency < MINIMUM_EMERGENCY_SUPPLY_AMOUNT) {
 				methaneAmountEmergency = MINIMUM_EMERGENCY_SUPPLY_AMOUNT;
 			}
-			result.put(METHANE_ID, methaneAmountEmergency);
+			result.put(METHANOL_ID, methaneAmountEmergency);
 		}
 
 		return result;
@@ -818,15 +820,16 @@ public class EmergencySupply extends RoverMission {
 		while (i.hasNext()) {
 			Malfunctionable entity = i.next();
 
-			// Determine parts needed but not available for repairs.
+			// Determine parts needed to see if they are available from resource storage. 
+			// Save them if they are not available for repairs.
 			Iterator<Malfunction> j = entity.getMalfunctionManager().getMalfunctions().iterator();
 			while (j.hasNext()) {
 				Malfunction malfunction = j.next();
 				Map<Integer, Integer> repairParts = malfunction.getRepairParts();
-				Iterator<Integer> k = repairParts.keySet().iterator();
-				while (k.hasNext()) {
-					Integer part = k.next();
-					int number = repairParts.get(part);
+				
+				for (Entry<Integer, Integer> entry: repairParts.entrySet()) {
+					Integer part = entry.getKey();
+					int number = entry.getValue();
 					if (!settlement.getItemResourceIDs().contains(part)) {
 						if (result.containsKey(part)) {
 							number += result.get(part).intValue();
@@ -836,12 +839,14 @@ public class EmergencySupply extends RoverMission {
 				}
 			}
 
-			// Determine parts needed but not available for maintenance.
+			// Determine parts needed to see if they are available from resource storage.
+			// Save them if they are not available for repairs.
 			Map<Integer, Integer> maintParts = entity.getMalfunctionManager().getMaintenanceParts();
-			Iterator<Integer> l = maintParts.keySet().iterator();
-			while (l.hasNext()) {
-				Integer part = l.next();
-				int number = maintParts.get(part);
+			
+			for (Entry<Integer, Integer> entry: maintParts.entrySet()) {
+				Integer part = entry.getKey();
+				int number = entry.getValue();
+	
 				if (!settlement.getItemResourceIDs().contains(part)) {
 					if (result.containsKey(part)) {
 						number += result.get(part).intValue();
@@ -890,8 +895,8 @@ public class EmergencySupply extends RoverMission {
 
 			// Vehicle with superior range should be ranked higher.
 			if (result == 0) {
-				double firstRange = firstVehicle.getRange(MissionType.EMERGENCY_SUPPLY);
-				double secondRange = secondVehicle.getRange(MissionType.EMERGENCY_SUPPLY);
+				double firstRange = firstVehicle.getRange();
+				double secondRange = secondVehicle.getRange();
 				if (firstRange > secondRange) {
 					result = 1;
 				} else if (firstRange < secondRange) {

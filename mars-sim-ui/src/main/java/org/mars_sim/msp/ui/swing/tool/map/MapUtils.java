@@ -1,13 +1,12 @@
 /*
  * Mars Simulation Project
  * MapUtils.java
- * @date 2022-08-02
+ * @date 2023-04-28
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.map;
 
-import org.mars_sim.mapdata.MapDataUtil;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.IntPoint;
 
@@ -16,11 +15,6 @@ import org.mars_sim.msp.core.IntPoint;
  */
 public class MapUtils {
 
-	private static final int MAP_HEIGHT = MapDataUtil.MAP_HEIGHT;
-	private static final int HALF_MAP = MAP_HEIGHT / 2;
-	private static final int LOW_EDGE = HALF_MAP - MapDataUtil.GLOBE_BOX_WIDTH / 2; 
-	private static final double RHO = MAP_HEIGHT / Math.PI;
-	
 	/**
 	 * Private constructor for utility class.
 	 */
@@ -32,11 +26,13 @@ public class MapUtils {
 	 * Gets a coordinate x, y position on the map image.
 	 * 
 	 * @param coords  location of unit
-	 * @param mapType the type of map.
+	 * @param baseMap the type of map.
 	 * @return display point on map
 	 */
-	public static IntPoint getRectPosition(Coordinates coords, Coordinates mapCenter, String mapType) {
-		return Coordinates.findRectPosition(coords, mapCenter, RHO, HALF_MAP, LOW_EDGE);
+	public static IntPoint getRectPosition(Coordinates coords, Coordinates mapCenter, Map baseMap) {
+		int halfMap = baseMap.getPixelHeight()/2;
+		return Coordinates.findRectPosition(coords, mapCenter, baseMap.getScale(),
+											halfMap, halfMap - (MapPanel.MAP_BOX_HEIGHT/2));
 	}
 
 	/**
@@ -46,7 +42,7 @@ public class MapUtils {
 	 * @param mapType
 	 * @return
 	 */
-	public static int getPixelDistance(double distance, String mapType) {
-		return (int) Math.round(distance / Coordinates.MARS_CIRCUMFERENCE * MapDataUtil.MAP_WIDTH);
+	public static int getPixelDistance(double distance, Map baseMap) {
+		return (int) Math.round(distance / Coordinates.MARS_CIRCUMFERENCE * baseMap.getPixelWidth());
 	}
 }

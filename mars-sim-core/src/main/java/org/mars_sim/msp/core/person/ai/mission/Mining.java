@@ -24,6 +24,7 @@ import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.ResourceUtil;
+import org.mars_sim.msp.core.structure.ObjectiveType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.vehicle.Crewable;
@@ -73,6 +74,8 @@ public class Mining extends EVAMission
 	 * exploration site for it to be considered mature enough to mine.
 	 */
 	public static final int MATURE_ESTIMATE_NUM = 10;
+
+	private static final Set<ObjectiveType> OBJECTIVES = Set.of(ObjectiveType.BUILDERS_HAVEN, ObjectiveType.MANUFACTURING_DEPOT);
 
 	
 	private ExploredLocation miningSite;
@@ -184,7 +187,7 @@ public class Mining extends EVAMission
 			logger.warning("Light utility vehicle not available.");
 			endMission(LUV_NOT_AVAILABLE);
 		} else {
-			luv.setReservedForMission(true);
+			claimVehicle(luv);
 		}
 
 		// Set initial mission phase.
@@ -433,8 +436,8 @@ public class Mining extends EVAMission
 		double bestValue = 0D;
 
 		try {
-			double roverRange = rover.getRange(MissionType.MINING);
-			double tripTimeLimit = getTotalTripTimeLimit(rover, rover.getCrewCapacity(), true);
+			double roverRange = rover.getRange();
+			double tripTimeLimit = rover.getTotalTripTimeLimit(true);
 			double tripRange = getTripTimeRange(tripTimeLimit, rover.getBaseSpeed() / 2D);
 			double range = roverRange;
 			if (tripRange < range) {
@@ -474,8 +477,8 @@ public class Mining extends EVAMission
 		double total = 0;
 
 		try {
-			double roverRange = rover.getRange(MissionType.MINING);
-			double tripTimeLimit = getTotalTripTimeLimit(rover, rover.getCrewCapacity(), true);
+			double roverRange = rover.getRange();
+			double tripTimeLimit = rover.getTotalTripTimeLimit(true);
 			double tripRange = getTripTimeRange(tripTimeLimit, rover.getBaseSpeed() / 2D);
 			double range = roverRange;
 			if (tripRange < range) {
@@ -554,7 +557,7 @@ public class Mining extends EVAMission
 			miningSite.setReserved(false);
 		}
 		if (luv != null) {
-			luv.setReservedForMission(false);
+			releaseVehicle(luv);
 		}
 	}
 
@@ -564,22 +567,18 @@ public class Mining extends EVAMission
 	 * @return reserved light utility vehicle or null if none.
 	 */
 	private LightUtilityVehicle reserveLightUtilityVehicle() {
-		LightUtilityVehicle result = null;
-
-		Iterator<Vehicle> i = getStartingSettlement().getParkedVehicles().iterator();
-		while (i.hasNext() && (result == null)) {
-			Vehicle vehicle = i.next();
+		for(Vehicle vehicle : getStartingSettlement().getParkedVehicles()) {
 			if (vehicle.getVehicleType() == VehicleType.LUV) {
 				LightUtilityVehicle luvTemp = (LightUtilityVehicle) vehicle;
 				if (((luvTemp.getPrimaryStatus() == StatusType.PARKED) || (luvTemp.getPrimaryStatus() == StatusType.GARAGED))
 						&& !luvTemp.isReserved() && (luvTemp.getCrewNum() == 0) && (luvTemp.getRobotCrewNum() == 0)) {
-					result = luvTemp;
-					luvTemp.setReservedForMission(true);
+					claimVehicle(luvTemp);
+					return luvTemp;
 				}
 			}
 		}
 
-		return result;
+		return null;
 	}
 
 	/**
@@ -663,6 +662,11 @@ public class Mining extends EVAMission
 		return PREFERRED_JOBS;
 	}
 
+	@Override
+	public Set<ObjectiveType> getObjectiveSatisified() {
+		return OBJECTIVES;
+	}
+	
 	@Override
 	public double getTotalSiteScore(Settlement reviewerSettlement) {
 		return getMiningSiteValue(miningSite, reviewerSettlement);

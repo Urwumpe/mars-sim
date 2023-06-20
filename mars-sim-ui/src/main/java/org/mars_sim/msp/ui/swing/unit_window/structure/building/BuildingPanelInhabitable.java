@@ -7,13 +7,11 @@
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.GridLayout;
 import java.util.Collection;
 
+import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JTextField;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
@@ -21,8 +19,7 @@ import org.mars_sim.msp.core.structure.building.function.LifeSupport;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.unit_window.UnitListPanel;
-
-import com.alee.laf.panel.WebPanel;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
 /**
  * The InhabitableBuildingPanel class is a building function panel representing 
@@ -31,11 +28,11 @@ import com.alee.laf.panel.WebPanel;
 @SuppressWarnings("serial")
 public class BuildingPanelInhabitable extends BuildingFunctionPanel {
 
-	private static final String PEOPLE_ICON = Msg.getString("icon.people"); //$NON-NLS-1$
+	private static final String PEOPLE_ICON = "people";
 
 	/** The inhabitable building. */
 	private LifeSupport inhabitable;
-	private JTextField numberLabel;
+	private JLabel numberLabel;
 	private UnitListPanel<Person> inhabitantListPanel;
 
 	/**
@@ -49,7 +46,7 @@ public class BuildingPanelInhabitable extends BuildingFunctionPanel {
 		// Use BuildingFunctionPanel constructor
 		super(
 			Msg.getString("BuildingPanelInhabitable.title"), 
-			ImageLoader.getNewIcon(PEOPLE_ICON),
+			ImageLoader.getIconByName(PEOPLE_ICON),
 			inhabitable.getBuilding(), 
 			desktop
 		);
@@ -64,22 +61,20 @@ public class BuildingPanelInhabitable extends BuildingFunctionPanel {
 	@Override
 	protected void buildUI(JPanel center) {
 		// Create label panel
-		WebPanel labelPanel = new WebPanel(new GridLayout(2, 2, 5, 1));
+		AttributePanel labelPanel = new AttributePanel(2);
 		center.add(labelPanel, BorderLayout.NORTH);
-		labelPanel.setOpaque(false);
-		labelPanel.setBackground(new Color(0,0,0,128));
 
 		// Create number label
-		numberLabel = addTextField(labelPanel, Msg.getString("BuildingPanelInhabitable.number"),
-								   inhabitable.getOccupantNumber(), null); //$NON-NLS-1$
+		numberLabel = labelPanel.addTextField(Msg.getString("BuildingPanelInhabitable.number"),
+								   Integer.toString(inhabitable.getOccupantNumber()), null); //$NON-NLS-1$
 
 		// Create capacity label
-		addTextField(labelPanel, Msg.getString("BuildingPanelInhabitable.capacity"),
-					 inhabitable.getOccupantCapacity(), null);
+		labelPanel.addTextField(Msg.getString("BuildingPanelInhabitable.capacity"),
+					 Integer.toString(inhabitable.getOccupantCapacity()), null);
 
 
 		// Create inhabitant list panel
-		inhabitantListPanel = new UnitListPanel<>(getDesktop(), new Dimension(150, 100)) {
+		inhabitantListPanel = new UnitListPanel<>(getDesktop(), new Dimension(200, 250)) {
 			@Override
 			protected Collection<Person> getData() {
 				return inhabitable.getOccupants();

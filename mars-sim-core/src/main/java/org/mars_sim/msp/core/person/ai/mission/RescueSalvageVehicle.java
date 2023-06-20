@@ -86,9 +86,11 @@ public class RescueSalvageVehicle extends RoverMission {
 		// Use RoverMission constructor
 		super(MissionType.RESCUE_SALVAGE_VEHICLE, startingPerson, null);
 
+		setPriority(5);
+		
 		if (!isDone()) {			
 			if (vehicleTarget == null)
-				vehicleTarget = findBeaconVehicle(getStartingSettlement(), getVehicle().getRange(MissionType.RESCUE_SALVAGE_VEHICLE));
+				vehicleTarget = findBeaconVehicle(getStartingSettlement(), getVehicle().getRange());
 
 			if (vehicleTarget != null) {
 				rescue = true;
@@ -304,18 +306,14 @@ public class RescueSalvageVehicle extends RoverMission {
 					"Rescuing Stranded Vehicle", // cause
 					getName(), // during
 					member.getName(), // member
-					vehicleTarget.getLocationTag().getLocale(),
-					vehicleTarget.getAssociatedSettlement().getName(),
-					vehicleTarget.getCoordinates().getCoordinateString()
+					vehicleTarget
 			);
 		} else {
 			newEvent = new MissionHistoricalEvent(EventType.MISSION_RENDEZVOUS, this,
 					"Salvaging Vehicle", 
 					getName(), // during
 					member.getName(), // member
-					vehicleTarget.getLocationTag().getLocale(),
-					vehicleTarget.getAssociatedSettlement().getName(),
-					vehicleTarget.getCoordinates().getCoordinateString()
+					vehicleTarget
 			);
 		}
 		eventManager.registerNewEvent(newEvent);
@@ -360,10 +358,8 @@ public class RescueSalvageVehicle extends RoverMission {
 						this, 
 						serious.getName(),
 					this.getName(), 
-					towedVehicle.getName(),
-					towedVehicle.getLocationTag().getImmediateLocation(), 
-					towedVehicle.getAssociatedSettlement().getName(),
-					towedVehicle.getCoordinates().getCoordinateString()
+					null,
+					towedVehicle
 					);
 				eventManager.registerNewEvent(salvageEvent);
 			}
@@ -386,19 +382,15 @@ public class RescueSalvageVehicle extends RoverMission {
 						// Retrieve the dead person
 						p.transfer(disembarkSettlement);
 						
-						int id = disembarkSettlement.getIdentifier();
-						BuildingManager.addToMedicalBuilding(p, id);
-						p.setAssociatedSettlement(id);
+						BuildingManager.addToMedicalBuilding(p, disembarkSettlement);
+						p.setAssociatedSettlement(disembarkSettlement.getIdentifier());
 
 						HistoricalEvent rescueEvent = new MissionHistoricalEvent(EventType.MISSION_RESCUE_PERSON, 
 								this,
 								p.getPhysicalCondition().getHealthSituation(), 
 								p.getTaskDescription(), 
 								p.getName(),
-//								p.getVehicle().getName(), 
-								p.getLocationTag().getImmediateLocation(), 
-								p.getAssociatedSettlement().getName(),
-								p.getAssociatedSettlement().getCoordinates().getCoordinateString()
+								p
 								);
 						eventManager.registerNewEvent(rescueEvent);												
 					}
@@ -433,7 +425,7 @@ public class RescueSalvageVehicle extends RoverMission {
 		int peopleNum = getRescuePeopleNum(vehicleTarget);
 
 		// Determine life support supplies needed for to support rescued people
-		addLifeSupportResources(result, peopleNum, timeSols, useBuffer);
+		result = addLifeSupportResources(result, peopleNum, timeSols, useBuffer);
 
 		// Add extra EVA Suits based on how many people to be rescued
 		return result;
@@ -617,7 +609,7 @@ public class RescueSalvageVehicle extends RoverMission {
 	}
 
 	/**
-	 * Gets the mission qualification score
+	 * Gets the mission qualification score.
 	 * 
 	 * @param member
 	 * @return the score
@@ -666,7 +658,7 @@ public class RescueSalvageVehicle extends RoverMission {
 						while (iV.hasNext() && result) {
 							Vehicle vehicle = iV.next();
 							if (vehicle instanceof Rover) {
-								if (vehicle.getRange(MissionType.RESCUE_SALVAGE_VEHICLE) >= (settlementDistance * 2D)) {
+								if (vehicle.getRange() >= (settlementDistance * 2D)) {
 									result = false;
 								}
 							}
@@ -689,9 +681,12 @@ public class RescueSalvageVehicle extends RoverMission {
 		// Override and full rover with fuel and life support resources.
 		Map<Integer, Number> result = new HashMap<>(4);
 
-		result.put(getVehicle().getFuelType(), getVehicle().getAmountResourceCapacity(getVehicle().getFuelType()));
-		result.put(OXYGEN_ID, getVehicle().getAmountResourceCapacity(OXYGEN_ID));
-		result.put(WATER_ID, getVehicle().getAmountResourceCapacity(WATER_ID));
+		int fuelTypeID = getVehicle().getFuelTypeID();
+		if (fuelTypeID > 0) {
+			result.put(fuelTypeID, getVehicle().getAmountResourceCapacity(fuelTypeID));
+			result.put(OXYGEN_ID, getVehicle().getAmountResourceCapacity(OXYGEN_ID));
+			result.put(WATER_ID, getVehicle().getAmountResourceCapacity(WATER_ID));
+		}
 		result.put(FOOD_ID, getVehicle().getAmountResourceCapacity(FOOD_ID));
 
 		// Get parts too.

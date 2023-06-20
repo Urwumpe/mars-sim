@@ -9,7 +9,6 @@ package org.mars_sim.msp.core.person.ai.task;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
@@ -18,17 +17,16 @@ import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
+import org.mars_sim.msp.core.person.ai.social.RelationshipType;
 import org.mars_sim.msp.core.person.ai.social.RelationshipUtil;
 import org.mars_sim.msp.core.person.ai.task.util.Task;
 import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
-import org.mars_sim.msp.core.person.ai.social.RelationshipType;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.core.science.ScientificStudyUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
-import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Rover;
 
@@ -135,31 +133,6 @@ public class InviteStudyCollaborator extends Task {
     }
 
     /**
-     * Gets an available administration building that the person can use.
-     * @param person the person
-     * @return available administration building or null if none.
-     */
-    public static Building getAvailableAdministrationBuilding(Person person) {
-
-        Building result = null;
-
-        if (person.isInSettlement()) {
-            BuildingManager manager = person.getSettlement().getBuildingManager();
-            List<Building> administrationBuildings = manager.getBuildings(FunctionType.ADMINISTRATION);
-            administrationBuildings = BuildingManager.getNonMalfunctioningBuildings(administrationBuildings);
-            administrationBuildings = BuildingManager.getLeastCrowdedBuildings(administrationBuildings);
-
-            if (administrationBuildings.size() > 0) {
-                Map<Building, Double> administrationBuildingProbs = BuildingManager.getBestRelationshipBuildings(
-                        person, administrationBuildings);
-                result = RandomUtil.getWeightedRandomObject(administrationBuildingProbs);
-            }
-        }
-
-        return result;
-    }
-
-    /**
      * Determines the best available researcher to invite for collaboration on a study.
      * @return best collaborative invitee or null if none.
      */
@@ -239,7 +212,7 @@ public class InviteStudyCollaborator extends Task {
 	            // Add invitation to study.
 	            study.addInvitedResearcher(invitee);
 
-	            RelationshipUtil.changeOpinion(person, invitee, RelationshipType.COMMUNICATION_MEETING, RandomUtil.getRandomDouble(5));
+	            RelationshipUtil.changeOpinion(person, invitee, RelationshipType.REMOTE_COMMUNICATION, RandomUtil.getRandomDouble(5));
 	            
 	            logger.log(worker, Level.FINE, 0, "Inviting " + invitee.getName() +
 	                    " to collaborate in " + study.getName() + ".");

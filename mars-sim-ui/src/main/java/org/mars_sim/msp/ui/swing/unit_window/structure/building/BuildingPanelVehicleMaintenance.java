@@ -7,13 +7,10 @@
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.GridLayout;
 import java.util.Collection;
 
+import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JTextField;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.structure.building.function.VehicleMaintenance;
@@ -22,8 +19,8 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.unit_window.UnitListPanel;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
-import com.alee.laf.panel.WebPanel;
 
 /**
  * The BuildingPanelVehicleMaintenance class is a building function panel representing 
@@ -32,12 +29,12 @@ import com.alee.laf.panel.WebPanel;
 @SuppressWarnings("serial")
 public class BuildingPanelVehicleMaintenance extends BuildingFunctionPanel {
 
-	private static final String SUV_ICON = Msg.getString("icon.suv"); //$NON-NLS-1$
+	private static final String SUV_ICON = "vehicle";
 	
 	private VehicleMaintenance garage;
 	
-	private JTextField vehicleNumberLabel;
-	private JTextField flyerNumberLabel;
+	private JLabel vehicleNumberLabel;
+	private JLabel flyerNumberLabel;
 	
 	private UnitListPanel<Vehicle> vehicleList;
 	private UnitListPanel<Flyer> flyerList;
@@ -52,7 +49,7 @@ public class BuildingPanelVehicleMaintenance extends BuildingFunctionPanel {
 		// Use BuildingFunctionPanel constructor
 		super(
 			Msg.getString("BuildingPanelVehicleMaintenance.title"),
-			ImageLoader.getNewIcon(SUV_ICON),
+			ImageLoader.getIconByName(SUV_ICON),
 			garage.getBuilding(), 
 			desktop
 		);
@@ -68,31 +65,30 @@ public class BuildingPanelVehicleMaintenance extends BuildingFunctionPanel {
 	protected void buildUI(JPanel center) {
 
 		// Create label panel
-		WebPanel labelPanel = new WebPanel(new GridLayout(4, 2, 0, 0));
+		AttributePanel labelPanel = new AttributePanel(2,2);
 		center.add(labelPanel, BorderLayout.NORTH);
 		labelPanel.setOpaque(false);
-		labelPanel.setBackground(new Color(0,0,0,128));
 
 		// Create vehicle number label
-		vehicleNumberLabel = addTextField(labelPanel, Msg.getString("BuildingPanelVehicleMaintenance.numberOfVehicles"),
-				garage.getCurrentVehicleNumber(), 3, null);
+		vehicleNumberLabel = labelPanel.addTextField(Msg.getString("BuildingPanelVehicleMaintenance.numberOfVehicles"),
+									Integer.toString(garage.getCurrentVehicleNumber()), null);
 
 		// Create vehicle capacity label
 		int vehicleCapacity = garage.getVehicleCapacity();
-		addTextField(labelPanel, Msg.getString("BuildingPanelVehicleMaintenance.vehicleCapacity"),
-				vehicleCapacity, 3, null);
+		labelPanel.addTextField(Msg.getString("BuildingPanelVehicleMaintenance.vehicleCapacity"),
+									Integer.toString(vehicleCapacity), null);
 
 		// Create drone number label
-		flyerNumberLabel = addTextField(labelPanel, Msg.getString("BuildingPanelVehicleMaintenance.numberOfFlyers"),
-				garage.getCurrentFlyerNumber(), 3, null);
+		flyerNumberLabel = labelPanel.addTextField(Msg.getString("BuildingPanelVehicleMaintenance.numberOfFlyers"),
+									Integer.toString(garage.getCurrentFlyerNumber()), null);
 
 		// Create drone capacity label
 		int droneCapacity = garage.getFlyerCapacity();
-		addTextField(labelPanel, Msg.getString("BuildingPanelVehicleMaintenance.flyerCapacity"),
-				droneCapacity, 3, null);
+		labelPanel.addTextField(Msg.getString("BuildingPanelVehicleMaintenance.flyerCapacity"),
+									Integer.toString(droneCapacity), null);
 		
 		// Create vehicle list panel
-		vehicleList = new UnitListPanel<>(getDesktop(), new Dimension(260, 60)) {
+		vehicleList = new UnitListPanel<>(getDesktop()) {
 
 			@Override
 			protected Collection<Vehicle> getData() {
@@ -109,7 +105,7 @@ public class BuildingPanelVehicleMaintenance extends BuildingFunctionPanel {
 		listPanel.add(vehiclePanel, BorderLayout.NORTH);
 
 		// Create drone list panel
-		flyerList = new UnitListPanel<>(getDesktop(), new Dimension(260, 60)) {
+		flyerList = new UnitListPanel<>(getDesktop()) {
 
 			@Override
 			protected Collection<Flyer> getData() {

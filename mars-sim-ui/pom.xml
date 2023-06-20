@@ -7,7 +7,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<parent>
 		<groupId>com.github.mars-sim</groupId>
 		<artifactId>mars-sim</artifactId>
-		<version>pre-3.5.0</version>
+		<version>pre-3.6.0</version>
 	</parent>
 	<artifactId>mars-sim-ui</artifactId>
 	<name>mars-sim-ui</name>
@@ -33,7 +33,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 		<dependency>
 			<groupId>org.jfree</groupId>
 			<artifactId>jfreechart</artifactId>
-			<version>1.5.3</version>
+			<version>1.5.4</version>
 		</dependency>
 
 		<!-- https://mvnrepository.com/artifact/org.jfree/org.jfree.chart3d -->
@@ -82,23 +82,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 		    <version>0.0.17.4</version>
 		</dependency>
 
-		<!-- https://github.com/mgarin/weblaf
-			 https://mvnrepository.com/artifact/com.weblookandfeel/weblaf-ui
-			 https://oss.sonatype.org/content/repositories/snapshots/com/weblookandfeel/ -->
-        <dependency>
-            <groupId>com.weblookandfeel</groupId>
-            <artifactId>weblaf-ui</artifactId>
-            <version>1.2.13</version>
-        </dependency>
 		<dependency>
-		    <groupId>com.weblookandfeel</groupId>
-		    <artifactId>weblaf-core</artifactId>
-            <version>1.2.13</version>
-		</dependency>
-		<dependency>
-		    <groupId>com.weblookandfeel</groupId>
-		    <artifactId>weblaf-plugin</artifactId>
-            <version>1.2.13</version>
+			<groupId>com.formdev</groupId>
+			<artifactId>flatlaf</artifactId>
+			<version>3.1.1</version>
 		</dependency>
 
 		<!-- https://github.com/jidesoft/jide-oss/issues/48 for user's build info 
@@ -107,15 +94,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 			<groupId>com.formdev</groupId>
 			<artifactId>jide-oss</artifactId>
 			<version>3.7.12</version>
-		</dependency>
-
-		<!-- https://mvnrepository.com/artifact/com.github.jiconfont/jiconfont-font_awesome : 124 KB
-			 https://github.com/jIconFont/jiconfont-font_awesome -->
-		<dependency>
-		    <groupId>com.github.jiconfont</groupId>
-		    <artifactId>jiconfont-font_awesome</artifactId>
-		    <version>4.7.0.1</version>
-		    <!-- version>4.5.0.3</version-->
 		</dependency>
 
   </dependencies>

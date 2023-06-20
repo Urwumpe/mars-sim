@@ -33,7 +33,7 @@ import org.mars_sim.msp.core.structure.building.function.FunctionType;
  */
 public class MaintainBuildingMeta extends MetaTask implements SettlementMetaTask {
 	/**
-     * Represents a Job needed for intenral maintenance on a Building
+     * Represents a Job needed for internal maintenance on a Building
      */
     private static class MaintainTaskJob extends SettlementTask {
 
@@ -43,7 +43,7 @@ public class MaintainBuildingMeta extends MetaTask implements SettlementMetaTask
 		private boolean eva;
 
         public MaintainTaskJob(SettlementMetaTask owner, Building target, boolean eva, double score) {
-			super(owner, "Maintain " + (eva ? "via EVA " : "") + target.getName(), score);
+			super(owner, "Maintain " + (eva ? "via EVA " : "") + "@ " + target.getName(), score);
             this.target = target;
 			this.eva = eva;
         }
@@ -82,7 +82,8 @@ public class MaintainBuildingMeta extends MetaTask implements SettlementMetaTask
     }
 
 	/**
-     * Get the score for a Settlement task for a person. This considers and EVA factor for eva maintenance.
+     * Gets the score for a Settlement task for a person. This considers and EVA factor for eva maintenance.
+     * 
 	 * @param t Task being scored
 	 * @parma p Person requesting work.
 	 * @return The factor to adjust task score; 0 means task is not applicable
@@ -105,6 +106,7 @@ public class MaintainBuildingMeta extends MetaTask implements SettlementMetaTask
 
     /**
      * For a robot can not do EVA tasks so will return a zero factor in this case.
+     * 
 	 * @param t Task being scored
 	 * @parma r Robot requesting work.
 	 * @return The factor to adjust task score; 0 means task is not applicable
@@ -119,14 +121,15 @@ public class MaintainBuildingMeta extends MetaTask implements SettlementMetaTask
 	}
 
 	/**
-	 * Scan the Settlement for any Building that need maintenance.
-	 * @param settlement Settlemnt to scan.
+	 * Scans the Settlement for any Building that need maintenance.
+	 * 
+	 * @param settlement Settlement to scan.
 	 */
 	@Override
 	public List<SettlementTask> getSettlementTasks(Settlement settlement) {
 		List<SettlementTask>  tasks = new ArrayList<>();
 	
-		for (Building building: settlement.getBuildingManager().getBuildings()) {
+		for (Building building: settlement.getBuildingManager().getBuildingSet()) {
 			double score = scoreMaintenance(building);
 
 			if (score > 0) {
@@ -139,10 +142,11 @@ public class MaintainBuildingMeta extends MetaTask implements SettlementMetaTask
 	}
 
 	/**
-	 * Score the entity in terms of need for maintenance. Considers malfunction, condition & time
+	 * Scores the entity in terms of need for maintenance. Considers malfunction, condition & time
 	 * since last maintenance.
+	 * 
 	 * @param entity
-	 * @return A score on teh need for maintenance
+	 * @return A score on the need for maintenance
 	 */
 	public static double scoreMaintenance(Malfunctionable entity) {
 		MalfunctionManager manager = entity.getMalfunctionManager();

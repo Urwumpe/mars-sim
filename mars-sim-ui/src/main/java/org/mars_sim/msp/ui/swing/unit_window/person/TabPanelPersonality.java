@@ -7,16 +7,13 @@
 package org.mars_sim.msp.ui.swing.unit_window.person;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.FlowLayout;
-import java.awt.Font;
 
-import javax.swing.BorderFactory;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JTextArea;
 import javax.swing.SpringLayout;
-import javax.swing.border.TitledBorder;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
@@ -29,21 +26,13 @@ import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.text.WebTextArea;
-import com.alee.managers.style.StyleId;
-
 /**
  * The TabPanelPersonality is a tab panel for personality information about a person.
  */
 @SuppressWarnings("serial")
 public class TabPanelPersonality extends TabPanel {
 
-	private static final String PUZZLE_ICON = Msg.getString("icon.puzzle"); //$NON-NLS-1$
-
-	private static final Font RESULT_FONT = new Font("Monospaced", Font.PLAIN, 18);
-	private static final Font MONOSPACED_PLAIN_12 = new Font("Monospaced", Font.PLAIN, 12);
+	private static final String PER_ICON = "personality"; //$NON-NLS-1$
 
 	/** The Person instance. */
 	private Person person;
@@ -59,7 +48,7 @@ public class TabPanelPersonality extends TabPanel {
 		// Use the TabPanel constructor
 		super(
 			Msg.getString("TabPanelPersonality.title"), //$NON-NLS-1$
-			ImageLoader.getNewIcon(PUZZLE_ICON),		
+			ImageLoader.getIconByName(PER_ICON),		
 			Msg.getString("TabPanelPersonality.title"), //$NON-NLS-1$
 			unit, desktop
 		);
@@ -103,7 +92,7 @@ public class TabPanelPersonality extends TabPanel {
 		int[] scores = new int[4];
 		
 		// Prepare MBTI text area
-		WebTextArea ta = new WebTextArea();
+		JTextArea ta = new JTextArea();
 		ta.setAlignmentX(Component.CENTER_ALIGNMENT);
 		ta.setAlignmentY(Component.CENTER_ALIGNMENT);
 		String tip =  "<html>Introvert (I) / Extrovert  (E) : -50 to 0 / 0 to 50" 
@@ -112,33 +101,24 @@ public class TabPanelPersonality extends TabPanel {
 					  + "<br>  Judging (J) / Perceiving (P) : -50 to 0 / 0 to 50</html>";
 		ta.setToolTipText(tip);
 		ta.setEditable(false);
-		ta.setSelectedTextColor(Color.ORANGE.darker());
-		ta.setFont(MONOSPACED_PLAIN_12);
 		ta.setColumns(15);
 		ta.setBorder(new MarsPanelBorder());
 		
-		WebPanel mbtiPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+		JPanel mbtiPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		mbtiPanel.add(ta);
 		
-		WebPanel listPanel = new WebPanel(new BorderLayout(1, 1));
+		JPanel listPanel = new JPanel(new BorderLayout(1, 1));
 		listPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
 		listPanel.setAlignmentY(Component.CENTER_ALIGNMENT);
-		listPanel.setPreferredSize(110, 90);
-		listPanel.setMaximumSize(110, 110);
 		listPanel.add(mbtiPanel, BorderLayout.NORTH);
 		
 		String type = p.getTypeString();
 		String descriptor = p.getDescriptor();
-		WebLabel descriptorLabel = new WebLabel(StyleId.labelShadow, type + " : " + descriptor, JLabel.CENTER);
+		JLabel descriptorLabel = new JLabel(type + " : " + descriptor, JLabel.CENTER);
 		descriptorLabel.setToolTipText(Msg.getString("TabPanelPersonality.mbti.descriptor.tip"));//$NON-NLS-1$
-		descriptorLabel.setFont(RESULT_FONT);
 		listPanel.add(descriptorLabel, BorderLayout.CENTER);
 		
-		TitledBorder titledBorder = BorderFactory.createTitledBorder(
-				null, " Myers & Briggs Type Indicator",
-				TitledBorder.DEFAULT_JUSTIFICATION, TitledBorder.DEFAULT_POSITION,
-				SUBTITLE_FONT_1, Color.darkGray);
-		listPanel.setBorder(titledBorder);
+		addBorder(listPanel, "Myers & Briggs Type Indicator");
 		
 		
 		if (ie < 0) {
@@ -211,12 +191,10 @@ public class TabPanelPersonality extends TabPanel {
     	}
     	
 		// Prepare MBTI text area
-		WebTextArea ta = new WebTextArea();
+		JTextArea ta = new JTextArea();
 		ta.setAlignmentX(Component.CENTER_ALIGNMENT);
 		ta.setAlignmentY(Component.CENTER_ALIGNMENT);
 		ta.setEditable(false);
-		ta.setFont(MONOSPACED_PLAIN_12);
-		ta.setSelectedTextColor(Color.ORANGE.darker());
 		ta.setColumns(15);
 		ta.setBorder(new MarsPanelBorder());
 		
@@ -226,16 +204,13 @@ public class TabPanelPersonality extends TabPanel {
 				  	  + "<br>       Neuroticism : 0 to 100</html>";
 		ta.setToolTipText(tip);
 	
-		WebPanel listPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+		JPanel listPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		listPanel.setAlignmentY(Component.CENTER_ALIGNMENT);
 		listPanel.setToolTipText(Msg.getString("TabPanelPersonality.bigFive.label"));//$NON-NLS-1$
-		listPanel.setPreferredSize(110, 160);
+		//listPanel.setPreferredSize(110, 160);
 		listPanel.add(ta);
 
-		TitledBorder titledBorder = BorderFactory.createTitledBorder(null, " Big Five Personality Traits",
-				TitledBorder.DEFAULT_JUSTIFICATION, TitledBorder.DEFAULT_POSITION,
-				SUBTITLE_FONT_1, Color.darkGray);
-		listPanel.setBorder(titledBorder);
+		addBorder(listPanel, "Big Five Personality Traits");
 		
 		for (int i = 0; i < 5; i++) {
 			String s = types[i];

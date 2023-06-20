@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * AuthorityEditor.java
- * @date 2021-09-04
+ * @date 2023-05-31
  * @author Barry Evans
  */
 package org.mars_sim.msp.ui.swing.configeditor;
@@ -23,6 +23,7 @@ import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
+import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -34,13 +35,11 @@ import javax.swing.JTextField;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.reportingAuthority.MissionAgenda;
-import org.mars_sim.msp.core.reportingAuthority.MissionSubAgenda;
+import org.mars_sim.msp.core.reportingAuthority.MissionCapability;
 import org.mars_sim.msp.core.reportingAuthority.ReportingAuthority;
 import org.mars_sim.msp.core.reportingAuthority.ReportingAuthorityFactory;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MainWindow;
-
-import com.alee.laf.window.WebDialog;
 
 /**
  * UI Editor that allows ReportingAuthorities to be edited
@@ -124,7 +123,7 @@ public class AuthorityEditor  {
 
 	private ReportingAuthorityFactory raFactory;
 	
-	private WebDialog<?> f;
+	private JDialog f;
 
 	private TextList settlementNames;
 	private TextList countries;
@@ -151,9 +150,8 @@ public class AuthorityEditor  {
 					  ReportingAuthorityFactory raFactory) {
 		this.raFactory = raFactory;
 		
-		f = new WebDialog(simulationConfigEditor.getFrame(), TITLE, true);
+		f = new JDialog(simulationConfigEditor.getFrame(), TITLE, true);
 		f.setIconImage(MainWindow.getIconImage());
-		//f.setResizable(false);
 
 		// Create main panel.
 		JPanel mainPane = new JPanel(new BorderLayout());
@@ -185,8 +183,8 @@ public class AuthorityEditor  {
 				String selected = (String) agendaCB.getSelectedItem();
 				MissionAgenda selectedAgenda = raFactory.getAgenda(selected);
 				agendaObjective.setText(OBJECTIVE + selectedAgenda.getObjectiveName());
-				ta.setText(selectedAgenda.getAgendas().stream()
-						.map(MissionSubAgenda::getDescription)
+				ta.setText(selectedAgenda.getCapabilities().stream()
+						.map(MissionCapability::getDescription)
 						.collect(Collectors.joining(".\n- ", "- ", ".")));
 			}
 		});
@@ -195,14 +193,13 @@ public class AuthorityEditor  {
 		agendaObjective.setAlignmentX(Component.LEFT_ALIGNMENT);
 		agendaPanel.add(agendaObjective);
 		
-		JLabel goals = new JLabel("Goals:");
-		goals.setAlignmentX(Component.LEFT_ALIGNMENT);
-		agendaPanel.add(goals);
+		JLabel cap = new JLabel("Mission Capabilities:");
+		cap.setAlignmentX(Component.LEFT_ALIGNMENT);
+		agendaPanel.add(cap);
 		
 		ta = new JTextArea();
 		ta.setAlignmentX(Component.LEFT_ALIGNMENT);
 		ta.setEditable(false);
-		//ta.setFont(new Font(Font.DIALOG, Font.PLAIN, 10));
 		ta.setColumns(20);
 		ta.setLineWrap(true);
 		ta.setWrapStyleWord(true);
@@ -265,7 +262,7 @@ public class AuthorityEditor  {
 		f.setVisible(true);
 	}
 	
-	public WebDialog getJFrame() {
+	public JDialog getJFrame() {
 		return f;
 	}
 

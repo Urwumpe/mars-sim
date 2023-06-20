@@ -7,7 +7,6 @@
 package org.mars_sim.msp.ui.swing.tool.monitor;
 
 import java.util.List;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Msg;
@@ -39,8 +38,6 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
 @SuppressWarnings("serial")
 public class VehicleTableModel extends UnitTableModel<Vehicle> {
 
-	private static final Logger logger = Logger.getLogger(VehicleTableModel.class.getName());
-
 	private static final String ON = "On";
 	private static final String OFF = "Off";
 	private static final String TRUE = "True";
@@ -49,27 +46,26 @@ public class VehicleTableModel extends UnitTableModel<Vehicle> {
 	// Column indexes
 	private static final int NAME = 0;
 	private static final int TYPE = 1;
-	private static final int HOME = 2;
-	private static final int LOCATION = 3;
-	private static final int DESTINATION = 4;
-	private static final int DESTDIST = 5;
-	private static final int MISSION = 6;
-	private static final int CREW = 7;
-	private static final int DRIVER = 8;
-	private static final int STATUS = 9;
-	private static final int BEACON = 10;
-	private static final int RESERVED = 11;
-	private static final int SPEED = 12;
-	private static final int MALFUNCTION = 13;
-	private static final int OXYGEN = 14;
-	private static final int METHANE = 15;
-	private static final int WATER = 16;
-	private static final int FOOD = 17;
-	private static final int DESSERT = 18;
-	private static final int ROCK_SAMPLES = 19;
-	private static final int ICE = 20;
+	private static final int LOCATION = 2;
+	private static final int DESTINATION = 3;
+	private static final int DESTDIST = 4;
+	private static final int MISSION = 5;
+	private static final int CREW = 6;
+	private static final int DRIVER = 7;
+	private static final int STATUS = 8;
+	private static final int BEACON = 9;
+	private static final int RESERVED = 10;
+	private static final int SPEED = 11;
+	private static final int MALFUNCTION = 12;
+	private static final int OXYGEN = 13;
+	private static final int METHANOL = 14;
+	private static final int WATER = 15;
+	private static final int FOOD = 16;
+	private static final int DESSERT = 17;
+	private static final int ROCK_SAMPLES = 18;
+	private static final int ICE = 19;
 	/** The number of Columns. */
-	private static final int COLUMNCOUNT = 21;
+	private static final int COLUMNCOUNT = 20;
 	/** Names of Columns. */
 	private static String[] columnNames;
 
@@ -86,14 +82,12 @@ public class VehicleTableModel extends UnitTableModel<Vehicle> {
 		columnTypes[NAME] = String.class;
 		columnNames[TYPE] = "Type";
 		columnTypes[TYPE] = String.class;
-		columnNames[HOME] = "Home";
-		columnTypes[HOME] = String.class;
 		columnNames[LOCATION] = "Location";
 		columnTypes[LOCATION] = String.class;
 		columnNames[DESTINATION] = "Next Waypoint";
 		columnTypes[DESTINATION] = Coordinates.class;
 		columnNames[DESTDIST] = "Dist. to next [km]";
-		columnTypes[DESTDIST] = Integer.class;
+		columnTypes[DESTDIST] = Double.class;
 		columnNames[MISSION] = "Mission";
 		columnTypes[MISSION] = String.class;
 		columnNames[CREW] = "Crew";
@@ -107,29 +101,29 @@ public class VehicleTableModel extends UnitTableModel<Vehicle> {
 		columnNames[RESERVED] = "Reserved";
 		columnTypes[RESERVED] = String.class;
 		columnNames[SPEED] = "Speed";
-		columnTypes[SPEED] = Number.class;
+		columnTypes[SPEED] = Double.class;
 		columnNames[MALFUNCTION] = "Malfunction";
 		columnTypes[MALFUNCTION] = String.class;
 		columnNames[OXYGEN] = "Oxygen";
-		columnTypes[OXYGEN] = Number.class;
-		columnNames[METHANE] = "Methane";
-		columnTypes[METHANE] = Number.class;
+		columnTypes[OXYGEN] = Double.class;
+		columnNames[METHANOL] = "Methanol";
+		columnTypes[METHANOL] = Double.class;
 		columnNames[WATER] = "Water";
-		columnTypes[WATER] = Number.class;
+		columnTypes[WATER] = Double.class;
 		columnNames[FOOD] = "Food";
-		columnTypes[FOOD] = Number.class;
+		columnTypes[FOOD] = Double.class;
 		columnNames[DESSERT] = "Dessert";
-		columnTypes[DESSERT] = Number.class;
+		columnTypes[DESSERT] = Double.class;
 		columnNames[ROCK_SAMPLES] = "Rock Samples";
-		columnTypes[ROCK_SAMPLES] = Number.class;
+		columnTypes[ROCK_SAMPLES] = Double.class;
 		columnNames[ICE] = "Ice";
-		columnTypes[ICE] = Number.class;
+		columnTypes[ICE] = Double.class;
 	}
 
 	private static final int FOOD_ID = ResourceUtil.foodID;
 	private static final int OXYGEN_ID = ResourceUtil.oxygenID;
 	private static final int WATER_ID = ResourceUtil.waterID;
-	private static final int METHANE_ID = ResourceUtil.methaneID;
+	private static final int METHANOL_ID = ResourceUtil.methanolID;
 	private static final int ROCK_SAMPLES_ID = ResourceUtil.rockSamplesID;
 	private static final int ICE_ID = ResourceUtil.iceID;
 
@@ -180,17 +174,7 @@ public class VehicleTableModel extends UnitTableModel<Vehicle> {
 			} break;
 
 			case TYPE : {
-				result = vehicle.getVehicleType().getName();
-			} break;
-
-			case HOME : {
-				Settlement as = vehicle.getAssociatedSettlement();
-				if (as != null) {
-					result = as.getName();
-				}
-				else {
-					result = vehicle.getCoordinates().getFormattedString();
-				}
+				result = vehicle.getSpecName();
 			} break;
 
 			case LOCATION : {
@@ -204,7 +188,7 @@ public class VehicleTableModel extends UnitTableModel<Vehicle> {
 			} break;
 
 			case DESTINATION : {
-				Mission mission = missionManager.getMissionForVehicle(vehicle);
+				Mission mission = vehicle.getMission();
 				if (mission instanceof VehicleMission) {
 					VehicleMission vehicleMission = (VehicleMission) mission;
 
@@ -218,7 +202,7 @@ public class VehicleTableModel extends UnitTableModel<Vehicle> {
 			} break;
 
 			case DESTDIST : {
-				Mission mission = missionManager.getMissionForVehicle(vehicle);
+				Mission mission = vehicle.getMission();
 				if (mission instanceof VehicleMission) {
 					VehicleMission vehicleMission = (VehicleMission) mission;
 					result = vehicleMission.getDistanceCurrentLegRemaining();
@@ -227,7 +211,7 @@ public class VehicleTableModel extends UnitTableModel<Vehicle> {
 			} break;
 
 			case MISSION : {
-				Mission mission = missionManager.getMissionForVehicle(vehicle);
+				Mission mission = vehicle.getMission();
 				if (mission != null) {
 					result = mission.getFullMissionDesignation();
 				}
@@ -295,8 +279,8 @@ public class VehicleTableModel extends UnitTableModel<Vehicle> {
 				result = vehicle.getAmountResourceStored(OXYGEN_ID);
 				break;
 
-			case METHANE : 
-				result = vehicle.getAmountResourceStored(METHANE_ID);
+			case METHANOL : 
+				result = vehicle.getAmountResourceStored(METHANOL_ID);
 				break;
 
 			case ROCK_SAMPLES : 
@@ -355,8 +339,8 @@ public class VehicleTableModel extends UnitTableModel<Vehicle> {
 
 				if (resourceId == OXYGEN_ID) 
 					columnNum = OXYGEN;
-				else if (resourceId == METHANE_ID)
-					columnNum = METHANE;
+				else if (resourceId == METHANOL_ID)
+					columnNum = METHANOL;
 				else if (resourceId == FOOD_ID)
 					columnNum = FOOD;
 				else if (resourceId == WATER_ID)

@@ -36,6 +36,7 @@ import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
+import org.mars_sim.msp.ui.swing.tool.monitor.MonitorWindow;
 import org.mars_sim.msp.ui.swing.tool.monitor.PersonTableModel;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.vehicle.TabPanelMission;
@@ -52,7 +53,7 @@ extends TabPanel {
 	/** default logger. */
 	private static SimLogger logger = SimLogger.getLogger(TabPanelMissions.class.getName());
 
-	private static final String FLAG_ICON = Msg.getString("icon.mission"); //$NON-NLS-1$
+	private static final String FLAG_ICON = "mission";
 	
 	// Data members
 	/** The Settlement instance. */
@@ -75,7 +76,7 @@ extends TabPanel {
 		// Use the TabPanel constructor
 		super(
 			null,
-			ImageLoader.getNewIcon(FLAG_ICON),
+			ImageLoader.getIconByName(FLAG_ICON),
 			Msg.getString("TabPanelMissions.title"), //$NON-NLS-1$
 			settlement, desktop
 		);
@@ -139,7 +140,7 @@ extends TabPanel {
 		buttonPanel.add(innerButtonPanel, BorderLayout.NORTH);
 
 		// Create mission button.
-		missionButton = new JButton(ImageLoader.getIcon(Msg.getString("icon.mission"))); //$NON-NLS-1$
+		missionButton = new JButton(ImageLoader.getIconByName(MissionWindow.ICON)); //$NON-NLS-1$
 		missionButton.setMargin(new Insets(1, 1, 1, 1));
 		missionButton.setToolTipText(Msg.getString("TabPanelMissions.tooltip.mission")); //$NON-NLS-1$
 		missionButton.setEnabled(false);
@@ -151,7 +152,7 @@ extends TabPanel {
 		innerButtonPanel.add(missionButton);
 
 		// Create monitor button.
-		monitorButton = new JButton(ImageLoader.getIcon(Msg.getString("img.monitor"))); //$NON-NLS-1$
+		monitorButton = new JButton(ImageLoader.getIconByName(MonitorWindow.ICON)); //$NON-NLS-1$
 		monitorButton.setMargin(new Insets(1, 1, 1, 1));
 		monitorButton.setToolTipText(Msg.getString("TabPanelMissions.tooltip.monitor")); //$NON-NLS-1$
 		monitorButton.setEnabled(false);
@@ -209,7 +210,7 @@ extends TabPanel {
 	private void openMissionTool() {
 		Mission mission = (Mission) missionList.getSelectedValue();
 		if (mission != null) {
-			getDesktop().openToolWindow(MissionWindow.NAME, mission);
+			getDesktop().showDetails(mission);
 		}
 	}
 

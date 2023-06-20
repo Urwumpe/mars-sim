@@ -8,28 +8,23 @@
 package org.mars_sim.msp.ui.swing.unit_window.vehicle;
 
 import java.awt.BorderLayout;
-import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.util.Collection;
 
+import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JTextField;
-import javax.swing.SpringLayout;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.structure.Airlock.AirlockMode;
 import org.mars_sim.msp.core.vehicle.Rover;
-import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.core.vehicle.VehicleAirlock;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
+import org.mars_sim.msp.ui.swing.StyleManager;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
 import org.mars_sim.msp.ui.swing.unit_window.UnitListPanel;
-
-import com.alee.laf.panel.WebPanel;
-
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
 /**
  * The TabPanelEVA class represents the EVA airlock function of a vehicle.
@@ -37,7 +32,7 @@ import com.alee.laf.panel.WebPanel;
 @SuppressWarnings("serial")
 public class TabPanelEVA extends TabPanel {
 
-	private static final String SUIT_ICON = Msg.getString("icon.suit"); //$NON-NLS-1$
+	private static final String EVA_ICON = "eva"; 
 	
 	private static final String UNLOCKED = "Unlocked";
 	private static final String LOCKED = "Locked";
@@ -59,18 +54,18 @@ public class TabPanelEVA extends TabPanel {
 	private String innerDoorStateCache = "";
 	private String outerDoorStateCache = "";
 
-	private JTextField innerDoorLabel;
-	private JTextField outerDoorLabel;
-	private JTextField occupiedLabel;
-	private JTextField emptyLabel;
-	private JTextField operatorLabel;
-	private JTextField airlockStateLabel;
-	private JTextField activationLabel;
-	private JTextField transitionLabel;
-	private JTextField cycleTimeLabel;
-	private JTextField innerDoorStateLabel;
-	private JTextField outerDoorStateLabel;
-	private JTextField airlockModeLabel;
+	private JLabel innerDoorLabel;
+	private JLabel outerDoorLabel;
+	private JLabel occupiedLabel;
+	private JLabel emptyLabel;
+	private JLabel operatorLabel;
+	private JLabel airlockStateLabel;
+	private JLabel activationLabel;
+	private JLabel transitionLabel;
+	private JLabel cycleTimeLabel;
+	private JLabel innerDoorStateLabel;
+	private JLabel outerDoorStateLabel;
+	private JLabel airlockModeLabel;
 	
 	private	UnitListPanel<Person> occupants;
 
@@ -82,18 +77,16 @@ public class TabPanelEVA extends TabPanel {
      * @param vehicle the vehicle.
      * @param desktop The main desktop.
      */
-    public TabPanelEVA(Vehicle vehicle, MainDesktopPane desktop) {
+    public TabPanelEVA(Rover vehicle, MainDesktopPane desktop) {
         // Use the TabPanel constructor
         super(
             Msg.getString("TabPanelEVA.title"), //$NON-NLS-1$
-			ImageLoader.getNewIcon(SUIT_ICON),        	
+			ImageLoader.getIconByName(EVA_ICON),        	
         	Msg.getString("TabPanelEVA.title"), //$NON-NLS-1$
-        	vehicle, 
         	desktop
         );
 
-        if (vehicle instanceof Rover)
-        	vehicleAirlock = (VehicleAirlock)((Rover) vehicle).getAirlock();
+        vehicleAirlock = (VehicleAirlock)vehicle.getAirlock();
     }
     
 	/**
@@ -108,15 +101,15 @@ public class TabPanelEVA extends TabPanel {
     	}
 
         // Create top panel
-        WebPanel topPanel = new WebPanel(new BorderLayout());
+        JPanel topPanel = new JPanel(new BorderLayout());
         content.add(topPanel, BorderLayout.CENTER);
 
-		WebPanel labelGrid = new WebPanel(new SpringLayout());
+		AttributePanel labelGrid = new AttributePanel(6, 2);
 		topPanel.add(labelGrid, BorderLayout.NORTH);
 		
 		// Create innerDoorLabel
-		innerDoorLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.innerDoor.number"),
-				vehicleAirlock.getNumAwaitingInnerDoor(), 4, null);
+		innerDoorLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.innerDoor.number"),
+				Integer.toString(vehicleAirlock.getNumAwaitingInnerDoor()), null);
 
 		if (vehicleAirlock.isInnerDoorLocked())
 			innerDoorStateCache = LOCKED;
@@ -124,12 +117,12 @@ public class TabPanelEVA extends TabPanel {
 			innerDoorStateCache = UNLOCKED;
 		}
 		// Create innerDoorStateLabel
-		innerDoorStateLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.innerDoor.state"),
-										   innerDoorStateCache, 8, null);
+		innerDoorStateLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.innerDoor.state"),
+										   innerDoorStateCache, null);
 
 		// Create outerDoorLabel
-		outerDoorLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.outerDoor.number"),
-				vehicleAirlock.getNumAwaitingOuterDoor(), 4, null);
+		outerDoorLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.outerDoor.number"),
+											Integer.toString(vehicleAirlock.getNumAwaitingOuterDoor()), null);
 
 		if (vehicleAirlock.isOuterDoorLocked())
 			outerDoorStateCache = LOCKED;
@@ -137,52 +130,48 @@ public class TabPanelEVA extends TabPanel {
 			outerDoorStateCache = UNLOCKED;
 		}
 		// Create outerDoorStateLabel
-		outerDoorStateLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.outerDoor.state"),
-										   outerDoorStateCache, 8, null);
+		outerDoorStateLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.outerDoor.state"),
+										   outerDoorStateCache, null);
 
 		// Create occupiedLabel
-		occupiedLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.occupied"),
-				vehicleAirlock.getNumInChamber(), 4, null);
-
-		// Create activationLabel
-		activationLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.airlock.activation"),
-										 vehicleAirlock.isActivated() + "", 8, null);
-		// Create emptyLabel
-		emptyLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.empty"),
-				vehicleAirlock.getNumEmptied(), 4, null);
-
-		// Create airlockStateLabel
-		airlockStateLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.airlock.state"),
-										 vehicleAirlock.getState().toString(), 8, null);
-
-		// Create cycleTimeLabel
-		cycleTimeLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.airlock.cycleTime"),
-									  DECIMAL_PLACES1.format(vehicleAirlock.getRemainingCycleTime()), 4, null);
-		
-		// Create transitionLabel
-		transitionLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.airlock.transition"),
-				 vehicleAirlock.isTransitioning() + "", 8, null);
+		occupiedLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.occupied"),
+											Integer.toString(vehicleAirlock.getNumInChamber()), null);
 
 		// Create airlockModeLabel
-		airlockModeLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.airlock.mode"),
-				vehicleAirlock.getAirlockMode().getName() + "", 8, null);
+		airlockModeLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.airlock.mode"),
+											vehicleAirlock.getAirlockMode().getName(), null);
+
+		// Create emptyLabel
+		emptyLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.empty"),
+											Integer.toString(vehicleAirlock.getNumEmptied()), null);
+
+		// Create airlockStateLabel
+		airlockStateLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.airlock.state"),
+											vehicleAirlock.getState().toString(), null);
+
+		// Create cycleTimeLabel
+		cycleTimeLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.airlock.cycleTime"),
+											StyleManager.DECIMAL_PLACES1.format(vehicleAirlock.getRemainingCycleTime()), null);
+		
+		// Create transitionLabel
+		transitionLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.airlock.transition"),
+				 							Boolean.toString(vehicleAirlock.isTransitioning()), null);
+
+		// Create activationLabel
+		activationLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.airlock.activation"),
+				Boolean.toString(vehicleAirlock.isActivated()), null);
 		
 		// Create OperatorLabel
-		operatorLabel = addTextField(labelGrid, Msg.getString("TabPanelEVA.operator"),
-				vehicleAirlock.getOperatorName(), 12, null);
-		
-		SpringUtilities.makeCompactGrid(labelGrid,
-                6, 4, //rows, cols
-                10, INITY_DEFAULT,        //initX, initY
-                XPAD_DEFAULT, YPAD_DEFAULT);       //xPad, yPad	
-				
+		operatorLabel = labelGrid.addTextField(Msg.getString("TabPanelEVA.operator"),
+				vehicleAirlock.getOperatorName(), null);
+
 		// Create occupant panel
-		WebPanel occupantPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+		JPanel occupantPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		addBorder(occupantPanel, Msg.getString("TabPanelEVA.titledB.occupants"));
 		content.add(occupantPanel, BorderLayout.SOUTH);
 		
         // Create occupant list
-        occupants = new UnitListPanel<>(getDesktop(), new Dimension(150, 100)) {
+        occupants = new UnitListPanel<>(getDesktop()) {
 			@Override
 			protected Collection<Person> getData() {
 				return getUnitsFromIds(vehicleAirlock.getAllInsideOccupants());
@@ -261,7 +250,7 @@ public class TabPanelEVA extends TabPanel {
 		double time = vehicleAirlock.getRemainingCycleTime();
 		if (cycleTimeCache != time) {
 			cycleTimeCache = time;
-			cycleTimeLabel.setText(DECIMAL_PLACES1.format(cycleTimeCache));
+			cycleTimeLabel.setText(StyleManager.DECIMAL_PLACES1.format(cycleTimeCache));
 		}
 
 		String innerDoorState = "";

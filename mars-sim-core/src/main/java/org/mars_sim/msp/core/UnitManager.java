@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * UnitManager.java
- * @date 2021-12-13
+ * @date 2023-06-15
  * @author Scott Davis
  */
 package org.mars_sim.msp.core;
@@ -24,12 +24,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.data.UnitSet;
 import org.mars_sim.msp.core.environment.MarsSurface;
+import org.mars_sim.msp.core.environment.OuterSpace;
 import org.mars_sim.msp.core.equipment.Equipment;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.malfunction.MalfunctionFactory;
+import org.mars_sim.msp.core.moon.Moon;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
@@ -53,7 +55,7 @@ public class UnitManager implements Serializable, Temporal {
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
-	private static final Logger logger = Logger.getLogger(UnitManager.class.getName());
+	private static final SimLogger logger = SimLogger.getLogger(UnitManager.class.getName());
 
 	public static final int THREE_SHIFTS_MIN_POPULATION = 6;
 
@@ -104,9 +106,15 @@ public class UnitManager implements Serializable, Temporal {
 
 	private static ThreadLocal<Settlement> activeSettlement = new ThreadLocal<>();
 
-	/** The instance of MarsSurface. */
+	/** The instance of Mars Surface. */
 	private MarsSurface marsSurface;
-
+	
+	/** The instance of Outer Space. */
+	private OuterSpace outerSpace;
+	
+	/** The instance of Moon. */
+	private Moon moon;
+	
 	/**
 	 * Constructor.
 	 */
@@ -122,12 +130,12 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Get the appropriate Unit Map for a Unit identifier
-	 * @param id
+	 * Gets the appropriate Unit Map for a Unit type.
+	 * 
+	 * @param type
 	 * @return
 	 */
-	private Map<Integer, ? extends Unit> getUnitMap(Integer id) {
-		UnitType type = getTypeFromIdentifier(id);
+	private Map<Integer, ? extends Unit> getUnitMap(UnitType type ) {
 		Map<Integer,? extends Unit> map = null;
 
 		switch (type) {
@@ -161,6 +169,22 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
+	 * Gets the Unit of a certain type matching the name.
+	 * 
+	 * @param type The UnitType to search for
+	 * @param name Name of the unit
+	 */
+	public Unit getUnitByName(UnitType type, String name) {
+		Map<Integer,? extends Unit> map = getUnitMap(type);
+		for(Unit u : map.values()) {
+			if (u.getName().equalsIgnoreCase(name)) {
+				return u;
+			}
+		}
+		return null;
+	}
+	
+	/**
 	 * Gets the unit with a particular identifier (unit id).
 	 *
 	 * @param id identifier
@@ -169,13 +193,16 @@ public class UnitManager implements Serializable, Temporal {
 	public Unit getUnitByID(Integer id) {
 		if (id.intValue() == Unit.MARS_SURFACE_UNIT_ID)
 			return marsSurface;
+		else if (id.intValue() == Unit.OUTER_SPACE_UNIT_ID)
+			return outerSpace;
 		else if (id.intValue() == Unit.UNKNOWN_UNIT_ID) {
 			return null;
 		}
 
-		Unit found = getUnitMap(id).get(id);
+		UnitType type = getTypeFromIdentifier(id);
+		Unit found = getUnitMap(type).get(id);
 		if (found == null) {
-			logger.warning("Unit not found " + id + ". Type of unit : " + getTypeFromIdentifier(id)
+			logger.warning("Unit not found " + id + ". Type of unit : " + type
 			               + " (Base ID:" + (id >>> TYPE_BITS) + ").");
 		}
 		return found;
@@ -191,7 +218,7 @@ public class UnitManager implements Serializable, Temporal {
 
 	/**
 	 * Gets the settlement list including the commander's associated settlement
-	 * and the settlement that he's at or in the vicinity of
+	 * and the settlement that he's at or in the vicinity.
 	 *
 	 * @return {@link List<Settlement>}
 	 */
@@ -274,11 +301,20 @@ public class UnitManager implements Serializable, Temporal {
 				lookupSite.put(unit.getIdentifier(),
 							   (ConstructionSite) unit);
 				break;
-			case PLANET:
+			case MARS:
 				// Bit of a hack at the moment.
 				// Need to revisit once extra Planets added.
 				marsSurface = (MarsSurface) unit;
 				break;
+				
+			case OUTER_SPACE:
+				outerSpace = (OuterSpace) unit;
+				break;
+				
+			case MOON:
+				moon = (Moon) unit;
+				break;
+				
 			default:
 				throw new IllegalArgumentException("Cannot store unit type:" + unit.getUnitType());
 			}
@@ -294,7 +330,8 @@ public class UnitManager implements Serializable, Temporal {
 	 * @param unit the unit to remove.
 	 */
 	public synchronized void removeUnit(Unit unit) {
-		Map<Integer,? extends Unit> map = getUnitMap(unit.getIdentifier());
+		UnitType type = getTypeFromIdentifier(unit.getIdentifier());
+		Map<Integer,? extends Unit> map = getUnitMap(type);
 
 		map.remove(unit.getIdentifier());
 
@@ -303,8 +340,9 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Increment the count of the number of new unit requested.
+	 * Increments the count of the number of new unit requested.
 	 * This count is independent of the actual Units held in the manager.
+	 * 
 	 * @param name
 	 * @return
 	 */
@@ -324,7 +362,7 @@ public class UnitManager implements Serializable, Temporal {
 
 
 	/**
-	 * Notify all the units that time has passed. Times they are a changing.
+	 * Notifies all the units that time has passed. Times they are a changing.
 	 *
 	 * @param pulse the amount time passing (in millisols)
 	 * @throws Exception if error during time passing.
@@ -350,7 +388,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Sets up executive service
+	 * Sets up executive service.
 	 */
 	private void setupExecutor() {
 		if (executor == null) {
@@ -364,7 +402,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Sets up settlement tasks for executive service
+	 * Sets up settlement tasks for executive service.
 	 */
 	private void setupTasks() {
 		if (settlementTasks == null || settlementTasks.isEmpty()) {
@@ -374,7 +412,8 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Add a Settlement to the managed list and activate it for time pulses.
+	 * Adds a Settlement to the managed list and activate it for time pulses.
+	 * 
 	 * @param s
 	 */
 	public void activateSettlement(Settlement s) {
@@ -389,8 +428,9 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * This method validates whether teh current active Settlement in this thread matches
+	 * This method validates whether the current active Settlement in this thread matches
 	 * the owner of an entity. This is a Thread specific method.
+	 * 
 	 * @param operation
 	 * @param owner
 	 */
@@ -412,7 +452,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Fires the clock pulse to each clock listener
+	 * Fires the clock pulse to each clock listener.
 	 *
 	 * @param pulse
 	 */
@@ -443,7 +483,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Ends the current executor
+	 * Ends the current executor.
 	 */
 	public void endSimulation() {
 		if (executor != null)
@@ -451,7 +491,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Get number of settlements
+	 * Gets number of settlements.
 	 *
 	 * @return the number of settlements
 	 */
@@ -460,7 +500,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Get settlements in virtual Mars
+	 * Gets a collection of settlements.
 	 *
 	 * @return Collection of settlements
 	 */
@@ -469,7 +509,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Get vehicles in virtual Mars
+	 * Gets a collection of vehicles.
 	 *
 	 * @return Collection of vehicles
 	 */
@@ -478,16 +518,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Get number of people
-	 *
-	 * @return the number of people
-	 */
-	public int getTotalNumPeople() {
-		return lookupPerson.size();
-	}
-
-	/**
-	 * Get all people in Mars
+	 * Gets a collection of people.
 	 *
 	 * @return Collection of people
 	 */
@@ -496,7 +527,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Get Robots in virtual Mars
+	 * Get a collection of robots.
 	 *
 	 * @return Collection of Robots
 	 */
@@ -505,7 +536,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Adds the unit for display
+	 * Adds the unit for display.
 	 *
 	 * @param unit
 	 */
@@ -517,7 +548,8 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Obtains the settlement and vehicle units for map display
+	 * Obtains the settlement and vehicle units for map display.
+	 * 
 	 * @return
 	 */
 	public Set<Unit> getDisplayUnits() {
@@ -525,7 +557,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Adds a unit manager listener
+	 * Adds a unit manager listener.
 	 *
 	 * @param source UnitType monitored
 	 * @param newListener the listener to add.
@@ -543,7 +575,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Removes a unit manager listener
+	 * Removes a unit manager listener.
 	 *
 	 * @param oldListener the listener to remove.
 	 */
@@ -562,7 +594,7 @@ public class UnitManager implements Serializable, Temporal {
 	}
 
 	/**
-	 * Fire a unit update event.
+	 * Fires a unit update event.
 	 *
 	 * @param eventType the event type.
 	 * @param unit      the unit causing the event.
@@ -583,6 +615,74 @@ public class UnitManager implements Serializable, Temporal {
 		}
 	}
 
+	/**
+	 * Returns the Mars surface instance.
+	 *
+	 * @return {@Link MarsSurface}
+	 */
+	public MarsSurface getMarsSurface() {
+		return marsSurface;
+	}
+
+	/**
+	 * Returns the outer space instance.
+	 *
+	 * @return {@Link OuterSpace}
+	 */	
+	public OuterSpace getOuterSpace() {
+		return outerSpace;
+	}
+	
+	/**
+	 * Returns the Moon instance.
+	 *
+	 * @return {@Link Moon}
+	 */	
+	public Moon getMoon() {
+		return moon;
+	}
+	
+	/**
+	 * Extracts the UnitType from an identifier.
+	 * 
+	 * @param id
+	 * @return
+	 */
+	public static UnitType getTypeFromIdentifier(int id) {
+		// Extract the bottom 4 bit
+		int typeId = (id & TYPE_MASK);
+
+		return UnitType.values()[typeId];
+	}
+
+	/**
+	 * Generates a new unique UnitId for a certain type. This will be used later
+	 * for lookups.
+	 * The lowest 4 bits contain the ordinal of the UnitType. Top remaining bits
+	 * are a unique increasing number.
+	 * This guarantees uniqueness PLUS a quick means to identify the UnitType 
+	 * from only the identifier.
+	 * 
+	 * @param unitType
+	 * @return
+	 */
+	public synchronized int generateNewId(UnitType unitType) {
+		int baseId = uniqueId++;
+		if (baseId >= MAX_BASE_ID) {
+			throw new IllegalStateException("Too many Unit created " + MAX_BASE_ID);
+		}
+		int typeId = unitType.ordinal();
+
+		return (baseId << TYPE_BITS) + typeId;
+	}
+
+	public void setOriginalBuild(String build) {
+		originalBuild = build;
+	}
+
+	public String getOriginalBuild() {
+		return originalBuild;
+	}
 
 	/**
 	 * Reloads instances after loading from a saved sim.
@@ -609,59 +709,20 @@ public class UnitManager implements Serializable, Temporal {
 		// Sets up the concurrent tasks
 		setupTasks();
 	}
-
+	
+//	/**
+//	 * Reinitializes instances after deserialization.
+//	 * 
+//	 * @param in
+//	 * @throws IOException
+//	 * @throws ClassNotFoundException
+//	 */
+//	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+//		in.defaultReadObject();
+//	}
+	
 	/**
-	 * Returns Mars surface instance
-	 *
-	 * @return {@Link MarsSurface}
-	 */
-	public MarsSurface getMarsSurface() {
-		return marsSurface;
-	}
-
-	/**
-	 * Extracts the UnitType from an identifier
-	 * @param id
-	 * @return
-	 */
-	public static UnitType getTypeFromIdentifier(int id) {
-		// Extract the bottom 4 bit
-		int typeId = (id & TYPE_MASK);
-
-		return UnitType.values()[typeId];
-	}
-
-	/**
-	 * Generate a new unique UnitId for a certain type. This will be used later
-	 * for lookups.
-	 * The lowest 4 bits contain the ordinal of the UnitType. Top remaining bits
-	 * are a unique increasing number.
-	 * This guarantees
-	 * uniqueness PLUS a quick means to identify the UnitType from only the
-	 * identifier.
-	 * @param unitType
-	 * @return
-	 */
-	public synchronized int generateNewId(UnitType unitType) {
-		int baseId = uniqueId++;
-		if (baseId >= MAX_BASE_ID) {
-			throw new IllegalStateException("Too many Unit created " + MAX_BASE_ID);
-		}
-		int typeId = unitType.ordinal();
-
-		return (baseId << TYPE_BITS) + typeId;
-	}
-
-	public void setOriginalBuild(String build) {
-		originalBuild = build;
-	}
-
-	public String getOriginalBuild() {
-		return originalBuild;
-	}
-
-	/**
-	 * Prepare object for garbage collection.
+	 * Prepares object for garbage collection.
 	 */
 	public void destroy() {
 		activeSettlement.remove();
@@ -713,7 +774,7 @@ public class UnitManager implements Serializable, Temporal {
 
 		marsSurface = null;
 
-		listeners.clear();
+//		listeners.clear();
 		listeners = null;
 	}
 

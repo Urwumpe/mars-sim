@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * CropCategory.java
- * @date 2022-06-20
+ * @date 2023-05-06
  * @author Manny Kung
  */
 
@@ -9,21 +9,21 @@ package org.mars_sim.msp.core.structure.building.function.farming;
 
 public enum CropCategory {
 	
-	BULBS("Blbs"),
+	BULBS("Bulbs"),
 	CORMS("Corms"),
 	FLOWERS("Flowers"),
 	FRUITS("Fruits"),
-	
 	FUNGI("Fungi"),
+	
 	GRAINS("Grains"),
 	GRASSES("Grasses"),
+	HERBS("Herbs"),	
 	LEAVES("Leaves"),
-	
 	LEGUMES("Legumes"),
+	
 	ROOTS("Roots"),
 	SEEDS("Seeds"),
 	//SPICES("spices"),
-	
 	STEMS("Stems"),
 	TUBERS("Tubers");
 	

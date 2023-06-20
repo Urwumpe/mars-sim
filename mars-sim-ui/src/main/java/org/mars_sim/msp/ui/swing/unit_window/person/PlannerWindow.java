@@ -16,7 +16,6 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.text.DecimalFormat;
 import java.util.List;
 
 import javax.swing.DefaultListCellRenderer;
@@ -42,7 +41,6 @@ import org.mars_sim.msp.core.person.ai.task.util.TaskManager.OneActivity;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 
 
@@ -154,11 +152,6 @@ implements InternalFrameListener, ActionListener {
 	    //	table.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
 	    //}
 		topPanel.add(scrollPanel, BorderLayout.CENTER);
-
-		// 2015-06-08 Added setTableStyle()
-		TableStyle.setTableStyle(table);
-
-		update();
 	}
 
 	public void addItem(JPanel p, JComponent c, int x, int y, int w, int h, int align) {
@@ -233,15 +226,6 @@ implements InternalFrameListener, ActionListener {
 
 	}
 
-
-	/**
-	 * Updates the info on this panel.
-	 */
-	public void update() {
-		TableStyle.setTableStyle(table);
-		// Update if necessary.
-	}
-
 	class PromptComboBoxRenderer extends DefaultListCellRenderer {
 
 		private static final long serialVersionUID = 1L;
@@ -306,8 +290,6 @@ implements InternalFrameListener, ActionListener {
 
 		private TaskManager taskSchedule;
 		private List<OneActivity> activities;
-
-		DecimalFormat fmt = new DecimalFormat("0000");
 
 		/**
 		 * hidden constructor.

@@ -19,7 +19,6 @@ import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.Vehicle;
-import org.mars_sim.msp.core.vehicle.VehicleType;
 
 /**
  * Command to display vehicles
@@ -46,22 +45,15 @@ public class VehicleCommand extends AbstractSettlementCommand {
 		List<Vehicle> vlist = new ArrayList<>(settlement.getAllAssociatedVehicles());
 		Collections.sort(vlist);
 
-		response.appendTableHeading("Name", CommandHelper.PERSON_WIDTH, "Type", 15, 
-									"Status", 7, "Home", "Reserved", "Maint Due", "Mission", 25);
+		response.appendTableHeading("Name", CommandHelper.PERSON_WIDTH, "Type", 21, 
+									"Status", 7, "Home", "Maint Due", "Mission", 25);
 
-		var missionMgr = context.getSim().getMissionManager();
 		for (Vehicle v : vlist) {
-			VehicleType vt = v.getVehicleType();
-			String vTypeStr;
-			if (vt == VehicleType.LUV)
-				vTypeStr = "LUV";
-			else {
-				vTypeStr = vt.getName();
-			}
-			
+			String vTypeStr = v.getSpecName();	
+
 			// Print mission name
 			String missionName = "";
-			Mission mission = missionMgr.getMissionForVehicle(v);
+			Mission mission = v.getMission();
 			if (mission != null) {
 				missionName = mission.getName();
 			}
@@ -72,7 +64,7 @@ public class VehicleCommand extends AbstractSettlementCommand {
 			// Dropped Parked once fix problem
 			boolean isHome = settlement.equals(v.getSettlement());
 			response.appendTableRow(v.getName(), vTypeStr, v.getPrimaryStatus().getName(),
-						isHome, v.isReserved(), needMaintenance, missionName);
+						isHome, needMaintenance, missionName);
 		}
 		
 		context.println(response.getOutput());

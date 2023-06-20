@@ -7,16 +7,18 @@
 package org.mars_sim.msp.ui.swing.unit_window.structure;
 
 import java.awt.Dimension;
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.List;
 
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableColumnModel;
 
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Msg;
@@ -33,17 +35,15 @@ import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
-
-import com.alee.laf.scroll.WebScrollPane;
+import org.mars_sim.msp.ui.swing.utils.UnitModel;
+import org.mars_sim.msp.ui.swing.utils.UnitTableLauncher;
 
 @SuppressWarnings("serial")
 public class TabPanelCredit
 extends TabPanel {
 	
-	private static final String CREDIT_ICON = Msg.getString("icon.credit"); //$NON-NLS-1$
+	private static final String CREDIT_ICON = "credit";
 
 	/** The Settlement instance. */
 	private Settlement settlement;
@@ -61,7 +61,7 @@ extends TabPanel {
 		// Use TabPanel constructor.
 		super(
 			null,
-			ImageLoader.getNewIcon(CREDIT_ICON),
+			ImageLoader.getIconByName(CREDIT_ICON),
 			Msg.getString("TabPanelCredit.title"), //$NON-NLS-1$
 			unit, desktop
 		);
@@ -74,7 +74,7 @@ extends TabPanel {
 	protected void buildUI(JPanel content) {
 
 		// Create scroll panel for the outer table panel.
-		WebScrollPane creditScrollPanel = new WebScrollPane();
+		JScrollPane creditScrollPanel = new JScrollPane();
 		creditScrollPanel.setPreferredSize(new Dimension(280, 280));
 		content.add(creditScrollPanel);
 
@@ -82,15 +82,16 @@ extends TabPanel {
 		creditTableModel = new CreditTableModel(settlement);
 
 		// Prepare credit table.
-		creditTable = new ZebraJTable(creditTableModel);
+		creditTable = new JTable(creditTableModel);
 		creditScrollPanel.setViewportView(creditTable);
 		creditTable.setRowSelectionAllowed(true);
+		creditTable.addMouseListener(new UnitTableLauncher(getDesktop()));
 
 		creditTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2, true));
-
-		creditTable.getColumnModel().getColumn(0).setPreferredWidth(100);
-		creditTable.getColumnModel().getColumn(1).setPreferredWidth(120);
-		creditTable.getColumnModel().getColumn(2).setPreferredWidth(50);
+		TableColumnModel columnModel = creditTable.getColumnModel();
+		columnModel.getColumn(0).setPreferredWidth(100);
+		columnModel.getColumn(1).setPreferredWidth(120);
+		columnModel.getColumn(2).setPreferredWidth(50);
 
 		// Resizable automatically when its Panel resizes
 		creditTable.setPreferredScrollableViewportSize(new Dimension(225, -1));
@@ -101,36 +102,25 @@ extends TabPanel {
 		// Align the preference score to the center of the cell
 		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
 		renderer.setHorizontalAlignment(SwingConstants.RIGHT);
-		creditTable.getColumnModel().getColumn(0).setCellRenderer(renderer);
-		creditTable.getColumnModel().getColumn(2).setCellRenderer(renderer);
+		columnModel.getColumn(0).setCellRenderer(renderer);
+		columnModel.getColumn(2).setCellRenderer(renderer);
 
 		DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
 		centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
-		creditTable.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
-
-		TableStyle.setTableStyle(creditTable);
-
-	}
-
-	/**
-	 * Updates the info on this panel.
-	 */
-	@Override
-	public void update() {
-		TableStyle.setTableStyle(creditTable);
+		columnModel.getColumn(1).setCellRenderer(centerRenderer);
 	}
 
 	/**
 	 * Internal class used as model for the credit table.
 	 */
 	private static class CreditTableModel extends AbstractTableModel implements CreditListener,
-	UnitManagerListener {
+						UnitManagerListener, UnitModel {
 
 		/** default serial id. */
 		private static final long serialVersionUID = 1L;
 
 		// Data members
-		private Collection<Settlement> settlements;
+		private List<Settlement> settlements;
 		private Settlement thisSettlement;
 		private UnitManager unitManager = Simulation.instance().getUnitManager();
 
@@ -142,10 +132,8 @@ extends TabPanel {
 			this.thisSettlement = thisSettlement;
 
 			// Get collection of all other settlements.
-			settlements = new ConcurrentLinkedQueue<Settlement>();
-			Iterator<Settlement> i = CollectionUtils.sortByName(unitManager.getSettlements()).iterator();
-			while (i.hasNext()) {
-				Settlement settlement = i.next();
+			settlements = new ArrayList<>();
+			for(Settlement settlement : unitManager.getSettlements()) {
 				if (settlement != thisSettlement) {
 					settlements.add(settlement);
 					settlement.getCreditManager().addListener(this);
@@ -185,7 +173,7 @@ extends TabPanel {
 		@Override
 		public Object getValueAt(int row, int column) {
 			if (row < getRowCount()) {
-				Settlement settlement = (Settlement) settlements.toArray()[row];
+				Settlement settlement = settlements.get(row);
 				if (column == 0) return settlement.getName();
 				else {
 					double credit = 0D;
@@ -258,6 +246,11 @@ extends TabPanel {
 
 		public void destroy() {
 			unitManager.removeUnitManagerListener(UnitType.SETTLEMENT, this);
+		}
+
+		@Override
+		public Unit getAssociatedUnit(int row) {
+			return settlements.get(row);
 		}
 	}
 

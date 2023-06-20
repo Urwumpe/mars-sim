@@ -1,64 +1,89 @@
 /*
  * Mars Simulation Project
  * MissionWindow.java
- * @date 2022-07-31
+ * @date 2023-06-18
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.mission;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
-import javax.swing.JList;
-import javax.swing.ListSelectionModel;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
+import javax.swing.Icon;
+import javax.swing.JButton;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
+import javax.swing.JTree;
+import javax.swing.event.TreeSelectionEvent;
+import javax.swing.event.TreeSelectionListener;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeCellRenderer;
+import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeNode;
+import javax.swing.tree.TreePath;
 
 import org.mars_sim.msp.core.person.ai.mission.Mission;
+import org.mars_sim.msp.core.person.ai.mission.MissionManager;
+import org.mars_sim.msp.core.person.ai.mission.MissionManagerListener;
+import org.mars_sim.msp.core.person.ai.mission.MissionPlanning;
+import org.mars_sim.msp.core.person.ai.mission.PlanType;
+import org.mars_sim.msp.core.project.Stage;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.time.ClockPulse;
+import org.mars_sim.msp.ui.swing.ConfigurableWindow;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.StyleManager;
 import org.mars_sim.msp.ui.swing.tool.mission.create.CreateMissionWizard;
 import org.mars_sim.msp.ui.swing.tool.mission.edit.EditMissionDialog;
+import org.mars_sim.msp.ui.swing.tool.navigator.NavigatorWindow;
 import org.mars_sim.msp.ui.swing.toolwindow.ToolWindow;
-
-import com.alee.laf.button.WebButton;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.tabbedpane.WebTabbedPane;
 
 /**
  * Window for the mission tool.
  */
 @SuppressWarnings("serial")
-public class MissionWindow extends ToolWindow {
+public class MissionWindow extends ToolWindow implements ConfigurableWindow {
 
 	/** Tool name. */
 	public static final String NAME = "Mission Tool";
-	public static final int WIDTH = 640;
-	public static final int LEFT_PANEL_WIDTH = 180;
-	public static final int HEIGHT = 640;
+	public static final String ICON = "mission";
+	
+	private static final int PADDING = 20;
+	static final int LEFT_PANEL_WIDTH = 220;
+	static final int WIDTH = LEFT_PANEL_WIDTH + NavigatorWindow.MAP_BOX_WIDTH;
+	
+	static final int MAP_BOX_HEIGHT = NavigatorWindow.MAP_BOX_WIDTH;
+	static final int TABLE_HEIGHT = 160;
+	static final int HEIGHT = MAP_BOX_HEIGHT + TABLE_HEIGHT;
+	
+	private static final String MISSIONNAME_PROP = "selected";
 
 	// Private members
-	private WebTabbedPane tabPane;
 	private MainDetailPanel mainPanel;
-
-	private JList<Settlement> settlementList;
-	private JList<Mission> missionList;
-
-	private SettlementListModel settlementListModel;
-	private MissionListModel missionListModel;
-
-	private Settlement settlementCache;
 	private Mission missionCache;
 
 	private NavpointPanel navpointPane;
 
 	private CreateMissionWizard createMissionWizard;
 
-	private EditMissionDialog editMissionDialog;
+	private MissionManager missionMgr;
+	private DefaultTreeModel treeModel;
+	private DefaultMutableTreeNode missionRoot;
+	private Map<Settlement,DefaultMutableTreeNode> settlementNodes = new HashMap<>();
+	private Map<Mission,DefaultMutableTreeNode> missionNodes = new HashMap<>();
+	private JButton abortButton;
+	private JButton editButton;
+	private JButton approveButton;
+	private JTree missionTree;
+	private JButton rejectButton;
 
 	/**
 	 * Constructor.
@@ -70,79 +95,93 @@ public class MissionWindow extends ToolWindow {
 		// Use ToolWindow constructor
 		super(NAME, desktop);
 
+		this.missionMgr = desktop.getSimulation().getMissionManager();
+		this.missionMgr.addListener(new MissionManagerListener() {
+
+			@Override
+			public void addMission(Mission mission) {
+				addMissionNode(mission);
+			}
+
+			@Override
+			public void removeMission(Mission mission) {
+				removeMissionNode(mission);
+			}
+			
+		});
+
+//		setSize(new Dimension(WIDTH, HEIGHT));
+		setPreferredSize(new Dimension(WIDTH, HEIGHT));
+//		setMaximumSize(new Dimension(WIDTH, HEIGHT));
+		
 		// Create content panel.
-		WebPanel mPane = new WebPanel(new BorderLayout());
+		JPanel mPane = new JPanel(new BorderLayout());
 		mPane.setBorder(MainDesktopPane.newEmptyBorder());
 		setContentPane(mPane);
 
 		// Create the left panel.
-		WebPanel leftPane = new WebPanel(new BorderLayout());
-		mPane.add(leftPane, BorderLayout.WEST);
+		JPanel treePanel = new JPanel(new BorderLayout());
+		treePanel.setBorder(StyleManager.createLabelBorder("Missions"));
+		mPane.add(treePanel, BorderLayout.WEST);
 
-		// Create the settlement list panel.
-		WebPanel settlementListPane = new WebPanel(new BorderLayout());
-		settlementListPane.setPreferredSize(new Dimension(LEFT_PANEL_WIDTH, 220));
-		leftPane.add(settlementListPane, BorderLayout.NORTH);
+		missionRoot = new DefaultMutableTreeNode("Settlements");
+		treeModel = new DefaultTreeModel(missionRoot);
+		missionTree = new JTree(treeModel);
+		missionTree.setExpandsSelectedPaths(true);    
+		missionTree.setCellRenderer(new MissionTreeRenderer());          
+		missionTree.addTreeSelectionListener(new TreeSelectionListener() {
+            public void valueChanged(TreeSelectionEvent e) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) e
+                        .getPath().getLastPathComponent();
+				Object selection = node.getUserObject();
 
-		// Create the mission list panel.
-		WebPanel missionListPane = new WebPanel(new BorderLayout());
-		missionListPane.setPreferredSize(new Dimension(LEFT_PANEL_WIDTH, 400));
-		leftPane.add(missionListPane, BorderLayout.CENTER);
-
-		// Create the settlement list.
-		settlementListModel = new SettlementListModel();
-		settlementList = new JList<>(settlementListModel);
-		settlementList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-		settlementListPane.add(new WebScrollPane(settlementList), BorderLayout.CENTER);
-		settlementList.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent me) {
-				JList<Settlement> target = (JList<Settlement>)me.getSource();
-				int index = target.locationToIndex(me.getPoint());
-				if (index >= 0) {
-					Settlement settlement = (Settlement)target.getModel().getElementAt(index);
-					selectSettlement(settlement);
+				if (selection instanceof Mission) {
+					Mission m = (Mission) selection;
+					selectMission(m);
 				}
-	         }
-		});
+				else {
+					selectMission(null);
+				}
+            }
+        });
 
-		// Create the mission list.
-		missionListModel = new MissionListModel(this);
-		missionList = new JList<>(missionListModel);
-		missionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);//SINGLE_INTERVAL_SELECTION);
-		missionListPane.add(new WebScrollPane(missionList), BorderLayout.CENTER);
-		missionList.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent me) {
-				JList<Mission> target = (JList<Mission>)me.getSource();
-				int index = target.locationToIndex(me.getPoint());
-				if (index >= 0) {
-					Mission mission = (Mission)target.getModel().getElementAt(index);
-					selectMission(mission);
-               }
-	         }
-		});
+		JScrollPane scroller = new JScrollPane(missionTree);
+		
+		scroller.setSize(new Dimension(LEFT_PANEL_WIDTH, HEIGHT - PADDING));
+		scroller.setMinimumSize(new Dimension(LEFT_PANEL_WIDTH, HEIGHT - PADDING));
+//		scroller.setMaximumSize(new Dimension(LEFT_PANEL_WIDTH, HEIGHT - PADDING));
+		
+		treePanel.add(scroller, BorderLayout.CENTER);
+
+		for(Mission m : missionMgr.getMissions()) {
+			addMissionNode(m);
+		}
 
 		// Create the info tab panel.
-		tabPane = new WebTabbedPane();
+		JTabbedPane tabPane = new JTabbedPane();
 		mPane.add(tabPane, BorderLayout.CENTER);
 
 		// Create the main detail panel.
 		mainPanel = new MainDetailPanel(desktop, this);
-		mainPanel.setSize(new Dimension(WIDTH - LEFT_PANEL_WIDTH, HEIGHT));
 		tabPane.add("Main", mainPanel);
 
 		// Create the navpoint panel.
 		navpointPane = new NavpointPanel(this);
-		missionList.addListSelectionListener(navpointPane);
+//		navpointPane.setSize(new Dimension(NavigatorWindow.MAP_BOX_WIDTH, HEIGHT));
+//		navpointPane.setPreferredSize(new Dimension(NavigatorWindow.MAP_BOX_WIDTH, HEIGHT));
+//		navpointPane.setMaximumSize(new Dimension(NavigatorWindow.MAP_BOX_WIDTH, HEIGHT));
+		
 		tabPane.add("Navigation", navpointPane);
 
+		JSplitPane spliter = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, treePanel, tabPane);
+		mPane.add(spliter, BorderLayout.CENTER);
+
 		// Create the button panel.
-		WebPanel buttonPane = new WebPanel(new FlowLayout());
+		JPanel buttonPane = new JPanel(new FlowLayout());
 		mPane.add(buttonPane, BorderLayout.SOUTH);
 
 		// Create the create mission button.
-		WebButton createButton = new WebButton("Create New Mission");
+		JButton createButton = new JButton("Create");
 		createButton.addActionListener(e -> 
 				// Create new mission.
 				createNewMission()
@@ -150,102 +189,79 @@ public class MissionWindow extends ToolWindow {
 		buttonPane.add(createButton);
 
 		// Create the edit mission button.
-		final WebButton editButton = new WebButton("Modify Mission");
+		editButton = new JButton("Modify");
 		editButton.setEnabled(false);
 
 		editButton.addActionListener(e -> {
-			missionCache = (Mission) missionList.getSelectedValue();
 			if (missionCache != null) editMission(missionCache);
 		});
-
 		buttonPane.add(editButton);
 
-		// Create the abort mission button.
-		final WebButton abortButton = new WebButton("Abort Mission");
-		abortButton.setEnabled(false);
+		// Create the approve mission button.
+		approveButton = new JButton("Approve");
+		approveButton.setEnabled(false);
+		approveButton.addActionListener(e -> {
+			if (missionCache != null) reviewMission(missionCache, true);
+		});
+		buttonPane.add(approveButton);
+		rejectButton = new JButton("Reject");
+		rejectButton.setEnabled(false);
+		rejectButton.addActionListener(e -> {
+			if (missionCache != null) reviewMission(missionCache, false);
+		});
+		buttonPane.add(rejectButton);
 
+		// Create the abort mission button.
+		abortButton = new JButton("Abort");
+		abortButton.setEnabled(false);
 		abortButton.addActionListener(e -> {
 			// End the mission.
-			missionCache = missionList.getSelectedValue();
-			if (missionCache != null) missionCache.abortMission();
+			if (missionCache != null) missionCache.abortMission("User aborted");
 		});
-		
-		missionList.addListSelectionListener(new ListSelectionListener() {
-			public void valueChanged(ListSelectionEvent e) {
-				boolean value = missionList.getSelectedValue() != null;
-				abortButton.setEnabled(value);
-				// Enable button if mission is selected in list.
-				editButton.setEnabled(value);
-			}
-		});
-
 		buttonPane.add(abortButton);
 
 		setSize(new Dimension(WIDTH, HEIGHT));
-//		setMaximizable(true);
-		setResizable(false);
+		setResizable(true);
 
-		setVisible(true);
-		// pack();
-
-		Dimension desktopSize = desktop.getSize();
-		Dimension jInternalFrameSize = this.getSize();
-		int width = (desktopSize.width - jInternalFrameSize.width) / 2;
-		int height = (desktopSize.height - jInternalFrameSize.height) / 2;
-		setLocation(width, height);
+		// Reselect previous mission
+		Properties userSettings = desktop.getMainWindow().getConfig().getInternalWindowProps(NAME);
+		String selectedMission = (userSettings != null ? userSettings.getProperty(MISSIONNAME_PROP) : null);
+		if (selectedMission != null) {
+			for(Mission m : missionMgr.getMissions()) {
+				if (m.getName().equals(selectedMission)) {
+					openMission(m);
+					break;
+				}
+			}
+		}
 	}
 
-	/**
-	 * Selects a mission for display.
-	 *
-	 * @param missionCache the mission to select.
-	 */
-	public void selectSettlement(Settlement settlement) {
-		if (settlement == null) {
-			settlementList.clearSelection();
-			return;
+	private DefaultMutableTreeNode addMissionNode(Mission m) {
+		Settlement s = m.getAssociatedSettlement();
+		DefaultMutableTreeNode sNode = settlementNodes.get(s);
+		if (sNode == null) {
+			sNode = new DefaultMutableTreeNode(s.getName(), true);
+			//missionRoot.add(parent);
+			treeModel.insertNodeInto(sNode, missionRoot, missionRoot.getChildCount());
+			settlementNodes.put(s, sNode);
 		}
-	
-		if (settlementCache == null || settlementCache != settlement) {
-			// Update the settlement cache
-			this.settlementCache = settlement;
-			// Highlight the selected mission
-			settlementList.setSelectedValue(settlement, true);
-		}
-		
-		// Populate the missions in this settlement
-		missionListModel.populateMissions();
-		
-		missionCache = null;
-		// Clear the info on main tab to avoid confusion
-		mainPanel.clearInfo();
-		// Clear the info on navigation tab to avoid confusion	
-		navpointPane.clearNavTab(settlementCache);
+
+		DefaultMutableTreeNode mNode = new DefaultMutableTreeNode(m, false);
+		treeModel.insertNodeInto(mNode, sNode, sNode.getChildCount());
+		missionNodes.put(m, mNode);
+
+		// Open Tree
+		missionTree.expandPath(new TreePath(sNode.getPath()));
+
+		return mNode;
 	}
 
-	/**
-	 * Selects a mission for display.
-	 *
-	 * @param missionCache the mission to select.
-	 */
-	public void selectSettlement(Settlement settlement, Mission mission) {
-		if (settlement == null) {
-			settlementList.clearSelection();
+	private void removeMissionNode(Mission m) {
+		DefaultMutableTreeNode mNode = missionNodes.get(m);
+		if (mNode == null) {
 			return;
 		}
-	
-		if (settlementCache == null || settlementCache != settlement) {
-			// Update the settlement cache
-			this.settlementCache = settlement;
-			// Highlight the selected mission
-			settlementList.setSelectedValue(settlement, true);
-		}
-		
-		// Populate the missions in this settlement
-		missionListModel.populateMissions();
-		
-		// Automatically select the first mission in the mission list
-		selectMission(mission);
+		treeModel.removeNodeFromParent(mNode);
 	}
 	
 	
@@ -254,22 +270,22 @@ public class MissionWindow extends ToolWindow {
 	 *
 	 * @param newMission the mission to select.
 	 */
-	public void selectMission(Mission newMission) {	
-		if (newMission == null) {	
-			missionList.clearSelection();
-			return;
-		}
+	private void selectMission(Mission newMission) {	
 		
-		if (missionCache == null || missionCache != newMission) {
-			// Update the cache
-			missionCache = newMission;
-			// Select the new mission on the mission list
-			missionList.setSelectedValue(newMission, true);
-			// Highlight the selected mission in Main tab
-			mainPanel.setMission(newMission);
-			// Highlight the selected mission in Nav tab
-			navpointPane.setMission(newMission);
-		}
+		// Update the cache
+		missionCache = newMission;
+
+		abortButton.setEnabled(missionCache != null);
+		editButton.setEnabled(missionCache != null);
+
+		boolean preMission = ((missionCache != null) && (missionCache.getStage() == Stage.PREPARATION));
+		approveButton.setEnabled(preMission);
+		rejectButton.setEnabled(preMission);
+
+		// Highlight the selected mission in Main tab
+		mainPanel.setMission(newMission);
+		// Highlight the selected mission in Nav tab
+		navpointPane.setMission(newMission);
 	}
 
 	/**
@@ -280,48 +296,105 @@ public class MissionWindow extends ToolWindow {
 	}
 
 	/**
+	 * Approve a mission being review
+	 * @param mission the mission to review
+	 */
+	private void reviewMission(Mission mission, boolean approved) {
+		MissionPlanning plan = mission.getPlan();
+		if ((plan != null) && plan.getStatus() == PlanType.PENDING) {
+			missionMgr.approveMissionPlan(plan, (approved ?
+								PlanType.APPROVED : PlanType.NOT_APPROVED), 0);
+			selectMission(mission); // Force a full refresh
+		}
+	}
+
+
+	/**
 	 * Open wizard to edit a mission.
 	 * @param mission the mission to edit.
 	 */
 	private void editMission(Mission mission) {
-		editMissionDialog = new EditMissionDialog(desktop, mission, this);
+		new EditMissionDialog(desktop, mission, this);
 	}
 
 	public CreateMissionWizard getCreateMissionWizard() {
 		return createMissionWizard;
 	}
 
-	public boolean isNavPointsMapTabOpen() {
-        return tabPane.getSelectedIndex() == 1;
-	}
-
-	public Settlement getSettlement() {
-		return settlementCache;
-	}
-
 	public Mission getMission() {
 		return missionCache;
 	}
 
-	public void selectFirstIndex() {
-		missionList.setSelectedIndex(0);
+	/**
+	 * Time has advanced
+	 * @param pulse The clock change
+	 */
+	@Override
+	public void update(ClockPulse pulse) {
+		navpointPane.update(pulse);
 	}
 
-	public JList<Mission> getMissionList() {
-		return missionList;
-	}
-
-	public JList<Settlement> getSettlementList() {
-		return settlementList;
-	}
-	
 	/**
 	 * Prepares tool window for deletion.
 	 */
 	@Override
 	public void destroy() {
-		missionListModel.destroy();
-		settlementListModel.destroy();
 		navpointPane.destroy();
 	}
+
+	/**
+	 * External tools has asked to open a Mission
+	 * @param mission Mission to display
+	 */
+	public void openMission(Mission mission) {
+		DefaultMutableTreeNode found = missionNodes.get(mission);
+		if (found == null) {
+			// Should never happen
+			found = addMissionNode(mission);
+		}
+
+		TreeNode[] path = found.getPath();
+		missionTree.setSelectionPath(new TreePath(path));
+	}
+
+	/**
+	 * Get the current status of the window in terms of User experience.
+	 */
+	@Override
+	public Properties getUIProps() {
+		Properties results = new Properties();
+		if (missionCache != null) {
+			results.setProperty(MISSIONNAME_PROP, missionCache.getName());
+		}
+		return results;
+	}
+
+	private static class MissionTreeRenderer extends DefaultTreeCellRenderer {
+		private static final Icon COMPLETED = ImageLoader.getIconByName("mission/completed");
+		//private static final Icon ABORTED = ImageLoader.getIconByName("mission/aborted");
+		private static final Icon IN_PROGRESS = ImageLoader.getIconByName("mission/inprogress");
+		private static final Icon REVIEW = ImageLoader.getIconByName("mission/review");
+	  
+	  
+		@Override
+		public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded,
+													  boolean leaf, int row, boolean hasFocus) {
+			super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+			DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
+			Object userObject = node.getUserObject();
+			if (userObject instanceof Mission m) {
+				Icon mIcon = IN_PROGRESS;
+				MissionPlanning mp = m.getPlan();
+				if ((mp != null) && (mp.getStatus() == PlanType.PENDING)) {
+					mIcon = REVIEW;
+				}
+				else if (m.isDone()) {
+					mIcon = COMPLETED;
+				}
+				this.setText(m.getName());
+				this.setIcon(mIcon);
+			}
+			return this;
+		}
+	  }
 }

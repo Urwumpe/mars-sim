@@ -12,29 +12,31 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.Image;
-import java.awt.MouseInfo;
-import java.awt.Point;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowFocusListener;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.swing.JDialog;
+import javax.swing.JInternalFrame;
+import javax.swing.JLabel;
+import javax.swing.JMenuItem;
+import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.WindowConstants;
 import javax.swing.border.Border;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 
+import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitType;
-import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.construction.ConstructionManager;
 import org.mars_sim.msp.core.structure.construction.ConstructionSite;
+import org.mars_sim.msp.core.vehicle.GroundVehicle;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ComponentMover;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
@@ -42,17 +44,16 @@ import org.mars_sim.msp.ui.swing.MainWindow;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 import org.mars_sim.msp.ui.swing.unit_window.UnitWindow;
 import org.mars_sim.msp.ui.swing.unit_window.structure.ConstructionSitesPanel;
-import com.alee.laf.desktoppane.WebInternalFrame;
-import com.alee.laf.menu.WebMenuItem;
-import com.alee.laf.menu.WebPopupMenu;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.window.WebDialog;
-import com.alee.managers.style.StyleId;
+import org.mars_sim.msp.ui.swing.utils.SwingHelper;
 
-public class PopUpUnitMenu extends WebPopupMenu {
+
+public class PopUpUnitMenu extends JPopupMenu {
 
 	private static final long serialVersionUID = 1L;
-
+	
+	// default logger.
+	private static final SimLogger logger = SimLogger.getLogger(PopUpUnitMenu.class.getName());
+	
 	public static final int WIDTH_0 = 350;
 
 	public static final int WIDTH_1 = WIDTH_0;
@@ -61,110 +62,66 @@ public class PopUpUnitMenu extends WebPopupMenu {
 	public static final int WIDTH_2 = UnitWindow.WIDTH - 130;
 	public static final int HEIGHT_2 = UnitWindow.HEIGHT - 70;
 
-	private static Map<Integer, WebInternalFrame> panels = new ConcurrentHashMap<>();
-
-	private WebMenuItem itemOne, itemTwo, itemThree, itemFour;
-    private Unit unit;
-    private Settlement settlement;
-	private MainDesktopPane desktop;
+	private static Map<Integer, JInternalFrame> panels = new ConcurrentHashMap<>();
 
     public PopUpUnitMenu(final SettlementWindow swindow, final Unit unit){
-    	this.unit = unit;
-    	desktop = swindow.getDesktop();
-    	this.settlement = swindow.getMapPanel().getSettlement();
+    	MainDesktopPane desktop = swindow.getDesktop();
 
-    	// Description
-    	itemOne = new WebMenuItem(Msg.getString("PopUpUnitMenu.itemOne"));
-    	// Details
-        itemTwo = new WebMenuItem(Msg.getString("PopUpUnitMenu.itemTwo"));
-        // Relocate
-        itemThree = new WebMenuItem(Msg.getString("PopUpUnitMenu.itemThree"));
-        // Manual
-        itemFour = new WebMenuItem(Msg.getString("PopUpUnitMenu.itemFour"));
-        
-        itemOne.setForeground(new Color(139,69,19));
-        itemTwo.setForeground(new Color(139,69,19));
-        itemThree.setForeground(new Color(139,69,19));
-        itemFour.setForeground(new Color(139,69,19));
-        
-        if (unit.getUnitType() == UnitType.PERSON) {
-        	add(itemTwo); // Details
-        	buildItemTwo(unit);
-        }
+    	switch (unit.getUnitType()) {
+			case PERSON:
+        		add(buildDetailsItem(unit, desktop));
+				break;
+        	
+			case VEHICLE: 
+				add(buildDescriptionitem(unit, desktop));
+				add(buildDetailsItem(unit, desktop));
+				add(buildVehicleRelocate(unit));
+				break;
 
-        else if (unit.getUnitType() == UnitType.VEHICLE) {
-        	add(itemOne); // Description
-        	add(itemTwo); // Details
-        	add(itemThree); // Relocate
-        	buildItemOne(unit);
-            buildItemTwo(unit);
-            buildItemThree(unit);
-        }
+        	case BUILDING:
+				add(buildDescriptionitem(unit, desktop));
+				add(buildDetailsItem(unit, desktop));
+				break;
 
-        else if (unit.getUnitType() == UnitType.BUILDING) {
-        	add(itemOne); // Description
-        	add(itemTwo); // Details
-        	buildItemOne(unit);
-            buildItemTwo(unit);
-        }
-        // Note: for construction sites
-        else { // if (unit.getUnitType() == UnitType.CONSTRUCTION) {
-        	add(itemOne); // Description
-        	add(itemTwo); // Details
-        	add(itemFour); // Manual Rel
-//        	// Note : how to implement itemFour in such a way as to
-        	// enable the use of arrow to move the construction site ?
-        	buildItemOne(unit);
-            buildItemTwo(unit);
-            buildItemFour(unit);
-        }
-        
-     // Note: for JavaFX, determine what the GraphicsDevice can support.
-//        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-//        GraphicsDevice gd = ge.getDefaultScreenDevice();
-//        boolean isPerPixelTranslucencySupported =
-//            gd.isWindowTranslucencySupported(PERPIXEL_TRANSLUCENT);
-//
-//        //If translucent windows aren't supported, exit.
-//        if (!isPerPixelTranslucencySupported) {
-//            System.out.println(
-//                "Per-pixel translucency is not supported");
-//                System.exit(0);
-//        }
+        	// Note: for construction sites
+			case CONSTRUCTION:
+				add(buildDescriptionitem(unit, desktop));
+				add(buildDetailsItem(unit, desktop));
+				add(relocateSite((ConstructionSite)unit));
+				add(rotateSite((ConstructionSite)unit));
+				add(confirmSite((ConstructionSite)unit));
+				break;
 
+			default:
+				add(buildDetailsItem(unit, desktop));
+				break;
+        }
     }
 
 
     /**
-     * Builds item one
+     * Builds item one.
      *
      * @param unit
      */
-    public void buildItemOne(final Unit unit) {
+    private JMenuItem buildDescriptionitem(final Unit unit, final MainDesktopPane desktop) {
+        
+		JMenuItem descriptionItem = new JMenuItem(Msg.getString("PopUpUnitMenu.description"));
 
-        itemOne.addActionListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent e) {
-            	final WebDialog<?> d = new WebDialog<>(StyleId.dialogTransparent);//.dialogDecorated);
+        descriptionItem.setForeground(new Color(139,69,19));
+        descriptionItem.addActionListener(e -> {
 
 	           	setOpaque(false);
 		        setBackground(new Color(0,0,0,128));
-//
-		        d.setForeground(Color.WHITE); // orange font
-                d.setFont(new Font("Arial", Font.BOLD, 14));
 
-		        d.setUndecorated(true);
-            	d.setOpacity(0.75f);
-		        d.setBackground(new Color(0,0,0,128));
-
-                String description;
-                String type;
-                String name;
+                String description = null;
+                String type = null;
+                String name = null;
 
                 if (unit.getUnitType() == UnitType.VEHICLE) {
                 	Vehicle vehicle = (Vehicle) unit;
-                	description = vehicle.getDescription(vehicle.getVehicleTypeString());
-                	type = vehicle.getVehicleTypeString();
+                	description = vehicle.getDescription();
+                	type = vehicle.getVehicleType().getName();
                 	name = vehicle.getName();
                 }
                 else if (unit.getUnitType() == UnitType.BUILDING) {
@@ -173,77 +130,76 @@ public class PopUpUnitMenu extends WebPopupMenu {
                 	type = building.getBuildingType();
                 	name = building.getNickName();
                 }
-                else {
+                else if (unit.getUnitType() == UnitType.CONSTRUCTION) {
                 	ConstructionSite site = (ConstructionSite) unit;
                 	description = site.getStageInfo().getName();
                 	type = site.getStageInfo().getType();
                 	name = site.getName();
                 }
-                
-				d.setSize(WIDTH_1, HEIGHT_1);
-		        d.setResizable(false);
+                else
+                	return;
 
-			    UnitInfoPanel b = new UnitInfoPanel(desktop);
+				UnitInfoPanel b = new UnitInfoPanel(desktop);
 
 			    b.init(name, type, description);
 	           	b.setOpaque(false);
 		        b.setBackground(new Color(0,0,0,128));
 
-			    d.add(b);
+				final JDialog d = SwingHelper.createPoupWindow(b, WIDTH_1, HEIGHT_1, 0, 0);
 
-            	// Make it to appear at the mouse cursor
-                Point location = MouseInfo.getPointerInfo().getLocation();
-                d.setLocation(location);
+				d.setForeground(Color.WHITE); // orange font
+                d.setFont(new Font("Arial", Font.BOLD, 14));
 
+            	d.setOpacity(0.75f);
+		        d.setBackground(new Color(0,0,0,128));
                 d.setVisible(true);
-				d.addWindowFocusListener(new WindowFocusListener() {
-				    public void windowLostFocus(WindowEvent e) {
-				    	d.dispose();
-				    }
-				    public void windowGainedFocus(WindowEvent e) {
-				    }
-				});
 
                 // Make panel drag-able
-			    ComponentMover mover = new ComponentMover(d, desktop);//d.getContentPane());
+			    ComponentMover mover = new ComponentMover(d, desktop);
 			    mover.registerComponent(b);
 
              }
-        });
+        );
+
+		return descriptionItem;
     }
 
-
+	
     /**
-     * Builds item two
+     * Builds item two.
      *
      * @param unit
+     * @param mainDesktopPane
      */
-    private void buildItemTwo(final Unit unit) {
-        itemTwo.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
+    private JMenuItem buildDetailsItem(final Unit unit, final MainDesktopPane desktop) {
+		JMenuItem detailsItem = new JMenuItem(Msg.getString("PopUpUnitMenu.details"));
+
+        detailsItem.setForeground(new Color(139,69,19));
+        detailsItem.addActionListener(e -> {
 	            if (unit.getUnitType() == UnitType.VEHICLE
 	            		|| unit.getUnitType() == UnitType.PERSON
 		            	|| unit.getUnitType() == UnitType.BUILDING	
 	            		|| unit.getUnitType() == UnitType.ROBOT) {
-	            	desktop.openUnitWindow(unit, false);
+	            	desktop.showDetails(unit);
 	            }
 	            
 	            // TODO Why is this not a dedicated class ?
 	            else if (unit.getUnitType() == UnitType.CONSTRUCTION) {
-	            	buildConstructionWindow();
+	            	buildConstructionWindow(unit, desktop);
 	            }
-	         }
 	    });
+
+		return detailsItem;
     }
 
-    private void buildConstructionWindow() {
+    private void buildConstructionWindow(final Unit unit, final MainDesktopPane desktop) {
     	int newID = unit.getIdentifier();
 
     	if (!panels.isEmpty()) {
         	Iterator<Integer> i = panels.keySet().iterator();
 			while (i.hasNext()) {
 				int oldID = i.next();
-				WebInternalFrame f = panels.get(oldID);
+				JInternalFrame f = panels.get(oldID);
         		if (newID == oldID && (f.isShowing() || f.isVisible())) {
         			f.dispose();
         			panels.remove(oldID);
@@ -253,11 +209,11 @@ public class PopUpUnitMenu extends WebPopupMenu {
     	
        	ConstructionSite site = (ConstructionSite) unit;
 
-       	ConstructionManager manager = settlement.getConstructionManager();
+       	ConstructionManager manager = site.getAssociatedSettlement().getConstructionManager();
        	
 		final ConstructionSitesPanel sitePanel = new ConstructionSitesPanel(manager);
 
-        WebInternalFrame d = new WebInternalFrame(StyleId.internalframe,
+        JInternalFrame d = new JInternalFrame(
         		unit.getSettlement().getName() + " - " + site,
         		true,  //resizable
                 false, //not closable
@@ -269,12 +225,17 @@ public class PopUpUnitMenu extends WebPopupMenu {
 		d.setFrameIcon(MainWindow.getLanderIcon());
 		d.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
 
-		WebPanel panel = new WebPanel(new BorderLayout(1, 1));
+		JPanel panel = new JPanel(new BorderLayout(1, 1));
 		panel.setBorder(new MarsPanelBorder());
 		panel.setBorder(new EmptyBorder(1, 1, 1, 1));
 
 		panel.add(sitePanel, BorderLayout.CENTER);
 
+		String phase = site.getPhase().getName();
+		JLabel label = new JLabel("Mission Phase : " + phase, JLabel.CENTER);
+		
+		panel.add(label, BorderLayout.SOUTH);
+		
 		d.add(panel);
 		desktop.add(d);
 
@@ -299,49 +260,99 @@ public class PopUpUnitMenu extends WebPopupMenu {
      *
      * @param unit
      */
-	private void buildItemThree(final Unit unit) {
-        itemThree.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-	            Vehicle vehicle = (Vehicle) unit;
-	            vehicle.relocateVehicle();
+	private JMenuItem buildVehicleRelocate(Unit unit) {
+		JMenuItem relocateItem = new JMenuItem(Msg.getString("PopUpUnitMenu.relocate"));
+
+        relocateItem.setForeground(new Color(139,69,19));
+        relocateItem.addActionListener(e -> {
+	            ((Vehicle) unit).relocateVehicle();
 	    		repaint();
-            }
         });
+
+		return relocateItem;
 	}
 	
     /**
-     * Builds item four
+     * Builds item four.
      *
      * @param unit
      */
-	public void buildItemFour(final Unit unit) {
-        itemFour.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-	            ConstructionSite site = (ConstructionSite) unit;
-	            site.relocate();
+	private JMenuItem relocateSite(ConstructionSite site) {
+		JMenuItem relocateItem = new JMenuItem(Msg.getString("PopUpUnitMenu.relocate"));
+
+		List<GroundVehicle> vehicles = site.getVehicles();
+		
+        relocateItem.setForeground(new Color(139,69,19));
+        relocateItem.addActionListener(e -> {
+        		site.relocateSite();
+        		
+        		if (vehicles != null && !vehicles.isEmpty()) {
+	        		Coordinates coord = site.getCoordinates();
+	        		for (Vehicle v: vehicles) {
+	        			v.setCoordinates(coord);
+	        		}
+        		}
 	    		repaint();
-            }
         });
+
+		return relocateItem;
 	}
 	
-
 	/**
-	 * Sets the icon image for the main window.
-	 */
-	public Image getIconImage() {
-		return MainWindow.getIconImage();
-	}
+     * Builds item five.
+     *
+     * @param unit
+     */
+	private JMenuItem rotateSite(ConstructionSite site) {
+		JMenuItem rotateItem = new JMenuItem(Msg.getString("PopUpUnitMenu.rotate"));
 
+		rotateItem.setForeground(new Color(139,69,19));
+		rotateItem.addActionListener(e -> {
+			int siteAngle = (int) site.getFacing();
+			siteAngle += 90;
+			if (siteAngle >= 360)
+				siteAngle = 0;
+			site.setFacing(siteAngle);
+			logger.info(site, "Just set facing to " + (int)Math.round(siteAngle) + ".");
+			repaint();
+        });
+
+		return rotateItem;
+	}
+	
+	/**
+     * Builds item six.
+     *
+     * @param unit
+     */
+	private JMenuItem confirmSite(ConstructionSite site) {
+		JMenuItem confirmItem = new JMenuItem(Msg.getString("PopUpUnitMenu.confirmSite"));
+
+		confirmItem.setForeground(new Color(139,69,19));
+		confirmItem.addActionListener(e -> {
+
+			boolean isConfirm = site.isSitePicked();
+			if (!isConfirm) {
+				site.setSitePicked(!isConfirm);
+//				String s = site.isSitePicked() + "";
+//				s = s.toLowerCase();
+//				s = Conversion.capitalize(s);
+				logger.info(site, "Just confirmed the site location. Ready to go to the next phase.");
+				repaint();
+			}
+			else {
+				logger.info(site, "The site has already been confirmed at this point.");
+			}
+			
+        });
+
+		return confirmItem;
+	}
+	
+	
 	public void destroy() {
 		panels.clear();
 		panels = null;
-		settlement.destroy();
-		settlement = null;
-		unit.destroy();
-		unit = null;
-		itemOne = null;
-		itemTwo = null;
-		itemThree = null;
 	}
 
 }

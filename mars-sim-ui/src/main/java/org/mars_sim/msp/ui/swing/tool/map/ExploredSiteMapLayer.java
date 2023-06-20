@@ -13,16 +13,15 @@ import javax.swing.Icon;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.IntPoint;
-import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.environment.ExploredLocation;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 
 public class ExploredSiteMapLayer implements MapLayer {
 
 	// Static members
-	private static final String EXPLORED_ICON_NAME = Msg.getString("img.smallFlagYellow"); //$NON-NLS-1$
-	private static final String MINED_ICON_NAME = Msg.getString("img.smallFlagGray"); //$NON-NLS-1$
-	private static final String SELECTED_ICON_NAME = Msg.getString("img.smallFlagBlue"); //$NON-NLS-1$
+	private static final String EXPLORED_ICON_NAME = "map/flag_smallyellow"; 
+	private static final String MINED_ICON_NAME = "map/flag_smallgray"; 
+	private static final String SELECTED_ICON_NAME ="map/flag_smallblue"; 
 
 	// Domain members
 	private Component displayComponent;
@@ -33,7 +32,7 @@ public class ExploredSiteMapLayer implements MapLayer {
 	private boolean displayReserved;
 	private ExploredLocation selectedSite;
 
-	private double angle = Map.HALF_MAP_ANGLE;
+	private static final double HALF_MAP_ANGLE = Map.HALF_MAP_ANGLE;
 
 	/**
 	 * Constructor.
@@ -44,9 +43,9 @@ public class ExploredSiteMapLayer implements MapLayer {
 
 		// Initialize domain data.
 		this.displayComponent = displayComponent;
-		navpointIconExplored = ImageLoader.getIcon(EXPLORED_ICON_NAME);
-		navpointIconMined = ImageLoader.getIcon(MINED_ICON_NAME);
-		navpointIconSelected = ImageLoader.getIcon(SELECTED_ICON_NAME);
+		navpointIconExplored = ImageLoader.getIconByName(EXPLORED_ICON_NAME);
+		navpointIconMined = ImageLoader.getIconByName(MINED_ICON_NAME);
+		navpointIconSelected = ImageLoader.getIconByName(SELECTED_ICON_NAME);
 		displayMined = true;
 		displayReserved = true;
 		selectedSite = null;
@@ -83,10 +82,11 @@ public class ExploredSiteMapLayer implements MapLayer {
 	 * Displays the layer on the map image.
 	 * 
 	 * @param mapCenter the location of the center of the map.
-	 * @param mapType   the type of map.
+	 * @param baseMap   the type of map.
 	 * @param g         graphics context of the map display.
 	 */
-	public void displayLayer(Coordinates mapCenter, String mapType, Graphics g) {
+	@Override
+	public void displayLayer(Coordinates mapCenter, Map baseMap, Graphics g) {
 		for (ExploredLocation site : surfaceFeatures.getExploredLocations()) {
 			boolean displaySite = !site.isReserved() || displayReserved;
             if (site.isMined() && !displayMined)
@@ -94,7 +94,7 @@ public class ExploredSiteMapLayer implements MapLayer {
 			if (!site.isExplored())
 				displaySite = false;
 			if (displaySite)
-				displayExploredSite(site, mapCenter, mapType, g);
+				displayExploredSite(site, mapCenter, baseMap, g);
 		}
 	}
 
@@ -103,12 +103,12 @@ public class ExploredSiteMapLayer implements MapLayer {
 	 * 
 	 * @param navpoint  the navpoint to display.
 	 * @param mapCenter the location of the center of the map.
-	 * @param mapType   the type of map.
+	 * @param baseMap   the type of map.
 	 * @param g         graphics context of the map display.
 	 */
-	private void displayExploredSite(ExploredLocation site, Coordinates mapCenter, String mapType, Graphics g) {
+	private void displayExploredSite(ExploredLocation site, Coordinates mapCenter, Map baseMap, Graphics g) {
 
-		if (mapCenter.getAngle(site.getLocation()) < angle) {
+		if (mapCenter.getAngle(site.getLocation()) < HALF_MAP_ANGLE) {
 
 			// Chose a navpoint icon based on the map type.
 			Icon navIcon = null;
@@ -120,7 +120,7 @@ public class ExploredSiteMapLayer implements MapLayer {
 				navIcon = navpointIconExplored;
 
 			// Determine the draw location for the icon.
-			IntPoint location = MapUtils.getRectPosition(site.getLocation(), mapCenter, mapType);
+			IntPoint location = MapUtils.getRectPosition(site.getLocation(), mapCenter, baseMap);
 			IntPoint drawLocation = new IntPoint(location.getiX(), (location.getiY() - navIcon.getIconHeight()));
 
 			// Draw the navpoint icon.

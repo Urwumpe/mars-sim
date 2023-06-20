@@ -1,18 +1,15 @@
 /*
  * Mars Simulation Project
- * TabPanelFavorite.java
+ * TabPanelSchedule.java
  * @date 2022-07-09
  * @author Manny Kung
  */
 package org.mars_sim.msp.ui.swing.unit_window.person;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -21,13 +18,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.DefaultListCellRenderer;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
-import javax.swing.table.DefaultTableCellRenderer;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
@@ -38,21 +37,12 @@ import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Shift;
 import org.mars_sim.msp.core.structure.ShiftSlot;
 import org.mars_sim.msp.core.structure.ShiftSlot.WorkStatus;
-import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.JComboBoxMW;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
+import org.mars_sim.msp.ui.swing.NumberCellRenderer;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
-
-import com.alee.laf.checkbox.WebCheckBox;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.text.WebTextField;
-import com.alee.managers.tooltip.TooltipManager;
-import com.alee.managers.tooltip.TooltipWay;
 
 /**
  * The TabPanelSchedule is a tab panel showing the daily schedule a person.
@@ -60,23 +50,23 @@ import com.alee.managers.tooltip.TooltipWay;
 @SuppressWarnings("serial")
 public class TabPanelSchedule extends TabPanel {
 
-	private static final String SCH_ICON = Msg.getString("icon.schedule"); //$NON-NLS-1$
+	private static final String SCH_ICON = "schedule";
 
 	private static final String SOL = "  Sol ";
 
 	private boolean isRealTimeUpdate;
 	private int todayCache = 1;
 	private int today;
-	private int theme;
+	private String shiftDescCache; 
 	
 	private Integer selectedSol;
 	private Integer todayInteger;
 
 	private JTable table;
 
-	private WebCheckBox realTimeBox;
-	private WebTextField shiftTF;
-	private WebLabel shiftLabel;
+	private JCheckBox realTimeBox;
+	private JTextField shiftTF;
+	private JLabel shiftLabel;
 
 	private JComboBoxMW<Object> solBox;
 	private DefaultComboBoxModel<Object> comboBoxModel;
@@ -94,7 +84,7 @@ public class TabPanelSchedule extends TabPanel {
 	private ShiftSlot taskSchedule;
 	private TaskManager taskManager;
 	
-	private static MarsClock marsClock;
+	private MasterClock masterClock;
 
 	/**
 	 * Constructor.
@@ -106,7 +96,7 @@ public class TabPanelSchedule extends TabPanel {
 		// Use the TabPanel constructor
 		super(
 			null,
-			ImageLoader.getNewIcon(SCH_ICON),
+			ImageLoader.getIconByName(SCH_ICON),
 			Msg.getString("TabPanelSchedule.title"), //$NON-NLS-1$
 			unit, desktop
 		);
@@ -117,13 +107,11 @@ public class TabPanelSchedule extends TabPanel {
 		} else {
 			robot = (Robot) unit;
 		}
+		masterClock = getSimulation().getMasterClock();
 	}
 
 	@Override
 	protected void buildUI(JPanel content) {
-		
-		if (marsClock == null)
-			marsClock = getSimulation().getMasterClock().getMarsClock();
 
 		isRealTimeUpdate = true;
 
@@ -137,33 +125,32 @@ public class TabPanelSchedule extends TabPanel {
 		}
 
 		// Create the button panel.
-		WebPanel buttonPane = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+		JPanel buttonPane = new JPanel(new FlowLayout(FlowLayout.CENTER));
 
 		Unit unit = getUnit();
 		if (unit instanceof Person) {
 
-			shiftLabel = new WebLabel(Msg.getString("TabPanelSchedule.shift.label"), WebLabel.CENTER); //$NON-NLS-1$
-
-			TooltipManager.setTooltip(shiftLabel, Msg.getString("TabPanelSchedule.shift.toolTip"), TooltipWay.down); //$NON-NLS-1$
+			shiftLabel = new JLabel(Msg.getString("TabPanelSchedule.shift.label"), JLabel.CENTER); //$NON-NLS-1$
+			shiftLabel.setToolTipText(Msg.getString("TabPanelSchedule.shift.toolTip")); //$NON-NLS-1$
 			buttonPane.add(shiftLabel);
 
-			shiftTF = new WebTextField();
-			String shiftDesc = getShiftDescription(taskSchedule);
-			shiftTF.setText(shiftDesc);
+			shiftDescCache = getShiftDescription(taskSchedule);	
+			
+			shiftTF = new JTextField();
+			shiftTF.setText(shiftDescCache);
 			
 			shiftTF.setEditable(false);
-			shiftTF.setColumns(15);
-
-			shiftTF.setHorizontalAlignment(WebTextField.CENTER);
+			shiftTF.setColumns(20);
+			shiftTF.setHorizontalAlignment(JTextField.CENTER);
+			
 			buttonPane.add(shiftTF);
-
 		}
 
-		WebPanel topPanel = new WebPanel(new BorderLayout());
+		JPanel topPanel = new JPanel(new BorderLayout());
 		content.add(topPanel, BorderLayout.NORTH);
 		topPanel.add(buttonPane, BorderLayout.NORTH);
 
-		today = marsClock.getMissionSol();
+		today = masterClock.getMarsTime().getMissionSol();
 		
 		todayInteger = (Integer) today;
 		solList = new CopyOnWriteArrayList<Integer>();
@@ -188,13 +175,14 @@ public class TabPanelSchedule extends TabPanel {
 		solBox.setPreferredSize(new Dimension(80, 25));
 		solBox.setPrototypeDisplayValue(new Dimension(80, 25));
 		solBox.setSelectedItem(todayInteger);
-		solBox.setWide(true);
+		solBox.setWide(false);
 		
 		solBox.setRenderer(new PromptComboBoxRenderer());
 		solBox.setMaximumRowCount(7);
 
-		WebPanel solPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));	
-		solPanel.add(solBox);
+		JPanel solPanel = new JPanel(new BorderLayout());//FlowLayout.CENTER));	
+		solPanel.setPreferredSize(new Dimension(80, 25));
+		solPanel.add(solBox, BorderLayout.CENTER);
 
 		topPanel.add(solPanel, BorderLayout.CENTER);
 
@@ -214,12 +202,10 @@ public class TabPanelSchedule extends TabPanel {
 		});
 
 		// Create realTimeUpdateCheckBox.
-		realTimeBox = new WebCheckBox(Msg.getString("TabPanelSchedule.checkbox.realTimeUpdate")); //$NON-NLS-1$
+		realTimeBox = new JCheckBox(Msg.getString("TabPanelSchedule.checkbox.realTimeUpdate")); //$NON-NLS-1$
 		realTimeBox.setSelected(true);
 		realTimeBox.setHorizontalTextPosition(SwingConstants.RIGHT);
-		realTimeBox.setFont(new Font("Serif", Font.PLAIN, 12));
-		TooltipManager.setTooltip(realTimeBox, Msg.getString("TabPanelSchedule.tooltip.realTimeUpdate"),
-				TooltipWay.down);
+		realTimeBox.setToolTipText(Msg.getString("TabPanelSchedule.tooltip.realTimeUpdate"));
 		realTimeBox.addActionListener(s -> {
 			if (realTimeBox.isSelected()) {
 				isRealTimeUpdate = true;
@@ -230,7 +216,10 @@ public class TabPanelSchedule extends TabPanel {
 		});
 		
 		topPanel.add(realTimeBox, BorderLayout.WEST);
-		topPanel.add(new WebPanel(new JLabel("                    ")), BorderLayout.EAST);
+
+		JPanel eastPanel = new JPanel();
+		eastPanel.add(new JLabel("                    "));
+		topPanel.add(eastPanel, BorderLayout.EAST);
 		
 		// Create schedule table model
 		if (unit instanceof Person)
@@ -239,41 +228,21 @@ public class TabPanelSchedule extends TabPanel {
 			scheduleTableModel = new ScheduleTableModel((Robot) unit);
 
 		// Create attribute scroll panel
-		WebScrollPane scrollPanel = new WebScrollPane();
+		JScrollPane scrollPanel = new JScrollPane();
 		content.add(scrollPanel);
 
 		// Create schedule table
-		table = new ZebraJTable(scheduleTableModel);
-		TableStyle.setTableStyle(table);
+		table = new JTable(scheduleTableModel);
 		table.setPreferredScrollableViewportSize(new Dimension(225, 100));
 		table.getColumnModel().getColumn(0).setPreferredWidth(7);
 		table.getColumnModel().getColumn(1).setPreferredWidth(100);
 		table.getColumnModel().getColumn(2).setPreferredWidth(60);
 		table.getColumnModel().getColumn(3).setPreferredWidth(50);
 		table.setRowSelectionAllowed(true);
-		// table.setDefaultRenderer(Integer.class, new NumberCellRenderer());
-
-		// Apply sorting for multiple columns
-//		table.getTableHeader().setDefaultRenderer(new MultisortTableHeaderCellRenderer());
 		
 		scrollPanel.setViewportView(table);
-
-		// Align the content to the center of the cell
-		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
-		renderer.setHorizontalAlignment(SwingConstants.CENTER);
-		table.getColumnModel().getColumn(0).setCellRenderer(renderer);
+		table.getColumnModel().getColumn(0).setCellRenderer(new NumberCellRenderer(2));
 		
-		DefaultTableCellRenderer renderer1 = new DefaultTableCellRenderer();
-		renderer1.setHorizontalAlignment(SwingConstants.LEFT);
-		table.getColumnModel().getColumn(1).setCellRenderer(renderer1);
-		table.getColumnModel().getColumn(2).setCellRenderer(renderer1);
-		table.getColumnModel().getColumn(3).setCellRenderer(renderer1);
-
-		// SwingUtilities.invokeLater(() ->
-		// ColumnResizer.adjustColumnPreferredWidths(table));
-
-		// Added sorting
-//		table.setAutoCreateRowSorter(true);
 
 		update();
 		
@@ -284,20 +253,32 @@ public class TabPanelSchedule extends TabPanel {
 			scheduleTableModel.update(selectedSol);
 	}
 
+	/**
+	 * Gets the shift description.
+	 * 
+	 * @param shift
+	 * @return
+	 */
 	public static String getShiftDescription(ShiftSlot shift) {
 		WorkStatus status = shift.getStatus();
 		
 		Shift s = shift.getShift();
+		int start = s.getStart();
+		int end = s.getEnd();
+		String shiftName = s.getName();
+		
 		switch(status) {
 			case ON_CALL:
 				return "On Call";
 			case ON_DUTY:
-				return s.getName() + " : OnDuty ends @ " + s.getEnd();
+				return shiftName + " : On Duty ends @ " + end + " mols (" + start + " - " + end + ")";
 			case OFF_DUTY:
-				return s.getName() + " : Off Duty start @ " + s.getStart();
+				return shiftName + " : Off Duty starts @ " + start + " mols (" + start + " - " + end + ")";
 			case ON_LEAVE:
-				return s.getName() + " : On Leave";
+				return shiftName + " : On Leave";
 		}
+
+		
 		return "";
 	}
 
@@ -308,19 +289,15 @@ public class TabPanelSchedule extends TabPanel {
 	@Override
 	public void update() {
 
-		int t = -1;
-
-		if (theme != t) {
-			theme = t;
-			TableStyle.setTableStyle(table);
-		}
-
 		if (person != null) {
-			String shiftDesc = getShiftDescription(person.getShiftSlot());		
-			shiftTF.setText(shiftDesc);
+			
+			String shiftDesc = getShiftDescription(taskSchedule);
+			
+			if (shiftDescCache.equalsIgnoreCase(shiftDesc))
+				shiftTF.setText(shiftDesc);
 		}
 
-		today = marsClock.getMissionSol();
+		today = masterClock.getMarsTime().getMissionSol();
 		
 		todayInteger = (Integer) today;
 		selectedSol = (Integer) solBox.getSelectedItem(); 
@@ -407,31 +384,6 @@ public class TabPanelSchedule extends TabPanel {
 
 			setText(SOL + value);// + SPACES);
 
-			// 184,134,11 mud yellow
-			// 255,229,204 white-ish (super pale) yellow
-			// (37, 85, 118) navy blue
-			// 131,172,234 pale sky blue
-
-			if (isSelected) {
-				if (theme == 7) {
-					c.setBackground(new Color(184, 134, 11, 255)); // 184,134,11 mud yellow
-					c.setForeground(Color.white);// new Color(255,229,204)); // 255,229,204 white-ish (super pale)
-														// yellow
-				} else {// if (theme == 0 || theme == 6) {
-					c.setBackground(new Color(37, 85, 118, 255)); // (37, 85, 118) navy blue
-					c.setForeground(Color.white);// new Color(131,172,234)); // 131,172,234 pale sky blue
-				}
-
-			} else {
-				// unselected, and not the DnD drop location
-				if (theme == 7) {
-					c.setForeground(new Color(184, 134, 11)); // 184,134,11 mud yellow
-					c.setBackground(new Color(255, 229, 204, 40)); // 255,229,204 white-ish (super pale) yellow
-				} else {// if (theme == 0 || theme == 6) {
-					c.setForeground(new Color(37, 85, 118));// (37, 85, 118) navy blue
-					c.setBackground(new Color(131, 172, 234, 40)); // 131,172,234 pale sky blue
-				}
-			}
 			// result.setOpaque(false);
 			return c;
 		}
@@ -441,8 +393,6 @@ public class TabPanelSchedule extends TabPanel {
 	 * Internal class used as model for the attribute table.
 	 */
 	private class ScheduleTableModel extends AbstractTableModel {
-
-		DecimalFormat fmt = new DecimalFormat("000.00");
 
 		/**
 		 * hidden constructor.
@@ -499,7 +449,7 @@ public class TabPanelSchedule extends TabPanel {
 		public Object getValueAt(int row, int column) {
 			OneActivity activity = activities.get(row);
 			if (column == 0)
-				return fmt.format(activity.getStartTime());
+				return activity.getStartTime();
 			else if (column == 1)
 				return activity.getDescription();
 			else if (column == 2)

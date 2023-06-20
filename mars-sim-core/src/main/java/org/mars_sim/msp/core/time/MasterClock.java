@@ -7,6 +7,8 @@
 package org.mars_sim.msp.core.time;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoField;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -85,7 +87,7 @@ public class MasterClock implements Serializable {
 	/** Sol day on the last fireEvent. */
 	private int lastSol = -1;
 	/** The last millisol integer on the last fireEvent. */
-	private int lastMSol = 0;
+	private int lastIntMillisol = 0;
 	/** The maximum wait time between pulses in terms of milli-seconds. */
 	private int maxWaitTimeBetweenPulses;
 	
@@ -110,11 +112,13 @@ public class MasterClock implements Serializable {
 	private double optMilliSolPerPulse;
 
 	/** The Martian Clock. */
+	private MarsTime marsTime;
+	/** The Martian Clock. */
 	private MarsClock marsClock;
 	/** A copy of the initial martian clock at the start of the sim. */
 	private MarsClock initialMarsTime;
 	/** The Earth Clock. */
-	private EarthClock earthClock;
+	private LocalDateTime earthTime;
 	/** The Uptime Timer. */
 	private UpTimer uptimer;
 	/** The thread for running the game loop. */
@@ -132,12 +136,13 @@ public class MasterClock implements Serializable {
 	
 		// Create a martian clock
 		marsClock = MarsClockFormat.fromDateString(simulationConfig.getMarsStartDateTime());
+		marsTime = MarsTimeFormat.fromDateString(simulationConfig.getMarsStartDateTime());
 
 		// Save a copy of the initial mars time
 		initialMarsTime = new MarsClock(marsClock);
 
 		// Create an Earth clock
-		earthClock = new EarthClock(simulationConfig.getEarthStartDateTime());
+		earthTime = simulationConfig.getEarthStartDate();
 
 		// Create an Uptime Timer
 		uptimer = new UpTimer();
@@ -181,8 +186,6 @@ public class MasterClock implements Serializable {
 				+ ((maxMilliSolPerPulse - minMilliSolPerPulse) * desiredTR / MAX_TIME_RATIO);
 	}
 	
-
-	
 	/**
 	 * Returns the Martian clock.
 	 *
@@ -190,6 +193,15 @@ public class MasterClock implements Serializable {
 	 */
 	public MarsClock getMarsClock() {
 		return marsClock;
+	}
+
+	/**
+	 * Returns the current Martian time.
+	 *
+	 * @return Martian time
+	 */
+	public MarsTime getMarsTime() {
+		return marsTime;
 	}
 
 	/**
@@ -202,12 +214,12 @@ public class MasterClock implements Serializable {
 	}
 
 	/**
-	 * Returns the Earth clock.
+	 * Returns the Earth date.
 	 *
-	 * @return Earth clock instance
+	 * @return Earth date
 	 */
-	public EarthClock getEarthClock() {
-		return earthClock;
+	public LocalDateTime getEarthTime() {
+		return earthTime;
 	}
 
 	/**
@@ -518,10 +530,11 @@ public class MasterClock implements Serializable {
 					uptimer.updateTime(optMilliSolPerPulse * MILLISECONDS_PER_MILLISOL / desiredTR);
 
 					// Add time to the Earth clock.
-					earthClock.addTime(earthMillisec);
+					earthTime = earthTime.plus(earthMillisec, ChronoField.MILLI_OF_SECOND.getBaseUnit());
 
 					// Add time pulse to Mars clock.
 					marsClock.addTime(lastPulseTime);
+					marsTime = marsTime.addTime(lastPulseTime);
 
 					// Run the clock listener tasks that are in other package
 					fireClockPulse(lastPulseTime);
@@ -666,19 +679,19 @@ public class MasterClock implements Serializable {
 	 * @param time
 	 */
 	private void fireClockPulse(double time) {
-		// Identify if it's a new Millisol integer
-		int currentMSol = marsClock.getMillisolInt();
-		boolean isNewMSol = false;
-		if (lastMSol != currentMSol) {
-			lastMSol = currentMSol;
-			isNewMSol = true;
+
+		int currentIntMillisol = marsClock.getMillisolInt();
+		// Checks if this pulse starts a new integer millisol
+		boolean isNewIntMillisol = lastIntMillisol != currentIntMillisol;
+		if (isNewIntMillisol) {
+			lastIntMillisol = currentIntMillisol;
 		}
-		
+	
 		// Identify if it's a new Sol
 		int currentSol = marsClock.getMissionSol();
 		boolean isNewSol = ((lastSol >= 0) && (lastSol != currentSol));
 		lastSol = currentSol;
-		
+
 		// Print the current sol banner
 		if (isNewSol)
 			printNewSol(currentSol);
@@ -688,7 +701,7 @@ public class MasterClock implements Serializable {
 		int logIndex = (int)(newPulseId % MAX_PULSE_LOG);
 		pulseLog[logIndex] = System.currentTimeMillis();
 
-		currentPulse = new ClockPulse(newPulseId, time, marsClock, earthClock, this, isNewSol, isNewMSol);
+		currentPulse = new ClockPulse(newPulseId, time, marsClock, this, isNewSol, isNewIntMillisol);
 		// Note: for-loop may handle checked exceptions better than forEach()
 		// See https://stackoverflow.com/questions/16635398/java-8-iterable-foreach-vs-foreach-loop?rq=1
 
@@ -958,8 +971,6 @@ public class MasterClock implements Serializable {
 	public void destroy() {
 		marsClock = null;
 		initialMarsTime = null;
-		earthClock.destroy();
-		earthClock = null;
 		uptimer = null;
 		clockThreadTask = null;
 		listenerExecutor = null;

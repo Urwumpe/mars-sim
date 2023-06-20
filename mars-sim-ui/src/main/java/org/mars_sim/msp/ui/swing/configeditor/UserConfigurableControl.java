@@ -18,15 +18,15 @@ import javax.swing.DefaultComboBoxModel;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JTextField;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.configuration.UserConfigurable;
 import org.mars_sim.msp.core.configuration.UserConfigurableConfig;
-
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.text.WebTextField;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 
 /**
  * This is a UI Control panel that manages the UserConfigurable items of an existing
@@ -48,7 +48,7 @@ public abstract class UserConfigurableControl<T extends UserConfigurable> implem
 
 	private DefaultComboBoxModel<String> itemCB;
 
-	private WebTextField descriptionTF;
+	private JTextField descriptionTF;
 	private UserConfigurableConfig<T> config;
 	private JPanel buttonPane;
 	private T selected;
@@ -65,7 +65,7 @@ public abstract class UserConfigurableControl<T extends UserConfigurable> implem
 		this.buttonPane.setBorder(BorderFactory.createTitledBorder(itemType));
 		
 		// Item name selection
-		buttonPane.add(new WebLabel(Msg.getString("UserConfigurableControl.label.load") + " :"));
+		buttonPane.add(new JLabel(Msg.getString("UserConfigurableControl.label.load") + " :"));
 		itemCB = new DefaultComboBoxModel<>();
 		itemCB.addAll(0, config.getItemNames());
 		JComboBox<String> crewSelector = new JComboBox<>(itemCB) ;
@@ -75,34 +75,34 @@ public abstract class UserConfigurableControl<T extends UserConfigurable> implem
 		buttonPane.add(crewSelector);
 		
 		// Description field
-		buttonPane.add(new WebLabel(Msg.getString("UserConfigurableControl.label.description") + " : "));
-		descriptionTF = new WebTextField(15);
+		buttonPane.add(new JLabel(Msg.getString("UserConfigurableControl.label.description") + " : "));
+		descriptionTF = new JTextField(15);
 		descriptionTF.setToolTipText(Msg.getString("UserConfigurableControl.tooltip.description", itemType));
 		buttonPane.add(descriptionTF);
 		
 		// Create save button.
-		saveButton = new JButton(Msg.getString("UserConfigurableControl.button.save"));
+		saveButton = new JButton(ImageLoader.getIconByName("action/save"));
 		saveButton.addActionListener(this);
 		saveButton.setActionCommand(SAVE);
 		saveButton.setToolTipText(Msg.getString("UserConfigurableControl.tooltip.save", itemType));
 		buttonPane.add(saveButton);		
 
 		// Create save as new button.
-		saveAsButton = new JButton(Msg.getString("UserConfigurableControl.button.saveas"));
+		saveAsButton = new JButton(ImageLoader.getIconByName("action/saveAs"));
 		saveAsButton.setActionCommand(SAVE_NEW);
 		saveAsButton.setToolTipText(Msg.getString("UserConfigurableControl.tooltip.saveas", itemType));
 		saveAsButton.addActionListener(this);
 		buttonPane.add(saveAsButton);
 
 		// Create delete button.
-		delButton = new JButton(Msg.getString("UserConfigurableControl.button.delete"));
+		delButton = new JButton(ImageLoader.getIconByName("action/delete"));
 		delButton.setActionCommand(DELETE);
 		delButton.setToolTipText(Msg.getString("UserConfigurableControl.tooltip.delete", itemType));
 		delButton.addActionListener(this);
 		buttonPane.add(delButton);
 		
 		// Create save new crew button.
-		JButton undoButton = new JButton(Msg.getString("UserConfigurableControl.button.undo"));
+		JButton undoButton = new JButton(ImageLoader.getIconByName("action/undo"));
 		undoButton.setActionCommand(UNDO);
 		undoButton.setToolTipText(Msg.getString("UserConfigurableControl.tooltip.undo"));
 		undoButton.addActionListener(this);

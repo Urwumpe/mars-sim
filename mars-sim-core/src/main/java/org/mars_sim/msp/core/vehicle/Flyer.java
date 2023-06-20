@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * Flyer.java
- * @date 2022-07-01
+ * @date 2023-06-05
  * @author Manny
  */
 
@@ -42,8 +42,8 @@ public abstract class Flyer extends Vehicle {
 	/** Current total elevation above the sea level in km. */
 	private double elevation;
 
-	/** Current hovering elevation in km. */
-	private double hoveringElevation;
+	/** Current hovering height in km. */
+	private double hoveringHeight;
 
 //	/** Current Angle of Attack in degree. */
 //	private double AoA;
@@ -57,46 +57,46 @@ public abstract class Flyer extends Vehicle {
 	 * Constructs a {@link Flyer} object at a given settlement.
 	 * 
 	 * @param name                name of the airborne vehicle
-	 * @param description         the configuration description of the vehicle.
+	 * @param spec         the configuration description of the vehicle.
 	 * @param settlement          settlement the airborne vehicle is parked at
 	 * @param maintenanceWorkTime the work time required for maintenance (millisols)
 	 */
-	protected Flyer(String name, String description, Settlement settlement, double maintenanceWorkTime) {
+	protected Flyer(String name, VehicleSpec spec, Settlement settlement, double maintenanceWorkTime) {
 		// use Vehicle constructor
-		super(name, description, settlement, maintenanceWorkTime);
+		super(name, spec, settlement, maintenanceWorkTime);
 	}
 
 	/**
-	 * Returns the hovering elevation of the vehicle in km.
+	 * Returns the hovering height of the vehicle above ground [in km].
 	 * 
-	 * @return elevation of the airborne vehicle (in km)
+	 * @return height
 	 */
-	public double getHoveringElevation() {
-		return hoveringElevation;
+	public double getHoveringHeight() {
+		return hoveringHeight;
 	}
 
 	/**
-	 * Sets the hovering elevation of the vehicle (in km.)
+	 * Sets the hovering height of the vehicle above ground [in km].
 	 * 
-	 * @param elevation new elevation for airborne vehicle
+	 * @param height 
 	 */
-	public void setHoveringlevation(double elevation) {
-		this.hoveringElevation = elevation;
+	public void setHoveringHeight(double height) {
+		this.hoveringHeight = height;
 	}
 
 	/**
-	 * Returns the total elevation of the vehicle above the sea level in km.
+	 * Returns the elevation of the vehicle [in km].
 	 * 
-	 * @return elevation of the airborne vehicle (in km)
+	 * @return elevation
 	 */
 	public double getElevation() {
 		return elevation;
 	}
 
 	/**
-	 * Sets the elevation of the vehicle (in km.)
+	 * Sets the elevation of the vehicle [in km].
 	 * 
-	 * @param elevation new elevation for airborne vehicle
+	 * @param elevation
 	 */
 	public void setElevation(double elevation) {
 		this.elevation = elevation;
@@ -209,38 +209,4 @@ public abstract class Flyer extends Vehicle {
 			setParkedLocation(newLoc, newFacing);
 		}
 	}
-
-	/**
-	 * Checks if the vehicle has enough amount of fuel as prescribed
-	 * 
-	 * @param fuelConsumed
-	 * @return true if it has enough fuel
-	 */
-/* 
-	protected boolean hasEnoughFuel(double fuelConsumed) {
-		Vehicle v = getVehicle();
-        int fuelType = v.getFuelType();
-        
-    	try {
-    		double remainingFuel = v.getAmountResourceStored(fuelType);
-//	
-    		if (remainingFuel < LEAST_AMOUNT) {
-    			v.addSecondaryStatus(StatusType.OUT_OF_FUEL);
-    			return false;
-    		}
-    			
-    		if (fuelConsumed > remainingFuel) {
-            	fuelConsumed = remainingFuel;
-            	return false;
-    		}
-    		else
-    			return true;
-	    }
-	    catch (Exception e) {
-	    	logger.log(this, Level.SEVERE, 0, 
-	    			"Could not retrieve methane. Cannot fly.", e);
-	    	return false;
-	    }
-	}
-	*/
 }

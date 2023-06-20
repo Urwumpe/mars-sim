@@ -7,11 +7,9 @@
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
@@ -22,6 +20,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
@@ -35,14 +37,6 @@ import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.RobotType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
-
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
 
 /**
  * A wizard panel for selecting bots.
@@ -61,9 +55,9 @@ implements ActionListener {
 	private BotMembersTableModel botMembersTableModel;
 
 	private JTable botMembersTable;
-	private WebLabel errorMessageLabel;
-	private WebButton addButton;
-	private WebButton removeButton;
+	private JLabel errorMessageLabel;
+	private JButton addButton;
+	private JButton removeButton;
 
 	/**
 	 * Constructor
@@ -80,31 +74,29 @@ implements ActionListener {
 		setBorder(new MarsPanelBorder());
 
 		// Create the select members label.
-		WebLabel selectMembersLabel = new WebLabel("Select Bots for the Mission", WebLabel.CENTER);
-		selectMembersLabel.setFont(selectMembersLabel.getFont().deriveFont(Font.BOLD));
-		selectMembersLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		JLabel selectMembersLabel = createTitleLabel("Select Bots for the Mission");
 		add(selectMembersLabel);
 
 		// Create the available bots label.
-		WebLabel availableBotsLabel = new WebLabel("Available Bots", WebLabel.CENTER);
+		JLabel availableBotsLabel = new JLabel("Available Bots", JLabel.CENTER);
 		availableBotsLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(availableBotsLabel);
 
 		// Create the bots panel.
-		WebPanel botsPane = new WebPanel(new BorderLayout(0, 0));
+		JPanel botsPane = new JPanel(new BorderLayout(0, 0));
 		botsPane.setPreferredSize(new Dimension(300, 150));
 		botsPane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(botsPane);
 
 		// Create scroll panel for available bots list.
-		WebScrollPane botsScrollPane = new WebScrollPane();
+		JScrollPane botsScrollPane = new JScrollPane();
 		botsPane.add(botsScrollPane, BorderLayout.CENTER);
 
 		// Create the bots table model.
 		botsTableModel = new BotsTableModel();
 
 		// Create the bots table.
-		botsTable = new WebTable(botsTableModel);
+		botsTable = new JTable(botsTableModel);
 		botsTable.setDefaultRenderer(Object.class, new UnitTableCellRenderer(botsTableModel));
 		botsTable.setRowSelectionAllowed(true);
 		botsTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
@@ -168,27 +160,25 @@ implements ActionListener {
 		botsScrollPane.setViewportView(botsTable);
 
 		// Create the message label.
-		errorMessageLabel = new WebLabel(" ", WebLabel.CENTER);
-		errorMessageLabel.setForeground(Color.RED);
-		errorMessageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		errorMessageLabel = createErrorLabel();
 		add(errorMessageLabel);
 
 		// Add vertical strut to make some UI space.
 		add(Box.createVerticalStrut(10));
 
 		// Create the button panel.
-		WebPanel buttonPane = new WebPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
+		JPanel buttonPane = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
 		buttonPane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(buttonPane);
 
 		// Create the add button.
-		addButton = new WebButton("Add Bots");
+		addButton = new JButton("Add Bots");
 		addButton.setEnabled(false);
 		addButton.addActionListener(this);
 		buttonPane.add(addButton);
 
 		// Create the remove button.
-		removeButton = new WebButton("Remove Bots");
+		removeButton = new JButton("Remove Bots");
 		removeButton.setEnabled(false);
 		removeButton.addActionListener(
 				new ActionListener() {
@@ -208,7 +198,7 @@ implements ActionListener {
 		add(Box.createVerticalStrut(10));
 
 		// Create the rover capacity label.
-//		roverCapacityLabel = new WebLabel("Remaining Rover Capacity: ");
+//		roverCapacityLabel = new JLabel("Remaining Rover Capacity: ");
 //		roverCapacityLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 //		add(roverCapacityLabel);
 
@@ -216,26 +206,25 @@ implements ActionListener {
 		add(Box.createVerticalStrut(10));
 
 		// Create the members label.
-		WebLabel membersLabel = new WebLabel("Mission Bots");
+		JLabel membersLabel = new JLabel("Mission Bots");
 		membersLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(membersLabel);
 
 		// Create the members panel.
-		WebPanel membersPane = new WebPanel(new BorderLayout(0, 0));
+		JPanel membersPane = new JPanel(new BorderLayout(0, 0));
 		membersPane.setPreferredSize(new Dimension(300, 150));
 		membersPane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(membersPane);
 
 		// Create scroll panel for members list.
-		WebScrollPane membersScrollPane = new WebScrollPane();
+		JScrollPane membersScrollPane = new JScrollPane();
 		membersPane.add(membersScrollPane, BorderLayout.CENTER);
 
 		// Create the members table model.
 		botMembersTableModel = new BotMembersTableModel();
 
 		// Create the members table.
-		botMembersTable = new ZebraJTable(botMembersTableModel);
-		TableStyle.setTableStyle(botMembersTable);
+		botMembersTable = new JTable(botMembersTableModel);
 		// Added sorting
 		botMembersTable.setAutoCreateRowSorter(true);
 		botMembersTable.setRowSelectionAllowed(true);

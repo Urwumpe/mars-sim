@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
- * LoadVehicleTest
- * @date 2021-10-21
+ * LoadControllerTest
+ * @date 2023-04-16
  * @author Scott Davis
  */
 
@@ -52,7 +52,9 @@ extends TestCase {
 
 	@Override
     public void setUp() throws Exception {
-        SimulationConfig.instance().loadConfig();
+
+        SimulationConfig config = SimulationConfig.instance();
+		config.loadConfig();
         Simulation.instance().testRun();
 
         unitManager = Simulation.instance().getUnitManager();
@@ -61,7 +63,8 @@ extends TestCase {
 		settlement = new MockSettlement();
 		unitManager.addUnit(settlement);
 
-		vehicle = new Rover("Test Cargo Rover", "Cargo Rover", settlement);
+		vehicle = new Rover("Test Cargo Rover",
+							config.getVehicleConfiguration().getVehicleSpec("cargo rover"), settlement);
 		settlement.addOwnedVehicle(vehicle);
 		unitManager.addUnit(vehicle);
 
@@ -83,8 +86,8 @@ extends TestCase {
 	 */
 	public void testBackgroundLoading() throws Exception {
 		Map<Integer, Number> requiredResourcesMap = new HashMap<>();
-		requiredResourcesMap.put(ResourceUtil.oxygenID, 10D);
-		requiredResourcesMap.put(ResourceUtil.methaneID, 10D);
+		requiredResourcesMap.put(ResourceUtil.oxygenID, 20D);
+		requiredResourcesMap.put(ResourceUtil.methanolID, 10D);
 
 		loadSettlementResources(settlement, requiredResourcesMap);
 

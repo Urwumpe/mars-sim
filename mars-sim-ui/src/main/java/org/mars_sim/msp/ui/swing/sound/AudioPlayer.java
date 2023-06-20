@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * AudioPlayer.java
- * @date 2021-08-21
+ * @date 2023-03-30
  * @author Lars Naesbye Christensen (complete rewrite for OGG)
  */
 
@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.logging.Level;
 
 import org.apache.commons.io.FileUtils;
@@ -37,6 +38,10 @@ public class AudioPlayer {
 			File.separator + Msg.getString("Simulation.musicFolder"); //$NON-NLS-1$
 	
 	public static final double DEFAULT_VOL = .5;
+
+	public static final String PROPS_NAME = "audio";
+	private static final String VOLUME = "volume";
+	private static final String MUTE = "mute";
 
 	/** The volume of the audio player (0.0 to 1.0) */
 	public static double currentMusicVol = DEFAULT_VOL;
@@ -69,19 +74,19 @@ public class AudioPlayer {
 			loadSoundEffects();
 		}
 		
-		if (!UIConfig.INSTANCE.useUIDefault()) {
-			
-			if (UIConfig.INSTANCE.isMute()) {
-				muteSoundEffect();
-				muteMusic();
-				currentMusicVol = 0;
-				currentSoundVol = 0;
-			}
-			else {
-				double v = UIConfig.INSTANCE.getVolume();
-				currentMusicVol = v;
-				currentSoundVol = v;
-			}
+		UIConfig config = desktop.getMainWindow().getConfig();
+		Properties props = config.getPropSet(PROPS_NAME);
+		boolean mute = UIConfig.extractBoolean(props, MUTE, true);
+		if (mute) {
+			muteSoundEffect();
+			muteMusic();
+			currentMusicVol = 0;
+			currentSoundVol = 0;
+		}
+		else {
+			double v = UIConfig.extractDouble(props, VOLUME, 0.5D);
+			currentMusicVol = v;
+			currentSoundVol = v;
 		}
 	}
 		
@@ -259,8 +264,8 @@ public class AudioPlayer {
 		}
 		
 		if (!isVolumeDisabled && hasMasterGain
-				&& currentMusic.getVol() < 1
-				&& currentMusic != null) {
+				&& currentMusic != null
+				&& currentMusic.getVol() < 1) {
 
 			double v = currentMusic.getVol() + .05;
 			if (v > 1)
@@ -280,8 +285,8 @@ public class AudioPlayer {
 		}
 		
 		if (!isVolumeDisabled && hasMasterGain
-				&& currentMusic.getVol() > 0
-				&& currentMusic != null) {
+				&& currentMusic != null
+				&& currentMusic.getVol() > 0) {
 
 			double v = currentMusic.getVol() - .05;
 			if (v < 0)
@@ -297,8 +302,8 @@ public class AudioPlayer {
 	 */
 	public void soundVolumeUp() {
 		if (!isVolumeDisabled && hasMasterGain 
-				&& currentSoundClip.getVol() < 1
-				&& currentSoundClip != null) {
+				&& currentSoundClip != null
+				&& currentSoundClip.getVol() < 1) {
 			double v = currentSoundClip.getVol() + .05;
 			if (v > 1)
 				v = 1;
@@ -313,8 +318,8 @@ public class AudioPlayer {
 	 */
 	public void soundVolumeDown() {
 		if (!isVolumeDisabled && hasMasterGain 
-				&& currentSoundClip.getVol() > 0
-				&& currentSoundClip != null) {
+				&& currentSoundClip != null
+				&& currentSoundClip.getVol() > 0) {
 			double v = currentSoundClip.getVol() - .05;
 			if (v < 0)
 				v = 0;
@@ -548,7 +553,7 @@ public class AudioPlayer {
 	 * Is the volume of the audio player disable ?
 	 * @return
 	 */
-	public boolean isVolumeDisabled() {
+	public static boolean isAudioDisabled() {
 		return isVolumeDisabled;
 	}
 
@@ -557,7 +562,7 @@ public class AudioPlayer {
 		currentSoundVol = 0;
 	}
 	
-	public static void disableVolume() {
+	public static void disableAudio() {
 		isVolumeDisabled = true;
 		hasMasterGain = false;
 		
@@ -574,6 +579,17 @@ public class AudioPlayer {
 		return numTracks;
 	}
 	
+	/**
+	 * Get the UI properties of the audio player to be stored for later use
+	 */
+	public Properties getUIProps() {
+        Properties result = new Properties();
+		result.setProperty(VOLUME, Double.toString(currentSoundVol));
+		result.setProperty(MUTE, Boolean.toString(AudioPlayer.isEffectMute()));
+
+		return result;
+    }
+
 	public void destroy() {
 		allSoundClips = null;
 		currentSoundClip = null;

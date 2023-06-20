@@ -1,47 +1,56 @@
-/**
+/*
  * Mars Simulation Project
  * SimuLoggingFormatter.java
- * @version 3.2.0 2021-06-20
+ * @Date 2023-06-15
  * @author Sebastien Venot
- * $LastChangedDate$
- * $LastChangedRevision$
  */
+
 package org.mars_sim.msp.core.logging;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
-import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.time.MarsClockFormat;
+import org.mars_sim.msp.core.time.MarsTime;
 import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.core.tool.Conversion;
 
 public class SimuLoggingFormatter extends Formatter {
 
-	private static final String LOGSIM = "simlogger";
-	private final static String LINEFEED = System.getProperty("line.separator");
-	private final static String O_PAREN = " (";
-	private final static String C_PAREN = ") ";
-	private final static String BRAC_X1 = "[x1] ";
-	private final static String C_BRAC = "] ";
-	private final static String O_BRAC_X = "[x";
-	private final static String O_BRAC = "[";
-	private final static String PERIOD = ".";
-	private final static String COLON = " : ";
-
+	private static int timeStampType = 2;
+	
     // Cache Mars Timestamp as text can be expensive
 	private static double lastClock = -1D;
-	private static String lastMarsTimestamp = null;
-    private static MasterClock masterClock;
-	private static int timeStampType = 2;
+	
+	private static final String LOGSIM = "simlogger";
+	private static final String LINEFEED = System.getProperty("line.separator");
+	private static final String O_PAREN = " (";
+	private static final String C_PAREN = ") ";
+	private static final String BRAC_X1 = "[x1] ";
+	private static final String C_BRAC = "] ";
+	private static final String O_BRAC_X = "[x";
+	private static final String O_BRAC = "[";
+	private static final String PERIOD = ".";
+	private static final String COLON = " : ";
+
+	private static String lastMarsTimestamp;
+	
+	private static final DateTimeFormatter DATE_TIME_FORMATTER
+						= DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT);
     
+	private static MasterClock masterClock;
+	
     public SimuLoggingFormatter() {
 		super();
 	}
 
+    /**
+     * Obtains a formatted string of a time record.
+     */
 	public String format(LogRecord record) {
     	
 		String msg = formatMessage(record);
@@ -53,7 +62,7 @@ public class SimuLoggingFormatter extends Formatter {
 				sb.append(getLocalTime());
 			}
 			else if (timeStampType == 1) {
-				sb.append(masterClock.getEarthClock().getTimeStampF0());
+				sb.append(masterClock.getEarthTime().format(DATE_TIME_FORMATTER));
 			}
 			else if (timeStampType == 2  && isMarsClockValid()) {
 				String marsTime = getMarsTimestamp();
@@ -117,19 +126,25 @@ public class SimuLoggingFormatter extends Formatter {
 		return sb.toString();
     }
 
+	/**
+	 * Returns the Martian timestamp.
+	 * 
+	 * @return
+	 */
     private static String getMarsTimestamp() {
+		MarsTime mTime = masterClock.getMarsTime();
+    	double millisols = mTime.getTotalMillisols();
 		// Let's cache the format to save processing of recreating the timestamp as text
-    	MarsClock mc = masterClock.getMarsClock();
-		if ((lastMarsTimestamp == null) || (lastClock != mc.getTotalMillisols())) {
-			lastClock = mc.getTotalMillisols();
-			lastMarsTimestamp = MarsClockFormat.getDateTimeStamp(mc);
+		if ((lastMarsTimestamp == null) || (lastClock != millisols)) {
+			lastClock = millisols;
+			lastMarsTimestamp = mTime.getDateTimeStamp();
 		}
 		
 		return lastMarsTimestamp;
 	}
 
 	/**
-     * Checks if the mars clock is different from the starting clock
+     * Checks if the mars clock is different from the starting clock.
      * 
      * @return
      */
@@ -140,7 +155,7 @@ public class SimuLoggingFormatter extends Formatter {
     
     
     /**
-     * Append the machine's local time
+     * Appends the machine's local time.
      */
     private static final String getLocalTime() {
 		// Gets the local time
@@ -150,39 +165,11 @@ public class SimuLoggingFormatter extends Formatter {
     }
     
     /**
-     * Replace characters in a string quickly without using regex
+     * Defines the clock to use.
      * 
-     * @param str
-     * @param target
-     * @param replacement
-     * @return
-     */
-    private static final String fastReplace(String str, String target, String replacement) {
-        int targetLength = target.length();
-        if( targetLength == 0 ) {
-            return str;
-        }
-        int idx2 = str.indexOf( target );
-        if( idx2 < 0 ) {
-            return str;
-        }
-        StringBuilder buffer = new StringBuilder( targetLength > replacement.length() ? str.length() : str.length() * 2 );
-        int idx1 = 0;
-        do {
-            buffer.append( str, idx1, idx2 );
-            buffer.append( replacement );
-            idx1 = idx2 + targetLength;
-            idx2 = str.indexOf( target, idx1 );
-        } while( idx2 > 0 );
-        buffer.append( str, idx1, str.length() );
-        return buffer.toString();
-    }
-
-    /**
-     * Define the clock to use
      * @param mc
      */
-	public static void initializeInstances(MasterClock mc) {
-		masterClock = mc;
+	public static void initializeInstances(MasterClock masterC) {
+		masterClock = masterC;
 	}
 }

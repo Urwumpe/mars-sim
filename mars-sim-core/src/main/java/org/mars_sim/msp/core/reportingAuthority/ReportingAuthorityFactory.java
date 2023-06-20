@@ -1,14 +1,13 @@
 /*
  * Mars Simulation Project
  * ReportingAuthorityFactory.java
- * @date 2022-07-15
+ * @date 2023-05-31
  * @author Barry Evans
  */
 package org.mars_sim.msp.core.reportingAuthority;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,8 +18,6 @@ import org.jdom2.Element;
 import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.configuration.ConfigHelper;
 import org.mars_sim.msp.core.configuration.UserConfigurableConfig;
-import org.mars_sim.msp.core.person.ai.mission.MissionType;
-import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.structure.Settlement;
 
 /**
@@ -33,13 +30,10 @@ public final class ReportingAuthorityFactory extends UserConfigurableConfig<Repo
 	private static final String AUTHORITY_EL = "authority";
 	private static final String AUTHORITIES_EL = "authorities";
 	private static final String CODE_ATTR = "code";
-	private static final String MISSION_ATTR = "mission";
-	private static final String SCIENCE_ATTR = "science";
-	private static final String MODIFIER_EL = "modifier";
-	private static final String VALUE_ATTR = "value";
+	private static final String MODIFIER_ATTR = "modifier";
 	private static final String DESCRIPTION_ATTR = "description";
-	private static final String SUB_AGENDA_EL = "sub-agenda";
-	private static final String SAMPLES_ATTR = "samples";
+	private static final String CAPABILITY_EL = "capability";
+	private static final String DATA_ATTR = "data";
 	private static final String FINDINGS_ATTR = "findings";
 	private static final String OBJECTIVE_ATTR = "objective";
 	private static final String AGENDA_EL = "agenda";
@@ -49,6 +43,8 @@ public final class ReportingAuthorityFactory extends UserConfigurableConfig<Repo
 	private static final String SETTLEMENTNAME_EL = "settlement-name";
 	private static final String ROVERNAME_EL = "rover-name";
 	private static final String GENDER_ATTR = "gender-ratio";
+	private static final String PERFERENCE_EL = "preference";
+	private static final String TYPE_ATTR = "type";
 	
 	private Map<String,MissionAgenda> agendas;
 
@@ -76,38 +72,30 @@ public final class ReportingAuthorityFactory extends UserConfigurableConfig<Repo
 			String name = agendaNode.getAttributeValue(NAME_ATTR);
 			String objective = agendaNode.getAttributeValue(OBJECTIVE_ATTR);
 			String findings = agendaNode.getAttributeValue(FINDINGS_ATTR);
-			String samples = agendaNode.getAttributeValue(SAMPLES_ATTR);
+			String data = agendaNode.getAttributeValue(DATA_ATTR);
 
 			// Load sub-agendas
-			List<MissionSubAgenda> subs = new ArrayList<>();
-			List<Element> subNodes = agendaNode.getChildren(SUB_AGENDA_EL);
+			List<MissionCapability> subs = new ArrayList<>();
+			List<Element> subNodes = agendaNode.getChildren(CAPABILITY_EL);
 			for (Element subNode : subNodes) {
 				String description = subNode.getAttributeValue(DESCRIPTION_ATTR);
-				
-				// Get modifiers
-				Map<MissionType, Integer> missionModifiers = new EnumMap<>(MissionType.class);
-				Map<ScienceType, Integer> scienceModifiers = new EnumMap<>(ScienceType.class);
-
-				List<Element> modNodes = subNode.getChildren(MODIFIER_EL);
-				for (Element modNode : modNodes) {
-					int value = Integer.parseInt(modNode.getAttributeValue(VALUE_ATTR));
-					String misText = modNode.getAttributeValue(MISSION_ATTR);
-					if (misText != null) {
-						MissionType mission = MissionType.valueOf(misText);
-						missionModifiers.put(mission, value);
-					}
-					else {
-						// Assume it's science
-						ScienceType science = ScienceType.valueOf(modNode.getAttributeValue(SCIENCE_ATTR));
-						scienceModifiers.put(science, value);
-					}
-				}
 	
-				subs.add(new MissionSubAgenda(description, missionModifiers, scienceModifiers));
+				// Load the preferences
+				Map<PreferenceKey, Double> preferences = new HashMap<>();	
+				for (Element preNode : subNode.getChildren(PERFERENCE_EL)) {
+					double value = Double.parseDouble(preNode.getAttributeValue(MODIFIER_ATTR));
+					PreferenceKey.Type pType = PreferenceKey.Type.valueOf(preNode.getAttributeValue(TYPE_ATTR));
+					String pName = preNode.getAttributeValue(NAME_ATTR).toUpperCase();
+
+					preferences.put(new PreferenceKey(pType, pName), value);
+				}
+
+				subs.add(new MissionCapability(description, 
+												Collections.unmodifiableMap(preferences)));
 			}	
 				
 			// Add the agenda
-			agendas.put(name, new MissionAgenda(name, objective, subs, findings, samples));
+			agendas.put(name, new MissionAgenda(name, objective, subs, findings, data));
 		}
 	
 		// Load the Reporting authorities
@@ -166,7 +154,7 @@ public final class ReportingAuthorityFactory extends UserConfigurableConfig<Repo
 	public void discoverReportingAuthorities(UnitManager mgr) {
 		// Then overwrite the loaded with those that are active in the simulation
 		for (Settlement s : mgr.getSettlements()) {
-			ReportingAuthority ra = s.getSponsor();
+			ReportingAuthority ra = s.getReportingAuthority();
 			addItem(ra);
 		}
 	}

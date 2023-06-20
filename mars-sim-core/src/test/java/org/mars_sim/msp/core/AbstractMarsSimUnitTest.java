@@ -8,6 +8,7 @@ import org.junit.Before;
 import org.mars_sim.msp.core.environment.MarsSurface;
 import org.mars_sim.msp.core.person.GenderType;
 import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.mission.TravelToSettlement;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
 import org.mars_sim.msp.core.person.ai.task.util.PersonTaskManager;
@@ -77,7 +78,8 @@ public abstract class AbstractMarsSimUnitTest extends TestCase {
 
 	
 	protected Rover buildRover(Settlement settlement, String name, LocalPosition parked) {
-	    Rover rover1 = new Rover(name, "Explorer Rover", settlement);
+	    Rover rover1 = new Rover(name, simConfig.getVehicleConfiguration().getVehicleSpec("explorer rover"),
+								settlement);
 		if (parked != null) {
 	    	rover1.setParkedLocation(parked, 0D);
 		}
@@ -95,6 +97,8 @@ public abstract class AbstractMarsSimUnitTest extends TestCase {
 	    VehicleGarage garage = new VehicleGarage(building0,
 	            new LocalPosition[] { parkingLocation });
 	    building0.addFunction(garage);
+
+		buildingManager.addNewBuildingtoBFMap(building0);
 	    
 	    return garage;
 	}
@@ -140,15 +144,16 @@ public abstract class AbstractMarsSimUnitTest extends TestCase {
 				.setAttribute(null)
 				.build();
 		person.initialize();
+		person.setJob(JobType.ENGINEER, "Test");
 		
 		unitManager.addUnit(person);
 		return person;
 	}
 
 	/**
-	 * Build a psuedo vehcile mission that can be used in tests
+	 * Builds a pseudo vehicle mission that can be used in tests.
 	 */
-	protected VehicleMission  buildMission(Settlement starting, Person leader) {
+	protected VehicleMission buildMission(Settlement starting, Person leader) {
 		// Need a vehicle
 		Rover rover = buildRover(starting, "loader", null);
 
@@ -185,6 +190,7 @@ public abstract class AbstractMarsSimUnitTest extends TestCase {
 
 	/**
      * Creates a Clock pulse that just contains a MarsClock at a specific time.
+     * 
      * @param missionSol Sol in the current mission
      * @param mSol MSol throught the day
      * @param newSol Is the new Sol flag set
@@ -196,7 +202,8 @@ public abstract class AbstractMarsSimUnitTest extends TestCase {
 	}
 
 	/**
-	 * Create a clock pulse by advancing the simuaktino clock a certain duration.
+	 * Creates a clock pulse by advancing the simulation clock a certain duration.
+	 * 
 	 * @param duration Millisols to advanced the clock 
 	 */
 	protected ClockPulse createPulse(int duration) {
@@ -206,6 +213,6 @@ public abstract class AbstractMarsSimUnitTest extends TestCase {
     }
 
 	protected ClockPulse createPulse(MarsClock marsTime, boolean newSol) {
-        return new ClockPulse(pulseID++, 1D, marsTime, null, null, newSol, true);
+        return new ClockPulse(pulseID++, 1D, marsTime, null, newSol, true);
     }
 }

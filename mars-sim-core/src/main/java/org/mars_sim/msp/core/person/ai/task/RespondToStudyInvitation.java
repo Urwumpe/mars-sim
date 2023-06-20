@@ -9,6 +9,7 @@ package org.mars_sim.msp.core.person.ai.task;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.logging.Level;
 
 import org.mars_sim.msp.core.Msg;
@@ -126,7 +127,7 @@ public class RespondToStudyInvitation extends Task {
 
 		if (person.isInSettlement()) {
 			BuildingManager manager = person.getSettlement().getBuildingManager();
-			List<Building> administrationBuildings = manager.getBuildings(FunctionType.ADMINISTRATION);
+			Set<Building> administrationBuildings = manager.getBuildingSet(FunctionType.ADMINISTRATION);
 			administrationBuildings = BuildingManager.getNonMalfunctioningBuildings(administrationBuildings);
 			administrationBuildings = BuildingManager.getLeastCrowdedBuildings(administrationBuildings);
 
@@ -185,7 +186,7 @@ public class RespondToStudyInvitation extends Task {
 
 				// Add 5 points to primary researcher's opinion of invitee for accepting
 				// invitation.
-		        RelationshipUtil.changeOpinion(primaryResearcher, person, RandomUtil.getRandomDouble(5));
+		        RelationshipUtil.changeOpinion(primaryResearcher, person, RandomUtil.getRandomDouble(2));
 
 				logger.log(person, Level.FINE, 0, "Accepted invitation from " + primaryResearcher.getName()
 							+ " to collaborate on "	+ study.getName() + ".");
@@ -193,7 +194,7 @@ public class RespondToStudyInvitation extends Task {
 
 				// Subtract 5 points from primary researcher's opinion of invitee for rejecting
 				// invitation.
-		        RelationshipUtil.changeOpinion(primaryResearcher, person, RandomUtil.getRandomDouble(-5));
+		        RelationshipUtil.changeOpinion(primaryResearcher, person, RandomUtil.getRandomDouble(-2));
 
 				logger.log(person, Level.FINE, 0, "Rejected invitation from " + primaryResearcher.getName()
 							+ " to collaborate on "	+ study.getName() + ".");

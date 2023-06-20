@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
@@ -26,11 +27,7 @@ import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
-
-import com.alee.laf.scroll.WebScrollPane;
 
 /**
  * The SkillTabPanel is a tab panel for the skills of a person or robot.
@@ -39,7 +36,7 @@ import com.alee.laf.scroll.WebScrollPane;
 public class TabPanelSkill
 extends TabPanel {
 
-	private static final String SKILL_ICON = Msg.getString("icon.running"); //$NON-NLS-1$
+	private static final String SKILL_ICON = "skill"; //$NON-NLS-1$
 	
 	private JTable skillTable ;
 	private SkillTableModel skillTableModel;
@@ -54,7 +51,7 @@ extends TabPanel {
 		// Use the TabPanel constructor
 		super(
 			Msg.getString("TabPanelSkill.title"), //$NON-NLS-1$
-			ImageLoader.getNewIcon(SKILL_ICON),
+			ImageLoader.getIconByName(SKILL_ICON),
 			Msg.getString("TabPanelSkill.title"), //$NON-NLS-1$
 			unit, desktop
 		);
@@ -67,11 +64,11 @@ extends TabPanel {
 	protected void buildUI(JPanel content) {
 
 		// Create skill scroll panel
-		WebScrollPane skillScrollPanel = new WebScrollPane();
+		JScrollPane skillScrollPanel = new JScrollPane();
 		content.add(skillScrollPanel);
 
 		// Create skill table
-		skillTable = new ZebraJTable(skillTableModel);
+		skillTable = new JTable(skillTableModel);
 		skillTable.setPreferredScrollableViewportSize(new Dimension(250, 100));
 		skillTable.getColumnModel().getColumn(0).setPreferredWidth(110);
 		skillTable.getColumnModel().getColumn(1).setPreferredWidth(50);
@@ -93,8 +90,6 @@ extends TabPanel {
 
 		// Added sorting
 		skillTable.setAutoCreateRowSorter(true);
-
-		TableStyle.setTableStyle(skillTable);
 	}
 
 	/**
@@ -103,7 +98,6 @@ extends TabPanel {
 	@Override
 	public void update() {		
 		if (skillTable != null) {
-			TableStyle.setTableStyle(skillTable);
 			skillTableModel.update();
 		}
 	}

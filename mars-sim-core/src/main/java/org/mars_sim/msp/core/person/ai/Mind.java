@@ -9,17 +9,15 @@ package org.mars_sim.msp.core.person.ai;
 import java.io.Serializable;
 import java.util.List;
 
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.job.util.JobAssignmentType;
-import org.mars_sim.msp.core.person.ai.job.util.JobHistory;
+import org.mars_sim.msp.core.person.ai.job.util.AssignmentType;
+import org.mars_sim.msp.core.person.ai.job.util.AssignmentHistory;
 import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.job.util.JobUtil;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
-import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.person.ai.social.Relation;
 import org.mars_sim.msp.core.person.ai.social.RelationshipUtil;
 import org.mars_sim.msp.core.person.ai.task.util.PersonTaskManager;
@@ -44,7 +42,9 @@ public class Mind implements Serializable, Temporal {
 
 	private static final int MAX_EXECUTE = 100; // Maximum number of iterations of a Task per pulse
 	private static final int MAX_ZERO_EXECUTE = 100; // Maximum number of executeTask action that consume no time
-	private static final int STRESS_UPDATE_CYCLE = 10;
+	private static final int STRESS_UPDATE_CYCLE = 300;
+
+	private static final double RANGE = .8;
 	private static final double MINIMUM_MISSION_PERFORMANCE = 0.3;
 	private static final double FACTOR = .05;
 	private static final double SMALL_AMOUNT_OF_TIME = 0.001;
@@ -65,7 +65,7 @@ public class Mind implements Serializable, Temporal {
 	/** The person's personality. */
 	private MBTIPersonality mbti;
 	/** The person's emotional states. */
-	private EmotionManager emotion;
+	private EmotionManager emotionMgr;
 	/** The person's personality trait manager. */
 	private PersonalityTraitManager trait;
 	/** The person's relationship with others. */
@@ -73,11 +73,11 @@ public class Mind implements Serializable, Temporal {
 	
 	private static MissionManager missionManager;
 
-	static {
-		Simulation sim = Simulation.instance();
-		// Load the mission manager
-		missionManager = sim.getMissionManager();
-	}
+//	static {
+//		Simulation sim = Simulation.instance();
+//		// Load the mission manager
+//		missionManager = sim.getMissionManager();
+//	}
 
 	/**
 	 * Constructor 1.
@@ -97,7 +97,7 @@ public class Mind implements Serializable, Temporal {
 		// Construct the MBTI personality type.
 		mbti = new MBTIPersonality(person);
 		// Construct the emotion states.
-		emotion = new EmotionManager(person);
+		emotionMgr = new EmotionManager(person);
 		// Construct the task manager.
 		taskManager = new PersonTaskManager(this);
 		// Construct the Relation instance.
@@ -155,7 +155,7 @@ public class Mind implements Serializable, Temporal {
 		// Note: getNewJob() also checks if existing job is "good enough"/ or has good prospect
 		JobType newJob = JobUtil.getNewJob(person);
 		if (newJob != null)
-			assignJob(newJob, bypassingJobLock, assignedBy, JobAssignmentType.APPROVED, assignedBy);
+			assignJob(newJob, bypassingJobLock, assignedBy, AssignmentType.APPROVED, assignedBy);
 	}
 
 	/**
@@ -274,30 +274,16 @@ public class Mind implements Serializable, Temporal {
 			}
 		}
 
-		if (hasActiveMission) {
-			if (mission.getMissionType() == MissionType.DELIVERY) {
-				// In case of a delivery mission, the person doesn't need to be onboard
-				if (mission.getPhase() != null) {
-					resumeMission(0);
-				}
-			}
-
+		if (hasActiveMission && !mission.isDone()) {
+			// Missions have to be done and are stressfull so allow high stress.
+			if (person.getPhysicalCondition().getPerformanceFactor() < 0.7D)
+				// Cannot perform the mission if a person is not well
+				// Note: If everyone has dangerous medical condition during a mission,
+				// then it won't matter and someone needs to drive the rover home.
+				// Add penalty in resuming the mission
+				resumeMission(1);
 			else {
-				// If the mission vehicle has embarked but the person is not on board,
-				// then release the person from the mission
-
-				if (mission.getPhase() != null) {
-			        // Missions have to be done and are stressfull so allow high stress.
-					if (person.getPhysicalCondition().getPerformanceFactor() < 0.7D)
-			        	// Cannot perform the mission if a person is not well
-			        	// Note: If everyone has dangerous medical condition during a mission,
-			        	// then it won't matter and someone needs to drive the rover home.
-						// Add penalty in resuming the mission
-						resumeMission(1);
-					else {
-						resumeMission(2);
-					}
-				}
+				resumeMission(2);
 			}
 		}
 
@@ -348,7 +334,7 @@ public class Mind implements Serializable, Temporal {
 	 * @param newJob           the new job
 	 * @param bypassingJobLock
 	 */
-	public void reassignJob(JobType newJob, boolean bypassingJobLock, String assignedBy, JobAssignmentType status,
+	public void reassignJob(JobType newJob, boolean bypassingJobLock, String assignedBy, AssignmentType status,
 			String approvedBy) {
 		assignJob(newJob, bypassingJobLock, assignedBy, status, approvedBy);
 	}
@@ -363,8 +349,8 @@ public class Mind implements Serializable, Temporal {
 	 * @param approvedBy
 	 */
 	public void assignJob(JobType newJob, boolean bypassingJobLock, String assignedBy,
-			JobAssignmentType status, String approvedBy) {
-		JobHistory jh = person.getJobHistory();
+			AssignmentType status, String approvedBy) {
+		AssignmentHistory jh = person.getJobHistory();
 
 		// Future: check if the initiator's role allows the job to be changed
 		if (newJob != job) {
@@ -541,13 +527,13 @@ public class Mind implements Serializable, Temporal {
 				}
 			}
 
-			if (v[0] > .8)
-				v[0] = .8;
+			if (v[0] > RANGE)
+				v[0] = RANGE;
 			else if (v[0] < 0)
 				v[0] = 0;
 
-			if (v[1] > .8)
-				v[1] = .8;
+			if (v[1] > RANGE)
+				v[1] = RANGE;
 			else if (v[1] < 0)
 				v[1] = 0;
 
@@ -557,31 +543,29 @@ public class Mind implements Serializable, Temporal {
 	}
 
 	/**
-	 * Updates the emotion states
+	 * Updates the emotion states.
 	 */
 	public void updateEmotion() {
-		// Check for stimulus
-		emotion.checkStimulus();
-
-//		int dim = emotion.getDimension();
-		
+		// Check for physical stimulus
+		emotionMgr.checkStimulus();
+	
 		// Get the prior history vector
-		List<double[]> wVector = emotion.getOmegaVector(); 
+		List<double[]> oVector = emotionMgr.getOmegaVector(); 
 		// Get the personality vector
 		double[] pVector = trait.getPersonalityVector(); 
 		// Get the new emotional stimulus/Influence vector
-		double[] aVector = emotion.getEmotionInfoVector(); 
+		double[] iVector = emotionMgr.getEmotionInfoVector(); 
 		// Get the existing emotional State vector
-		double[] eVector = emotion.getEmotionVector();
-
-		// Call Psi Function - with desire changes aVector
-		double[] psi = callPsi(aVector, pVector);//new double[dim];
-
-		// Call Omega Function - internal changes such as decay of emotional states
-		// for normalize vectors
-		double[] omega = MathUtils.normalize(wVector.get(wVector.size()-1)); //new double[dim];
-
-		double[] newE = new double[2];
+		double[] eVector = emotionMgr.getEmotionVector();
+		
+		// Get Psi Function to incorporate new stimulus
+		double[] psi = callPsi(iVector, pVector);
+		// Get Omega Function to normalize internal changes such as decay of emotional states
+		double[] omega = MathUtils.normalize(oVector.get(oVector.size()-1));
+		
+		int dim = emotionMgr.getDimension();
+		// Construct a new emotional state function modified by psi and omega functions
+		double[] newE = new double[dim];
 
 		for (int i=0; i<2; i++) {
 			newE[i] = (eVector[i] + psi[i] + omega[i]) / 2.05;
@@ -596,22 +580,22 @@ public class Mind implements Serializable, Temporal {
 		// java.lang.OutOfMemoryError: Java heap space
 //		double[] e_tt = MathUtils.concatAll(eVector, psi, omega);
 
-		if (newE[0] > .8)
-			newE[0] = .8;
+		if (newE[0] > RANGE)
+			newE[0] = RANGE;
 		else if (newE[0] < 0)
 			newE[0] = 0;
 
-		if (newE[1] > .8)
-			newE[1] = .8;
+		if (newE[1] > RANGE)
+			newE[1] = RANGE;
 		else if (newE[1] < 0)
 			newE[1] = 0;
 
 		// Update the emotional states
-		emotion.updateEmotion(newE);
+		emotionMgr.updateEmotion(newE);
 	}
 
 	public EmotionManager getEmotion() {
-		return emotion;
+		return emotionMgr;
 	}
 
 	/**

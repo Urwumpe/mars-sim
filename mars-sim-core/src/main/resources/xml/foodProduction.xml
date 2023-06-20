@@ -270,7 +270,7 @@
 		</outputs>
 	</process>
 	
-	<process name="Make French Fries from potatoes"
+	<process name="Make French Fries from Potatoes"
 			tech="1" skill="1"
 			work-time="50"
 			process-time="50"
@@ -285,7 +285,7 @@
 		</outputs>
 	</process>
 	
-	<process name="Make French Fries from potatoes"
+	<process name="Make French Fries from Potatoes"
 			tech="1" skill="1"
 			work-time="50"
 			process-time="50"
@@ -368,7 +368,7 @@
 		</outputs>
 	</process>
 
-	<process name="Make sesame milk from soymilk"
+	<process name="Make Sesame Milk from Soymilk"
 		tech="1" skill="1" work-time="20" process-time="20"
 			power-required="1.0">
 
@@ -497,6 +497,26 @@
 		</outputs>
 	</process>
 
+	<process name="Make Tofu from Soymilk and Calcium Sulfate"
+		tech="1" skill="1" work-time="25" process-time="50"
+			power-required="1.0">
+
+		<description> Boil up soymilk, add calcium sulfate as coagulant,
+			gently stir and heat, and the curds will separate.</description>
+
+		<inputs>
+			<part name="stove" number="1" />
+			<resource name="Soymilk" amount="2.5" />
+			<resource name="calcium sulfate" amount="0.03" />
+		</inputs>
+		<outputs>
+			<part name="stove" number="1" />
+			<resource name="Tofu" amount="2.1" />
+			<!-- Grey Water is (edible) tofu whey -->
+			<resource name="Grey Water" amount="0.4" />
+		</outputs>
+	</process>
+	
 	<process name="Make Tofu from Soymilk and Epsom Salt"
 		tech="1" skill="1" work-time="25" process-time="50"
 			power-required="1.0">
@@ -517,7 +537,6 @@
 		</outputs>
 	</process>
 
-	<!-- 7.37 g/kg soymilk to 15.47 g/kg soymilk is ideal according to https://www.instructables.com/Homemade-Tofu/ ...TODO: add gypsum later? -->
 	<process name="Make Tofu from Soymilk and Vinegar"
 		tech="1" skill="1" work-time="25" process-time="50"
 			power-required="1.0">
@@ -827,7 +846,7 @@
 		<inputs>
 			<resource name="White Rice" amount="1.0" />
 			<resource name="Water" amount="3.0" />
-
+			<resource name="calcium sulfate" amount="3.0" />
 		</inputs>
 		<outputs>
 			<resource name="Water" amount="2.9" />
@@ -902,7 +921,11 @@
 		</outputs>
 	</process>
 	
-	<!-- https://umanitoba.ca/faculties/engineering/departments/ce2p2e/alternative_village/media/19_Physical_Chemical_surface_properties_wheat_husk_rye_husk_soft_wood_Bledzki.pdf says 15-20 % husk for wheat; https://www.sciencedirect.com/topics/agricultural-and-biological-sciences/milling-fractions saysfor Buckwheat cultivar Siva, it is 55.4 % flour (from raw grain), 24.2 % bran, and 17.4 % husk according to Skrabanja et al., 2003a assumes waste is linear from grain to wholegrain to white   -->
+	<!-- https://umanitoba.ca/faculties/engineering/departments/ce2p2e/alternative_village/media/19_Physical_Chemical_surface_properties_wheat_husk_rye_husk_soft_wood_Bledzki.pdf 
+	    says 15-20 % husk for wheat; 
+	    https://www.sciencedirect.com/topics/agricultural-and-biological-sciences/milling-fractions says for Buckwheat cultivar Siva, 
+	    it is 55.4 % flour (from raw grain), 24.2 % bran, and 17.4 % husk according to Skrabanja et al., 2003a 
+	    assumes waste is linear from grain to wholegrain to white   -->
 	<process name= "Process Wheat into Wheat Flour"
 		tech="1" skill="2" work-time="50" process-time="400"
 			power-required="5.0">
@@ -1149,7 +1172,7 @@
 		<description>Clean bottle with bleach. Add water to white rice and heat up mixture.
 			Add bacteria and wait for fermentation to complete</description>
 		<inputs>
-			<part name="bottle" number="5" />
+			<part name="plastic bottle" number="5" />
 			<part name="autoclave" number="1" />
 			<resource name="White Rice" amount="5.0" />
 			<resource name="Acetic Acid Bacteria" amount="0.3" />
@@ -1159,7 +1182,7 @@
 			<resource name="sodium hypochlorite" amount="0.003" />
 		</inputs>
 		<outputs>
-			<part name="bottle" number="5" />
+			<part name="plastic bottle" number="5" />
 			<part name="autoclave" number="1" />
 			<resource name="Grey Water" amount="1.25" />
 			<resource name="Rice Vinegar" amount="15.0" />
@@ -1172,14 +1195,14 @@
 			power-required="1.0">
 		<description>Soak seeds, crush and ground. Hulls and bran are sifted out. Liquids added to the seed flour.</description>
 		<inputs>
-			<part name="bottle" number="2" />
+			<part name="plastic bottle" number="2" />
 			<resource name="Mustard Seed" amount="0.5" />
 			<resource name="Rice Vinegar" amount="0.1" />
 			<resource name="Sugar" amount=".4" />
 			<resource name="Water" amount="4" />
 		</inputs>
 		<outputs>
-			<part name="bottle" number="2" />
+			<part name="plastic bottle" number="2" />
 			<resource name="Mustard" amount="5.0" />
 		</outputs>
 	</process>
@@ -1189,7 +1212,7 @@
 			power-required="1.0">
 		<description>Cook tomatoes. Then grind them with garlic, onions, vinegar, and spice.</description>
 		<inputs>
-			<part name="bottle" number="2" />
+			<part name="plastic bottle" number="2" />
 			<part name="stove" number="1" />
 			<resource name="tomato" amount="5.0" />
 			<resource name="Garlic" amount="0.022" />
@@ -1200,7 +1223,7 @@
 			<resource name="Sugar" amount="0.367" />
 		</inputs>
 		<outputs>
-			<part name="bottle" number="2" />
+			<part name="plastic bottle" number="2" />
 			<part name="stove" number="1" />
 			<resource name="Ketchup" amount="5.0" />
 		</outputs>
@@ -1214,7 +1237,7 @@
 		Carbohydrates contained in wheat gives soy sauce its fine aroma and adds sweetness to the soy sauce.
 		Wheat is roasted at high temperatures, then crushed by rollers to facilitate fermentation.</description>
 		<inputs>
-			<part name="bottle" number="5" />
+			<part name="plastic bottle" number="5" />
 			<part name="autoclave" number="1" />
 			<resource name="Soybean" amount="5.0" />
 			<resource name="Wheat" amount="1.0" />
@@ -1224,7 +1247,7 @@
 			<resource name="sodium hypochlorite" amount="0.003" />
 		</inputs>
 		<outputs>
-			<part name="bottle" number="5" />
+			<part name="plastic bottle" number="5" />
 			<part name="autoclave" number="1" />
 			<resource name="Grey Water" amount="1.25" />			
 			<resource name="Soy Sauce" amount="15.0" />
@@ -1237,7 +1260,7 @@
 			power-required="1.0">
 		<description>Clean bottle with bleach. Soybeans are soaked and fermented with rice and brine to produce a thick paste.</description>
 		<inputs>
-			<part name="bottle" number="1" />
+			<part name="plastic bottle" number="1" />
 			<part name="autoclave" number="1" />
 			<part name="blender" number="1" />
 			<resource name="Soybean" amount="0.7" />
@@ -1248,7 +1271,7 @@
 			<resource name="sodium hypochlorite" amount="0.002" />
 		</inputs>
 		<outputs>
-			<part name="bottle" number="1" />
+			<part name="plastic bottle" number="1" />
 			<part name="autoclave" number="1" />
 			<part name="blender" number="1" />
 			<resource name="Miso" amount="2.81" />
@@ -1493,4 +1516,19 @@
 		</outputs>
 	</process>
 
+	<!-- 
+		Curry powder recipe : 
+		
+		2 Tbsp ground coriander
+		2 Tbsp ground cumin
+		1 1/2 Tbsp ground turmeric
+		2 tsp ground ginger
+		1 tsp dry mustard
+		1/2 tsp ground black pepper
+		1 tsp ground cinnamon
+		1/2 tsp ground cardamom
+		1/2 tsp cayenne pepper or ground chilies
+	 -->
+ 
+ 
 </foodProduction-processes>

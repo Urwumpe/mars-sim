@@ -6,6 +6,8 @@
  */
 package org.mars_sim.msp.core.person.ai.mission;
 
+import java.util.List;
+
 import org.mars_sim.msp.core.person.ai.task.LoadingController;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.time.MarsClock;
@@ -14,7 +16,8 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
 public interface VehicleMission extends Mission {
 
     /**
-     * Get the Vehicle assigned to the Mission
+     * Gets the Vehicle assigned to the Mission.
+     * 
      * @return 
      */
     Vehicle getVehicle();
@@ -27,29 +30,30 @@ public interface VehicleMission extends Mission {
     double getDistanceProposed();
     
     /**
-	 * Gets the actual total distance travelled during the mission so far.
+	 * Gets the actual total distance traveled during the mission so far.
 	 *
 	 * @return distance (km)
 	 */
     double getTotalDistanceTravelled();
 
     /**
-     * Get the total distacne remaining for the mission.
+     * Gets the total distance remaining for the mission.
      */
     double getTotalDistanceRemaining();
 
     /**
-     * Get the remaining distacne for the current travel leg
+     * Gets the remaining distance for the current travel leg.
      */
     double getDistanceCurrentLegRemaining();
 
     /**
 	 * Gets the current loading plan for this Mission phase.
+	 * 
 	 * @return
 	 */
     LoadingController getLoadingPlan();
 
-    	/**
+    /**
 	 * Gets the estimated time of arrival (ETA) for the current leg of the mission.
 	 *
 	 * @return time (MarsClock) or null if not applicable.
@@ -57,24 +61,19 @@ public interface VehicleMission extends Mission {
 	MarsClock getLegETA();
 
     /**
-     * Is the Mission travelling to the current destination.
+     * Is the Mission traveling to the current destination.
+     * 
      * @see #getCurrentDestination()
      */
     boolean isTravelling();
 
     /**
-	 * What is the current desitnation of the Mission. The isTravelling flag
+	 * Gets the current destination of the Mission. The isTravelling flag
 	 * identifies if the Mission is on the way.
+	 * 
      * @see #isTravelling()
 	 */
 	NavPoint getCurrentDestination();
-
-	/**
-	 * Gets the number of navpoints on the trip.
-	 * 
-	 * @return number of navpoints
-	 */
-    int getNumberOfNavpoints();
 
     /**
 	 * Gets the navpoint at an index value.
@@ -83,17 +82,10 @@ public interface VehicleMission extends Mission {
 	 * @return navpoint
 	 * @throws IllegaArgumentException if no navpoint at that index.
 	 */
-    NavPoint getNavpoint(int i);
+    List<NavPoint> getNavpoints();
 
     /**
-     * Gets the mission's next navpoint index.
-     * 
-     * @return navpoint index or -1 if none.
-     */
-    int getNextNavpointIndex();
-
-    /**
-     * Somehting has gone wrong so request help
+     * Something has gone wrong so request help
      */
     void getHelp(MissionStatus status);
 

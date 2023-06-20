@@ -8,13 +8,12 @@
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Font;
 import java.awt.GridLayout;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JLabel;
@@ -37,12 +36,13 @@ import org.mars_sim.msp.core.structure.construction.ConstructionSite;
 import org.mars_sim.msp.core.structure.construction.ConstructionStageInfo;
 import org.mars_sim.msp.core.structure.construction.ConstructionUtil;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 @SuppressWarnings("serial")
 public class SalvageProjectPanel
 extends WizardPanel {
-
+	// Static members.
+ 	private static Logger logger = Logger.getLogger(SalvageProjectPanel.class.getName());
+ 	
 	/** The wizard panel name. */
     private final static String NAME = "Salvage Project";
     
@@ -68,8 +68,7 @@ extends WizardPanel {
         setBorder(new MarsPanelBorder());
         
         // Create the select salvage project label.
-        JLabel titleLabel = new JLabel("Select a salvage project", JLabel.CENTER);
-        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD));
+        JLabel titleLabel = createTitleLabel("Select a salvage project");
         add(titleLabel, BorderLayout.NORTH);
 
         // Create the center panel.
@@ -130,15 +129,11 @@ extends WizardPanel {
         
         // Create the parts table.
         partsTable = new JTable(partsTableModel);
-		TableStyle.setTableStyle(partsTable);
         partsTable.setRowSelectionAllowed(false);
         partsTableScrollPane.setViewportView(partsTable);
         
         // Create the error message label.
-        errorMessageLabel = new JLabel(" ", JLabel.CENTER);
-        errorMessageLabel.setForeground(Color.RED);
-        errorMessageLabel.setFont(errorMessageLabel.getFont().deriveFont(Font.BOLD));
-        errorMessageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        errorMessageLabel = createErrorLabel();
         add(errorMessageLabel, BorderLayout.SOUTH);
     }
     
@@ -271,7 +266,7 @@ extends WizardPanel {
                     info = ConstructionUtil.getConstructionStageInfo(salvageBuilding.getBuildingType());
                 }
                 catch (Exception e) {
-                    e.printStackTrace(System.err);
+        			logger.log(Level.SEVERE, "Issues with updating PartsTableModel: " + e.getMessage());
                 }
             }
             else if (project instanceof ConstructionSite) {

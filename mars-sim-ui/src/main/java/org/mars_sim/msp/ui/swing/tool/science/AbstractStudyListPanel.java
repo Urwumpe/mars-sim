@@ -8,7 +8,6 @@ package org.mars_sim.msp.ui.swing.tool.science;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.Rectangle;
 import java.util.List;
 
@@ -24,7 +23,7 @@ import javax.swing.table.AbstractTableModel;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
+import org.mars_sim.msp.ui.swing.StyleManager;
 
 /**
  * Class to creates a panel containing a sorted table of ScientificStudy
@@ -34,9 +33,6 @@ public abstract class AbstractStudyListPanel extends JPanel {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
-	
-	// Font used in tab panel title
-	protected static final Font TITLE_FONT = new Font("Serif", Font.BOLD, 16);
 	
 	private ScienceWindow scienceWindow;
 	private StudyTableModel studyTableModel;
@@ -190,7 +186,7 @@ public abstract class AbstractStudyListPanel extends JPanel {
 
 		// Create title label.
 		JLabel titleLabel = new JLabel(Msg.getString(msgTag + ".title"), JLabel.CENTER); //$NON-NLS-1$
-		titleLabel.setFont(TITLE_FONT);
+		StyleManager.applySubHeading(titleLabel);
 		add(titleLabel, BorderLayout.NORTH);
 
 		// Create list scroll pane.
@@ -228,9 +224,7 @@ public abstract class AbstractStudyListPanel extends JPanel {
 		studyTable.getColumnModel().getColumn(5).setPreferredWidth(80);
 		
 		studyTable.setAutoCreateRowSorter(true);
-		
-		TableStyle.setTableStyle(studyTable);
-		
+				
 		listScrollPane.setViewportView(studyTable);
 	}
 	
@@ -244,7 +238,6 @@ public abstract class AbstractStudyListPanel extends JPanel {
 	 * Updates the panel.
 	 */
 	protected void update() {
-		TableStyle.setTableStyle(studyTable);
 		studyTableModel.update(getStudies());
 		// Make sure study is selected.
 		selectScientificStudy(scienceWindow.getScientificStudy(), false);

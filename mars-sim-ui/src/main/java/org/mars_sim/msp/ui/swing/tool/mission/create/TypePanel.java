@@ -10,7 +10,6 @@ package org.mars_sim.msp.ui.swing.tool.mission.create;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.beans.PropertyChangeEvent;
@@ -21,6 +20,9 @@ import java.util.Objects;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
@@ -29,16 +31,12 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.Document;
 import javax.swing.text.JTextComponent;
 
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.ui.swing.JComboBoxMW;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
 
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.text.WebTextField;
 
 /**
  * A wizard panel for selecting mission type.
@@ -51,15 +49,14 @@ public class TypePanel extends WizardPanel implements ItemListener {
 	
 	// Private members.
 	private JComboBoxMW<String> typeSelect;
-	private WebLabel descriptionInfoLabel;
-	private WebLabel descriptionLabel;
-	private WebTextField descriptionTF;
+	private JLabel descriptionInfoLabel;
+	private JLabel descriptionLabel;
+	private JTextField descriptionTF;
 	
 	private String descriptionText;
 	
-	private static MissionManager missionManager;
+	private MissionManager missionManager;
 
-	//private CreateMissionWizard wizard;
 	
 	
 	/**
@@ -73,7 +70,7 @@ public class TypePanel extends WizardPanel implements ItemListener {
 		
 		this.wizard = wizard;
 		
-		missionManager = Simulation.instance().getMissionManager();
+		missionManager = getSimulation().getMissionManager();
 		
 		// Set the layout.
 		setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
@@ -82,31 +79,26 @@ public class TypePanel extends WizardPanel implements ItemListener {
 		setBorder(new MarsPanelBorder());
 		
 		// Create the type info label.
-		WebLabel typeInfoLabel = new WebLabel("Select Mission Type");
-		typeInfoLabel.setFont(typeInfoLabel.getFont().deriveFont(Font.BOLD));
-		typeInfoLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		JLabel typeInfoLabel = createTitleLabel("Select Mission Type");
 		add(typeInfoLabel);
 		
 		// Create the type panel.
-		WebPanel typePane = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+		JPanel typePane = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		typePane.setAlignmentX(Component.LEFT_ALIGNMENT);
 		add(typePane);
 		
 		// Create the type label.
-		WebLabel typeLabel= new WebLabel("Type: ");
+		JLabel typeLabel= new JLabel("Type: ");
 		typePane.add(typeLabel);
 		
 		// Create the mission types.
 		MissionType[] missionTypes = MissionDataBean.getMissionTypes();
-//		sortStringBubble(missionTypes);
-//		MissionType[] displayMissionTypes = new MissionType[missionTypes.length];
 		List<String> types = new ArrayList<>();
 		int size = missionTypes.length;
 		for (int i=0; i<size; i++) {
 			types.add(missionTypes[i].getName());
 		}
-//		displayMissionTypes[0] = "";
-//        System.arraycopy(missionTypes, 0, displayMissionTypes, 1, missionTypes.length);
+
 		typeSelect = new JComboBoxMW<String>();
 		Iterator<String> k = types.iterator();
 		while (k.hasNext()) 
@@ -123,24 +115,22 @@ public class TypePanel extends WizardPanel implements ItemListener {
 		add(Box.createVerticalStrut(10));
 		
 		// Create the description info label.
-		descriptionInfoLabel = new WebLabel("Edit Mission Description (Optional)");
-		descriptionInfoLabel.setFont(descriptionInfoLabel.getFont().deriveFont(Font.BOLD));
-		descriptionInfoLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+		descriptionInfoLabel = new JLabel("Edit Mission Description (Optional)");
 		descriptionInfoLabel.setEnabled(false);
 		add(descriptionInfoLabel);
 		
 		// Create the description panel.
-		WebPanel descriptionPane = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+		JPanel descriptionPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		descriptionPane.setAlignmentX(Component.LEFT_ALIGNMENT);
 		add(descriptionPane);
 		
 		// Create the description label.
-		descriptionLabel = new WebLabel("Description: ");
+		descriptionLabel = new JLabel("Description: ");
 		descriptionLabel.setEnabled(false);
 		descriptionPane.add(descriptionLabel);
 		
 		// Create the description text field.
-		descriptionTF = new WebTextField(20);
+		descriptionTF = new JTextField(20);
 		descriptionTF.setEnabled(false);
 		descriptionPane.add(descriptionTF);
 		descriptionPane.setMaximumSize(new Dimension(Short.MAX_VALUE, descriptionTF.getPreferredSize().height));
@@ -148,7 +138,6 @@ public class TypePanel extends WizardPanel implements ItemListener {
 		// Listen for changes in the text
 		addChangeListener(descriptionTF, e -> {
 			  descriptionText = descriptionTF.getText();
-//			  System.out.println("descriptionText: " + descriptionText);
 		});
 		
 		// Add a vertical glue.

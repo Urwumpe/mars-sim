@@ -1,16 +1,13 @@
 /*
  * Mars Simulation Project
  * Resupply.java
- * @date 2022-07-19
+ * @date 2023-05-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.interplanetary.transport.resupply;
 
 import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -21,32 +18,21 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 import org.mars_sim.msp.core.BoundedObject;
-import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.LocalAreaUtil;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.UnitManager;
-import org.mars_sim.msp.core.equipment.Equipment;
-import org.mars_sim.msp.core.equipment.EquipmentFactory;
-import org.mars_sim.msp.core.interplanetary.transport.TransitState;
+import org.mars_sim.msp.core.events.ScheduledEventManager;
 import org.mars_sim.msp.core.interplanetary.transport.Transportable;
+import org.mars_sim.msp.core.interplanetary.transport.resupply.ResupplyConfig.SupplyManifest;
 import org.mars_sim.msp.core.logging.SimLogger;
-import org.mars_sim.msp.core.person.GenderType;
-import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.PersonConfig;
-import org.mars_sim.msp.core.person.ai.job.util.JobUtil;
-import org.mars_sim.msp.core.reportingAuthority.ReportingAuthority;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.Part;
-import org.mars_sim.msp.core.robot.Robot;
-import org.mars_sim.msp.core.robot.RobotConfig;
-import org.mars_sim.msp.core.robot.RobotDemand;
-import org.mars_sim.msp.core.robot.RobotSpec;
-import org.mars_sim.msp.core.robot.RobotType;
-import org.mars_sim.msp.core.robot.ai.job.RobotJob;
 import org.mars_sim.msp.core.structure.BuildingTemplate;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.SettlementBuilder;
+import org.mars_sim.msp.core.structure.SettlementSupplies;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingCategory;
 import org.mars_sim.msp.core.structure.building.BuildingConfig;
@@ -55,40 +41,33 @@ import org.mars_sim.msp.core.structure.building.BuildingSpec;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
-import org.mars_sim.msp.core.vehicle.Drone;
-import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
-import org.mars_sim.msp.core.vehicle.Rover;
-import org.mars_sim.msp.core.vehicle.Vehicle;
-import org.mars_sim.msp.core.vehicle.VehicleType;
 
 /**
  * Resupply mission from Earth for a settlement.
  */
-public class Resupply implements Serializable, Transportable {
+public class Resupply extends Transportable implements SettlementSupplies {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
 	/** default logger. */
 	private static final SimLogger logger = SimLogger.getLogger(Resupply.class.getName());
-
-	public static final String LAUNCH_ON = "Resupply Mission launched on ";
 	
-	public static final String POSITIONING = "Positioning ";
+	private static final String POSITIONING = "Positioning ";
 	
 	// Default separation distance between the outer wall of buildings .
-	public static final int MAX_HABITABLE_BUILDING_DISTANCE = 6;
-	public static final int MIN_HABITABLE_BUILDING_DISTANCE = 2;
+	private static final int MAX_HABITABLE_BUILDING_DISTANCE = 6;
+	private static final int MIN_HABITABLE_BUILDING_DISTANCE = 2;
 
-	public static final int MAX_INHABITABLE_BUILDING_DISTANCE = 6;
-	public static final int MIN_INHABITABLE_BUILDING_DISTANCE = 2;
+	private static final int MAX_INHABITABLE_BUILDING_DISTANCE = 6;
+	private static final int MIN_INHABITABLE_BUILDING_DISTANCE = 2;
 
-	public static final int MAX_OBSERVATORY_BUILDING_DISTANCE = 48;
-	public static final int MIN_OBSERVATORY_BUILDING_DISTANCE = 36;
+	private static final int MAX_OBSERVATORY_BUILDING_DISTANCE = 48;
+	private static final int MIN_OBSERVATORY_BUILDING_DISTANCE = 36;
 
 	private static final int BUILDING_CENTER_SEPARATION = 11; // why 11?
 
-	public static final int MAX_COUNTDOWN = 20;
+	private static final int MAX_COUNTDOWN = 20;
 
 	// Default width and length for variable size buildings if not otherwise
 	// determined.
@@ -104,68 +83,70 @@ public class Resupply implements Serializable, Transportable {
 	private int settlementID;
 	private transient Settlement settlement;
 	
-	private TransitState state;
-
-	private ResupplyMissionTemplate template;
+	private ResupplySchedule template;
 	
 	private List<BuildingTemplate> newBuildings;
-	private List<String> newVehicles;
+	private Map<String, Integer> newVehicles;
 	private Map<String, Integer> newEquipment;
 	private Map<AmountResource, Double> newResources;
 	private Map<Part, Integer> newParts;
 
-	private MarsClock launchDate;
-	private MarsClock arrivalDate;
+	private int cycle;
 	
 	/**
-	 * Constructor.
+	 * Constructor based of a Supply schedule.
 	 * 
+	 * @param template The schedule of the resupply
 	 * @param arrivalDate the arrival date of the supplies.
 	 * @param settlement  the settlement receiving the supplies.
 	 */
-	public Resupply(ResupplyMissionTemplate template, MarsClock arrivalDate, Settlement settlement) {
+	public Resupply(ResupplySchedule template, int cycle, MarsClock arrivalDate, Settlement settlement) {
+		this(template.getName() + " #" + cycle, arrivalDate, settlement);
+
 		// Initialize data members.
-		this.arrivalDate = arrivalDate;
 		this.template = template;
-		
-        // Determine launch date.
-        launchDate = new MarsClock(arrivalDate);
-        launchDate.addTime(-1D * ResupplyUtil.getAverageTransitTime() * 1000D);
- 
-		this.settlement = settlement;
-		settlementID = settlement.getIdentifier();
+		this.cycle = cycle;
+
+		// Load up the respply according to the manifest
+		SupplyManifest manifest = template.getManifest();
+		setBuildings(manifest.buildings());
+		setVehicles(manifest.vehicles());
+		setEquipment(manifest.equipment());
+		setNewImmigrantNum(manifest.people());
+		setResources(manifest.resources());
+		setParts(manifest.parts());
 	}
 
-	public ResupplyMissionTemplate getTemplate() {
+	/**
+	 * Bespoke resupply mission.
+	 */
+	public Resupply(String name, MarsClock arrivalDate, Settlement destination) {
+		super(name, destination.getCoordinates());
+
+		this.settlement = destination;
+		settlementID = destination.getIdentifier();
+
+		// Schedule the launch
+		setArrivalDate(arrivalDate);
+	}
+
+	/**
+	 * The parent settlement is controlling the events for the resupply mission.
+	 * 
+	 * @return Settlement's scheduled events
+	 */
+	@Override
+	protected ScheduledEventManager getOwningManager() {
+		return settlement.getFutureManager();
+	}
+
+	/**
+	 * Gets the schedule that defines this resupply.
+	 * 
+	 * @return Potentially can return null.
+	 */
+	public ResupplySchedule getTemplate() {
 		return template;
-	}
-
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + settlementID;
-		result = prime * result + ((arrivalDate == null) ? 0 : arrivalDate.hashCode());
-		return result;
-	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		Resupply other = (Resupply) obj;
-		if (settlementID != other.settlementID)
-			return false;
-		if (arrivalDate == null) {
-			if (other.arrivalDate != null)
-				return false;
-		} else if (!arrivalDate.equals(other.arrivalDate))
-			return false;
-		return true;
 	}
 
 	/**
@@ -185,7 +166,17 @@ public class Resupply implements Serializable, Transportable {
 		}
 		
 		// Deliver the rest of the supplies and add people.
-		deliverOthers(sim.getUnitManager(), sc.getPersonConfig(), sc.getRobotConfiguration());
+		deliverOthers(sim, sc);
+
+		// If a schedule then create the next one
+		if (template.getFrequency() > 0) {
+			// Scheduled the follow on
+			MarsClock newArrival = new MarsClock(getArrivalDate());
+			newArrival.addTime(template.getActiveMissions() * template.getFrequency() * 1000.0);
+			Resupply followOn = new Resupply(this.getTemplate(), cycle + template.getActiveMissions(),
+												newArrival, settlement);
+			tm.addNewTransportItem(followOn);
+		}
 	}
 
 	/**
@@ -199,9 +190,8 @@ public class Resupply implements Serializable, Transportable {
 		if (!orderedBuildings.isEmpty()) {
 
 			BuildingManager buildingManager = settlement.getBuildingManager();
-			
-			Building aBuilding = buildingManager.getACopyOfBuildings().get(0);
-			settlement.fireUnitUpdate(UnitEventType.START_BUILDING_PLACEMENT_EVENT, aBuilding);
+
+			settlement.fireUnitUpdate(UnitEventType.START_BUILDING_PLACEMENT_EVENT, buildingManager.getABuilding());
 
 			Iterator<BuildingTemplate> buildingI = orderedBuildings.iterator();
 
@@ -304,10 +294,6 @@ public class Resupply implements Serializable, Transportable {
 				noImmovable = isCollisionFreeImmovable(bt);
 			}
 
-			if (noImmovable) {
-				noConflictResupply = isCollisionFreeResupplyBuildings(bt, buildingManager);
-			}
-
 			if (noConflictResupply) {
 				inZone = isWithinZone(spec, bt, buildingManager);
 			}
@@ -322,40 +308,6 @@ public class Resupply implements Serializable, Transportable {
 		}
 
 		return bt;
-	}
-
-	/**
-	 * Checks if the building template collides with any planned resupply buildings.
-	 * 
-	 * @param bt  a building template
-	 * @param mgr BuildingManager
-	 * @return true if the location is clear of collision
-	 */
-	public static boolean isCollisionFreeResupplyBuildings(BuildingTemplate bt, BuildingManager mgr) {
-
-		BoundedObject b0 = bt.getBounds();
-
-		List<Resupply> resupplies = ResupplyUtil.loadInitialResupplyMissions();
-
-		Iterator<Resupply> i = resupplies.iterator();
-		while (i.hasNext()) {
-			Resupply r = i.next();
-			if (r.getSettlement().equals(mgr.getSettlement()) || r.getSettlement() == mgr.getSettlement()) {
-
-				List<BuildingTemplate> templates = r.getNewBuildings();
-				Iterator<BuildingTemplate> j = templates.iterator();
-				while (j.hasNext()) {
-					BuildingTemplate t = j.next();
-					BoundedObject b1 = t.getBounds();
-
-					if (LocalAreaUtil.isTwoBoundedOjectsIntersected(b0, b1))
-						return false;
-				}
-			}
-		}
-
-		return true;
-
 	}
 
 	/**
@@ -430,145 +382,23 @@ public class Resupply implements Serializable, Transportable {
 	/**
 	 * Delivers vehicles, resources, bots and immigrants to a settlement on a resupply
 	 * mission.
-	 * @param unitManager 
-	 * @param personConfig 
+	 * @param timings 
 	 */
-	private void deliverOthers(UnitManager unitManager, PersonConfig personConfig, RobotConfig robotConfig) {
-		ReportingAuthority sponsor = settlement.getSponsor();
-		Iterator<String> vehicleI = getNewVehicles().iterator();
-		while (vehicleI.hasNext()) {
-			String vehicleType = vehicleI.next();
-			Vehicle vehicle = null;
-			String name = Vehicle.generateName(vehicleType, sponsor);
-			if (LightUtilityVehicle.NAME.equalsIgnoreCase(vehicleType)) {
-				vehicle = new LightUtilityVehicle(name, vehicleType, settlement);
-			} 
-			else if (VehicleType.DELIVERY_DRONE.getName().equalsIgnoreCase(vehicleType)) {
-				vehicle = new Drone(name, vehicleType, settlement);
-			}
-			else {
-				vehicle = new Rover(name, vehicleType, settlement);
-			}
-			unitManager.addUnit(vehicle);
-			settlement.addOwnedVehicle(vehicle);
-		}
-
-		// Deliver equipment.
-		Iterator<String> equipmentI = getNewEquipment().keySet().iterator();
-		while (equipmentI.hasNext()) {
-			String equipmentType = equipmentI.next();
-			int number = getNewEquipment().get(equipmentType);
-			for (int x = 0; x < number; x++) {
-				Equipment equipment = EquipmentFactory.createEquipment(equipmentType, settlement);
-				unitManager.addUnit(equipment);
-				// Place this equipment within a settlement
-				settlement.addEquipment(equipment);
-				// Set the container unit
-				equipment.setContainerUnit(settlement);
-			}
-		}
-
-		// Deliver resources.
-		Iterator<AmountResource> resourcesI = getNewResources().keySet().iterator();
-		while (resourcesI.hasNext()) {
-			AmountResource resource = resourcesI.next();
-			int id = resource.getID();
-			double amount = getNewResources().get(resource);
-			double capacity = settlement.getAmountResourceRemainingCapacity(id);
-			if (amount > capacity)
-				amount = capacity;
-			settlement.storeAmountResource(id, amount);
-		}
-
-		// Deliver parts.
-		Iterator<Part> partsI = getNewParts().keySet().iterator();
-		while (partsI.hasNext()) {
-			Part part = partsI.next();
-			int number = getNewParts().get(part);
-			settlement.storeItemResource(part.getID(), number);
-		}
-
-		// Deliver Robots.
-		RobotDemand demand = new RobotDemand(settlement);
-		for (int x = 0; x < getNewBotNum(); x++) {
-			// Get a robotType randomly
-			RobotType robotType = demand.getBestNewRobot();
-			// Adopt Static Factory Method and Factory Builder Pattern
-			String newName = Robot.generateName(robotType);
-			
-			// Find the spec for this robot, take any model
-			RobotSpec spec = robotConfig.getRobotSpec(robotType, null);
-
-			Robot robot = new Robot(newName, settlement, spec);
-			robot.initialize();
-
-
-			RobotJob robotJob = JobUtil.getRobotJob(robotType);
-			robot.getBotMind().setRobotJob(robotJob, true);
-
-			unitManager.addUnit(robot);
-
-			settlement.addOwnedRobot(robot);
-			// Set the container unit
-			robot.setContainerUnit(settlement);
-
-			logger.config(robot, "Arrived on Mars.");
-
-			settlement.fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_ROBOT_EVENT, robot);
-		}
-
+	private void deliverOthers(Simulation sim, SimulationConfig sc) {
+		SettlementBuilder builder = new SettlementBuilder(sim, sc);
 		
-		// Deliver immigrants.
-		// Future: add a crew editor for user to define what team and who to send
-		Collection<Person> immigrants = new ArrayList<>();
-		for (int x = 0; x < getNewImmigrantNum(); x++) {
-			GenderType gender = GenderType.FEMALE;
-			if (RandomUtil.getRandomDouble(1.0D) <= sponsor.getGenderRatio()) {
-				gender = GenderType.MALE;
-			}
+		builder.createSupplies(this, settlement);
 
-			String country = sponsor.getDefaultCountry();
-			String immigrantName = Person.generateName(country, gender);
-			// Use Builder Pattern for creating an instance of Person
-			Person immigrant = Person.create(immigrantName, settlement)
-					.setGender(gender)
-					.setCountry(country)
-					.setSponsor(sponsor)
-					.setSkill(null)
-					.setPersonality(null, null)
-					.setAttribute(null)
-					.build();
-			immigrant.initialize();
-			// Assign a job 
-			immigrant.getMind().getAJob(true, JobUtil.MISSION_CONTROL);
+		builder.createRobots(settlement, settlement.getRobots().size() + getNewBotNum());
+		
+		builder.createPeople(settlement, settlement.getNumCitizens() + getNewImmigrantNum(), true);
 
-			// Add preference
-			immigrant.getPreference().initializePreference();
-
-			unitManager.addUnit(immigrant);
-			
-			settlement.addACitizen(immigrant);
-			// Set the container unit
-			immigrant.setContainerUnit(settlement);
-			
-			immigrants.add(immigrant);
-
-			logger.config(immigrant, "Arrived on Mars");
-			// Add fireUnitUpdate()
-			settlement.fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_PERSON_EVENT, immigrant);
-		}
-
-		// Update command/governance and work shift schedules at settlement with new
-		// immigrants.
-		if (!immigrants.isEmpty()) {
-			// Reset command/government system at settlement.
-			settlement.getChainOfCommand().establishSettlementGovernance();
-		}
 	}
 
 	/**
 	 * Orders the new buildings with non-connector buildings first and connector
 	 * buildings last.
+	 * 
 	 * @param buildingConfig 
 	 * 
 	 * @return list of new buildings.
@@ -576,7 +406,7 @@ public class Resupply implements Serializable, Transportable {
 	private List<BuildingTemplate> orderNewBuildings(BuildingConfig buildingConfig) {
 		List<BuildingTemplate> result = new CopyOnWriteArrayList<>();
 		
-		List<BuildingTemplate> list = getNewBuildings().stream()
+		List<BuildingTemplate> list = getBuildings().stream()
 				.sorted(Comparator.comparing(bt -> bt.getID()))
 				.collect(Collectors.toList());
 		
@@ -703,10 +533,7 @@ public class Resupply implements Serializable, Transportable {
 			// until a location is found.
 			if (buildingManager.getNumBuildings() > 0) {
 				for (int x = BUILDING_CENTER_SEPARATION; newPosition == null; x = x + 2) {
-					List<Building> allBuildings = buildingManager.getACopyOfBuildings();
-
-					Collections.shuffle(allBuildings);
-					Iterator<Building> i = allBuildings.iterator();
+					Iterator<Building> i = buildingManager.getBuildingSet().iterator();
 					while (i.hasNext()) {
 						Building building = i.next();
 						newPosition = positionNextToBuilding(spec, building, (double) x, false);
@@ -1249,47 +1076,13 @@ public class Resupply implements Serializable, Transportable {
 		return result;
 	}
 
-	@Override
-	public String getName() {
-		return getSettlement().getName();
-	}
-
-	@Override
-	public Coordinates getLandingLocation() {
-		return getSettlement().getCoordinates();
-	}
-
-	@Override
-	public TransitState getTransitState() {
-		return state;
-	}
-
-	@Override
-	public void setTransitState(TransitState transitState) {
-		this.state = transitState;
-	}
-
-
-	@Override
-	public MarsClock getLaunchDate() {
-		return new MarsClock(launchDate);
-	}
-
-	/**
-	 * Sets the launch date of the resupply mission.
-	 * 
-	 * @param launchDate the launch date.
-	 */
-	public void setLaunchDate(MarsClock launchDate) {
-		this.launchDate = new MarsClock(launchDate);
-	}
-
 	/**
 	 * Gets a list of the resupply buildings.
 	 * 
 	 * @return list of building types.
 	 */
-	public List<BuildingTemplate> getNewBuildings() {
+	@Override
+	public List<BuildingTemplate> getBuildings() {
 		return newBuildings;
 	}
 
@@ -1298,7 +1091,7 @@ public class Resupply implements Serializable, Transportable {
 	 * 
 	 * @param newBuildings list of building types.
 	 */
-	public void setNewBuildings(List<BuildingTemplate> newBuildings) {
+	public void setBuildings(List<BuildingTemplate> newBuildings) {
 		this.newBuildings = newBuildings;
 	}
 
@@ -1307,7 +1100,8 @@ public class Resupply implements Serializable, Transportable {
 	 * 
 	 * @return list of vehicle types.
 	 */
-	public List<String> getNewVehicles() {
+	@Override
+	public Map<String, Integer> getVehicles() {
 		return newVehicles;
 	}
 
@@ -1316,7 +1110,7 @@ public class Resupply implements Serializable, Transportable {
 	 * 
 	 * @param newVehicles list of vehicle types.
 	 */
-	public void setNewVehicles(List<String> newVehicles) {
+	public void setVehicles(Map<String, Integer> newVehicles) {
 		this.newVehicles = newVehicles;
 	}
 
@@ -1325,7 +1119,8 @@ public class Resupply implements Serializable, Transportable {
 	 * 
 	 * @return map of equipment type and number.
 	 */
-	public Map<String, Integer> getNewEquipment() {
+	@Override
+	public Map<String, Integer> getEquipment() {
 		return newEquipment;
 	}
 
@@ -1334,7 +1129,7 @@ public class Resupply implements Serializable, Transportable {
 	 * 
 	 * @param newEquipment map of equipment type and number.
 	 */
-	public void setNewEquipment(Map<String, Integer> newEquipment) {
+	public void setEquipment(Map<String, Integer> newEquipment) {
 		this.newEquipment = newEquipment;
 	}
 
@@ -1380,7 +1175,8 @@ public class Resupply implements Serializable, Transportable {
 	 * 
 	 * @return map of resource and amount (kg).
 	 */
-	public Map<AmountResource, Double> getNewResources() {
+	@Override
+	public Map<AmountResource, Double> getResources() {
 		return newResources;
 	}
 
@@ -1389,7 +1185,7 @@ public class Resupply implements Serializable, Transportable {
 	 * 
 	 * @param newResources map of resource and amount (kg).
 	 */
-	public void setNewResources(Map<AmountResource, Double> newResources) {
+	public void setResources(Map<AmountResource, Double> newResources) {
 		this.newResources = newResources;
 	}
 
@@ -1398,7 +1194,8 @@ public class Resupply implements Serializable, Transportable {
 	 * 
 	 * @return map of part and number.
 	 */
-	public Map<Part, Integer> getNewParts() {
+	@Override
+	public Map<Part, Integer> getParts() {
 		return newParts;
 	}
 
@@ -1407,23 +1204,10 @@ public class Resupply implements Serializable, Transportable {
 	 * 
 	 * @param newParts map of part and number.
 	 */
-	public void setNewParts(Map<Part, Integer> newParts) {
+	public void setParts(Map<Part, Integer> newParts) {
 		this.newParts = newParts;
 	}
 
-	@Override
-	public MarsClock getArrivalDate() {
-		return new MarsClock(arrivalDate);
-	}
-
-	/**
-	 * Sets the arrival date of the resupply mission.
-	 * 
-	 * @param arrivalDate the arrival date.
-	 */
-	public void setArrivalDate(MarsClock arrivalDate) {
-		this.arrivalDate = new MarsClock(arrivalDate);
-	}
 
 	/**
 	 * Gets the destination settlement.
@@ -1462,42 +1246,9 @@ public class Resupply implements Serializable, Transportable {
 		return buff.toString();
 	}
 
-	@Override
-	public int compareTo(Transportable o) {
-		int result = 0;
-
-		double arrivalTimeDiff = MarsClock.getTimeDiff(arrivalDate, o.getArrivalDate());
-		if (arrivalTimeDiff < 0D) {
-			result = -1;
-		} else if (arrivalTimeDiff > 0D) {
-			result = 1;
-		} else {
-			// If arrival time is the same, compare by name alphabetically.
-			result = getName().compareTo(o.getName());
-		}
-
-		return result;
-	}
-
 
 	@Override
 	public String getSettlementName() {
 		return getSettlement().getName();
-	}
-		
-	@Override
-	public void destroy() {
-		launchDate = null;
-		arrivalDate = null;
-		newBuildings.clear();
-		newBuildings = null;
-		newVehicles.clear();
-		newVehicles = null;
-		newEquipment.clear();
-		newEquipment = null;
-		newResources.clear();
-		newResources = null;
-		newParts.clear();
-		newParts = null;
 	}
 }

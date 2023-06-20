@@ -9,17 +9,15 @@ package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
 import java.awt.BorderLayout;
 
+import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JTextField;
-import javax.swing.SpringLayout;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.structure.building.function.PowerStorage;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
-
-import com.alee.laf.panel.WebPanel;
+import org.mars_sim.msp.ui.swing.StyleManager;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
 /**
  * The PowerStorageBuildingPanel class is a building function panel representing 
@@ -29,12 +27,10 @@ import com.alee.laf.panel.WebPanel;
 public class BuildingPanelPowerStorage
 extends BuildingFunctionPanel {
 
-	private static final String ENERGY_ICON = Msg.getString("icon.energy"); //$NON-NLS-1$
-
-	private static final String kWh = " kWh";
+	private static final String ENERGY_ICON = "energy";
 	
-	private JTextField storedTF;
-	private JTextField capTF;
+	private JLabel storedTF;
+	private JLabel capTF;
 
 	private double capacityCache;
 	private double storedCache;
@@ -51,7 +47,7 @@ extends BuildingFunctionPanel {
 		// Use BuildingFunctionPanel constructor
 		super(
 			Msg.getString("BuildingPanelPowerStorage.title"), 
-			ImageLoader.getNewIcon(ENERGY_ICON), 
+			ImageLoader.getIconByName(ENERGY_ICON), 
 			storage.getBuilding(), 
 			desktop
 		);
@@ -65,23 +61,18 @@ extends BuildingFunctionPanel {
 	@Override
 	protected void buildUI(JPanel center) {
 
-		WebPanel springPanel = new WebPanel(new SpringLayout());
+		AttributePanel springPanel = new AttributePanel(2);
 		center.add(springPanel, BorderLayout.NORTH);
 		
 		// Create capacity label.
-		capacityCache = Math.round(storage.getCurrentMaxCapacity() *10.0)/10.0;;
-		capTF = addTextField(springPanel, Msg.getString("BuildingPanelPowerStorage.cap"),
-							 DECIMAL_PLACES1.format(capacityCache) + kWh, null);
+		capacityCache = storage.getCurrentMaxCapacity();
+		capTF = springPanel.addTextField(Msg.getString("BuildingPanelPowerStorage.cap"),
+							 StyleManager.DECIMAL_KWH.format(capacityCache), null);
 		
 		// Create stored label.
 		storedCache = storage.getkWattHourStored();
-		storedTF = addTextField(springPanel, Msg.getString("BuildingPanelPowerStorage.stored"),
-									DECIMAL_PLACES1.format(storedCache) + kWh, null);
-		
-		SpringUtilities.makeCompactGrid(springPanel,
-                2, 2, 			//rows, cols
-                INITX_DEFAULT, INITY_DEFAULT,        //initX, initY
-                XPAD_DEFAULT, YPAD_DEFAULT);       //xPad, yPad
+		storedTF = springPanel.addTextField(Msg.getString("BuildingPanelPowerStorage.stored"),
+									StyleManager.DECIMAL_KWH.format(storedCache), null);
 	}
 
 	@Override
@@ -91,14 +82,14 @@ extends BuildingFunctionPanel {
 		double newCapacity = storage.getCurrentMaxCapacity();
 		if (capacityCache != newCapacity) {
 			capacityCache = newCapacity;
-			capTF.setText(DECIMAL_PLACES1.format(capacityCache) + kWh);
+			capTF.setText(StyleManager.DECIMAL_KWH.format(capacityCache));
 		}
 
 		// Update stored label if necessary.
 		double newStored = storage.getkWattHourStored();
 		if (storedCache != newStored) {
 			storedCache = newStored;
-			storedTF.setText(DECIMAL_PLACES1.format(storedCache) + kWh);
+			storedTF.setText(StyleManager.DECIMAL_KWH.format(storedCache));
 		}    
 	}
 	

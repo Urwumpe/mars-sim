@@ -7,12 +7,14 @@
 
 package org.mars.sim.console.chat.simcommand;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
+
 import org.mars.sim.console.chat.ChatCommand;
 import org.mars.sim.console.chat.Conversation;
 import org.mars.sim.console.chat.ConversationRole;
-import org.mars_sim.msp.core.time.EarthClock;
-import org.mars_sim.msp.core.time.MarsClockFormat;
-import org.mars_sim.msp.core.time.MarsClock;
+import org.mars_sim.msp.core.time.MarsTime;
 import org.mars_sim.msp.core.time.MasterClock;
 
 /**
@@ -22,6 +24,7 @@ import org.mars_sim.msp.core.time.MasterClock;
 public class DateCommand extends ChatCommand {
 
 	public static final ChatCommand DATE = new DateCommand();
+	private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT);
 
 	private DateCommand() {
 		super(TopLevel.SIMULATION_GROUP, "d", "date", "What is the date?");
@@ -35,14 +38,12 @@ public class DateCommand extends ChatCommand {
 
 		StructuredResponse responseText = new StructuredResponse();
 		MasterClock clock = context.getSim().getMasterClock();
-		EarthClock earthClock = clock.getEarthClock();
-		MarsClock marsClock = clock.getMarsClock();
+		LocalDateTime earthClock = clock.getEarthTime();
+		MarsTime marsClock = clock.getMarsTime();
 
 		responseText.appendLabelledDigit("Mission Sol", marsClock.getMissionSol());
-		responseText.appendLabeledString("Mars Date", MarsClockFormat.getDateString(marsClock));
-		responseText.appendLabeledString("Mars Time", MarsClockFormat.getDecimalTimeString(marsClock));
-		responseText.appendLabeledString("Earth Date", earthClock.getDateStringF4());
-		responseText.appendLabeledString("Earth Time", earthClock.getTimeStringF0());
+		responseText.appendLabeledString("Mars Date", marsClock.getTruncatedDateTimeStamp());
+		responseText.appendLabeledString("Earth Date", earthClock.format(DATE_FORMAT));
 		responseText.appendLabeledString("Uptime", clock.getUpTimer().getUptime());
 
 		if (context.getRoles().contains(ConversationRole.ADMIN)) {

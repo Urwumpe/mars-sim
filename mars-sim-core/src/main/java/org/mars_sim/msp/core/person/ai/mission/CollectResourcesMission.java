@@ -15,9 +15,11 @@ import java.util.logging.Level;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Direction;
+import org.mars_sim.msp.core.environment.TerrainElevation;
 import org.mars_sim.msp.core.equipment.ContainerUtil;
+import org.mars_sim.msp.core.equipment.Equipment;
+import org.mars_sim.msp.core.equipment.EquipmentOwner;
 import org.mars_sim.msp.core.equipment.EquipmentType;
-import org.mars_sim.msp.core.equipment.ResourceHolder;
 import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.task.CollectResources;
@@ -74,6 +76,8 @@ public abstract class CollectResourcesMission extends EVAMission
 	/** The type of container needed for the mission or null if none. */
 	private EquipmentType containerID;
 
+	protected static TerrainElevation terrainElevation;
+	
 	/**
 	 * Constructor
 	 *
@@ -124,8 +128,8 @@ public abstract class CollectResourcesMission extends EVAMission
 			if (hasVehicle()) {
 				// Get the current location.
 				Coordinates startingLocation = s.getCoordinates();
-				double range = getVehicle().getRange(missionType);
-				double timeLimit = getTotalTripTimeLimit(getRover(), getMembers().size(), true);
+				double range = getVehicle().getRange();
+				double timeLimit = getRover().getTotalTripTimeLimit(true);
 
 				// Determining the actual traveling range.
 				double timeRange = getTripTimeRange(timeLimit, numSites, true);
@@ -256,13 +260,17 @@ public abstract class CollectResourcesMission extends EVAMission
 	 * @param inv
 	 * @return
 	 */
-	private double updateResources(ResourceHolder inv) {
+	private double updateResources(EquipmentOwner inv) {
 		double resourceCollected = 0;
 
 		// Get capacity for all collectible resources. The collectible
 		// resource at a site may be more than the single one specified.
 		for(int resourceId : getCollectibleResources()) {
 			double amount = inv.getAmountResourceStored(resourceId);
+			for(Equipment e : inv.getEquipmentSet()) {
+				amount += e.getAmountResourceStored(resourceId);
+			}
+
 			resourceCollected += amount;
 			collected.put(resourceId, amount);
 		}
@@ -424,7 +432,7 @@ public abstract class CollectResourcesMission extends EVAMission
 				}
 
 				totalSiteScore += bestScore;
-				logger.log(Level.INFO, getMissionType().getName() + " totalSiteScore: " + Math.round(totalSiteScore*1000.0)/1000.0
+				logger.log(Level.INFO, getName() + " totalSiteScore: " + Math.round(totalSiteScore*1000.0)/1000.0
 						+ "   bestScore: " + Math.round(bestScore*1000.0)/1000.0);
 				unorderedSites.add(bestLocation);
 				currentLocation = bestLocation;

@@ -34,10 +34,8 @@ import org.jfree.chart.plot.Plot;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.ui.TextAnchor;
-//import org.jfree.chart.renderer.category.BarRenderer3D;
 import org.jfree.data.category.CategoryDataset;
 import org.jfree.data.general.AbstractSeriesDataset;
-//import org.jfree.ui.TextAnchor;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 
@@ -51,6 +49,8 @@ extends MonitorTab {
 	private final static int LABELWIDTH = 15;//8;
 	/** Large non-scroll chart. */
 	private final static int SCROLLTHRESHOLD = 800; // 400
+
+	public static final String ICON = "bar";
 
 	/**
 	 * Minimum time (milliseconds) between chart updates
@@ -289,7 +289,7 @@ extends MonitorTab {
 	 * @param columns Indexes of columns to display.
 	 */
 	public BarChartTab(MonitorModel model, int []columns) {
-		super(model, false, false, ImageLoader.getNewIcon(MonitorWindow.BAR_ICON));
+		super(model, false, false, ImageLoader.getIconByName(ICON));
 
 		String title = model.getName();
 		setName(title);
@@ -453,16 +453,14 @@ extends MonitorTab {
 		}
 	}
 
-	protected List<?> getSelection() {
-		return new ArrayList<Object>();
-	}
-
 	/**
 	 * The tab has been removed.
 	 */
+	@Override
 	public void removeTab() {
 		chart = null;
 		barModel.setModel(null);
 		barModel = null;
+		super.removeTab();
 	}
 }

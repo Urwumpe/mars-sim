@@ -48,7 +48,7 @@ public class LoadingController implements Serializable {
 	private static final int[] BACKGROUND_RESOURCES = {
 			ResourceUtil.oxygenID,
 			ResourceUtil.waterID,
-			ResourceUtil.methaneID
+			ResourceUtil.methanolID
 	};
 
 	// Avoid transferring micro-small amount
@@ -73,6 +73,8 @@ public class LoadingController implements Serializable {
 
 	// The number of times a settlement can not have the resources
 	private int retryAttempts = MAX_SETTLEMENT_ATTEMPTS;
+
+	private boolean vehicleFull = false;
 
 	/**
 	 * Load a vehicle with a manifest from a Settlement
@@ -214,6 +216,16 @@ public class LoadingController implements Serializable {
 		// Should the load stop for this worker? Either fully loaded or did not
 		// use load amount (that means load couldn't complete it
 		boolean completed = isCompleted();
+		
+		// If not completed then check that the vehcile still has a capacity
+		if (!completed) {
+			vehicleFull = vehicle.getRemainingCargoCapacity() < 10D;
+			if (vehicleFull) {
+				completed = true;
+				logger.warning(vehicle, "Vehicle full so loading completed");
+			}
+		}
+
 		if (completed) {
 			// Can remove assume fuel is reloaded
 			vehicle.removeSecondaryStatus(StatusType.OUT_OF_FUEL);
@@ -525,7 +537,7 @@ public class LoadingController implements Serializable {
 		// Manifest is empty so complete
 		return (resourcesManifest.isEmpty() && equipmentManifest.isEmpty()
 				&& optionalResourcesManifest.isEmpty() && optionalEquipmentManifest.isEmpty())
-				|| (vehicle.getRemainingCargoCapacity() < 10D);
+				|| vehicleFull;
 	}
 
 	/**
@@ -553,7 +565,8 @@ public class LoadingController implements Serializable {
 	}
 
 	/**
-	 * Settlement providing the resoruces for the load.
+	 * Returns the settlement providing the resources for the load.
+	 * 
 	 * @return
 	 */
 	public Settlement getSettlement() {
@@ -561,7 +574,8 @@ public class LoadingController implements Serializable {
 	}
 
 	/**
-	 * Dump a description of the contents into a String representation.
+	 * Dumps a description of the contents into a String representation.
+	 * 
 	 * @return String description of contents.
 	 */
 	public String dumpContents() {

@@ -16,7 +16,6 @@ import java.util.stream.Collectors;
 
 import org.mars.sim.console.chat.Conversation;
 import org.mars_sim.msp.core.Coordinates;
-import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.equipment.EquipmentType;
 import org.mars_sim.msp.core.malfunction.Malfunction;
 import org.mars_sim.msp.core.malfunction.Malfunction.Repairer;
@@ -63,7 +62,7 @@ public class CommandHelper {
 	// Width of a Bot name
 	public static final int BOT_WIDTH = 19;
 	// Width of a truncated timestamp 
-	private static final int TIMESTAMP_TRUNCATED_WIDTH = 15;
+	public static final int TIMESTAMP_TRUNCATED_WIDTH = 15;
 	// Width of a Coordinate
 	public static final int COORDINATE_WIDTH = 24;
     public static final int GOOD_WIDTH = 30;
@@ -72,6 +71,7 @@ public class CommandHelper {
 	public static final String DOUBLE_FORMAT = "%.2f";
 	public static final String KG_FORMAT = "%.2f kg";
 	public static final String KM_FORMAT = "%.2f km";
+	public static final String KWH_FORMAT = "%.2f kWh";
 	public static final String PERC_FORMAT = "%.0f%%";
 	public static final String PERC1_FORMAT = "%.1f%%";
 	public static final String MILLISOL_FORMAT = "%.1f millisol";
@@ -85,7 +85,8 @@ public class CommandHelper {
 	}
 
 	/**
-	 * Prompt teh user to select an option from a list of choices
+	 * Prompts the user to select an option from a list of choices.
+	 * 
 	 * @param context
 	 * @param names
 	 * @param string
@@ -109,7 +110,8 @@ public class CommandHelper {
 	}
 	
 	/**
-	 * Display the status of a Scientific Study
+	 * Displays the status of a Scientific Study.
+	 * 
 	 * @param response
 	 * @param study
 	 */
@@ -158,7 +160,8 @@ public class CommandHelper {
 	}
 	
 	/**
-	 * Display a list of Collalorators
+	 * Displays a list of Collaborators.
+	 * 
 	 * @param response
 	 * @param study
 	 */
@@ -199,7 +202,8 @@ public class CommandHelper {
 	}
 
 	/**
-	 * Display the details of a list of Airlocks
+	 * Displays the details of a list of Airlocks.
+	 * 
 	 * @param response Output for details.
 	 * @param airlocks
 	 */
@@ -220,7 +224,8 @@ public class CommandHelper {
 	}
 	
 	/**
-	 * Display the details of a list of Airlocks
+	 * Displays the details of a list of Airlocks.
+	 * 
 	 * @param response Output for details.
 	 * @param airlocks
 	 */
@@ -261,7 +266,8 @@ public class CommandHelper {
 	}
 	
 	/**
-	 * This generates the details of a mission.
+	 * Generates the details of a mission.
+	 * 
 	 * @param response Output destination
 	 * @param mission Mission in question
 	 */
@@ -283,7 +289,8 @@ public class CommandHelper {
 	
 		if (v != null) {
 			response.appendLabeledString("Vehicle", v.getName());
-			response.appendLabeledString("Type", v.getVehicleTypeString());
+			response.appendLabeledString("Type", v.getVehicleType().getName());
+			response.appendLabeledString("Specification", v.getSpecName());
 			response.appendLabeledString("Est. Dist.", String.format(KM_FORMAT, dist));
 			response.appendLabeledString("Travelled", String.format(KM_FORMAT, trav));
 		}
@@ -318,21 +325,21 @@ public class CommandHelper {
 			response.appendNumberedList("Members", names);
 		
 			// Travel mission has a route
-			if (mission instanceof VehicleMission) {
-				VehicleMission tm = (VehicleMission) mission;
-				int navPoints = tm.getNumberOfNavpoints();
-				if ((navPoints > 0) && (tm.getNextNavpointIndex() >= 0)) {
+			if (mission instanceof VehicleMission tm) {
+				List<NavPoint> route = tm.getNavpoints();
+				if (!route.isEmpty()) {
 					response.appendText("Itinerary:");
 					response.appendTableHeading("Way Point", COORDINATE_WIDTH, "Distance", 10,
 										"Description");
-					for(int i = tm.getNextNavpointIndex(); i < navPoints; i++) {
-						NavPoint nv = tm.getNavpoint(i);
+					NavPoint currentNav = tm.getCurrentDestination();
+					for(NavPoint nv : route) {
 						String distance = String.format(KM_FORMAT, nv.getDistance());
+						String prefix = (nv.equals(currentNav) ? "* " : "");
 						if (nv.isSettlementAtNavpoint()) {
-							response.appendTableRow(nv.getSettlement().getName(), distance, "");
+							response.appendTableRow(prefix + nv.getSettlement().getName(), distance, "");
 						}
 						else {
-							response.appendTableRow(nv.getLocation().getCoordinateString(),
+							response.appendTableRow(nv.getLocation().getFormattedString(),
 									distance,
 									nv.getDescription());
 						}
@@ -355,10 +362,17 @@ public class CommandHelper {
 		response.appendText("Log:");
 		response.appendTableHeading("Time", TIMESTAMP_TRUNCATED_WIDTH, "Phase");
 		for (MissionLog.MissionLogEntry entry : mission.getLog().getEntries()) {
-			response.appendTableRow(entry.getTime(), entry.getEntry());
+			response.appendTableRow(MarsClockFormat.getTruncatedDateTimeStamp(entry.getTime()), entry.getEntry());
 		}
 	}
 
+	/**
+	 * Outputs the equipment in use.
+	 * 
+	 * @param title
+	 * @param response
+	 * @param manifest
+	 */
 	private static void outputEquipment(String title, StructuredResponse response,
 			Map<Integer, Integer> manifest) {
 		if (!manifest.isEmpty()) {
@@ -373,6 +387,13 @@ public class CommandHelper {
 		}
 	}
 
+	/**
+	 * Outputs the resources in use.
+	 * 
+	 * @param title
+	 * @param response
+	 * @param resourcesManifest
+	 */
 	private static void outputResources(String title, StructuredResponse response,
 			Map<Integer, Number> resourcesManifest) {
 		if (!resourcesManifest.isEmpty()) {
@@ -399,14 +420,15 @@ public class CommandHelper {
 	}
 
 	/**
-	 * Output the details of Malfunction
+	 * Outputs the details of Malfunction.
+	 * 
 	 * @param response Destination for output
 	 * @param source Source of the malfunction
 	 * @param m Malfunction to describe
 	 */
 	public static void outputMalfunction(StructuredResponse response, Malfunctionable source, Malfunction m) {
 		response.appendHeading(m.getName());
-		response.appendLabeledString(Msg.getString(source.getUnitType().getMsgKey()), source.getName());
+		response.appendLabeledString(source.getUnitType().getName(), source.getName());
 
 		response.appendLabelledDigit("Severity", m.getSeverity());
 		response.appendLabeledString("Fixed ", String.format(PERC_FORMAT, m.getPercentageFixed()));
@@ -455,7 +477,8 @@ public class CommandHelper {
 	}
 
 	/**
-	 * Get the a Coordinates from user input. 
+	 * Gets the coordinates from user input. 
+	 * 
 	 * @param desc A prompt for the user explaining the purpose
 	 * @param context COntext of the conversation
 	 */
@@ -503,7 +526,8 @@ public class CommandHelper {
 	}
 
 	/**
-	 * Output the processes that a Resource Processor is running. Put these in a table.
+	 * Outputs the processes that a Resource Processor is running. Put these in a table.
+	 * 
 	 * @param response Output destination
 	 * @param processType The name of the process type column
 	 * @param currentMSol The current mars time

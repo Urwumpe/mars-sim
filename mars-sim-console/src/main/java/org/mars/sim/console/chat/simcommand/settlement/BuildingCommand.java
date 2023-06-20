@@ -35,12 +35,12 @@ public class BuildingCommand extends AbstractSettlementCommand {
 		StructuredResponse response = new StructuredResponse();
 		
 		BuildingManager bm = settlement.getBuildingManager();
-		List<Building> i = new ArrayList<>(bm.getBuildings());
+		List<Building> i = new ArrayList<>(bm.getBuildingSet());
 		Collections.sort(i);
 		
 		response.appendTableHeading("Building", CommandHelper.BUILIDNG_WIDTH, "Category", 12, "Power", 10,
-									"Dem. (kwh)", "Heat %",
-									"Temp.", 6, "People", "Maint.");
+									"Dem.(kwh)", "Heat %",
+									"Temp.", 6, "Peo", "Maint.");
 		for (Building building : i) {
 			MalfunctionManager mm = building.getMalfunctionManager();
 
@@ -48,8 +48,8 @@ public class BuildingCommand extends AbstractSettlementCommand {
 									building.getFullPowerRequired(),
 									building.getHeatMode().getPercentage(), building.getCurrentTemperature(),
 									building.getNumPeople(),
-									String.format(MAINT_FORMAT, (mm.getEffectiveTimeSinceLastMaintenance()
-																- mm.getMaintenancePeriod())));
+									String.format(MAINT_FORMAT,
+												(mm.getMaintenancePeriod() - mm.getEffectiveTimeSinceLastMaintenance())/1000D));
 		}
 
 		context.println(response.getOutput());

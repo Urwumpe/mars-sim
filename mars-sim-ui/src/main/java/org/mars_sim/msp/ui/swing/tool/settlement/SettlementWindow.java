@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * SettlementWindow.java
- * @date 2021-12-06
+ * @date 2023-05-14
  * @author Lars Naesbye Christensen
  */
 
@@ -12,62 +12,66 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Point;
+import java.util.Properties;
 
+import javax.swing.BorderFactory;
+import javax.swing.JLabel;
 import javax.swing.JLayer;
+import javax.swing.JPanel;
 import javax.swing.WindowConstants;
 import javax.swing.plaf.LayerUI;
 
+import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.person.Person;
+import org.mars_sim.msp.core.person.ai.task.util.Worker;
+import org.mars_sim.msp.core.robot.Robot;
+import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.time.ClockPulse;
+import org.mars_sim.msp.core.vehicle.Vehicle;
+import org.mars_sim.msp.ui.swing.ConfigurableWindow;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.tool.JStatusBar;
 import org.mars_sim.msp.ui.swing.tool.SpotlightLayerUI;
 import org.mars_sim.msp.ui.swing.toolwindow.ToolWindow;
-
-import com.alee.extended.label.WebStyledLabel;
-import com.alee.extended.statusbar.WebStatusBar;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.managers.style.StyleId;
 
 /**
  * The SettlementWindow is a tool window that displays the Settlement Map Tool.
  */
 @SuppressWarnings("serial")
-public class SettlementWindow extends ToolWindow {
+public class SettlementWindow extends ToolWindow implements ConfigurableWindow {
 
 	// default logger.
 	// private static final Logger logger = Logger.getLogger(SettlementWindow.class.getName());
 
-	/** Tool name. */
+	private static final int HORIZONTAL = 800;
+	private static final int VERTICAL = 800;
+	private static final int HEIGHT_STATUS_BAR = 16;
+	private static final int LABEL_WIDTH = 220;
+	
 	public static final String NAME = Msg.getString("SettlementWindow.title"); //$NON-NLS-1$
+	public static final String ICON = "settlement_map";
 
-	public static String css_file = MainDesktopPane.BLUE_CSS;
+	private static final String POPULATION = "  Population : ";
+	private static final String WHITESPACES_2 = "  ";
+	private static final String CLOSE_PARENT = ")  ";
+	private static final String WITHIN_BLDG = "  Building : (";
+	private static final String SETTLEMENT_MAP = "  Map : (";
+	private static final String PIXEL_MAP = "  Window : (";
 
-	public static final String SOL = " Sol : ";
-	public static final String POPULATION = "  Population : ";
-	public static final String CAP = "  Capacity : ";
-	public static final String WHITESPACES_2 = "  ";
-	public static final String COMMA = ", ";
-	public static final String CLOSE_PARENT = ")  ";
-	public static final String WITHIN_BLDG = "  Building : (";
-	public static final String SETTLEMENT_MAP = "  Map : (";
-	public static final String PIXEL_MAP = "  Window : (";
-
-	public static final int HORIZONTAL = 800;// 630;
-	public static final int VERTICAL = 800;// 590;
-
-	private WebStyledLabel buildingXYLabel;
-	private WebStyledLabel mapXYLabel;
-	private WebStyledLabel pixelXYLabel;
-	private WebStyledLabel popLabel;
-	private WebPanel subPanel;
+	private JLabel buildingXYLabel;
+	private JLabel mapXYLabel;
+	private JLabel pixelXYLabel;
+	private JLabel popLabel;
+	private JPanel subPanel;
 
 	/** The status bar. */
-	private WebStatusBar statusBar;
+	private JStatusBar statusBar;
 	/** Map panel. */
 	private SettlementMapPanel mapPanel;
 
-	private Font sansSerif12Plain = new Font("SansSerif", Font.PLAIN, 12);
-	private Font sansSerif13Bold = new Font("SansSerif", Font.BOLD, 13);
+	private Font font0 = new Font("Times New Roman", Font.PLAIN, 12);
+	private Font font1= new Font("Times New Roman", Font.BOLD, 13);
 	
 	/**
 	 * Constructor.
@@ -82,63 +86,54 @@ public class SettlementWindow extends ToolWindow {
 
 		setBackground(Color.BLACK);
 
-		WebPanel mainPanel = new WebPanel(new BorderLayout());
+		JPanel mainPanel = new JPanel(new BorderLayout());
 		setContentPane(mainPanel);
 
 		// Creates the status bar for showing the x/y coordinates and population
-        statusBar = new WebStatusBar();
+        statusBar = new JStatusBar(1, 1, HEIGHT_STATUS_BAR);
+        statusBar.setBorder(BorderFactory.createEmptyBorder(1, 0, 0, 0));
         mainPanel.add(statusBar, BorderLayout.SOUTH);
 
-        popLabel = new WebStyledLabel(StyleId.styledlabelShadow);
-        popLabel.setFont(sansSerif13Bold);
+        popLabel = new JLabel();
+        popLabel.setBorder(BorderFactory.createEmptyBorder(1, 0, 0, 0));
+        popLabel.setFont(font1);
         popLabel.setForeground(Color.DARK_GRAY);
-	    buildingXYLabel = new WebStyledLabel(StyleId.styledlabelShadow);
-	    buildingXYLabel.setFont(sansSerif12Plain);
+        popLabel.setPreferredSize(new Dimension(160, HEIGHT_STATUS_BAR));
+        
+	    buildingXYLabel = new JLabel();
+	    buildingXYLabel.setBorder(BorderFactory.createEmptyBorder(1, 0, 0, 0));
+	    buildingXYLabel.setFont(font0);
 	    buildingXYLabel.setForeground(Color.GREEN.darker().darker().darker());
-	    mapXYLabel = new WebStyledLabel(StyleId.styledlabelShadow);
-	    mapXYLabel.setFont(sansSerif12Plain);
-	    mapXYLabel.setForeground(Color.ORANGE.darker());
-	    pixelXYLabel = new WebStyledLabel(StyleId.styledlabelShadow);
-	    pixelXYLabel.setFont(sansSerif12Plain);
+	    buildingXYLabel.setPreferredSize(new Dimension(LABEL_WIDTH, HEIGHT_STATUS_BAR));
+      	    
+	    pixelXYLabel = new JLabel();
+	    pixelXYLabel.setBorder(BorderFactory.createEmptyBorder(1, 0, 0, 0));
+	    pixelXYLabel.setFont(font0);
 	    pixelXYLabel.setForeground(Color.GRAY);
-
-	    WebPanel emptyPanel = new WebPanel();
-	    emptyPanel.setPreferredSize(new Dimension(145, 20));
-	    emptyPanel.add(new WebLabel(""));
-
-	    WebPanel w0 = new WebPanel();
-	    w0.setPreferredSize(new Dimension(125, 20));
-	    w0.add(pixelXYLabel);
-
-	    WebPanel w1 = new WebPanel();
-	    w1.setPreferredSize(new Dimension(115, 20));
-	    w1.add(popLabel);
-
-	    WebPanel w2 = new WebPanel();
-	    w2.setPreferredSize(new Dimension(145, 20));
-	    w2.add(buildingXYLabel);
-
-	    WebPanel w3 = new WebPanel();
-	    w3.setPreferredSize(new Dimension(135, 20));
-	    w3.add(mapXYLabel);
-
-        statusBar.add(w0);
-        statusBar.add(emptyPanel);
-        statusBar.addToMiddle(w1);
-        statusBar.addToEnd(w2);
-        statusBar.addToEnd(w3);
-
+	    pixelXYLabel.setPreferredSize(new Dimension(LABEL_WIDTH, HEIGHT_STATUS_BAR));
+	    
+	    mapXYLabel = new JLabel();
+	    mapXYLabel.setBorder(BorderFactory.createEmptyBorder(1, 0, 0, 0));
+	    mapXYLabel.setFont(font0);
+	    mapXYLabel.setForeground(Color.ORANGE.darker().darker());
+	    mapXYLabel.setPreferredSize(new Dimension(145, HEIGHT_STATUS_BAR));
+	    
+        statusBar.addLeftComponent(popLabel, false);
+        statusBar.addCenterComponent(buildingXYLabel, false);
+        statusBar.addRightComponent(pixelXYLabel, false);
+        statusBar.addRightComponent(mapXYLabel, false);
+        
         // Create subPanel for housing the settlement map
-		subPanel = new WebPanel(new BorderLayout());
+		subPanel = new JPanel(new BorderLayout());
 		mainPanel.add(subPanel, BorderLayout.CENTER);
 		subPanel.setBackground(Color.BLACK);
 
-		mapPanel = new SettlementMapPanel(desktop, this);
+		mapPanel = new SettlementMapPanel(desktop, this, desktop.getMainWindow().getConfig().getInternalWindowProps(NAME));
 		mapPanel.createUI();
 
 		// Added SpotlightLayerUI
-		LayerUI<WebPanel> layerUI = new SpotlightLayerUI(mapPanel);
-		JLayer<WebPanel> jlayer = new JLayer<WebPanel>(mapPanel, layerUI);
+		LayerUI<JPanel> layerUI = new SpotlightLayerUI(mapPanel);
+		JLayer<JPanel> jlayer = new JLayer<JPanel>(mapPanel, layerUI);
 		subPanel.add(jlayer, BorderLayout.CENTER);
 
 		setSize(new Dimension(HORIZONTAL, VERTICAL));
@@ -151,21 +146,12 @@ public class SettlementWindow extends ToolWindow {
 		setVisible(true);
 	}
 
-	/**
-	 * Gets the settlement map panel.
-	 *
-	 * @return the settlement map panel.
-	 */
-	public SettlementMapPanel getMapPanel() {
-		return mapPanel;
-	}
-
-	public String format0(double x, double y) {
+	private String format0(double x, double y) {
 //		return String.format("%6.2f,%6.2f", x, y);
 		return Math.round(x*100.00)/100.00 + ", " + Math.round(y*100.00)/100.00;
 	}
 
-	public String format1(double x, double y) {
+	private String format1(double x, double y) {
 //		return String.format("%6.2f,%6.2f", x, y);
 		return (int)x + ", " + (int)y;
 	}
@@ -177,7 +163,7 @@ public class SettlementWindow extends ToolWindow {
 	 * @param y
 	 * @param blank
 	 */
-	public void setBuildingXYCoord(double x, double y, boolean blank) {
+	void setBuildingXYCoord(double x, double y, boolean blank) {
 		if (blank) {
 			buildingXYLabel.setText("");
 		}
@@ -194,7 +180,7 @@ public class SettlementWindow extends ToolWindow {
 	 * @param point
 	 * @param blank
 	 */
-	public void setPixelXYCoord(double x, double y, boolean blank) {
+	void setPixelXYCoord(double x, double y, boolean blank) {
 		if (blank) {
 			pixelXYLabel.setText("");
 		}
@@ -211,7 +197,7 @@ public class SettlementWindow extends ToolWindow {
 	 * @param point
 	 * @param blank
 	 */
-	public void setMapXYCoord(Point.Double point, boolean blank) {
+	void setMapXYCoord(Point.Double point, boolean blank) {
 		if (blank) {
 			mapXYLabel.setText("");
 		}
@@ -231,6 +217,16 @@ public class SettlementWindow extends ToolWindow {
         popLabel.setText(POPULATION + pop + WHITESPACES_2);
 	}
 
+	/**
+	 * Update this tool based on a change of time
+	 * @param pulse Clock pulse
+	 */
+	@Override
+	public void update(ClockPulse pulse) {
+		mapPanel.update(pulse);
+	}
+
+
 	@Override
 	public void destroy() {
 		buildingXYLabel = null;
@@ -242,6 +238,101 @@ public class SettlementWindow extends ToolWindow {
 		mapPanel = null;
 		desktop = null;
 
+	}
+
+	/**
+	 * Center the map panel on a position in a Settlement.
+	 * @param settlement To display
+	 * @parma position Location position within the set
+	 */
+	private void refocusMap(Settlement settlement, LocalPosition position) {
+		// Surely this should be simpler ?
+		mapPanel.getSettlementTransparentPanel().getSettlementListBox().setSelectedItem(settlement);
+
+		double xLoc = position.getX();
+		double yLoc = position.getY();
+		double scale = mapPanel.getScale();
+		mapPanel.reCenter();
+		mapPanel.moveCenter(xLoc * scale, yLoc * scale);
+	}
+
+	/**
+	 * Dispay a Vehicle in the appropirate Settlement map. The map will be switched to 
+	 * the appropriate Settlement and focused on the Vehicle. The Vehicle labels will be enabled.
+	 * @param vv Vehicle to display
+	 */
+    public void displayVehicle(Vehicle vv) {
+		if (vv.isInSettlement()) {
+			refocusMap(vv.getSettlement(), vv.getPosition());
+			mapPanel.setShowVehicleLabels(true);
+		}
+    }
+
+	/**
+	 * Display a worker in the settlement map. This caters for the Worker
+	 * 1. In a Building
+	 * 2. In a Vehicle
+	 * 3. Outsid edoing a local EVA
+	 * @param w Worker to display
+	 */
+	private boolean displayWorker(Worker w) {
+		Settlement home = null;
+		LocalPosition p = null;
+		if (w.isInSettlement()) {
+			home = w.getSettlement();
+			p = w.getBuildingLocation().getPosition();
+		}
+		else if (w.isInVehicle()) {
+			Vehicle v = w.getVehicle();
+			home = v.getSettlement();
+			p = v.getPosition();
+		}
+		else if (w.isOutside()) {
+			home = w.getSettlement();
+			p = w.getPosition();
+		}
+		else {
+			return false;
+		}
+
+		refocusMap(home, p);
+		return true;
+	}
+
+	/**
+	 * Dispay a Robot in the appropirate Settlement map. The map will be switched to 
+	 * the appropriate Settlement and focused on the Robot. The Robot labels will be enabled.
+	 * @param t Robot to display
+	 */
+    public void displayRobot(Robot r) {
+		if (displayWorker(r)) {
+			mapPanel.setShowRobotLabels(true);
+
+			if (mapPanel.getSelectedRobot() != null && mapPanel.getSelectedRobot() != r)
+				mapPanel.selectRobot(r);
+		}
+    }
+
+	/**
+	 * Dispay a Person in the appropirate Settlement map. The map will be switched to 
+	 * the appropriate Settlement and focused on the Person. The Person labels will be enabled.
+	 * @param p Person to display
+	 */
+    public void displayPerson(Person p) {
+		if (displayWorker(p)) {
+			mapPanel.setShowPersonLabels(true);
+
+			if (mapPanel.getSelectedPerson() != null && mapPanel.getSelectedPerson() != p)
+				mapPanel.selectPerson(p);
+		}
+    }
+
+	/**
+	 * Get the current user configured properties
+	 */
+	@Override
+	public Properties getUIProps() {
+		return mapPanel.getUIProps();
 	}
 
 }

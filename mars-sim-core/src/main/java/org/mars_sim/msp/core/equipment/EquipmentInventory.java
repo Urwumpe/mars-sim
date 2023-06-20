@@ -9,13 +9,13 @@ package org.mars_sim.msp.core.equipment;
 
 import java.io.Serializable;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.data.UnitSet;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 
@@ -47,7 +47,7 @@ public class EquipmentInventory
 
 		this.owner = owner;
 		this.cargoCapacity = cargoCapacity;
-
+	
 		// Create equipment set
 		equipmentSet = new UnitSet<>();
 
@@ -96,9 +96,10 @@ public class EquipmentInventory
 	 */
 	@Override
 	public Set<Equipment> getEquipmentSet() {
-//		if (equipmentSet == null)
-//			equipmentSet = new UnitSet<>();
-		return Collections.unmodifiableSet(equipmentSet);
+		if (equipmentSet == null)
+			equipmentSet = new UnitSet<>();
+		return equipmentSet;
+//		return Collections.unmodifiableSet(equipmentSet);
 	}
 
 	/**
@@ -110,7 +111,7 @@ public class EquipmentInventory
 	public Collection<Container> findAllContainers() {
 		Collection<Container> result = new HashSet<>();
 		for (Equipment e : equipmentSet) {
-			if (e != null && e instanceof Container) {
+			if (e != null && e.getUnitType() == UnitType.CONTAINER) {
 				result.add((Container)e);
 			}
 		}
@@ -276,7 +277,7 @@ public class EquipmentInventory
 	public int getItemResourceStored(int resource) {
 		return microInventory.getItemResourceStored(resource);
 	}
-
+	
 	/**
 	 * Gets the capacity of a particular amount resource.
 	 *
@@ -384,19 +385,27 @@ public class EquipmentInventory
 	 */
 	@Override
 	public double getAmountResourceStored(int resource) {
-		double result = 0;
-
-		// Do not consume resources from container Equipment. THis is an expensive
-		// and can generate concurrency issues
-		// for(Equipment e: equipmentSet) {
-		// 	if (e instanceof ResourceHolder) {
-		// 		result += e.getAmountResourceStored(resource);
-		// 	}
-		// }
-
-		return result + microInventory.getAmountResourceStored(resource);
+		return microInventory.getAmountResourceStored(resource);
 	}
 
+	/**
+	 * Gets all the amount resource resource stored, including inside equipment.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAllAmountResourceStored(int resource) {
+		double result = 0;
+		// Do not consume resources from container Equipment. THis is an expensive
+		// and can generate concurrency issues
+		for (Equipment e: equipmentSet) {
+//			if (e instanceof ResourceHolder) {
+		 		result += e.getAmountResourceStored(resource);
+//		 	}
+		 }
+		return result + getAmountResourceStored(resource);
+	}
 
 	/**
 	 * Finds the number of empty containers of a particular equipment.
@@ -453,7 +462,7 @@ public class EquipmentInventory
 	 * @param containerType
 	 * @param empty does it need to be empty ?
 	 * @param resource If -1 then resource doesn't matter
-	 * @retu,rn instance of container or null if none.
+	 * @return instance of container or null if none.
 	 */
 	public Container findOwnedContainer(EquipmentType containerType, int personId, int resource) {
 		for (Equipment e : equipmentSet) {
@@ -497,16 +506,22 @@ public class EquipmentInventory
 	@Override
 	public Set<Integer> getAmountResourceIDs() {
 		return microInventory.getResourcesStored();
-		// Set<Integer> set = new HashSet<>(microInventory.getResourcesStored());
-		// for (Equipment e: equipmentSet) {
-		// 	if (e instanceof ResourceHolder) {
-		// 		set.addAll(((ResourceHolder) e).getAmountResourceIDs());
-		// 	}
-		// }
-
-		// return set;
 	}
 
+	/**
+	 * Gets all stored amount resources.
+	 *
+	 * @return all stored amount resources.
+	 */
+	public Set<Integer> getAllAmountResourceIDs() {
+		Set<Integer> set = new HashSet<>(getAmountResourceIDs());
+		for (Equipment e: equipmentSet) {
+			if (e instanceof ResourceHolder) {
+				set.addAll(((ResourceHolder) e).getAmountResourceIDs());
+			}
+		}
+		return set;
+	}
 
 	/**
 	 * Is this unit empty ?

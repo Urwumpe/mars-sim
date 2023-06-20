@@ -1,17 +1,23 @@
 /*
  * Mars Simulation Project
  * Person.java
- * @date 2022-07-19
+ * @date 2023-05-09
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.core.person;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -46,8 +52,8 @@ import org.mars_sim.msp.core.person.ai.SkillManager;
 import org.mars_sim.msp.core.person.ai.fav.Favorite;
 import org.mars_sim.msp.core.person.ai.fav.FavoriteType;
 import org.mars_sim.msp.core.person.ai.fav.Preference;
-import org.mars_sim.msp.core.person.ai.job.util.JobAssignmentType;
-import org.mars_sim.msp.core.person.ai.job.util.JobHistory;
+import org.mars_sim.msp.core.person.ai.job.util.AssignmentType;
+import org.mars_sim.msp.core.person.ai.job.util.AssignmentHistory;
 import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.job.util.JobUtil;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
@@ -73,7 +79,6 @@ import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.time.ClockPulse;
-import org.mars_sim.msp.core.time.EarthClock;
 import org.mars_sim.msp.core.time.Temporal;
 import org.mars_sim.msp.core.tool.RandomUtil;
 import org.mars_sim.msp.core.vehicle.Crewable;
@@ -85,14 +90,18 @@ import org.mars_sim.msp.core.vehicle.VehicleType;
  * The Person class represents a person on Mars. It keeps track of everything
  * related to that person and provides information about him/her.
  */
-public class Person extends Unit implements Worker, Temporal, EquipmentOwner, ResearcherInterface {
+public class Person extends Unit implements Worker, Temporal, ResearcherInterface {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 	/** default logger. */
 	private static final SimLogger logger = SimLogger.getLogger(Person.class.getName());
+	
 	/** The maximum number of sols for storing stats. */
 	public static final int MAX_NUM_SOLS = 7;
+	/** The standard hand carrying capacity for food in a person. */
+	public static final int CARRYING_CAPACITY_FOOD = 1;
+	
 	/** A small amount. */
 	private static final double SMALL_AMOUNT = 0.00001;
 
@@ -128,12 +137,8 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	/** True if the person is declared dead. */
 	private boolean declaredDead;
 
-	/** The year of birth of a person */
-	private int year;
-	/** The month of birth of a person */
-	private int month;
-	/** The day of birth of a person */
-	private int day;
+	/** The birth of a person */
+	private LocalDate birthDate;
 	/** The age of a person */
 	private int age = -1;
 	/** The quarters that the person belongs. */
@@ -153,7 +158,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	private Integer buriedSettlement = Integer.valueOf(-1);
 
 	/** The eating speed of the person [kg/millisol]. */
-	private double eatingSpeed = .1 + RandomUtil.getRandomDouble(-.05, .05);
+	private double eatingSpeed = .5 + RandomUtil.getRandomDouble(-.05, .05);
 	/** The height of the person (in cm). */
 	private double height;
 	/** The height of the person (in kg). */
@@ -186,7 +191,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	/** Person's Favorite instance. */
 	private Favorite favorite;
 	/** Person's JobHistory instance. */
-	private JobHistory jobHistory;
+	private AssignmentHistory jobHistory;
 	/** Person's Role instance. */
 	private Role role;
 	/** Person's Preference instance. */
@@ -252,7 +257,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 		setContainerUnit(settlement);
 
 		// Add to a random building
-		BuildingManager.addPersonToRandomBuilding(this, associatedSettlementID);
+		BuildingManager.addPersonToRandomBuilding(this, settlement);
 		// Create PersonAttributeManager instance
 		attributes = new PersonAttributeManager();
 	}
@@ -308,6 +313,16 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	public void initializeForMaven() {
 		// Construct the EquipmentInventory instance.
 		eqmInventory = new EquipmentInventory(this, carryingCapacity);
+		// Create favorites
+		favorite = new Favorite(this);
+		// Create preferences
+		preference = new Preference(this);
+		
+		setupChromosomeMap();
+
+		eqmInventory.addCargoCapacity(carryingCapacity);
+		
+		eqmInventory.setResourceCapacity(ResourceUtil.foodID, CARRYING_CAPACITY_FOOD);
 	}
 	
 	/**
@@ -318,9 +333,9 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 		// Reloading from a saved sim
 		
 		// Add to a random building
-		BuildingManager.addPersonToRandomBuilding(this, associatedSettlementID);
+		BuildingManager.addPersonToRandomBuilding(this, getAssociatedSettlement());
 		// Set up the time stamp for the person
-		calculateBirthDate(earthClock);
+		calculateBirthDate(masterClock.getEarthTime());
 		// Create favorites
 		favorite = new Favorite(this);
 		// Create preferences
@@ -334,7 +349,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 		// Initialize field data in circadian clock
 		circadian.initialize();
 		// Create job history
-		jobHistory = new JobHistory();
+		jobHistory = new AssignmentHistory();
 		// Create the role
 		role = new Role(this);
 		// Create shift schedule
@@ -349,6 +364,10 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 		collabStudies = new HashSet<>();
 		// Construct the EquipmentInventory instance.
 		eqmInventory = new EquipmentInventory(this, carryingCapacity);
+		
+//		eqmInventory.addCargoCapacity(carryingCapacity);
+		
+		eqmInventory.setResourceCapacity(ResourceUtil.foodID, .6);
 	}
 
 	/**
@@ -370,15 +389,15 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 			setupHeight();
 			// Set up Weight
 			setupWeight();
-			// Set up personality traits: id 40 - 59
-			setupAttributeTrait();
+			// Set up carrying capacity and personality traits: id 40 - 59
+			setupCarryingCapAttributeTrait();
 		}
 	}
 
 	/**
-	 * Computes a person's attributes and its chromosome.
+	 * Computes a person's carrying capacity and attributes and its chromosome.
 	 */
-	private void setupAttributeTrait() {
+	private void setupCarryingCapAttributeTrait() {
 		// Note: set up a set of genes that was passed onto this person
 		// from two hypothetical parents
 		int id = 40;
@@ -425,7 +444,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 		// Set inventory total mass capacity based on the person's weight and strength.
 		carryingCapacity = Math.max(2, (int)(gym + load + Math.max(20, weight/6.0) + (strength - 50)/1.5 + (endurance - 50)/2.0
 				+ RandomUtil.getRandomRegressionInteger(10)));
-
+		
 		int score = mind.getMBTI().getIntrovertExtrovertScore();
 
 		Gene trait1G = new Gene(this, id, "Trait 1", true, dominant, "Introvert", score);
@@ -615,7 +634,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 		// In case of the role of the Mayor, his job must be set to Politician instead.
 		if (type == RoleType.MAYOR) {
 			// Set the job as Politician
-			mind.assignJob(JobType.POLITICIAN, true, JobUtil.SETTLEMENT, JobAssignmentType.APPROVED, JobUtil.SETTLEMENT);
+			mind.assignJob(JobType.POLITICIAN, true, JobUtil.SETTLEMENT, AssignmentType.APPROVED, JobUtil.SETTLEMENT);
 		}
 	}
 
@@ -626,7 +645,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	 * @param authority
 	 */
 	public void setJob(JobType job, String authority) {
-		mind.assignJob(job, true, JobUtil.SETTLEMENT, JobAssignmentType.APPROVED, authority);
+		mind.assignJob(job, true, JobUtil.SETTLEMENT, AssignmentType.APPROVED, authority);
 	}
 
 	/**
@@ -639,7 +658,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	/**
 	 * Gets the instance of JobHistory for a person.
 	 */
-	public JobHistory getJobHistory() {
+	public AssignmentHistory getJobHistory() {
 		return jobHistory;
 	}
 
@@ -664,52 +683,20 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 		return shiftSlot.getStatus() == WorkStatus.ON_DUTY;
 	}
 
-	/**
-	 * Gets the instance of the task schedule for a person.
-	 */
-	// public TaskSchedule getTaskSchedule() {
-	// 	return taskSchedule;
-	// }
 
 	/**
 	 * Creates a string representing the birth time of the person.
 	 * @param clock
 	 *
 	 */
-	private void calculateBirthDate(EarthClock clock) {
-		// Set a birth time for the person
-		if (age != -1) {
-			year = EarthClock.getCurrentYear(earthClock) - age - 1;
-		}
-		else {
-			year = EarthClock.getCurrentYear(earthClock) - RandomUtil.getRandomInt(21, 65);
-		}
-
-		month = RandomUtil.getRandomInt(11) + 1;
-
-		if (month == 2) {
-			if (((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0)) {
-				day = RandomUtil.getRandomInt(28) + 1;
-			} else {
-				day = RandomUtil.getRandomInt(27) + 1;
-			}
-		}
-
-		else if (month == 1 || month == 3 || month == 5 || month == 7 || month == 8 || month == 10 || month == 12) {
-			day = RandomUtil.getRandomInt(30) + 1;
-		} else {
-			day = RandomUtil.getRandomInt(29) + 1;
-		}
-
-		// Note: find out why sometimes day = 0 as seen on
-		if (day == 0) {
-			logger.warning(this, "Date of birth is on the day 0th. Incrementing to the 1st.");
-			day = 1;
-		}
+	private void calculateBirthDate(LocalDateTime earthLocalTime) {
+		// Remove a random number of days from the current earth date
+		int daysPast = RandomUtil.getRandomInt(21*365, 65*365);
+		birthDate = earthLocalTime.minusDays(daysPast).toLocalDate();
 
 		// Calculate the year
 		// Set the age
-		age = updateAge(clock);
+		age = updateAge(earthLocalTime);
 	}
 
 	/**
@@ -777,7 +764,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	@Override
 	public Settlement getSettlement() {
 
-		if (getContainerID() == Unit.MARS_SURFACE_UNIT_ID)
+		if (getContainerID() <= Unit.MARS_SURFACE_UNIT_ID)
 			return null;
 
 		Unit c = getContainerUnit();
@@ -912,7 +899,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 						}
 
 						// Check if a person's age should be updated
-						age = updateAge(pulse.getEarthTime());
+						age = updateAge(pulse.getMasterClock().getEarthTime());
 
 						// Checks if a person has a role
 						if (role.getType() == null)
@@ -993,12 +980,8 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	 *
 	 * @return the person's age
 	 */
-	private int updateAge(EarthClock clock) {
-		int newage = clock.getYear() - year - 1;
-		if (clock.getMonth() >= month)
-			if (clock.getDayOfMonth() >= day)
-				newage++;
-		age = newage;
+	private int updateAge(LocalDateTime localDateTime) {
+		age = (int)ChronoUnit.YEARS.between(birthDate, localDateTime);
 		return age;
 	}
 
@@ -1009,9 +992,9 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	 */
 	public void changeAge(int newAge) {
 		// Back calculate a person's year
-		int y = earthClock.getYear() - newAge - 1;
+		int offset = age - newAge;
 		// Set year to newYear
-		year = y;
+		birthDate = LocalDate.of(birthDate.getYear() + offset, birthDate.getMonth(), birthDate.getDayOfMonth());
 		age = newAge;
 	}
 
@@ -1021,18 +1004,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	 * @return the person's birth date
 	 */
 	public String getBirthDate() {
-		StringBuilder s = new StringBuilder();
-		s.append(year).append("-");
-		if (month < 10)
-			s.append("0").append(month).append("-");
-		else
-			s.append(month).append("-");
-		if (day < 10)
-			s.append("0").append(day);
-		else
-			s.append(day);
-
-		return s.toString();
+		return birthDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT));
 	}
 
 	/**
@@ -1286,25 +1258,6 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 		scientificAchievement.put(science, achievementCredit);
 	}
 
-	/**
-	 * Checks if one of the adjacent buildings has a certain function type.
-	 *
-	 * @param type
-	 * @return
-	 */
-	 public boolean isAdjacentBuilding(FunctionType type) {
-	 	Settlement s = getSettlement();
-	 	if (s != null) {
-	 		Building b = getBuildingLocation();
-
-	 		List<Building> list = s.createAdjacentBuildings(b);
-	 		for (Building bb : list) {
-	 			if (bb.hasFunction(type))
-	 				return true;
-	 		}
-	 	}
-	 	return false;
-	 }
 
 	/**
 	 * Computes the building the person is currently located at.
@@ -1335,7 +1288,10 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	}
 
 	public Settlement findSettlementVicinity() {
-		return getLocationTag().findSettlementVicinity();
+		if (isRightOutsideSettlement())
+			return getLocationTag().findSettlementVicinity();
+		else
+			return null;
 	}
 
 	@Override
@@ -1742,6 +1698,10 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 		return eqmInventory.getEquipmentSet();
 	}
 
+	public EquipmentInventory getEquipmentInventory() {
+		return eqmInventory;
+	}
+	
 	/**
 	 * Finds all of the containers (excluding EVA suit).
 	 *
@@ -1782,7 +1742,6 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	@Override
 	public boolean addEquipment(Equipment e) {
 		if (eqmInventory.addEquipment(e)) {
-			e.setCoordinates(getCoordinates());
 			e.setContainerUnit(this);
 			fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_EQUIPMENT_EVENT, this);
 			return true;
@@ -1914,13 +1873,34 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	}
 
 	/**
-	 * Gets all stored amount resources.
+	 * Gets all the amount resource resource stored, including inside equipment.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAllAmountResourceStored(int resource) {
+		return eqmInventory.getAllAmountResourceStored(resource);
+	}
+	
+	/**
+	 * Gets all stored amount resources in eqmInventory.
 	 *
 	 * @return all stored amount resources.
 	 */
 	@Override
 	public Set<Integer> getAmountResourceIDs() {
 		return eqmInventory.getAmountResourceIDs();
+	}
+	
+	/**
+	 * Gets all stored amount resources in eqmInventory, including inside equipment
+	 *
+	 * @return all stored amount resources.
+	 */
+	@Override
+	public Set<Integer> getAllAmountResourceIDs() {
+		return eqmInventory.getAllAmountResourceIDs();
 	}
 
 	/**
@@ -2022,11 +2002,20 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 				return;
 			}
 			// 1. Set Coordinates
-			setCoordinates(newContainer.getCoordinates());
-			// 2. Set LocationStateType
+			if (newContainer.getUnitType() == UnitType.MARS) {
+				// Since it's on the surface of Mars,
+				// First set its initial location to its old parent's location as it's leaving its parent.
+				// Later it may move around and updates its coordinates by itself
+				setCoordinates(getContainerUnit().getCoordinates());
+			}
+			else {
+				// Null its coordinates since it's now slaved after its parent
+				setNullCoordinates();
+			}
+			// 2. Set new LocationStateType
 			updatePersonState(newContainer);
 			// 3. Set containerID
-			// Q: what to set for a deceased person ?
+			// TODO: what to set for a deceased person ?
 			setContainerID(newContainer.getIdentifier());
 			// 4. Fire the container unit event
 			fireUnitUpdate(UnitEventType.CONTAINER_UNIT_EVENT, newContainer);
@@ -2071,7 +2060,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 		if (newContainer.getUnitType() == UnitType.PERSON)
 			return LocationStateType.ON_PERSON_OR_ROBOT;
 
-		if (newContainer.getUnitType() == UnitType.PLANET)
+		if (newContainer.getUnitType() == UnitType.MARS)
 			return LocationStateType.MARS_SURFACE;
 
 		return null;
@@ -2085,7 +2074,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	@Override
 	public boolean isInSettlement() {
 
-		if (containerID == MARS_SURFACE_UNIT_ID)
+		if (containerID <= MARS_SURFACE_UNIT_ID)
 			return false;
 
 		if (LocationStateType.INSIDE_SETTLEMENT == currentStateType)
@@ -2118,7 +2107,7 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 				logger.warning(this + "Not possible to be retrieved from " + cu + ".");
 			}
 		}
-		else if (ut == UnitType.PLANET) {
+		else if (ut == UnitType.MARS) {
 			transferred = ((MarsSurface)cu).removePerson(this);
 		}
 		else if (ut == UnitType.BUILDING) {
@@ -2137,14 +2126,14 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 		if (transferred) {
 			// Check if the destination is a vehicle
 			if (destination.getUnitType() == UnitType.VEHICLE) {
-				if (((Vehicle)destination).getVehicleType() != VehicleType.DELIVERY_DRONE) {
-					transferred = ((Crewable)destination).addPerson(this);
+				if (destination instanceof Crewable cr) {
+					transferred = cr.addPerson(this);
 				}
 				else {
 					logger.warning(this + "Not possible to be stored into " + cu + ".");
 				}
 			}
-			else if (destination.getUnitType() == UnitType.PLANET) {
+			else if (destination.getUnitType() == UnitType.MARS) {
 				transferred = ((MarsSurface)destination).addPerson(this);
 			}
 			else if (destination.getUnitType() == UnitType.SETTLEMENT) {
@@ -2164,8 +2153,8 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 				setContainerUnit(destination);
 				// Fire the unit event type
 				getContainerUnit().fireUnitUpdate(UnitEventType.INVENTORY_STORING_UNIT_EVENT, this);
-				// Fire the unit event type
-				getContainerUnit().fireUnitUpdate(UnitEventType.INVENTORY_RETRIEVING_UNIT_EVENT, this);
+				// Fire the unit event type for old container
+				cu.fireUnitUpdate(UnitEventType.INVENTORY_RETRIEVING_UNIT_EVENT, this);
 			}
 		}
 		else {
@@ -2199,11 +2188,11 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	public void setCoordinates(Coordinates newLocation) {
 		super.setCoordinates(newLocation);
 
-		if (getEquipmentSet() != null && !getEquipmentSet().isEmpty()) {
-			for (Equipment e: getEquipmentSet()) {
-				e.setCoordinates(newLocation);
-			}
-		}
+//		if (getEquipmentSet() != null && !getEquipmentSet().isEmpty()) {
+//			for (Equipment e: getEquipmentSet()) {
+//				e.setCoordinates(newLocation);
+//			}
+//		}
 	}
 
 	/**
@@ -2253,29 +2242,28 @@ public class Person extends Unit implements Worker, Temporal, EquipmentOwner, Re
 	}
 	
 	/**
-	 * Assigns standard living necessity.
+	 * Assigns a thermal bottle as a standard living necessity.
 	 */
 	public Container assignThermalBottle() {
+		Equipment bottle = null;
+		
 		if (!hasThermalBottle() && isInside()) {
-			Equipment bottle = null;
-			
-			for (Equipment e : ((EquipmentOwner)getContainerUnit()).getEquipmentSet()) {
-				if (e.getEquipmentType() == EquipmentType.THERMAL_BOTTLE) {	
-					bottle = e;
+
+			Iterator<Equipment> i = ((EquipmentOwner)getContainerUnit()).getEquipmentSet().iterator();
+			while (i.hasNext()){
+				bottle = i.next();
+				if (bottle.getEquipmentType() == EquipmentType.THERMAL_BOTTLE) {
+					i.remove();
+
+					addEquipment(bottle);
+					// Register the person as the owner of this bottle
+					bottle.setLastOwner(this);
 					break;
 				}
 			}
-					
-			if (bottle != null) {
-				((EquipmentOwner)getContainerUnit()).removeEquipment(bottle);
-				addEquipment(bottle);
-				// Register the person as the owner of this bottle
-				bottle.setLastOwner(this);
-				return (Container)bottle;
-			}
 		}
 		
-		return null;
+		return (Container)bottle;
 	}
 	
 	/**

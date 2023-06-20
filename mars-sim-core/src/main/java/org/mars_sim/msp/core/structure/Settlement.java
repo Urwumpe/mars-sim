@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * Settlement.java
- * @date 2022-09-12
+ * @date 2023-05-09
  * @author Scott Davis
  */
 
@@ -23,16 +23,17 @@ import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.LifeSupportInterface;
 import org.mars_sim.msp.core.LocalPosition;
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitEventType;
-import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.air.AirComposition;
 import org.mars_sim.msp.core.data.SolMetricDataLogger;
 import org.mars_sim.msp.core.data.UnitSet;
 import org.mars_sim.msp.core.environment.DustStorm;
 import org.mars_sim.msp.core.environment.MineralMap;
+import org.mars_sim.msp.core.environment.SurfaceFeatures;
 import org.mars_sim.msp.core.environment.TerrainElevation;
 import org.mars_sim.msp.core.equipment.Container;
 import org.mars_sim.msp.core.equipment.Equipment;
@@ -50,7 +51,7 @@ import org.mars_sim.msp.core.person.Commander;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PersonConfig;
 import org.mars_sim.msp.core.person.PhysicalCondition;
-import org.mars_sim.msp.core.person.ai.job.util.JobAssignmentType;
+import org.mars_sim.msp.core.person.ai.job.util.AssignmentType;
 import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.job.util.JobUtil;
 import org.mars_sim.msp.core.person.ai.mission.Exploration;
@@ -65,16 +66,17 @@ import org.mars_sim.msp.core.person.ai.task.util.SettlementTaskManager;
 import org.mars_sim.msp.core.person.ai.task.util.Task;
 import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.person.health.RadiationExposure;
+import org.mars_sim.msp.core.project.Stage;
+import org.mars_sim.msp.core.reportingAuthority.PreferenceKey;
+import org.mars_sim.msp.core.reportingAuthority.PreferenceKey.Type;
 import org.mars_sim.msp.core.reportingAuthority.ReportingAuthority;
 import org.mars_sim.msp.core.resource.ResourceUtil;
-import org.mars_sim.msp.core.resource.StorableItem;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.RobotType;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.structure.Airlock.AirlockMode;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
-import org.mars_sim.msp.core.structure.building.connection.BuildingConnector;
 import org.mars_sim.msp.core.structure.building.connection.BuildingConnectorManager;
 import org.mars_sim.msp.core.structure.building.function.EVA;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
@@ -107,7 +109,8 @@ public class Settlement extends Structure implements Temporal,
 	private static final String MINING_OUTPOST = "Mining Outpost";
 	private static final String ASTRONOMY_OBSERVATORY = "Astronomy Observatory";
 
-	private static final int MAX = 3000;
+
+	private static final int MAX = 6000;
 	private static final int UPDATE_GOODS_PERIOD = (1000/20); // Update 20 times per day
 	public static final int CHECK_MISSION = 20; // once every 10 millisols
 	public static final int MAX_NUM_SOLS = 3;
@@ -131,12 +134,20 @@ public class Settlement extends Structure implements Temporal,
 
 	private static final int OXYGEN_ID = ResourceUtil.oxygenID;
 	private static final int HYDROGEN_ID = ResourceUtil.hydrogenID;
-	private static final int WATER_ID = ResourceUtil.waterID;
-	private static final int CO2_ID = ResourceUtil.co2ID;
 	private static final int METHANE_ID = ResourceUtil.methaneID;
+	private static final int METHANOL_ID = ResourceUtil.methanolID;
+	private static final int CO2_ID = ResourceUtil.co2ID;
+	
+	private static final int WATER_ID = ResourceUtil.waterID;
+	private static final int ICE_ID = ResourceUtil.iceID;
+	private static final int BRINE_WATER_ID = ResourceUtil.brineWaterID;
+
 	private static final int REGOLITH_ID = ResourceUtil.regolithID;
 	private static final int SAND_ID = ResourceUtil.sandID;
-	private static final int ICE_ID = ResourceUtil.iceID;
+	private static final int CONCRETE_ID = ResourceUtil.concreteID;
+	private static final int CEMENT_ID = ResourceUtil.cementID;
+	
+
 	private static final int GREY_WATER_ID = ResourceUtil.greyWaterID;
 	private static final int BLACK_WATER_ID = ResourceUtil.blackWaterID;
 	private static final int ROCK_SAMPLES_ID = ResourceUtil.rockSamplesID;
@@ -151,11 +162,16 @@ public class Settlement extends Structure implements Temporal,
 				HYDROGEN_ID,
 				CO2_ID,
 				METHANE_ID,
+				METHANOL_ID,
+				BRINE_WATER_ID,
 				WATER_ID,
+				
+				ICE_ID,
+				BRINE_WATER_ID,
 				GREY_WATER_ID,
 				BLACK_WATER_ID,
 				ROCK_SAMPLES_ID,
-				ICE_ID,
+
 				REGOLITH_ID };
 	}
 	
@@ -164,7 +180,7 @@ public class Settlement extends Structure implements Temporal,
 	/** Safe low temperature range. */
 	public static final double SAFE_TEMPERATURE_RANGE = 18;
 	/** Initial mission passing score. */
-	private static final double INITIAL_MISSION_PASSING_SCORE = 100D;
+	private static final double INITIAL_MISSION_PASSING_SCORE = 500D;
 	/** The Maximum mission score that can be recorded. */
 	private static final double MAX_MISSION_SCORE = 1000D;
 
@@ -177,11 +193,6 @@ public class Settlement extends Structure implements Temporal,
 	public static double minimum_air_pressure;
 	/** The settlement life support requirements. */
 	public static double[][] life_support_value = new double[2][7];
-
-	/** The cache for the number of building connectors. */
-	private transient int numConnectorsCache = 0;
-	/** The settlement's map of adjacent buildings. */
-	private transient Map<Building, List<Building>> adjacentBuildingMap = new HashMap<>();
 	
 	/** The flag for checking if the simulation has just started. */
 	private boolean justLoaded = true;
@@ -222,8 +233,6 @@ public class Settlement extends Structure implements Temporal,
 	private double currentTemperature = 22.5;
 	/** The settlement's current indoor pressure [in kPa], not Pascal. */
 	private double currentPressure = NORMAL_AIR_PRESSURE;
-//	/** Amount of time (millisols) that the settlement has had zero population. */
-//	private double zeroPopulationTime;
 	/** The settlement's current meal replenishment rate. */
 	public double mealsReplenishmentRate = 0.3;
 	/** The settlement's current dessert replenishment rate. */
@@ -232,10 +241,6 @@ public class Settlement extends Structure implements Temporal,
 	private double iceProbabilityValue = 0;
 	/** The settlement's current probability value for regolith. */
 	private double regolithProbabilityValue = 0;
-	/** The settlement's current probability value for oxygen. */
-	private double oxygenProbabilityValue = 0;
-	/** The settlement's current probability value for methane. */
-	private double methaneProbabilityValue = 0;
 	/** The settlement's outside temperature. */
 	private double outside_temperature;
 	/** Total Crop area */
@@ -287,28 +292,22 @@ public class Settlement extends Structure implements Temporal,
 	private SolMetricDataLogger<Integer> dailyLaborTime;
 
 	/** The object that keeps track of wheelbarrows. */
-	private StorableItem wheelbarrows;
+//	private StorableItem wheelbarrows;
 	
 	/** The settlement's achievement in scientific fields. */
 	private EnumMap<ScienceType, Double> scientificAchievement;
 	/** The map of settlements allowed to trade. */
 	private Map<Integer, Boolean> allowTradeMissionSettlements;
-	/** The mission radius [in km] for the rovers of this settlement for each type of mission . */
-	private Map<MissionType, Integer> missionRange = new EnumMap<>(MissionType.class);
 	/** The total amount resource collected/studied. */
 	private Map<Integer, Double> resourcesCollected = new HashMap<>();
 	/** The settlement's resource statistics. */
 	private Map<Integer, Map<Integer, Map<Integer, Double>>> resourceStat = new HashMap<>();
-	/** The settlement's resource statistics. */
-	private Map<String, Double> mineralConcentrationMap = new HashMap<>();
 	
 	/** The last 20 mission scores */
 	private List<Double> missionScores;
 
 	/** The set of processes being overridden. */
 	private Set<OverrideType> processOverrides = new HashSet<>();
-	/** The set of disabled missions. */
-	private Set<MissionType> disabledMissions = new HashSet<>();
 	/** The set of available pressurized/pressurizing airlocks. */
 	private Set<Integer> availablePAirlocks = new HashSet<>();
 	/** The set of available depressurized/depressurizing airlocks. */
@@ -325,9 +324,13 @@ public class Settlement extends Structure implements Temporal,
 	private Set<Person> peopleWithin;
 	/** The settlement's list of robots within. */
 	private Set<Robot> robotsWithin;
+	/** The settlement's preference modifiers map. */
+	private Map<PreferenceKey, Double> preferenceModifiers = new HashMap<>();
 	
 	private static SettlementConfig settlementConfig = SimulationConfig.instance().getSettlementConfiguration();
 	private static PersonConfig personConfig = SimulationConfig.instance().getPersonConfig();
+	private static SurfaceFeatures surfaceFeatures;
+	private static TerrainElevation terrainElevation;
 
 	static {
 		water_consumption_rate = personConfig.getWaterConsumptionRate();
@@ -340,8 +343,6 @@ public class Settlement extends Structure implements Temporal,
 	 */
 	private Settlement() {
 		super(null, null);
-
-		unitManager = sim.getUnitManager();
 
 		// set location
 		location = getCoordinates();
@@ -358,10 +359,6 @@ public class Settlement extends Structure implements Temporal,
 		// Use Structure constructor.
 		super(name, location);
 
-		if (unitManager == null) {// for passing maven test
-			unitManager = sim.getUnitManager();
-		}
-
 		this.templateID = id;
 		this.location = location;
 
@@ -372,15 +369,12 @@ public class Settlement extends Structure implements Temporal,
 		peopleWithin = new UnitSet<>();
 		robotsWithin = new UnitSet<>();
 
-		if (missionManager == null) {// for passing maven test
-			missionManager = sim.getMissionManager();
-		}
-
 		final double GEN_MAX = 1_000_000;
+		
 		// Create EquipmentInventory instance
 		eqmInventory = new EquipmentInventory(this, GEN_MAX);
 
-
+		// Initialize schedule event manager
 		futureEvents = new ScheduledEventManager(marsClock);
 
 		creditManager = new CreditManager(this, unitManager);
@@ -416,6 +410,7 @@ public class Settlement extends Structure implements Temporal,
 
 		// Determine the reporting authority
 		this.sponsor = sponsor;
+		preferenceModifiers.putAll(sponsor.getPreferences());
 
 		citizens = new UnitSet<>();
 		ownedRobots = new UnitSet<>();
@@ -445,19 +440,32 @@ public class Settlement extends Structure implements Temporal,
 		return new Settlement(name, id, template, sponsor, location, populationNumber, initialNumOfRobots);
 	}
 
-
 	/**
 	 * Initialize field data, class and maps
 	 */
 	public void initialize() {
+		if (surfaceFeatures == null) 
+			surfaceFeatures = Simulation.instance().getSurfaceFeatures();
+		
+		if (terrainElevation == null) 
+			terrainElevation = surfaceFeatures.getTerrainElevation();
+		
 //		// Get the elevation and terrain gradient factor
-		terrainProfile = TerrainElevation.getTerrainProfile(location);
+		terrainProfile = terrainElevation.getTerrainProfile(location);
 
 //		Note: to check elevation, do this -> double elevation = terrainProfile[0];
 //		Note: to check gradient, do this ->double gradient = terrainProfile[1];
 
-		iceCollectionRate = iceCollectionRate + TerrainElevation.obtainIceCollectionRate(location);
+		iceCollectionRate = iceCollectionRate + terrainElevation.obtainIceCollectionRate(location);
+		regolithCollectionRate = regolithCollectionRate + terrainElevation.obtainRegolithCollectionRate(location);
 
+		logger.config(this, " iceCollectionRate: " + Math.round(iceCollectionRate * 100.0)/100.0);
+		logger.config(this, " regolithCollectionRate: " + Math.round(regolithCollectionRate * 100.0)/100.0);
+		
+		double areoThermalPot = surfaceFeatures.getAreothermalPotential(location);
+		
+		logger.config(this, " Areothermal Potential: " + Math.round(areoThermalPot * 1000.0)/1000.0);
+		
 		final double GEN_MAX = 1_000_000;
 		// Create EquipmentInventory instance
 		eqmInventory = new EquipmentInventory(this, GEN_MAX);
@@ -469,11 +477,17 @@ public class Settlement extends Structure implements Temporal,
 		SettlementTemplate sTemplate = settlementConfig.getItem(template);
 
 		// Initialize building manager
-		buildingManager = new BuildingManager(this, sTemplate.getBuildingTemplates());
+		buildingManager = new BuildingManager(this, sTemplate.getBuildings());
+		
+		buildingManager.initialize();
 		
 		// Initialize building connector manager.
-		buildingConnectorManager = new BuildingConnectorManager(this, sTemplate.getBuildingTemplates());
+		buildingConnectorManager = new BuildingConnectorManager(this, sTemplate.getBuildings());
 
+		// Create adjacent building map
+		buildingManager.createAdjacentBuildingMap();
+		
+		// Initialize schedule event manager
 		futureEvents = new ScheduledEventManager(marsClock);
 
 		// Get the rotation about the planet and convert that to a fraction of the Sol.
@@ -499,9 +513,10 @@ public class Settlement extends Structure implements Temporal,
 		// Initialize power grid
 		powerGrid = new PowerGrid(this);
 
-		// Added thermal control system
+		// Initialize thermal control system
 		thermalSystem = new ThermalSystem(this);
 
+		// Initialize settlement task manager
 		taskManager = new SettlementTaskManager(this);
 
 		// Initialize scientific achievement.
@@ -528,92 +543,31 @@ public class Settlement extends Structure implements Temporal,
 		dailyResourceOutput = new SolMetricDataLogger<>(MAX_NUM_SOLS);
 		// Create the daily labor hours map
 		dailyLaborTime = new SolMetricDataLogger<>(MAX_NUM_SOLS);
-
-		// Set default mission radius
-		missionRange.put(MissionType.AREOLOGY, 500);
-		missionRange.put(MissionType.BIOLOGY,500);
-		missionRange.put(MissionType.COLLECT_ICE,500);
-		missionRange.put(MissionType.COLLECT_REGOLITH,500);
-		missionRange.put(MissionType.DELIVERY,4000);
-		missionRange.put(MissionType.EMERGENCY_SUPPLY,1000);
-		missionRange.put(MissionType.EXPLORATION, 500);
-		missionRange.put(MissionType.METEOROLOGY, 500);
-		missionRange.put(MissionType.MINING, 500);
-		missionRange.put(MissionType.RESCUE_SALVAGE_VEHICLE, 1000);
-		missionRange.put(MissionType.TRADE, 2000);
-		missionRange.put(MissionType.TRAVEL_TO_SETTLEMENT, 4000);
-		
-		// Check nearby mineral concentration
-		mineralConcentrationMap = checkNearbyMineral();
-		if (!mineralConcentrationMap.isEmpty())
-			logger.log(this, Level.INFO, 0L, "Settlement vicinity mineral concentration: " + mineralConcentrationMap.toString());
-		
-
-	}
-
-	/*
-	 * Gets sponsoring agency for the person.
-	 */
-	public ReportingAuthority getSponsor() {
-		return sponsor;
 	}
 
 	/**
-	 * Creates a map of buildings with their lists of building connectors attached to
-	 * it.
-	 *
-	 * @return a map
-	 */
-	private Map<Building, List<Building>> createAdjacentBuildingMap() {
-		if (adjacentBuildingMap == null)
-			adjacentBuildingMap = new HashMap<>();
-		for (Building b : buildingManager.getBuildings()) {
-			List<Building> connectors = createAdjacentBuildings(b);
-			adjacentBuildingMap.put(b, connectors);
-		}
-
-		return adjacentBuildingMap;
-	}
-
-	/**
-	 * Gets a list of building connectors attached to this building.
-	 *
-	 * @param building
+	 * Gets the terrain elevation.
+	 * 
 	 * @return
 	 */
-	public List<Building> getBuildingConnectors(Building building) {
-		if (adjacentBuildingMap == null) {
-			adjacentBuildingMap = createAdjacentBuildingMap();
-		}
-		
-		if (!adjacentBuildingMap.containsKey(building)) {
-			return new ArrayList<>();
-		}
-
-		return adjacentBuildingMap.get(building);
+	public double getElevation() {
+		return terrainProfile[0];
 	}
 
 	/**
-	 * Creates a list of adjacent buildings attached to this building.
-	 *
-	 * @param building
-	 * @return a list of adjacent buildings
+	 * Gets the terrain gradient.
+	 * 
+	 * @return
 	 */
-	public List<Building> createAdjacentBuildings(Building building) {
-		List<Building> buildings = new ArrayList<>();
-
-		Set<BuildingConnector> connectors = buildingConnectorManager.getConnectionsToBuilding(building);
-		for (BuildingConnector c : connectors) {
-			Building b1 = c.getBuilding1();
-			Building b2 = c.getBuilding2();
-			if (b1 != building) {
-				buildings.add(b1);
-			} else if (b2 != building) {
-				buildings.add(b2);
-			}
-		}
-
-		return buildings;
+	public double getGradient() {
+		return terrainProfile[1];
+	}
+	
+	/**
+	 * Gets the space agency.
+	 */
+	public ReportingAuthority getReportingAuthority() {
+		return sponsor;
 	}
 
 	/**
@@ -901,15 +855,15 @@ public class Settlement extends Structure implements Temporal,
 		return currentTemperature;
 	}
 
-	/**
-	 * Reloads instances after loading from a saved sim
-	 *
-	 * @param clock
-	 * @param w
-	 */
-	public static void initializeInstances(UnitManager u) {
-		unitManager = u;
-	}
+//	/**
+//	 * Reloads instances after loading from a saved sim
+//	 *
+//	 * @param clock
+//	 * @param w
+//	 */
+//	public static void initializeInstances(UnitManager u) {
+//		unitManager = u;
+//	}
 
 	/**
 	 * Perform time-related processes
@@ -933,7 +887,7 @@ public class Settlement extends Structure implements Temporal,
 		// Update citizens
 		timePassingCitizens(pulse);
 
-		// Updateremaining Units
+		// Update remaining Units
 		timePassing(pulse, ownedVehicles);
 		timePassing(pulse, ownedRobots);
 
@@ -946,8 +900,6 @@ public class Settlement extends Structure implements Temporal,
 
 		// Computes the average air pressure & temperature of the life support system.
 		computeEnvironmentalAverages();
-
-		createBuildingMap();
 
 		return true;
 	}
@@ -966,24 +918,9 @@ public class Settlement extends Structure implements Temporal,
 		return 0;
 	}
 
-	/**
-	 * Create a building map and adjacent building map
-	 */
-	private void createBuildingMap() {
-		if (adjacentBuildingMap != null && !adjacentBuildingMap.isEmpty()) {
-			int numConnectors = adjacentBuildingMap.size();
-
-			if (numConnectorsCache != numConnectors) {
-				numConnectorsCache = numConnectors;
-				createAdjacentBuildingMap();
-			}
-		} else {
-			createAdjacentBuildingMap();
-		}
-	}
 
 	/**
-	 * Keeps track of things based on msol
+	 * Keeps track of things based on msol.
 	 *
 	 * @param pulse
 	 */
@@ -1050,7 +987,8 @@ public class Settlement extends Structure implements Temporal,
 			// Compute whether a baseline, GCR, or SEP event has occurred
 			remainder = msol % RadiationExposure.RADIATION_CHECK_FREQ;
 			if (remainder == 5) {
-				checkRadiationProbability(pulse.getElapsed());
+				RadiationStatus newExposed = RadiationStatus.calculateCurrent(pulse.getElapsed());
+				setExposed(newExposed);
 			}
 
 			remainder = msol % RESOURCE_UPDATE_FREQ;
@@ -1119,13 +1057,11 @@ public class Settlement extends Structure implements Temporal,
 		Building result = null;
 
 		if (person.isInSettlement()) {
-			List<Building> b = person.getSettlement().getBuildingManager()
-					.getBuildings(FunctionType.LIVING_ACCOMMODATIONS);
+			Set<Building> b = person.getSettlement().getBuildingManager()
+					.getBuildingSet(FunctionType.LIVING_ACCOMMODATIONS);
 			b = BuildingManager.getNonMalfunctioningBuildings(b);
 			b = getQuartersWithEmptyBeds(b, unmarked);
-			if (b.size() == 1) {
-				return b.get(0);
-			}
+
 			if (b.size() > 0) {
 				b = BuildingManager.getLeastCrowdedBuildings(b);
 			}
@@ -1135,9 +1071,9 @@ public class Settlement extends Structure implements Temporal,
 						b);
 				result = RandomUtil.getWeightedRandomObject(probs);
 			}
-			else if (b.size() == 1) {
-				return b.get(0);
-			}
+//			else if (b.size() == 1) {
+//				return b.get(0);
+//			}
 		}
 
 		return result;
@@ -1153,8 +1089,8 @@ public class Settlement extends Structure implements Temporal,
 	 *                     or not.
 	 * @return list of buildings with empty beds.
 	 */
-	private static List<Building> getQuartersWithEmptyBeds(List<Building> buildingList, boolean unmarked) {
-		List<Building> result = new ArrayList<>();
+	private static Set<Building> getQuartersWithEmptyBeds(Set<Building> buildingList, boolean unmarked) {
+		Set<Building> result = new UnitSet<>();
 
 		for (Building building : buildingList) {
 			LivingAccommodations quarters = building.getLivingAccommodations();
@@ -1425,6 +1361,16 @@ public class Settlement extends Structure implements Temporal,
 	}
 
 	/**
+	 * Gets a set of adjacent buildings.
+	 *
+	 * @param building
+	 * @return 
+	 */
+	public Set<Building> getAdjacentBuildings(Building building) {
+		return buildingManager.getAdjacentBuildings(building);
+	}
+	
+	/**
 	 * Gets the settlement's building connector manager.
 	 *
 	 * @return building connector manager.
@@ -1509,7 +1455,7 @@ public class Settlement extends Structure implements Temporal,
 	 * @return
 	 */
 	public boolean anyAirlocksForIngressEgress(Person person, boolean ingress) {
-		List<Building> bldgs = person.getSettlement().getBuildingManager().getBuildings(FunctionType.EVA);
+		Set<Building> bldgs = person.getSettlement().getBuildingManager().getBuildingSet(FunctionType.EVA);
 
 		Iterator<Building> i = bldgs.iterator();
 		while (i.hasNext()) {
@@ -1646,10 +1592,10 @@ public class Settlement extends Structure implements Temporal,
 	 * Checks for available airlocks.
 	 */
 	private void checkAvailableAirlocks() {
-		List<Building> pressurizedBldgs = new ArrayList<>();
-		List<Building> depressurizedBldgs = new ArrayList<>();
+		Set<Building> pressurizedBldgs = new HashSet<>();
+		Set<Building> depressurizedBldgs = new HashSet<>();
 
-		for(Building airlockBdg : buildingManager.getBuildings(FunctionType.EVA)) {
+		for(Building airlockBdg : buildingManager.getBuildingSet(FunctionType.EVA)) {
 			Airlock airlock = airlockBdg.getEVA().getAirlock();
 			if (airlock.isPressurized()	|| airlock.isPressurizing())
 				pressurizedBldgs.add(airlockBdg);
@@ -1672,7 +1618,7 @@ public class Settlement extends Structure implements Temporal,
 	 * @param bldgs
 	 * @param pressurized
 	 */
-	public void trackAirlocks(List<Building> bldgs, boolean pressurized) {	
+	public void trackAirlocks(Set<Building> bldgs, boolean pressurized) {	
 		for (Building building : bldgs) {
 			boolean chamberFull = building.getEVA().getAirlock().areAll4ChambersFull();
 			boolean reservationFull = building.getEVA().getAirlock().isReservationFull();
@@ -2189,14 +2135,14 @@ public class Settlement extends Structure implements Temporal,
 	
 	
 	/**
-	 * Adds an equipment to be owned by the settlement
+	 * Adds an equipment to be owned by the settlement.
 	 *
 	 * @param e the equipment
+	 * @return true if this settlement can carry it
 	 */
 	@Override
 	public boolean addEquipment(Equipment e) {
 		if (eqmInventory.addEquipment(e)) {
-			e.setCoordinates(getCoordinates());
 			e.setContainerUnit(this);
 			fireUnitUpdate(UnitEventType.ADD_ASSOCIATED_EQUIPMENT_EVENT, this);
 			return true;
@@ -2205,7 +2151,7 @@ public class Settlement extends Structure implements Temporal,
 	}
 
 	/**
-	 * Removes an equipment from being owned by the settlement
+	 * Removes an equipment from being owned by the settlement.
 	 *
 	 * @param e the equipment
 	 */
@@ -2286,9 +2232,7 @@ public class Settlement extends Structure implements Temporal,
 	public Collection<Vehicle> getMissionVehicles() {
 		return ownedVehicles.stream()
 				.filter(v -> v.getMission() != null
-					&& (v.getSettlement() == null
-					|| v.getMission().getMissionType() == MissionType.BUILDING_CONSTRUCTION
-					|| v.getMission().getMissionType() == MissionType.BUILDING_SALVAGE))
+					&& (v.getMission().getStage() == Stage.ACTIVE))
 				.collect(Collectors.toList());
 	}
 
@@ -2363,9 +2307,7 @@ public class Settlement extends Structure implements Temporal,
 	public int findNumParkedRovers() {
 		return Math.toIntExact(ownedVehicles
 					.stream()
-					.filter(v -> v.getVehicleType() == VehicleType.CARGO_ROVER
-					|| v.getVehicleType() == VehicleType.EXPLORER_ROVER
-					|| v.getVehicleType() == VehicleType.TRANSPORT_ROVER)
+					.filter(v -> VehicleType.isRover(v.getVehicleType()))
 					.filter(v -> this.equals(v.getSettlement()))
 					.collect(Collectors.counting()));
 	}
@@ -2521,12 +2463,12 @@ public class Settlement extends Structure implements Temporal,
 	}
 
 	/*
-	 * Compute the probability of radiation exposure during EVA/outside walk
+	 * Update the status of Radiation exposure
+	 * @param newExposed
 	 */
-	private void checkRadiationProbability(double time) {
-
+	public void setExposed(RadiationStatus newExposed) {
 		RadiationStatus oldStatus = exposed;
-		exposed = RadiationStatus.calculateCurrent(time);
+		exposed = newExposed;
 		
 		if (exposed.isBaselineEvent() && !oldStatus.isBaselineEvent()) {
 			logger.log(this, Level.INFO, 1_000, DETECTOR_GRID + UnitEventType.BASELINE_EVENT.toString() + " is imminent.");
@@ -2702,24 +2644,37 @@ public class Settlement extends Structure implements Temporal,
 	 */
 	private double computeRegolithProbability() {
 		double result = 0;
-		double regolithDemand = goodsManager.getAmountDemandValue(REGOLITH_ID);
+		double regolithDemand = goodsManager.getDemandValueWithID(REGOLITH_ID);
 		if (regolithDemand > REGOLITH_MAX)
 			regolithDemand = REGOLITH_MAX;
 		else if (regolithDemand < 1)
 			regolithDemand = 1;
 
-		double sandDemand = goodsManager.getAmountDemandValue(SAND_ID);
+		double sandDemand = goodsManager.getDemandValueWithID(SAND_ID);
 		if (sandDemand > REGOLITH_MAX)
 			sandDemand = REGOLITH_MAX;
 		else if (sandDemand < 1)
 			sandDemand = 1;
 		
-		int pop = numCitizens;
+		double concreteDemand = goodsManager.getDemandValueWithID(CONCRETE_ID);
+		if (concreteDemand > REGOLITH_MAX)
+			concreteDemand = REGOLITH_MAX;
+		else if (concreteDemand < 1)
+			concreteDemand = 1;
+		
+		double cementDemand = goodsManager.getDemandValueWithID(CEMENT_ID);
+		if (cementDemand > REGOLITH_MAX)
+			cementDemand = REGOLITH_MAX;
+		else if (cementDemand < 1)
+			cementDemand = 1;
 
 		double regolithAvailable = goodsManager.getSupplyValue(REGOLITH_ID);
 		regolithAvailable = regolithAvailable * regolithAvailable - 1;
+		
 		double sandAvailable = goodsManager.getSupplyValue(SAND_ID);
 		sandAvailable = sandAvailable * sandAvailable - 1;
+		
+		int pop = numCitizens;
 		int reserve = (MIN_REGOLITH_RESERVE + MIN_SAND_RESERVE) * pop;
 		
 		if (regolithAvailable + sandAvailable > reserve + regolithDemand + sandDemand) {
@@ -2734,12 +2689,16 @@ public class Settlement extends Structure implements Temporal,
 			result = 1.0 * reserve / pop ;
 		}
 
+		result = result + .5 * concreteDemand + .5 * cementDemand;
+		
 		if (result < 0)
 			result = 0;
 		if (result > MAX)
 			result = MAX;
 		
 //		logger.info(this, 30_000L, "regolithDemand: " + regolithDemand
+//						+ "   cementDemand: " + cementDemand
+//						+ "   concreteDemand: " + concreteDemand
 //						+ "   sandDemand: " + sandDemand
 //						+ "   regolith Prob value: " + result);
 		return result;
@@ -2752,14 +2711,21 @@ public class Settlement extends Structure implements Temporal,
 	 */
 	private double computeIceProbability() {
 		double result = 0;
-		double iceDemand = goodsManager.getAmountDemandValue(ICE_ID);
+		double iceDemand = goodsManager.getDemandValueWithID(ICE_ID);
 		if (iceDemand > ICE_MAX)
 			iceDemand = ICE_MAX;
 		if (iceDemand < 1)
 			iceDemand = 1;
 		
-		double waterDemand = goodsManager.getAmountDemandValue(WATER_ID);
+		double waterDemand = goodsManager.getDemandValueWithID(WATER_ID);
 		waterDemand = waterDemand * waterRationLevel / 10;
+		if (waterDemand > WATER_MAX)
+			waterDemand = WATER_MAX;
+		if (waterDemand < 1)
+			waterDemand = 1;
+		
+		double brineWaterDemand = goodsManager.getDemandValueWithID(BRINE_WATER_ID);
+		brineWaterDemand = brineWaterDemand * waterRationLevel / 10;
 		if (waterDemand > WATER_MAX)
 			waterDemand = WATER_MAX;
 		if (waterDemand < 1)
@@ -2768,16 +2734,20 @@ public class Settlement extends Structure implements Temporal,
 		// Compare the available amount of water and ice reserve
 		double iceSupply = goodsManager.getSupplyValue(ICE_ID);
 		double waterSupply = goodsManager.getSupplyValue(WATER_ID);
-
+		double brineWaterSupply = goodsManager.getSupplyValue(BRINE_WATER_ID);
+		
 		int pop = numCitizens;
 		int reserve = (MIN_WATER_RESERVE + MIN_ICE_RESERVE) * pop;
 
-		if (iceSupply + waterSupply > reserve + iceDemand + waterDemand) {
-			result = reserve + iceDemand + waterDemand - iceSupply - waterSupply;
+		double totalSupply = iceSupply + waterSupply + brineWaterSupply;
+		double totalDemand = iceDemand + waterDemand + brineWaterDemand;
+		
+		if (totalSupply > reserve + totalDemand) {
+			result = reserve + totalDemand - totalSupply;
 		}
 		
-		else if (iceSupply + waterSupply > reserve) {
-			result = reserve - iceSupply - waterSupply;
+		else if (totalSupply > reserve) {
+			result = reserve - totalSupply;
 		}
 
 		// Prompt the collect ice mission to proceed more easily if water resource is
@@ -2854,14 +2824,6 @@ public class Settlement extends Structure implements Temporal,
 		return regolithProbabilityValue;
 	}
 
-	public double getOxygenProbabilityValue() {
-		return oxygenProbabilityValue;
-	}
-
-	public double getMethaneProbabilityValue() {
-		return methaneProbabilityValue;
-	}
-
 	public double getOutsideTemperature() {
 		return outside_temperature;
 	}
@@ -2872,14 +2834,6 @@ public class Settlement extends Structure implements Temporal,
 
 	public void setDustStorm(DustStorm storm) {
 		this.storm = storm;
-	}
-
-	public int getMissionRadius(MissionType missionType) {
-		return missionRange.getOrDefault(missionType, 1000);
-	}
-
-	public void setMissionRadius(MissionType missionType, int newRange) {
-		missionRange.put(missionType, newRange);
 	}
 
 	public boolean hasDesignatedCommander() {
@@ -2949,7 +2903,7 @@ public class Settlement extends Structure implements Temporal,
 		Person p0 = JobUtil.findBestFit(settlement, job);
 		// Designate a specific job to a person
 		if (p0 != null) {
-			p0.getMind().assignJob(job, true, JobUtil.SETTLEMENT, JobAssignmentType.APPROVED, JobUtil.SETTLEMENT);
+			p0.getMind().assignJob(job, true, JobUtil.SETTLEMENT, AssignmentType.APPROVED, JobUtil.SETTLEMENT);
 		}
 	}
 
@@ -2979,13 +2933,13 @@ public class Settlement extends Structure implements Temporal,
 			if ((numEngs == 0) && (bestEng != null)) {
 				bestEng.getMind().assignJob(JobType.ENGINEER, true,
 						JobUtil.SETTLEMENT,
-						JobAssignmentType.APPROVED,
+						AssignmentType.APPROVED,
 						JobUtil.SETTLEMENT);
 			}
 			if ((numTechs == 0) && (bestTech != null)) {
 				bestTech.getMind().assignJob(JobType.TECHNICIAN, true,
 						JobUtil.SETTLEMENT,
-						JobAssignmentType.APPROVED,
+						AssignmentType.APPROVED,
 						JobUtil.SETTLEMENT);
 			}
 		}
@@ -3000,22 +2954,16 @@ public class Settlement extends Structure implements Temporal,
 	}
 
 	public void setMissionDisable(MissionType mission, boolean disable) {
-		if (disable) {
-			disabledMissions.add(mission);
-		}
-		else {
-			disabledMissions.remove(mission);
-		}
+		double newValue = (disable ? 0D : 1D);
+		setPreferenceModifier(new PreferenceKey(Type.MISSION, mission.name()), newValue);
 	}
 
 	public void setAllowTradeMissionFromASettlement(Settlement settlement, boolean allowed) {
 		allowTradeMissionSettlements.put(settlement.getIdentifier(), allowed);
 	}
 
-	public void setTradeMissionFromAllSettlements(boolean allowed) {
-		for (Settlement s: unitManager.getSettlements()) {
-			allowTradeMissionSettlements.put(s.getIdentifier(), allowed);
-		}
+	public boolean isAllowedTradeMission(Settlement settlement) {
+		return allowTradeMissionSettlements.getOrDefault(settlement.getIdentifier(), Boolean.TRUE);
 	}
 
 	/**
@@ -3025,31 +2973,40 @@ public class Settlement extends Structure implements Temporal,
 	 * @return probability value
 	 */
 	public boolean isMissionEnable(MissionType mission) {
-		return !disabledMissions.contains(mission);
+		return (getPreferenceModifier(new PreferenceKey(Type.MISSION, mission.name())) > 0D);
 	}
 
 	public double getTotalMineralValue(Rover rover) {
 		if (mineralValue == -1) {
 			// Check if any mineral locations within rover range and obtain their
 			// concentration
-			Map<String, Double> minerals = Exploration.getNearbyMineral(rover, this);
+			Map<String, Double> minerals = getNearbyMineral(rover, this);
 			if (!minerals.isEmpty()) {
 				mineralValue = Exploration.getTotalMineralValue(this, minerals);
 			}
 		}
 		return mineralValue;
 	}
-
 	/**
-	 * Checks if there are any mineral locations in the vicinity.
+	 * Checks if there are any mineral locations within rover/mission range.
 	 *
-	 * @return a map of mineral and amounts.
+	 * @param rover          the rover to use.
+	 * @param homeSettlement the starting settlement.
+	 * @return true if mineral locations.
+	 * @throws Exception if error determining mineral locations.
 	 */
-	public Map<String, Double> checkNearbyMineral() {
+	public Map<String, Double> getNearbyMineral(Rover rover, Settlement homeSettlement) {
 		Map<String, Double> minerals = new HashMap<>();
 
+		double roverRange = rover.getRange();
+		double tripTimeLimit = rover.getTotalTripTimeLimit(true);
+		double tripRange = getTripTimeRange(tripTimeLimit, rover.getBaseSpeed() / 1.25D);
+		double range = roverRange;
+		if (tripRange < range)
+			range = tripRange;
+
 		MineralMap map = surfaceFeatures.getMineralMap();
-		Coordinates mineralLocation = map.findRandomMineralLocation(getCoordinates(), 1.5);
+		Coordinates mineralLocation = map.findRandomMineralLocation(homeSettlement.getCoordinates(), range / 2D);
 
 		if (mineralLocation != null)
 			minerals = map.getAllMineralConcentrations(mineralLocation);
@@ -3057,16 +3014,46 @@ public class Settlement extends Structure implements Temporal,
 		return minerals;
 	}
 	
+	/**
+	 * Gets the range of a trip based on its time limit and exploration sites.
+	 *
+	 * @param tripTimeLimit time (millisols) limit of trip.
+	 * @param averageSpeed  the average speed of the vehicle.
+	 * @return range (km) limit.
+	 */
+	private double getTripTimeRange(double tripTimeLimit, double averageSpeed) {
+		int sol = marsClock.getMissionSol();
+		int numSites = 2 + (int)(1.0 * sol / 20);
+		double siteTime = 250;
+		
+		double tripTimeTravellingLimit = tripTimeLimit - (numSites * siteTime);
+		double millisolsInHour = MarsClock.convertSecondsToMillisols(60D * 60D);
+		double averageSpeedMillisol = averageSpeed / millisolsInHour;
+		return tripTimeTravellingLimit * averageSpeedMillisol;
+	}
+	
+
+	
+	/**
+	 * Returns the ice collection rate in the vicinity of this settlement.
+	 * 
+	 * @return
+	 */
     public double getIceCollectionRate() {
     	return iceCollectionRate;
     }
 
+    /**
+	 * Returns the regolith collection rate in the vicinity of this settlement.
+     * 
+     * @return
+     */
     public double getRegolithCollectionRate() {
     	return regolithCollectionRate;
     }
 
 	/**
-	 * Remove the record of the deceased person from airlock
+	 * Removes the record of the deceased person from airlock.
 	 *
 	 * @param person
 	 */
@@ -3112,22 +3099,6 @@ public class Settlement extends Structure implements Temporal,
 	@Override
 	public Settlement getSettlement() {
 		return null;
-	}
-
-	/**
-	 * Generate a unique name for the Settlement
-	 * @return
-	 */
-	public static String generateName(ReportingAuthority sponsor) {
-		List<String> remainingNames = new ArrayList<>(sponsor.getSettlementNames());
-
-		List<String> usedNames = unitManager.getSettlements().stream()
-							.map(s -> s.getName()).collect(Collectors.toList());
-
-		remainingNames.removeAll(usedNames);
-		int idx = RandomUtil.getRandomInt(remainingNames.size());
-
-		return remainingNames.get(idx);
 	}
 
 	/**
@@ -3305,6 +3276,17 @@ public class Settlement extends Structure implements Temporal,
 	}
 
 	/**
+	 * Gets all the amount resource resource stored, including inside equipment.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAllAmountResourceStored(int resource) {
+		return eqmInventory.getAllAmountResourceStored(resource);
+	}
+	
+	/**
 	 * Gets the amount resource owned by all resource holders.
 	 *
 	 * @param resource
@@ -3341,6 +3323,16 @@ public class Settlement extends Structure implements Temporal,
 		return eqmInventory.getItemResourceIDs();
 	}
 
+	/**
+	 * Gets all stored amount resources in eqmInventory, including inside equipment
+	 *
+	 * @return all stored amount resources.
+	 */
+	@Override
+	public Set<Integer> getAllAmountResourceIDs() {
+		return eqmInventory.getAllAmountResourceIDs();
+	}
+	
 	/**
 	 * Does it have this item resource ?
 	 *
@@ -3402,6 +3394,7 @@ public class Settlement extends Structure implements Temporal,
 
 	/**
 	 * Gets the EquipmentInventory instance.
+	 * 
 	 * @return
 	 */
 	public EquipmentInventory getEquipmentInventory() {
@@ -3409,31 +3402,8 @@ public class Settlement extends Structure implements Temporal,
 	}
 
 	/**
-	 * Sets the unit's container unit.
-	 *
-	 * @param newContainer the unit to contain this unit.
+	 * Gets the task manager that controls the backlog for the Settlement.
 	 */
-	@Override
-	public void setContainerUnit(Unit newContainer) {
-		if (newContainer != null) {
-			if (newContainer.equals(getContainerUnit())) {
-				return;
-			}
-			// 1. Set Coordinates
-			setCoordinates(newContainer.getCoordinates());
-			// 2. Set LocationStateType
-			currentStateType = LocationStateType.MARS_SURFACE;
-			// 3. Set containerID
-			setContainerID(newContainer.getIdentifier());
-			// 4. Fire the container unit event
-			fireUnitUpdate(UnitEventType.CONTAINER_UNIT_EVENT, newContainer);
-		}
-		else {
-			setContainerID(MARS_SURFACE_UNIT_ID);
-		}
-	}
-
-	
     public SettlementTaskManager getTaskManager() {
         return taskManager;
     }
@@ -3447,10 +3417,18 @@ public class Settlement extends Structure implements Temporal,
 		return creditManager;
 	}
 	
+	/**
+	 * Sets the credit manager.
+	 * 
+	 * @param cm
+	 */
 	public void setCreditManager(CreditManager cm) {
 		creditManager = cm;
 	}
 	
+	/**
+	 * Gets the manager of future scheduled events for this settlement.
+	 */
 	public ScheduledEventManager getFutureManager() {
 		return futureEvents;
 	}
@@ -3483,7 +3461,7 @@ public class Settlement extends Structure implements Temporal,
 	}
 
 	/**
-	 * Gets the holder's unit instance
+	 * Gets the holder's unit instance.
 	 *
 	 * @return the holder's unit instance
 	 */
@@ -3493,9 +3471,40 @@ public class Settlement extends Structure implements Temporal,
 	}
 	
 	/**
-	 * Reinitialize references after loading from a saved sim
+	 * Get the modifier to apply of a certain preference
+	 * @param key The preference
+	 * @return The appropriate modifier; return 1 by default
+	 */
+	public double getPreferenceModifier(PreferenceKey key) {
+		return preferenceModifiers.getOrDefault(key, 1D);
+	}
+
+	/**
+	 * Set the modifier to apply to preference of a certain type.
+	 * @param key The preference to update
+	 * @param value The new modifier value
+	 */
+	public void setPreferenceModifier(PreferenceKey key, double value) {
+		preferenceModifiers.put(key, value);
+	}
+
+	/**
+	 * Get the preference that this Settlement influences
+	 */
+	public Set<PreferenceKey> getKnownPreferences() {
+		return preferenceModifiers.keySet();
+	}
+
+	/**
+	 * Reinitialize references after loading from a saved sim.
 	 */
 	public void reinit() {
+		if (surfaceFeatures == null) 
+			surfaceFeatures = Simulation.instance().getSurfaceFeatures();
+		
+		if (terrainElevation == null) 
+			terrainElevation = surfaceFeatures.getTerrainElevation();
+		
 		buildingManager.reinit();
 	}
 
@@ -3538,6 +3547,4 @@ public class Settlement extends Structure implements Temporal,
 
 		scientificAchievement = null;
 	}
-
-
 }

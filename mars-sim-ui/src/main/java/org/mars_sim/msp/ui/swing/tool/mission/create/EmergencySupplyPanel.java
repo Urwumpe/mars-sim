@@ -8,10 +8,8 @@
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.text.ParseException;
@@ -20,6 +18,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.swing.JButton;
 import javax.swing.JFormattedTextField;
@@ -45,14 +45,15 @@ import org.mars_sim.msp.core.resource.PhaseType;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 /**
  * A wizard panel for getting emergency supplies information.
  */
 @SuppressWarnings("serial")
 public class EmergencySupplyPanel extends WizardPanel {
-
+	// Static members.
+ 	private static Logger logger = Logger.getLogger(EmergencySupplyPanel.class.getName());
+ 	
 	// Data members.
 	private JLabel errorMessageLabel;
 	private JTable supplyTable;
@@ -76,8 +77,7 @@ public class EmergencySupplyPanel extends WizardPanel {
 		setBorder(new MarsPanelBorder());
 
 		// Create title label.
-		JLabel titleLabel = new JLabel("Choose supply amounts to deliver.", JLabel.CENTER);
-		titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD));
+		JLabel titleLabel = createTitleLabel("Choose supply amounts to deliver.");
 		add(titleLabel, BorderLayout.NORTH);
 
 		// Create available supply panel.
@@ -94,7 +94,6 @@ public class EmergencySupplyPanel extends WizardPanel {
 		availableSupplyPane.add(supplyScrollPane, BorderLayout.CENTER);
 		supplyTableModel = new SupplyTableModel();
 		supplyTable = new JTable(supplyTableModel);
-		TableStyle.setTableStyle(supplyTable);
 		supplyTable.setRowSelectionAllowed(true);
 		supplyTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		supplyTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
@@ -219,8 +218,7 @@ public class EmergencySupplyPanel extends WizardPanel {
 		cargoScrollPane.setViewportView(cargoTable);
 
 		// Create the message label.
-		errorMessageLabel = new JLabel(" ", JLabel.CENTER);
-		errorMessageLabel.setForeground(Color.RED);
+		errorMessageLabel = createErrorLabel();
 		add(errorMessageLabel, BorderLayout.SOUTH);
 	}
 
@@ -243,7 +241,7 @@ public class EmergencySupplyPanel extends WizardPanel {
 				result = true;
 			}
 		} catch (Exception e) {
-			e.printStackTrace(System.err);
+			logger.log(Level.SEVERE, "Issues with commiting emergency goods from cargo goods: " + e.getMessage());
 		}
 
 		return result;
@@ -427,7 +425,7 @@ public class EmergencySupplyPanel extends WizardPanel {
 						amount--;
 					goodsMap.put(good, amount);
 				} catch (Exception e) {
-					e.printStackTrace(System.err);
+					logger.log(Level.SEVERE, "Issues updating a good in SupplyTableModel table: " + e.getMessage());
 				}
 			}
 			fireTableDataChanged();

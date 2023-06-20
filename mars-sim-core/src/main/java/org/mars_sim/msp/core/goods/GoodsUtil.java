@@ -8,8 +8,10 @@ package org.mars_sim.msp.core.goods;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.equipment.EquipmentType;
@@ -30,10 +32,6 @@ public class GoodsUtil {
 
     /** default logger. */
     private static final SimLogger logger = SimLogger.getLogger(GoodsUtil.class.getName());
-
-    private static final String HEAVY = "vehicle heavy";
-    private static final String MEDIUM = "vehicle medium";
-    private static final String SMALL = "vehicle small";
 
     // Data members
     private static Map<Integer, Good> goodsMap = null;
@@ -101,23 +99,6 @@ public class GoodsUtil {
         return null;
     }
 
-
-    /**
-     * Gets the string type for a given vehicle type.
-     * 
-     * @param vehicleType
-     * @return
-     */
-    public static String getVehicleCategory(VehicleType vehicleType) {
-        if (vehicleType == VehicleType.CARGO_ROVER || vehicleType == VehicleType.TRANSPORT_ROVER)
-            return HEAVY;
-        else if (vehicleType == VehicleType.EXPLORER_ROVER)
-            return MEDIUM;
-        else if (vehicleType == VehicleType.LUV || vehicleType == VehicleType.DELIVERY_DRONE)
-            return SMALL;
-        return "";
-    }
-
     /**
      * Gets a good object for the given vehicle type.
      *
@@ -156,7 +137,7 @@ public class GoodsUtil {
             // Another thread has created the lists
             return;
         }
-
+        
         // Only updated here so don't need to be thread safe
         Map<Integer, Good> newMap = new HashMap<>();
 
@@ -227,9 +208,14 @@ public class GoodsUtil {
      * @param newList
      */
     private static Map<Integer, Good> populateVehicles(Map<Integer, Good> newMap) {
+        Set<VehicleType> done = new HashSet<>();  // Only add one per Vehicle Type
         for(VehicleSpec vs : vehicleConfig.getVehicleSpecs()) {
-            Good newGood = new VehicleGood(vs);
-            newMap.put(newGood.getID(), newGood);
+            if (!done.contains(vs.getType())) {
+                Good newGood = new VehicleGood(vs);
+                newMap.put(newGood.getID(), newGood);
+
+                done.add(vs.getType());
+            }
         }
         return newMap;
     }

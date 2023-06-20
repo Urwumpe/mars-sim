@@ -8,20 +8,17 @@ package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridLayout;
 
+import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JTextField;
+import javax.swing.JTextArea;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.science.ScienceType;
 import org.mars_sim.msp.core.structure.building.function.Research;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.text.WebTextArea;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
 
 /**
@@ -31,7 +28,7 @@ import com.alee.laf.text.WebTextArea;
 @SuppressWarnings("serial")
 public class BuildingPanelResearch extends BuildingFunctionPanel {
 
-	private static final String SCIENCE_ICON = Msg.getString("icon.science"); //$NON-NLS-1$
+	private static final String SCIENCE_ICON = "science";
 
 	// Data members
 	/** The research building. */
@@ -41,7 +38,7 @@ public class BuildingPanelResearch extends BuildingFunctionPanel {
 	/** The number of researchers cache. */
 	private int researchersCache;
 
-	private JTextField researchersLabel;
+	private JLabel researchersLabel;
 
 	/**
 	 * Constructor.
@@ -53,7 +50,7 @@ public class BuildingPanelResearch extends BuildingFunctionPanel {
 		// Use BuildingFunctionPanel constructor
 		super(
 			Msg.getString("BuildingPanelResearch.title"), 
-			ImageLoader.getNewIcon(SCIENCE_ICON), 
+			ImageLoader.getIconByName(SCIENCE_ICON), 
 			lab.getBuilding(), 
 			desktop
 		);
@@ -69,25 +66,24 @@ public class BuildingPanelResearch extends BuildingFunctionPanel {
 	protected void buildUI(JPanel center) {
 
 		// Prepare label panel
-		WebPanel labelPanel = new WebPanel(new GridLayout(2, 2, 5, 1));
+		AttributePanel labelPanel = new AttributePanel(2);
 		center.add(labelPanel, BorderLayout.NORTH);
 	
 		// Prepare researcher number label
 		researchersCache = lab.getResearcherNum();
-		researchersLabel = addTextField(labelPanel, Msg.getString("BuildingPanelResearch.numberOfResearchers"),
-										researchersCache, 5, null);
+		researchersLabel = labelPanel.addTextField(Msg.getString("BuildingPanelResearch.numberOfResearchers"),
+										Integer.toString(researchersCache), null);
 
 		// Prepare researcher capacityLabel
-		addTextField(labelPanel, Msg.getString("BuildingPanelResearch.researcherCapacity"),
-					 lab.getLaboratorySize(), 5, null);
+		labelPanel.addTextField(Msg.getString("BuildingPanelResearch.researcherCapacity"),
+					 					Integer.toString(lab.getLaboratorySize()), null);
 
 		// Get the research specialties of the building.
 		ScienceType[] specialties = lab.getTechSpecialties();
 		int size = specialties.length;
 
-		WebTextArea specialtyTA = new WebTextArea();
+		JTextArea specialtyTA = new JTextArea();
 		specialtyTA.setEditable(false);
-		specialtyTA.setFont(new Font("SansSerif", Font.ITALIC, 12));
 		specialtyTA.setColumns(15);
 
 		// For each specialty, add specialty name panel.
@@ -98,7 +94,7 @@ public class BuildingPanelResearch extends BuildingFunctionPanel {
 				specialtyTA.append("\n");
 		}
 
-		WebPanel listPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+		JPanel listPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		listPanel.add(specialtyTA);
 		addBorder(listPanel, Msg.getString("BuildingPanelResearch.namesOfSpecialties"));
 		center.add(listPanel, BorderLayout.CENTER);

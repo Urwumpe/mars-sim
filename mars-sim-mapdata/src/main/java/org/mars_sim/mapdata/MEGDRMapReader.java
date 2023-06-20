@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * MEGDRMapReader.java
- * @date 2022-07-15
+ * @date 2023-06-17
  * @author Manny Kung
  */
 
@@ -17,47 +17,59 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
 import java.util.Objects;
+import java.util.logging.Logger;
+
+import org.mars_sim.msp.common.FileLocator;
 
 import com.google.common.io.ByteStreams;
-
-import me.lemire.integercompression.Composition;
-import me.lemire.integercompression.FastPFOR;
-import me.lemire.integercompression.IntWrapper;
-import me.lemire.integercompression.IntegerCODEC;
-import me.lemire.integercompression.VariableByte;
 
 /**
  * This class reads the topographical or elevation data of MOLA Mission Experiment 
  * Gridded Data Records (MEGDRs) acquired by MGS mission. 
- * See https://pds-geosciences.wustl.edu/missions/mgs/megdr.html.
+ * @See https://pds-geosciences.wustl.edu/missions/mgs/megdr.html.
  */
 public class MEGDRMapReader {
-
-	public static final int HEIGHT = 720; //2880;
-	public static final int WIDTH = 1440; //5760;
-
-	// megt90n000cb.img has a resolution of 4 pixels per degree (or 0.25 by 0.25 degrees)
-	// map scale : 14.818 km per pixel
-	private static final String PATH = "/maps/";
-	static final String IMG_FILE = "megt90n000cb.img";
-	static final String FILE = PATH + IMG_FILE;
-	private static final String COMPRESSED = "720x1440_JavaFastPFOR_compressed";
+	
+	private static final Logger logger = Logger.getLogger(MEGDRMapReader.class.getName());
+	
+//	NOTE: (Do not delete)
+//	
+// `megt90n000cb.img` provides 
+//	map resolution of 1440x720
+//	4 pixels per degree (or 0.25 by 0.25 degrees)
+//	map scale of 14.818 km per pixel
+//	
+// `megt90n000eb.img` provides
+//	map resolution of 5760x2880
+//	16 pixels per degree (or 0.0625by 0.0625 degrees)
+//	map scale of 3.705 km per pixel	
+//	
+// `megt90n000fb.img` provides
+//	map resolution of 11520x5760
+//	32 pixels per degree (or 0.03125 by 0.03125 degrees)
+//	map scale of 1.853 km per pixel		
+	 
+	/** meg004 is Low resolutions. */
+	private static final String meg004 = "megt90n000cb.img";
+//	private static final String COMPRESSED = "720x1440_JavaFastPFOR_compressed";
 //	private static final String UNCOMPRESSED = "720x1440_uncompressed";
 
-	// megt90n000eb.img has a resolution of 16 pixels per degree (or 0.0625 by 0.0625 degrees)
-	// map scale : 3.705 km per pixel
-//	private static final String FILE = "/maps/megt90n000eb.img";
+	/** meg004 is mid resolutions. */
+	private static final String meg016 = "megt90n000eb.img";
 //	private static final String COMPRESSED = "2880x5760_JavaFastPFOR_compressed";
 //	private static final String UNCOMPRESSED = "2880x5760_uncompressed";
 	
-//	public static final int HEIGHT = 2880;
-//	public static final int WIDTH = 5760;
+	/** meg032 is high resolutions. */
+	private static final String meg032 = "megt90n000fb.img";
+	
+	private static final String PATH = "/maps/";
+	static final String FILE = PATH + meg004;
+	
+	private String[] maps = {PATH + meg004, PATH + meg016, PATH + meg032};
 	
 	// Each number occupies 2 bytes
 	private static final int BUFFER_SIZE = 2;
-//	private static final byte[] buffer = new byte[BUFFER_SIZE]; 
 	
 	// Each number occupies ? bytes
 	private static final int COMPRESSED_BUFFER_SIZE = 4;
@@ -66,24 +78,35 @@ public class MEGDRMapReader {
 	private static int COMPRESSED_N;
 	
 	// Future: switch to using JavaFastPFOR to save memory.
-	private int[] elevation = new int[HEIGHT*WIDTH]; // has 1036800 values ; OR [720*2880] = 2073600 values
+	private short[] elevation;
+	
+	private static short height;
+	private static short width;
 	
 	public static void main(String[] args) throws IOException {
-		new MEGDRMapReader().loadElevation();
+		int level = 1;
+		new MEGDRMapReader(level).loadElevation(level);
 	}
 	
 	/**
-	 * THis class loads NASA's MEGDR elevation dataset 
+	 * This class loads NASA's MEGDR elevation data set. 
 	 * 
-	 * @see <a href="https://github.com/mars-sim/mars-sim/issues/225">GitHub Discussion #225</a>
+	 * @see <a href="https://github.com/mars-sim/mars-sim/issues/225">mars-sim Issue #225</a>
 	 */
-	public MEGDRMapReader() {
+	public MEGDRMapReader(int level) {
+		loadElevation(level);
 	}
 	
-	private int convert2ByteToInt(byte[] data) {
+	/**
+	 * Converts two bytes to a short int.
+	 * 
+	 * @param data
+	 * @return
+	 */
+	private short convert2ByteToShortInt(byte[] data) {
 	    if (data == null || data.length != 2) return 0x0;
 	    // ----------
-	    return (int)( // NOTE: type cast not necessary for int
+	    return (short)( // NOTE: type cast not necessary for int
 	            (0xff & data[0]) << 8  |
 	            (data[0]) << 8  |
 	            (0xff & data[1])
@@ -91,94 +114,52 @@ public class MEGDRMapReader {
 	}
 	
 	/**
-	 * Converts byte array to int array.
+	 * Converts byte array to short array.
 	 * 
 	 * @param data
 	 * @return
 	 */
-	public int[] convertByteArrayToIntArray(byte[] data) {
+	public short[] convertByteArrayToShortIntArray(byte[] data) {
         if (data == null || data.length % 2 != 0) return null;
-        // ----------
-        int[] ints = new int[data.length / 2];
-        for (int i = 0; i < ints.length; i++)
-            ints[i] = ( convert2ByteToInt(new byte[] {
+        int size = data.length / 2;
+        short[] shorts = new short[size];
+        
+        for (int i = 0; i < shorts.length; i++) {
+        	
+        	shorts[i]  = convert2ByteToShortInt(new byte[] {
                     data[(i*2)],
-                    data[(i*2)+1],
-            } ));
-        return ints;
+                    data[(i*2)+1]
+            	});
+        }
+        return shorts;
     }
 	
 	/**
-	 * Loads the elevation data into int array.
+	 * Loads the elevation data into short array.
 	 * 
 	 * @return
 	 */
-	public int[] loadElevation() {	 
-		InputStream inputStream = null; //MEGDRMapReader.class.getResourceAsStream(FILE); //new BufferedInputStream(new FileInputStream(inputFile));
-//		BufferedInputStream bis = null;
+	public short[] loadElevation(int level) {
+		// Select the map resolution
+		String file = maps[level];
 		
-	    try {
-	    	// open input stream test.txt for reading purpose.
-	    	inputStream = MEGDRMapReader.class.getResourceAsStream(FILE);
-			// input stream is converted to buffered input stream
-//			bis = new BufferedInputStream(inputStream);
-			// read number of bytes available
-//			int numByte = bis.available();
-			// byte array declared
-//			byte[] bytes = new byte[numByte];
+	    try (InputStream inputStream = new FileInputStream(FileLocator.locateFile(file))) {
+
 			// Use ByteStreams to convert to byte array
 			byte[] bytes = ByteStreams.toByteArray(inputStream);
 			
-//			System.out.println("# of bytes: " + bytes.length);
-			// It has a total of 2073600 bytes.
+			elevation = convertByteArrayToShortIntArray(bytes);
 			
-			elevation = convertByteArrayToIntArray(bytes);
-
-//			int size = elevation.length;
-//			for (int j=0; j<size; j++) {
-//				if (j % WIDTH == 0) System.out.println();
-//				System.out.print(elevation[j] + " ");
-//			}
+			height = (short) Math.sqrt(elevation.length / 2);
+			width = (short) (height * 2);
 			
-//		    int i = 0;  
-//			while (inputStream.read(buffer) != -1) {
-//				// Combine the 2 bytes into a 16-bit number
-//				//				elevation[i] =  (0xff & buffer[0] << 8) | (0xff & buffer[1]);
-//				elevation[i] = (buffer[0] << 8 ) | (buffer[1] & 0xff);
-//				if (i % WIDTH == 0) System.out.println();
-//				System.out.print(elevation[i] + " ");// + buffer[0] + " " + buffer[1]);
-//				i++;
-//			}
-			
-        if (inputStream != null)
-	        inputStream.close();
-	        
-//        if (bis != null)
-//        	bis.close();
-        
+			logger.info("Reading '" + file + "' - height is " + height + "; width is " + width);
+	            
 		} catch (Exception e) {
 			 System.out.println("Problems in inputStream: " + e.getMessage());
-
 		}
 	    
         return elevation;
-        
-//        try {
-//			write(OUTPUT, elevation);
-//		} catch (IOException e) {
-//		}
-//        
-//        write2ByteArray(UNCOMPRESSED, elevation);
-//        
-//        int[] uncompressed = read2ByteArray(UNCOMPRESSED);
-//        
-//        if(Arrays.equals(elevation, uncompressed)) {
-//            System.out.println("Uncompressed elevation data is recovered from file without loss");
-//        }
-//        else
-//            throw new RuntimeException("bug"); // could use assert
-        		
-//        useJavaFastPFOR();
 	}
 	
 
@@ -204,11 +185,11 @@ public class MEGDRMapReader {
 		return new int[] {maxIndex, max, minIndex, min};
 	}
 	
-	public int[] getElevationArray() {
+	public short[] getElevationArray() {
 		return elevation;
 	}
 	
-	   /**
+	/**
      * This method returns the byte array that represent the contents of 
      * {@code file}.
      * 
@@ -285,157 +266,157 @@ public class MEGDRMapReader {
     	}
     }
     
-    /**
-     * Uses Java Fast PFOR library to compress and uncompress arrays of integers. 
-     * See https://github.com/lemire/JavaFastPFOR.
-     */
-    public void useJavaFastPFOR() {
-//        int ChunkSize = 8192 ; //16384; //32768; // size of each chunk, choose a multiple of 128
-        final int N = elevation.length;
-//        final int TotalSize = N; // some arbitrary number
-        int[] data = elevation;
-        
-        // output vector should be large enough...
-//      int [] compressed = new int[TotalSize + 4096];//1024]; 
-        int[] compressed = new int [N+1024];// could need more
-
-        System.out.println("Compressing " + elevation.length + " integers using friendly interface");
-   
-        IntWrapper inputoffset = new IntWrapper(0);
-        IntWrapper outputoffset = new IntWrapper(0);
-        
-        // CODEC type 1
-        IntegerCODEC codec =  new Composition(
-            new FastPFOR(),
-            new VariableByte());
-        
-        // Compressing
-        codec.compress(data,inputoffset,data.length,compressed,outputoffset);
-
-//        // CODEC type 2
-//        System.out.println("Compressing "+TotalSize+" integers using chunks of "+ChunkSize+" integers ("+ChunkSize*4/1024+"KB)");
-//        System.out.println("(It is often better for applications to work in chunks fitting in CPU cache.)");
+//    /**
+//     * Uses Java Fast PFOR library to compress and uncompress arrays of integers. 
+//     * See https://github.com/lemire/JavaFastPFOR.
+//     */
+//    public void useJavaFastPFOR() {
+////        int ChunkSize = 8192 ; //16384; //32768; // size of each chunk, choose a multiple of 128
+//        final int N = elevation.length;
+////        final int TotalSize = N; // some arbitrary number
+//        int[] data = elevation;
 //        
-//        // Most of the processing
-//        // will be done with binary packing, and leftovers will
-//        // be processed using variable byte, using variable byte
-//        // only for the last chunk!
-//        IntegratedIntegerCODEC regularcodec =  new IntegratedBinaryPacking();
-//        IntegratedVariableByte ivb = new IntegratedVariableByte();
-//        IntegratedIntegerCODEC lastcodec =  new IntegratedComposition(regularcodec,ivb);
+//        // output vector should be large enough...
+////      int [] compressed = new int[TotalSize + 4096];//1024]; 
+//        int[] compressed = new int [N+1024];// could need more
+//
+//        System.out.println("Compressing " + elevation.length + " integers using friendly interface");
+//   
+//        IntWrapper inputoffset = new IntWrapper(0);
+//        IntWrapper outputoffset = new IntWrapper(0);
+//        
+//        // CODEC type 1
+//        IntegerCODEC codec =  new Composition(
+//            new FastPFOR(),
+//            new VariableByte());
 //        
 //        // Compressing
-//        for(int k = 0; k < TotalSize / ChunkSize; ++k)
-//            regularcodec.compress(data,inputoffset,ChunkSize,compressed,outputoffset);
+//        codec.compress(data,inputoffset,data.length,compressed,outputoffset);
+//
+////        // CODEC type 2
+////        System.out.println("Compressing "+TotalSize+" integers using chunks of "+ChunkSize+" integers ("+ChunkSize*4/1024+"KB)");
+////        System.out.println("(It is often better for applications to work in chunks fitting in CPU cache.)");
+////        
+////        // Most of the processing
+////        // will be done with binary packing, and leftovers will
+////        // be processed using variable byte, using variable byte
+////        // only for the last chunk!
+////        IntegratedIntegerCODEC regularcodec =  new IntegratedBinaryPacking();
+////        IntegratedVariableByte ivb = new IntegratedVariableByte();
+////        IntegratedIntegerCODEC lastcodec =  new IntegratedComposition(regularcodec,ivb);
+////        
+////        // Compressing
+////        for(int k = 0; k < TotalSize / ChunkSize; ++k)
+////            regularcodec.compress(data,inputoffset,ChunkSize,compressed,outputoffset);
+////        
+////        lastcodec.compress(data, inputoffset, TotalSize % ChunkSize, compressed, outputoffset);
+//            
+//        System.out.println("Reduce size of unsorted integers from "
+//        		+ data.length*4/1024+"KB to " 
+//        		+ outputoffset.intValue()*4/1024+"KB");
+//        System.out.println("compressed.length : " + compressed.length + "    N + 1024 : " + (N + 1024));
+//
+//        // we can repack the data: (optional)
+//        compressed = Arrays.copyOf(compressed,outputoffset.intValue());
 //        
-//        lastcodec.compress(data, inputoffset, TotalSize % ChunkSize, compressed, outputoffset);
-            
-        System.out.println("Reduce size of unsorted integers from "
-        		+ data.length*4/1024+"KB to " 
-        		+ outputoffset.intValue()*4/1024+"KB");
-        System.out.println("compressed.length : " + compressed.length + "    N + 1024 : " + (N + 1024));
-
-        // we can repack the data: (optional)
-        compressed = Arrays.copyOf(compressed,outputoffset.intValue());
-        
-        COMPRESSED_N = compressed.length;
-        System.out.println("Repacking compressed int[], size of COMPRESSED_N : " + COMPRESSED_N);
-
-        // CODEC type 1
-        int[] recovered = new int[N];
-        IntWrapper recoffset = new IntWrapper(0);
-        codec.uncompress(compressed,
-        		new IntWrapper(0),
-        		compressed.length,
-        		recovered,
-        		recoffset);
-        
-//        // CODEC type 2
-//        // We are *not* assuming that the original array length is known, however
-//        // we assume that the chunk size (ChunkSize) is known.
-//        int[] recovered = new int[ChunkSize]; // TotalSize];//
-//        IntWrapper compoff = new IntWrapper(0);
-//        IntWrapper recoffset;
-//        int currentpos = 0;
+//        COMPRESSED_N = compressed.length;
+//        System.out.println("Repacking compressed int[], size of COMPRESSED_N : " + COMPRESSED_N);
 //
-//        while(compoff.get()<compressed.length) {
-//            recoffset = new IntWrapper(0);
-//            regularcodec.uncompress(compressed,compoff,compressed.length - compoff.get(),recovered,recoffset);
-//
-//            if(recoffset.get() < ChunkSize) {// last chunk detected
-//                ivb.uncompress(compressed,compoff,compressed.length - compoff.get(),recovered,recoffset);
-//            }
-//            for(int i = 0; i < recoffset.get(); ++i) {
-//                if(data[currentpos+i] != recovered[i]) throw new RuntimeException("bug"); // could use assert
-//            }
-//            currentpos += recoffset.get();
+//        // CODEC type 1
+//        int[] recovered = new int[N];
+//        IntWrapper recoffset = new IntWrapper(0);
+//        codec.uncompress(compressed,
+//        		new IntWrapper(0),
+//        		compressed.length,
+//        		recovered,
+//        		recoffset);
+//        
+////        // CODEC type 2
+////        // We are *not* assuming that the original array length is known, however
+////        // we assume that the chunk size (ChunkSize) is known.
+////        int[] recovered = new int[ChunkSize]; // TotalSize];//
+////        IntWrapper compoff = new IntWrapper(0);
+////        IntWrapper recoffset;
+////        int currentpos = 0;
+////
+////        while(compoff.get()<compressed.length) {
+////            recoffset = new IntWrapper(0);
+////            regularcodec.uncompress(compressed,compoff,compressed.length - compoff.get(),recovered,recoffset);
+////
+////            if(recoffset.get() < ChunkSize) {// last chunk detected
+////                ivb.uncompress(compressed,compoff,compressed.length - compoff.get(),recovered,recoffset);
+////            }
+////            for(int i = 0; i < recoffset.get(); ++i) {
+////                if(data[currentpos+i] != recovered[i]) throw new RuntimeException("bug"); // could use assert
+////            }
+////            currentpos += recoffset.get();
+////        }
+//        
+//        System.out.println("recovered.length : " + recovered.length);
+//        
+//        if(Arrays.equals(data, recovered)) {
+//            System.out.println("Elevation data is recovered in memory without loss");
+//            write4ByteArray(COMPRESSED, compressed);
 //        }
-        
-        System.out.println("recovered.length : " + recovered.length);
-        
-        if(Arrays.equals(data, recovered)) {
-            System.out.println("Elevation data is recovered in memory without loss");
-            write4ByteArray(COMPRESSED, compressed);
-        }
-        else
-            throw new RuntimeException("bug"); // could use assert
-  
-//        IntWrapper outputoffset2 = new IntWrapper(0);
-        
-        int[] compressed2 = read4ByteArray(COMPRESSED);
-        System.out.println("compressed2.length : " + compressed2.length);
-        		
-        // we can repack the data: (optional)
-//        compressed2 = Arrays.copyOf(compressed2, outputoffset2.intValue());
-//        System.out.println("Repacking compressed2, compressed2.length : " + compressed2.length);
-        
-        int[] recovered2 = new int[N];
-        IntWrapper recoffset2 = new IntWrapper(0);
-        codec.uncompress(compressed2,
-        		new IntWrapper(0),
-        		compressed2.length,
-        		recovered2,
-        		recoffset2);
-        
-//        // CODEC type 2
-//        // We are *not* assuming that the original array length is known, however
-//        // we assume that the chunk size (ChunkSize) is known.
-//        int[] recovered2 = new int[ChunkSize];
-//        IntWrapper compoff2 = new IntWrapper(0);
-//        IntWrapper recoffset2;
-//        int currentpos2 = 0;
-//
-//        while(compoff.get( )< compressed2.length) {
-//            recoffset2 = new IntWrapper(0);
-//            regularcodec.uncompress(compressed2,
-//            		compoff2,
-//            		compressed2.length - compoff2.get(),
-//            		recovered2,
-//            		recoffset2);
-//
-//            if(recoffset2.get() < ChunkSize) {// last chunk detected
-//                ivb.uncompress(compressed2,
-//                		compoff2,
-//                		compressed2.length - compoff2.get(),
-//                		recovered2,
-//                		recoffset2);
-//            }
-//            for(int i = 0; i < recoffset2.get(); ++i) {
-//                if(data[currentpos2+i] != recovered2[i]) throw new RuntimeException("bug"); // could use assert
-//            }
-//            currentpos2 += recoffset2.get();
+//        else
+//            throw new RuntimeException("bug"); // could use assert
+//  
+////        IntWrapper outputoffset2 = new IntWrapper(0);
+//        
+//        int[] compressed2 = read4ByteArray(COMPRESSED);
+//        System.out.println("compressed2.length : " + compressed2.length);
+//        		
+//        // we can repack the data: (optional)
+////        compressed2 = Arrays.copyOf(compressed2, outputoffset2.intValue());
+////        System.out.println("Repacking compressed2, compressed2.length : " + compressed2.length);
+//        
+//        int[] recovered2 = new int[N];
+//        IntWrapper recoffset2 = new IntWrapper(0);
+//        codec.uncompress(compressed2,
+//        		new IntWrapper(0),
+//        		compressed2.length,
+//        		recovered2,
+//        		recoffset2);
+//        
+////        // CODEC type 2
+////        // We are *not* assuming that the original array length is known, however
+////        // we assume that the chunk size (ChunkSize) is known.
+////        int[] recovered2 = new int[ChunkSize];
+////        IntWrapper compoff2 = new IntWrapper(0);
+////        IntWrapper recoffset2;
+////        int currentpos2 = 0;
+////
+////        while(compoff.get( )< compressed2.length) {
+////            recoffset2 = new IntWrapper(0);
+////            regularcodec.uncompress(compressed2,
+////            		compoff2,
+////            		compressed2.length - compoff2.get(),
+////            		recovered2,
+////            		recoffset2);
+////
+////            if(recoffset2.get() < ChunkSize) {// last chunk detected
+////                ivb.uncompress(compressed2,
+////                		compoff2,
+////                		compressed2.length - compoff2.get(),
+////                		recovered2,
+////                		recoffset2);
+////            }
+////            for(int i = 0; i < recoffset2.get(); ++i) {
+////                if(data[currentpos2+i] != recovered2[i]) throw new RuntimeException("bug"); // could use assert
+////            }
+////            currentpos2 += recoffset2.get();
+////        }
+//         
+//        System.out.println("recovered2.length : " + recovered2.length);
+//        
+////        if(Arrays.equals(recovered, recovered2)) {       
+//        if(Arrays.equals(data, recovered2)) {
+//            System.out.println("Elevation data is recovered from the file without loss");
 //        }
-         
-        System.out.println("recovered2.length : " + recovered2.length);
-        
-//        if(Arrays.equals(recovered, recovered2)) {       
-        if(Arrays.equals(data, recovered2)) {
-            System.out.println("Elevation data is recovered from the file without loss");
-        }
-        else
-            throw new RuntimeException("bug"); // could use assert
-
-    }
+//        else
+//            throw new RuntimeException("bug"); // could use assert
+//
+//    }
     
     public void write4ByteArray(String filename, int[] array) {
     	int size = array.length;
@@ -543,6 +524,14 @@ public class MEGDRMapReader {
         
         return compressed;
     }
+
+	public short getHeight() {
+		return height;
+	}
+
+	public short getWidth() {
+		return width;
+	}
     
 //    static IntegratedIntCompressor iic = new IntegratedIntCompressor(
 //            new SkippableIntegratedComposition(

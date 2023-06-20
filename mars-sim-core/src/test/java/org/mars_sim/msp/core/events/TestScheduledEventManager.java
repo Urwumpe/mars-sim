@@ -10,11 +10,11 @@ public class TestScheduledEventManager extends AbstractMarsSimUnitTest  {
 
 	private static class TestHandler implements ScheduledEventHandler {
 
+		private static final long serialVersionUID = 1L;
+		
 		private String description;
 		private int counter = 0;
-		private int repeatDuration;
-
-		
+		private int repeatDuration;	
 
 		public TestHandler(String description, int repeatDuration) {
 			this.description = description;
@@ -27,7 +27,7 @@ public class TestScheduledEventManager extends AbstractMarsSimUnitTest  {
 		}
 
 		@Override
-		public int execute() {
+		public int execute(MarsClock now) {
 			counter++;
 			return repeatDuration;
 		}

@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * UnitWindow.java
- * @date 2022-10-24
+ * @date 2023-06-04
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window;
@@ -9,41 +9,47 @@ package org.mars_sim.msp.ui.swing.unit_window;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Image;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Properties;
 
+import javax.swing.Icon;
 import javax.swing.ImageIcon;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
-import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.ui.swing.ConfigurableWindow;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.MainWindow;
 import org.mars_sim.msp.ui.swing.ModalInternalFrame;
-
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.tabbedpane.WebTabbedPane;
 
 
 /**
  * The UnitWindow is the base window for displaying units.
  */
 @SuppressWarnings("serial")
-public abstract class UnitWindow extends ModalInternalFrame implements ChangeListener {
+public abstract class UnitWindow extends ModalInternalFrame
+			implements ConfigurableWindow {
+
+	private static final String AGENCY_FOLDER = "agency/";	
+	private static final String UNIT_TYPE = "unittype";
+	private static final String UNIT_NAME = "unitname";
+	private static final String SELECTED_TAB = "selected_tab";
 
 	public static final int WIDTH = 530;
 	public static final int HEIGHT = 620;
-
 	public static final int STATUS_HEIGHT = 60;
 	
-	public static final String USER = Msg.getString("icon.user");
-
 	/** The tab panels. */
 	private List<TabPanel> tabPanels;
 	/** The center panel. */
@@ -58,7 +64,7 @@ public abstract class UnitWindow extends ModalInternalFrame implements ChangeLis
 	protected Unit unit;
 
 	/**
-	 * Constructor
+	 * Constructor.
 	 *
 	 * @param desktop        the main desktop panel.
 	 * @param unit           the unit for this window.
@@ -74,31 +80,36 @@ public abstract class UnitWindow extends ModalInternalFrame implements ChangeLis
 
 		setFrameIcon(MainWindow.getLanderIcon());
 
+		Dimension windowSize;
 		if (unit.getUnitType() == UnitType.PERSON 
 				|| unit.getUnitType() == UnitType.SETTLEMENT) {
-			setMaximumSize(new Dimension(WIDTH, HEIGHT));
-			setPreferredSize(new Dimension(WIDTH, HEIGHT));
+			
+			windowSize = new Dimension(WIDTH, HEIGHT);
 		}
 		else { // for robot, equipment and vehicle
-			setMaximumSize(new Dimension(WIDTH, HEIGHT - STATUS_HEIGHT));
-			setPreferredSize(new Dimension(WIDTH, HEIGHT - STATUS_HEIGHT));
+			windowSize = new Dimension(WIDTH, HEIGHT - STATUS_HEIGHT);
 		}
 
+		setMaximumSize(windowSize);
+		setPreferredSize(windowSize);
 		this.setIconifiable(false);
 
 		initializeUI();
 	}
 
+	/**
+	 * Initializes the UI elements.
+	 */
 	private void initializeUI() {
 
 		tabPanels = new ArrayList<>();
 
 		// Create main panel
-		WebPanel mainPane = new WebPanel(new BorderLayout());
+		JPanel mainPane = new JPanel(new BorderLayout());
 		setContentPane(mainPane);
 
-		tabPane = new WebTabbedPane(WebTabbedPane.LEFT, WebTabbedPane.SCROLL_TAB_LAYOUT);
-		tabPane.setPreferredSize(new Dimension(WIDTH - 45, HEIGHT - 120));
+		tabPane = new JTabbedPane(JTabbedPane.LEFT, JTabbedPane.SCROLL_TAB_LAYOUT);
+		tabPane.setPreferredSize(new Dimension(WIDTH - 25, HEIGHT - 120));
 
 		// Add a listener for the tab changes
 		tabPane.addChangeListener(new ChangeListener() {
@@ -114,27 +125,20 @@ public abstract class UnitWindow extends ModalInternalFrame implements ChangeLis
 		});
 
 
-		WebPanel centerPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+		JPanel centerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		centerPanel.add(tabPane);
 
 		mainPane.add(centerPanel, BorderLayout.CENTER);
-
-		// Add focusListener to play sounds and alert users of critical conditions.
-		// Disabled in SVN while in development
-		// this.addInternalFrameListener(new
-		// UniversalUnitWindowListener(UnitInspector.getGlobalInstance()));
-
-		desktop.getMainWindow().initializeTheme();//initializeWeblaf();
 	}
 
 	/**
-	 * Sets the image on the label
+	 * Sets the image on the label.
 	 *
 	 * @param imageLocation
 	 * @param label
 	 */
-	public void setImage(String imageLocation, WebLabel label) {
-		ImageIcon imageIcon = ImageLoader.getNewIcon(imageLocation);
+	protected static void setImage(String imageLocation, JLabel label) {
+		Icon imageIcon = ImageLoader.getIconByName(imageLocation);
 		label.setIcon(imageIcon);
 	}
 
@@ -146,17 +150,6 @@ public abstract class UnitWindow extends ModalInternalFrame implements ChangeLis
 	protected final void addTabPanel(TabPanel panel) {
 		if (!tabPanels.contains(panel)) {
 			tabPanels.add(panel);
-		}
-	}
-
-	/**
-	 * Adds the death tab panel to the center panel.
-	 *
-	 * @param panel the death tab panel to add.
-	 */
-	protected final void addDeathPanel(TabPanel panel) {
-		if (!tabPanels.contains(panel)) {
-			tabPanels.add(0, panel);
 		}
 	}
 	
@@ -175,9 +168,7 @@ public abstract class UnitWindow extends ModalInternalFrame implements ChangeLis
 	 * Sorts tab panels.
 	 */
 	protected void sortTabPanels() {
-		tabPanels = tabPanels.stream()
-				.sorted((t1, t2) -> t1.getTabTitle().compareTo(t2.getTabTitle()))
-				.collect(Collectors.toList());
+		Collections.sort(tabPanels, (t1, t2) -> t1.getTabTitle().compareTo(t2.getTabTitle()));
 	}
 	
 	/**
@@ -186,15 +177,6 @@ public abstract class UnitWindow extends ModalInternalFrame implements ChangeLis
 	protected void addTabIconPanels() {
 		tabPanels.forEach(panel -> {
 			tabPane.addTab(null, panel.getTabIcon(), panel, panel.getTabToolTip());
-		});
-	}
-	
-	/**
-	 * Adds tab panels with titles.
-	 */
-	protected void addTabTitlePanels() {
-		tabPanels.forEach(panel -> {
-			tabPane.addTab(panel.getTabTitle(), null, panel, panel.getTabToolTip());
 		});
 	}
 	
@@ -228,12 +210,8 @@ public abstract class UnitWindow extends ModalInternalFrame implements ChangeLis
 		return null;
     }
 
-	public void setTitle(String value) {
-		super.setTitle(unit.getName());
-	}
-
 	/**
-	 * Return the currently selected tab.
+	 * Returns the currently selected tab.
 	 *
 	 * @return Monitor tab being displayed.
 	 */
@@ -246,6 +224,78 @@ public abstract class UnitWindow extends ModalInternalFrame implements ChangeLis
 		return selected;
 	}
 
+	@Override
+	public Properties getUIProps() {
+		Properties result = new Properties();
+		result.setProperty(UNIT_NAME, unit.getName());
+		result.setProperty(UNIT_TYPE, unit.getUnitType().name());
+		result.setProperty(SELECTED_TAB, getSelected().getTabTitle());
+
+		return result;
+	}
+
+	/**
+	 * Applies the preciously saved UI props to a window.
+	 * 
+	 * @param props
+	 */	
+    public void setUIProps(Properties props) {
+		String previousSelection = props.getProperty(SELECTED_TAB);
+		if (previousSelection != null) {
+			for(TabPanel tb : tabPanels) {
+				if (tb.getTabTitle().equals(previousSelection)) {
+					tabPane.setSelectedComponent(tb);
+					break;
+				}
+			}
+		}
+    }
+
+	/**
+	 * Finds a Unit from a previously generated UI Settings instance.
+	 * 
+	 * @see #getUIProps()
+	 * @param uMgr
+	 * @param settings
+	 * @return
+	 */
+	public static Unit getUnit(UnitManager uMgr, Properties settings) {
+		String type = settings.getProperty(UNIT_TYPE);
+		String name = settings.getProperty(UNIT_NAME);
+
+		if ((type != null) && (name != null)) {
+			UnitType uType = UnitType.valueOf(type);
+			return uMgr.getUnitByName(uType, name);
+		}
+		return null;
+	}
+	
+    /**
+     * Creates and returns space agency label.
+     * 
+     * @return
+     */
+    public JLabel agencyLabel() {
+		// Add space agency img
+		String agencyStr = null;
+		
+		if (unit.getUnitType() == UnitType.SETTLEMENT) {
+			agencyStr = ((Settlement)unit).getReportingAuthority().getName();
+		}
+		else
+			agencyStr = unit.getAssociatedSettlement().getReportingAuthority().getName();
+
+		Image img = (ImageLoader.getImage(AGENCY_FOLDER + agencyStr))
+				.getScaledInstance(UnitWindow.STATUS_HEIGHT - 5, UnitWindow.STATUS_HEIGHT - 5,
+		        Image.SCALE_SMOOTH);
+		
+		JLabel agencyLabel = new JLabel(new ImageIcon(img));
+		agencyLabel.setSize(new Dimension(-1, UnitWindow.STATUS_HEIGHT - 5));
+	
+		return agencyLabel;
+    }
+    
+    
 	/**
 	 * Prepares unit window for deletion.
 	 */
@@ -257,4 +307,5 @@ public abstract class UnitWindow extends ModalInternalFrame implements ChangeLis
 		desktop = null;
 		unit = null;
 	}
+
 }

@@ -1,7 +1,7 @@
 [![Release version](https://img.shields.io/github/v/release/mars-sim/mars-sim?sort=semver&color=blue&label=release&style=flat-square)](https://github.com/mars-sim/mars-sim/releases/latest)
 [![Repo Size](https://img.shields.io/github/repo-size/mars-sim/mars-sim?style=flat-square)](https://github.com/mars-sim/mars-sim/releases/latest)
-[![Commits Since](https://img.shields.io/github/commits-since/mars-sim/mars-sim/3.4.0?sort=semver)](https://github.com/mars-sim/mars-sim/commits)
-[![Commits Since](https://img.shields.io/github/commits-since/mars-sim/mars-sim/3.3.0?sort=semver)](https://github.com/mars-sim/mars-sim/commits)
+[![Commits Since](https://img.shields.io/github/commits-since/mars-sim/mars-sim/v3.5.0?sort=semver)](https://github.com/mars-sim/mars-sim/commits)
+[![Commits Since](https://img.shields.io/github/commits-since/mars-sim/mars-sim/v3.4.1?sort=semver)](https://github.com/mars-sim/mars-sim/commits)
 [![Last Commit](https://img.shields.io/github/last-commit/mars-sim/mars-sim?style=flat-square)](https://github.com/mars-sim/mars-sim/commits)
 [![GitHub Downloads](https://img.shields.io/github/downloads/mars-sim/mars-sim/total?label=gitHub%20downloads&style=flat-square&color=blue)](https://github.com/mars-sim/mars-sim/releases)
 
@@ -13,13 +13,51 @@
 [![SF Monthly Download](https://img.shields.io/sourceforge/dm/mars-sim.svg?label=sf%20download&style=flat-square)](https://sourceforge.net/projects/mars-sim/files/mars-sim/)
 
 
+# $$\color{#D29922}\textsf{\kern{0.2cm}\normalsize mars-sim}$$ 
 
-# mars-sim
-*The Mars Simulation Project* is a Java-based [open source](https://opensource.dev/) project that
-simulates daily activities of the first generation of settlers on Mars with a higher fidelity of
-modeling and simulation details than a typical PC strategy game.
+## Table of Contents
+* [Introduction](#introduction)  
+   * [Simulation](#simulation)
+   * [Exploration](#exploration)
+   * [Mars Direct Mission Plan](mars-direct-mission-plan) 
+   * [Settlement](#settlement)
+   * [Economics](#economics)   
+   * [Countries](#countries)   
+* [Operation Modeling](#operation-modeling)
+   * [Timekeeping](#timekeeping)
+   * [Indoor Atmosphere](#indoor-atmosphere)
+   * [EVA](#eva)
+   * [Radiation](#radiation)
+   * [Job](#job)
+   * [Role](#role)
+   * [Task](#task)
+   * [Work Shift](#work-shift)
+   * [Mission](#mission)
+   * [Weather](#weather)
+   * [Maintenance and Malfunction](#maintenance-and-malfunction)
+* [Summary](#summary)
+* [Set up](#set-up)
+   * [Prerequisites](#prerequisites)
+   * [JDK and JavaFX](#jdk-and-javafx)
+   * [OS Platforms](#os-platforms)
+   * [Remote Console Connection](#remote-console-connection)
+* [Outreach](#outreach)
+* [Discussions](#discussions)
+* [Issues and Tickets](#issues-and-tickets)
+* [Contribution](#contribution)
+* [Website](#website)
+* [Wiki](#wiki)
+* [Supported Platforms](#supported-platforms)
+* [Official Codebase](#official-codebase)
+* [Download](#download)
+* [License](#license)
 
 ---
+
+# Introduction
+*The Mars Simulation Project* is a Java-based [open source](https://opensource.dev/) project that
+simulates mission operations and activities of initial settlers on Mars with a higher fidelity of 
+modeling and simulation details than a classic PC game of its genre.
 
 ## Simulation
 mars-sim is designed to be a **general purpose** simulator depicting the early development of human settlements on Mars.
@@ -44,15 +82,62 @@ For instance, each settler is assigned with a job, a role, having technical
 They build [relationship](https://github.com/mars-sim/mars-sim/wiki/Relationship)
 as they interact and work with one another. They are there to live, dream, explore, and settle Mars.
 
+## Exploration
+
+History is shaped by pioneers. The exploration of Mars started in the 1960s with sending robotic 
+spacecraft to orbit the planet. The apex of this spirit of exploration will be culminated by the first human landing 
+in near future. Early explorers of Mars will come face-to-face with insurmountable challenges. 
+The first generations human explorers will not explore long distances from their habitat but within 
+a region being called an "Exploration Zone", say, within 100 km of their landing. Many mission planning
+activities would have been taken place prior to their arrival to first identify all the Science and Resource 
+Region of Interests (ROI). mars-sim is modeled to simulate the exploration of Mars within a decade after 
+the first landing. Humanity has shifted into high gears with the effort of making Mars the second home.
+
+## Mars Direct Mission Plan 
+
+mars-sim loosely follows the *Mars Direct Mission Plan by Robert Zubrin* and has crafted 5 basic
+settlement types, namely, Phase 1 Base, Phase 2 Base, Phase 3 Base, Alpha Base and special outposts. 
+
+In general, a 4-settler initial base is called a *Mars Direct Plan (MDP) Phase 1* template. An 8-settler base
+is constructed under *MDP Phase 2* template. A 12-settler base is *MDP Phase 3*. A 24-settler base
+is designated as *Alpha Base*. Besides, players may build a *Trading Outpost* or a *Mining Depot*
+near sites with high mineral concentrations. 
+
+Depending on its country or origin and/or sponsor, each template may vary in the numbers and types of building it contains.
+Altogether, there is a total of 24 [settlement templates](https://github.com/mars-sim/mars-sim/wiki/Settlement-Templates) 
+to choose from.
+
+## Settlement
+
+The selection of a landing site is determined by a variety of factors. 
+One of the goals of mars-sim is to populate Mars with human settlements.
+Each settlement has an initial sponsor to guide its development but will eventually develop
+its own *[command structure](https://github.com/mars-sim/mars-sim/wiki/Role)* and
+*[development objective](https://github.com/mars-sim/mars-sim/wiki/Settlement-Objective)*.
+
+## Economics
+
+In terms of [economics](https://github.com/mars-sim/mars-sim/wiki/Economics) modeling, mars-sim implements the
+**Value Point (VP)** system, which keeps track of the supply and demand on each good and resource.
+As there is no standard currency established on Mars yet, settlers barter trades with neighboring settlements
+by keeping track of the credits and deficit based on the VPs of the resources in exchange in each trading session.
+
+## Countries 
+
+It is an incredible undertaking in that 30 [countries](https://github.com/mars-sim/mars-sim/wiki/Countries) 
+are participating in this dream of making Mars as the second home for humanity. Altogether, there's a total of 9 
+possible space agencies to choose from as a sponsor to start a settlement. Notably, European Space Agency (ESA) 
+is a bloc that consists of 22 member nations willing to fund this space development effort. 
+
 ---
 
-## Operation Modeling
+# Operation Modeling
 
 mars-sim depicts near-term human exploration and settlement on Mars. It speaks of a rich scientific
 language selected from research journal and paper in defining operation paradigms and programming models
 that are based on present-day technologies.
 
-### Timekeeping
+## Timekeeping
 
 Without a doubt, settlers need a timekeeping standard system for tracking the passage of time. 
 That's because living on Mars does require a functioning Martian calendar in which settlers may keep track 
@@ -66,7 +151,7 @@ between Mars and Earth by merely a simple equation.
 See [timekeeping wiki](https://github.com/mars-sim/mars-sim/wiki/Timekeeping) for further discussions on 
 this topic.
 
-### Indoor Atmospheric Modeling
+## Indoor Atmosphere
 
 While at the Earth's sea level, the atmospheric pressure is **101.35 kPa** (14.7 psi) and has 20.9% oxygen,
 in mars-sim, a low pressure atmosphere of **34 kPa** (4.93 psi) is chosen for the settlement living with
@@ -92,7 +177,7 @@ Structurally speaking, a low-pressure environment reduces the need for a rigid s
 various load requirements for a building. It also facilitates occupants' Extra-Vehicular Activity (EVA)
 with the outside world.
 
-### EVA Modeling 
+## EVA
 
 An example of operation modeling is the sequence of steps involving the ingress and egress of airlocks.
 
@@ -108,16 +193,19 @@ All rovers have vehicular airlock built-in.
 To perform a team EVA, one of the members will be selected as the *airlock operator*, who will ensure that proper
 procedures be followed before going out for an EVA or after coming back from an EVA.
 
-In case of an egress operation, (1) the airlock would have to be *pressurized*. (2) The air would be heated
-so that the atmospheric pressure and temperature are equalized. (3) Next, the airlock operator would unlock
-and open the inner door. (4) The whole team would enter into the airlock. (5) After all have donned
-EVA suits, the operator will depressurize the chamber and gases would be re-captured to match the
-outside air pressure. (6) At last, he/she would unlock and open the outer door and the whole team will
-exit to the outside surface of Mars.
+In case of an egress operation, 
+(1) the airlock would have to be *pressurized*. 
+(2) The air would be heated
+so that the atmospheric pressure and temperature are equalized. 
+(3) Next, the airlock operator would unlock and open the inner door. 
+(4) The whole team would enter into the airlock. 
+(5) After all have donned EVA suits, the operator will depressurize the chamber and gases would be re-captured to match the
+outside air pressure. 
+(6) At last, he/she would unlock and open the outer door and the whole team will exit to the outside surface of Mars.
 
 See [Airlock wiki](https://github.com/mars-sim/mars-sim/wiki/Airlock) for details on this topic.
 
-### Radiation Modeling 
+## Radiation
 
 Another example is [Radiation Modeling](https://github.com/mars-sim/mars-sim/wiki/Radiation-Exposure),
 which account for how often the **Galactic Cosmic Ray (GCR)** and **Solar Energetic Particles (SEP)**
@@ -126,69 +214,53 @@ namely, the 30-day, the annual and the career lifetime of a settler. It would af
 of our body, namely, the *Blood Forming Organs (BFO)*, the *Ocular Lens*, and the *Skin*. The dose limits are
 measured in *milli-Severt*.
 
-### Economic Modeling
+## Job
 
-In terms of [economics](https://github.com/mars-sim/mars-sim/wiki/Economics) modeling, mars-sim implements the
-**Value Point (VP)** system, which keeps track of the supply and demand on each good and resource.
-As there is no standard currency established on Mars yet, settlers barter trades with neighboring settlements
-by keeping track of the credits and deficit based on the VPs of the resources in exchange in each trading session.
+Each settler is initially assigned a meaningful [job](https://github.com/mars-sim/mars-sim/wiki/Jobs) 
+that fit one's attributes and career profile. Player may designate the job of a settler in the xml file.
 
-### Earth Space Agencies 
+## Role
 
-A settler may come from any one of 29 major countries as listed in this [countries wiki](https://github.com/mars-sim/mars-sim/wiki/Countries).
+Each settlement has a command structure that brings each settler a [role](https://github.com/mars-sim/mars-sim/wiki/Role) 
+to play. 
 
-Note that the European Space Agency (ESA) consists of 22 member nations who are funding the space development effort.
+## Task
 
-Altogether, there's also 10 possible space agencies that can be acted as a sponsor to a settlement.
-
-### Job, Work Shift and Task Modeling
-
-Settlers spend much of their time learning to *live off the land*. Assigning a meaningful [role](https://github.com/mars-sim/mars-sim/wiki/Role) 
-with interesting [job](https://github.com/mars-sim/mars-sim/wiki/Jobs) to each settler is crucial. 
-Each settler is assigned a [work shift](https://github.com/mars-sim/mars-sim/wiki/Work-Shift) and 
-engages in various [tasks](https://github.com/mars-sim/mars-sim/wiki/Tasks) such as
-maintenance, ensuring life support resources are plentifully supplied, growing food crops in
+Settlers spend much of their time learning to *live off the land* and engage in various 
+[tasks](https://github.com/mars-sim/mars-sim/wiki/Tasks) such as maintenance, 
+ensuring life support resources are plentifully supplied, growing food crops in
 [greenhouses](https://github.com/mars-sim/mars-sim/wiki/Greenhouse-Operation), making secondary
 [food products](https://github.com/mars-sim/mars-sim/wiki/Food-Production), and manufacturing needed parts
 and equipment in workshops, all of which are vital to the health of the economy of the settlements. 
 
-### Mission Modeling
+## Work Shift
+
+Each settler is assigned a [work shift](https://github.com/mars-sim/mars-sim/wiki/Work-Shift) during each sol.
+The duration of a work shift may be one third of a sol or a quarter of a sol.
+
+## Mission
 
 Settlers also go out on field [Missions](https://github.com/mars-sim/mars-sim/wiki/Missions) to explore and
 study the surrounding landscapes, to prospect and mine minerals, and to trade with neighboring settlements, etc.
 They may even decide to migrate from one settlement to another.
 
-### Weather Modeling
+## Weather
 
 The perils of living on Mars are very real. Even though we do not have a complete surface weather model for Mars,
 we do currently simulate a total of 9 outside [weather metrics](https://github.com/mars-sim/mars-sim/wiki/Weather)
 in mars-sim. 
 
-### Reliability, Maintenance and Malfunction Modeling
+## Maintenance and Malfunction
 
-The perils of living on Mars are very real. There is a total of 39 types of [Malfunctions](https://github.com/mars-sim/mars-sim/wiki/Malfunctions)
-that can occur at a given moment. There are 3 metrics
-for tracking how reliable a part is, namely, [Reliability](https://github.com/mars-sim/mars-sim/wiki/Reliability)
-percentage, Failure Rate, Mean Time Between Failure (MTBF), which are dynamically updated in light of any incidents
-that occur during the simulation. Besides malfunction, workshops and machinery factories are to produce parts for
+The perils of living on Mars are very real. There is a total of 39 types of 
+[Malfunctions](https://github.com/mars-sim/mars-sim/wiki/Malfunctions) that can occur at a given moment. 
+
+There are 3 metrics for tracking how reliable a Part is. The [Reliability](https://github.com/mars-sim/mars-sim/wiki/Reliability)
+is shown in terms of Percentage, Failure Rate, Mean Time Between Failure (MTBF), which are 
+dynamically updated in light of any incidents that occur during the simulation. Besides 
+malfunction, workshops and machinery factories are to produce parts for
 replenishing parts to be used during regular [maintenance](https://github.com/mars-sim/mars-sim/wiki/Maintenance) tasks.
 
----
-
-## Settlement Development
-
-One of the goals of mars-sim is to populate the surface of Mars with human settlements.
-Each settlement has an initial sponsor to guide its development but will eventually develop
-its own *[command structure](https://github.com/mars-sim/mars-sim/wiki/Role)* and
-*[development objective](https://github.com/mars-sim/mars-sim/wiki/Settlement-Objective)*.
-
-mars-sim loosely follows the *Mars Direct Mission Plan by Robert Zubrin* and has 6 basic types of
-[settlement templates](https://github.com/mars-sim/mars-sim/wiki/Settlement-Templates) to choose from.
-A 4-settler initial base is called a *Mars Direct Plan (MDP) Phase 1* template. An 8-settler base
-is constructed under *MDP Phase 2* template. A 12-settler base is *MDP Phase 3*. A 24-settler base
-is designated as *Alpha Base*. Besides, players may build a *Trading Outpost* or a *Mining Depot*
-near sites with high mineral concentrations. Depending on its country or origin and/or sponsor,
-each level of template may vary in the numbers and types of building it contains.
 
 ---
 
@@ -203,9 +275,11 @@ planetary surface.
 
 ---
 
-## Getting Started
+# Set up
 
-### Prerequisites
+Below is a summary of how player may set up one's machine to evaluate and develop mars-sim
+
+## Prerequisites
 
 <a href="https://foojay.io/today/works-with-openjdk">
    <img align="right"
@@ -213,13 +287,12 @@ planetary surface.
         width="100">
 </a>
 
-Currently, mars-sim supports Java 11. We will transition to Java 17 in near future
-as JDK 17 is the latest long-term support (LTS) release.
+Currently, mars-sim supports Java 17 which is the latest long-term support (LTS) release.
 
-* Requires only JRE 11 for running mars-sim
-* Requires only JDK 11 (or openjdk 11) for compiling binary
+* Requires only JRE 17 for running mars-sim
+* Requires only JDK 17 (or openjdk 17) for compiling binary
 
-### JDK and JavaFX
+## JDK and JavaFX
 
 Beginning Java 11, the JRE/JDK package is being decoupled from the graphic
 JavaFX API package.
@@ -228,7 +301,7 @@ For the open source community, the OpenJDK is also being decoupled from the Open
 
 Currently, mars-sim does not require JavaFX.
 
-> Note 1 : Specifically, the official release of v3.1.0, v3.2.0, v3.3.0 and v3.4.0 of mars-sim do not
+> Note 1 : Specifically, the official release of mars-sim (v3.1.0 to v3.5.0) do not
 utilize JavaFX / OpenJFX. 
 
 Therefore, it's NOT a requirement to install it for running mars-sim.
@@ -241,23 +314,27 @@ configure the OpenJFX or JavaFX package on top of the JDK.
 See ticket #156 to read the discussions on how to set up JavaFX to run it
 under Java 11.
 
-You may go to [Bellsoft](https://bell-sw.com/pages/downloads/) or 
-[OpenLogic](https://www.openlogic.com/openjdk-downloads) to
-obtain the latest JRE/JDK for your platform.
+Obtain the latest JRE/JDK for your platform. Here are some of the popular OpenJDK packages out there :
+
+* [Amazon Cornetto](https://docs.aws.amazon.com/corretto/latest/corretto-17-ug/downloads-list.html)
+
+* [Microsoft](https://learn.microsoft.com/en-us/java/openjdk/download)
+
+* [Liberica](https://bell-sw.com/pages/downloads/)
+
+* [OpenLogic](https://www.openlogic.com/openjdk-downloads)
 
 If you need JavaFX, we recommend downloading the `Full JDK` 64-bits package.
 
 In case of Liberica, the `Full JDK` includes LibericaFX, which is based on OpenJFX, for
 running other apps that requires JavaFX.
 
-For windows platform, choose MSI version that will automatically set up the environment path.
 
+## OS Platforms
 
-### OS Platforms
+Assuming that OpenJDK 17 is being used.
 
-Assuming that OpenJDK 11 is being used.
-
-#### Linux
+### Linux
 
 1. The debian edition of mars-sim comes with debian installer for quick installation. However,
 you will have to install, configure and properly update the JDK or openJDK binary in your linux
@@ -266,50 +343,63 @@ you will have to install, configure and properly update the JDK or openJDK binar
 2. To manage multiple versions of java with the use of a tool called `SDKMan`,
 see this [DZone article](https://dzone.com/articles/how-to-install-multiple-versions-of-java-on-the-sa).
 
-#### macOS
+### macOS
 
 1.  Check if the directory of JDK is at `Library/Java/JavaVirtualMachines/jdk-11.jdk/Contents/Home`.
 See [DZone](https://dzone.com/articles/installing-openjdk-11-on-macos) for more instructions.
 
 2. Enter `/usr/libexec/java_home -V` to find out which version of Java you have installed.
 
+### Windows
 
-#### Windows
+Choose MSI version that will automatically set up the environment path correctly.
 
-1. Start a command prompt and type this `set PATH="C:\Program Files\Java\jre-11.0.17\bin";%PATH%`.
+However, there are cases that the `path` variable and `JAVE_HOME` variable are not being configured properly.
 
-2. Alternatively, pre-set the `JAVA_HOME` and `PATH` in *Environment Variables* in Control Panel.
+See this [page](https://www.baeldung.com/java-home-vs-path-env-var) for explanation.
 
-- a. Add `C:\Program Files\Java\jre-11.0.17\bin` to the `PATH` variable.
+In the command prompt, try `java -version` to see what version of Java is first being found in your specific cases. 
 
-> Note 2 : The order of precedence inside `PATH` is crucial. The first available folder having Java
+Follow the steps below : 
+
+1. Locate the folder with Java installation. For instance, "C:\Program Files\Java\jdk-17" may be your JDK's location.
+
+2. Under System variable, ensure `JAVA_HOME` has been added and set up correct as follows:
+
+> set JAVA_HOME=C:\Program Files\Java\jdk-17
+
+2a. Alternatively, one may start a command prompt and type this `set JAVA_HOME="C:\Program Files\Java\jdk-17"` 
+
+3. Under both User and the System variable, set the `PATH` variable to include the JDK folder. For instance,
+
+> set PATH=C:\Program Files\Java\jdk-17\bin
+
+or 
+
+> set PATH="%JAVA_HOME%\bin";%PATH%
+
+> Note 2 : The order of precedence inside `PATH` variable is crucial. The first available folder having Java
 executable inside will be the one to be loaded by Windows OS.
 
-- b. Set `JAVA_HOME` to a JRE or JDK's destination such as `C:\Program Files\Java\jdk-11.0.17\bin\` or
-`C:\Program Files\Java\jre-11.0.17\bin`.
-
-> Note 2a : The `\bin` is crucial. When running `java -jar xxxx.jar`, mars-sim will look for the
+> Note 2a : The `\bin` may be crucial. When running `java -jar xxxx.jar`, mars-sim will look for the
 presence of the `java.exe` in Windows OS. If `\bin` is missing in the `JAVA_HOME` variable,
 the Windows OS may not be able to locate the `java.exe` and may continue to go down the `PATH`
 variable to look for a valid JDK folder. If it's not found, java cannot start mars-sim.
 
-- c. Add `%JAVA_HOME%;` to `PATH`. Type "path" in a command prompt to double check
-the order of precedence when it comes to searching for the JDK.
+> Note 3 : The BEST approach is to enable only one Java build (such as Java 17.0.6)
+inside `PATH` variable and remove all other folders referencing other java versions/builds.
 
-> Note 3 : The BEST approach is to enable only one Java build (such as Java 11.0.17)
-inside `PATH` and remove all other folders referencing other java versions/builds.
-
-3. Remove any path similar to `C:\ProgramData\Oracle\Java\javapath;`  in `PATH` variable. It can
+4. Remove any path similar to `C:\ProgramData\Oracle\Java\javapath;`  in `PATH` variable. It can
 interfere with the correct version of Java that you would like to use.
 
-> Note 4 : Depending on the order of precedence in Path variable,
+> Note 4 : Depending on the order of precedence in `Path` variable,
 `C:\ProgramData\Oracle\Java\javapath` can load the undesired version of jre/jdk,
 instead of the java version you prefer.
 
-4. To test the version of Java that your machine is using, type "java -version"
+5. To test the version of Java that your machine is using, type "java -version"
 in a command prompt window.
 
-5. It's very typical for a machine to have multiple versions of Java installed.
+6. It's possible for a machine to have multiple versions of Java installed.
 To check if a particular Oracle version of Java is being *enabled*,
 start [Java Control Panel (JCP)](https://www.java.com/en/download/help/win_controlpanel.html)
 from the Control Panel as follows :
@@ -325,28 +415,24 @@ from the Control Panel as follows :
 only tracks the official Oracle versions. If you install any openJDK's on
 your machine, JCP won't be able to recognize them.
 
+7. To track what versions of openjdk have been installed on your machine, you may try using 
+[JDKMon](https://harmoniccode.blogspot.com/2021/04/friday-fun-lxiii-jdkmon.html).
 
-6. To track what versions of openjdk have been installed on your machine.
-Use [JDKMon](https://harmoniccode.blogspot.com/2021/04/friday-fun-lxiii-jdkmon.html).
-
-### Remote Console Connection
+## Remote Console Connection
 
 To set up true headless mode in your platform, follow the steps in this
 [wiki](https://github.com/mars-sim/mars-sim/wiki/Remote-Console-Connection).
 
-
-### Outreach
+## Outreach
 Feel free to use our [Facebook community](https://www.facebook.com/groups/125541663548/)
 to discuss relevant topics with regard to the development of mars-sim. See also
 old/archived [SF discussions](https://sourceforge.net/p/mars-sim/discussion/).
 
-
-### Discussions
+## Discussions
 Feel free to start a thread on a particular topic at our GitHub
 [Discussion](https://github.com/mars-sim/mars-sim/discussions) page.
 
-
-### Issues/Tickets
+## Issues and Tickets
 * Current : [GH Issues](https://github.com/mars-sim/mars-sim/issues)
 * Past/Archived : [SF Issues](https://sourceforge.net/p/mars-sim/tickets/search/?q=status%3Awont-fix+or+status%3Aclosed)
 
@@ -377,57 +463,59 @@ e.g. Include the followings :
  - Monitor Tool's showing People/Vehicle/Mission tabs
  - Settlement Map, etc.
 
-**Specifications  (please complete the following information):**
- - OS version : [e.g. Windows 10, macOS 10.13, Ubuntu 14.04, etc.]
- - Java version : [e.g. Oracle JDK 11.0.17, AdoptOpenJDK 11.0.17, openjfx 11 etc.]
- - mars-sim build version : [e.g. r7688, 3.4.0, pre-3.5.0, etc.]
+**Specifications (please complete)**
+ - OS version : [e.g. Windows 10, macOS 10.13, Ubuntu 14.04]
+ - Java version : [e.g. Oracle JDK 17.0.6, AdoptOpenJDK 17.0.6, openjfx 17]
+ - Major version and build : [e.g. 3.5.0 build 8103]
 
 **Additional context**
- - Add any other context about the problem here.
+ - Add any other context about the problem here. By providing more info above when filing it, 
+   you help expedite the handling of the issues you submit.
 
-> Note 1 : By providing the info above from the start, you help expedite the handling of the issue you submit.
+> Note 1 : if you double-click the jar file to start mars-sim and nothing shows up, 
+it's possible that an instance of JVM is already being created in the background 
+that has failed to load Main Window. To see if it's indeed the case, in Windows OS, 
+you may hit Ctrl+ESC to bring up the Task Manager and scroll down to see any 
+*orphaned* instances of `Java(TM) Platform SE binary` running in the background. 
+Be sure you first clear them off the memory by right-clicking on it and choosing `End Task`.
 
-> Note 2 : if you double-click the jar file to start mars-sim and nothing shows up, it's possible that an instance of
-a JVM be created but it fails to load MainScene. In Windows OS, you may hit Ctrl+ESC to bring up the Task Manager and
-scroll down to see any "orphaned" instances of `Java(TM) Platform SE binary` running in the background. Be sure you
-clear them off the memory by right-clicking on it and choosing `End Task`.
 
-
-### How to contribute
+### Contribution
 We welcome anyone to contribute to mars-sim in terms of ideas, concepts and coding. If you would like to contribute
 to coding, see this [wiki](https://github.com/mars-sim/mars-sim/wiki/Development-Environment) for developers.
 Also, we will answer your questions in our [Gitter chatroom](https://gitter.im/mokun/mars-sim).
 
 
-### Website
+## Website
 For a more detail description of this project, see our [project website](https://mars-sim.github.io/).
 
 
-### Wiki
+## Wiki
 * Check out our [wikis](https://github.com/mars-sim/mars-sim/wiki) at GitHub.
 
 
-### Supported Platforms
+## Supported Platforms
 * Windows
 * MacOS
 * Linux
 
-### Official Codebase
+
+## Official Codebase
 * https://github.com/mars-sim/mars-sim
 
 
-### Download
-Check out the most recent pre-release build in the [GitHub's Release Tab](https://github.com/mars-sim/mars-sim/releases).
+## Download
+* Check out the most recent release or pre-release build in GitHub [Release](https://github.com/mars-sim/mars-sim/releases) page.
 
-Also, see the previous and official release version at
-[SourceForge Repo](https://sourceforge.net/projects/mars-sim/files/mars-sim/3.4.0/).
+* Or see the previous and current official release versions at
+[SourceForge Repo](https://sourceforge.net/projects/mars-sim/files/mars-sim/3.5.0/).
 
-If you like, click on the SF's button below to automatically sense the correct OS platform to download.
+Note: if you prefer, click SF's button below to automatically sense the correct OS platform to download.
 
 [![Download Mars Simulation Project](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/mars-sim/files/latest/download)
 
 
-### License
+## License
 This project is licensed under the terms of the GPL v3.0 license.
 <!--stackedit_data:
 eyJoaXN0b3J5IjpbMjAwMTcyNzM3OCwtODY5ODg0NTgwXX0=

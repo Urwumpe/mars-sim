@@ -96,7 +96,7 @@ implements SettlementMapLayer {
 	public LabelMapLayer(SettlementMapPanel mapPanel) {
 		// Initialize data members.
 		this.mapPanel = mapPanel;
-		labelImageCache = new HashMap<String, BufferedImage>(30);
+		labelImageCache = new HashMap<String, BufferedImage>();
 	}
 
 	@Override
@@ -170,7 +170,7 @@ implements SettlementMapLayer {
 			double yDiff = scale / 2.5;
 			int yOffset = (int)yDiff;
 			
-			Iterator<Building> i = settlement.getBuildingManager().getBuildings().iterator();
+			Iterator<Building> i = settlement.getBuildingManager().getBuildingSet().iterator();
 			while (i.hasNext()) {
 				Building building = i.next();
 				String name = building.getNickName();

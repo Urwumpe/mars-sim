@@ -6,6 +6,8 @@
  */
 package org.mars_sim.msp.core.person.ai.mission;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.logging.Level;
 
@@ -58,6 +60,30 @@ public abstract class DroneMission extends AbstractVehicleMission {
 	}
 
 	/**
+	 * Gets a collection of available Drones at a settlement that are usable for
+	 * this mission.
+	 *
+	 * @param settlement the settlement to find vehicles.
+	 * @return list of available vehicles.
+	 */
+	@Override
+	protected Collection<Vehicle> getAvailableVehicles(Settlement settlement) {
+		Collection<Vehicle> result = new ArrayList<>();
+		Collection<Drone> list = settlement.getParkedDrones();
+		if (list.isEmpty())
+			return result;
+		for (Drone v : list) {
+			if (!v.haveStatusType(StatusType.MAINTENANCE)
+					&& !v.getMalfunctionManager().hasMalfunction()
+					&& isUsableVehicle(v)
+					&& !v.isReserved()) {
+				result.add(v);
+			}
+		}
+		return result;
+	}
+	
+	/**
 	 * Gets the available vehicle at the settlement with the greatest range.
 	 *
 	 * @param settlement         the settlement to check.
@@ -65,7 +91,7 @@ public abstract class DroneMission extends AbstractVehicleMission {
 	 * @return vehicle or null if none available.
 	 * @throws Exception if error finding vehicles.
 	 */
-	public static Drone getDroneWithGreatestRange(MissionType missionType, Settlement settlement, boolean allowMaintReserved) {
+	public static Drone getDroneWithGreatestRange(Settlement settlement, boolean allowMaintReserved) {
 		Drone bestDrone = null;
 		double bestRange = 0D;
 
@@ -77,7 +103,7 @@ public abstract class DroneMission extends AbstractVehicleMission {
 			usable = usable && (drone.getStoredMass() == 0);
 
 			if (usable) {
-				double range = drone.getRange(missionType);
+				double range = drone.getRange();
 				if ((bestDrone == null) || (bestRange > range)) {
 					bestDrone = drone;
 					bestRange = range;
@@ -204,7 +230,7 @@ public abstract class DroneMission extends AbstractVehicleMission {
 				setPhaseEnded(true);
 			}
 			else {
-				endMissionProblem(v, "Could not transfer to Surface");
+				endMissionProblem(v, "Could not transfer to Mars Surface.");
 			}
 		}
 	}
@@ -246,13 +272,6 @@ public abstract class DroneMission extends AbstractVehicleMission {
 			// Add vehicle to a garage if available.
 			boolean inAGarage = disembarkSettlement.getBuildingManager().addToGarage(v);
 
-			// Make sure the drone chasis is not overlapping a building structure in the settlement map
-//	        if (!inAGarage)
-//	        	drone.findNewParkingLoc();
-
-			// Reset the vehicle reservation
-			v.correctVehicleReservation();
-
 			// Unload drone if necessary.
 			boolean droneUnloaded = drone.getStoredMass() == 0D;
 
@@ -280,7 +299,7 @@ public abstract class DroneMission extends AbstractVehicleMission {
 				BuildingManager.removeFromGarage(v);
 
 				// Leave the vehicle.
-				leaveVehicle();
+				releaseVehicle(getVehicle());
 				setPhaseEnded(true);
 			}
 		}

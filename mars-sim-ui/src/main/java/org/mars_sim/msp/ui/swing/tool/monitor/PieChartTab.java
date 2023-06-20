@@ -35,7 +35,6 @@ import org.jfree.chart.plot.PiePlot3D;
 import org.jfree.chart.util.Rotation;
 import org.jfree.data.general.AbstractDataset;
 import org.jfree.data.general.PieDataset;
-//import org.jfree.util.Rotation;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 
@@ -58,6 +57,8 @@ class PieChartTab extends MonitorTab {
 
     /** The category name for unknown. */
     private final static String NONECAT = "None";
+
+	public static final String ICON = "pie";
 
     /**
      * Basic Pie Data set with a method to recalculate.
@@ -267,7 +268,7 @@ class PieChartTab extends MonitorTab {
      * @param column Index of the column to collate.
      */
     public PieChartTab(MonitorModel model, int column) {
-        super(model, false, false, ImageLoader.getNewIcon(MonitorWindow.PIE_ICON));
+        super(model, false, false, ImageLoader.getIconByName(ICON));
 
         String title = model.getName() + " - " + model.getColumnName(column);
         setName(title);
@@ -340,10 +341,6 @@ class PieChartTab extends MonitorTab {
 
     }
 
-    protected List<?> getSelection() {
-        return Collections.EMPTY_LIST;
-    }
-
     /**
      * Define which column is used to generate the Pie data set.
      *
@@ -361,10 +358,12 @@ class PieChartTab extends MonitorTab {
     /**
      * The tab has been removed.
      */
+    @Override
     public void removeTab() {
         chart = null;
         pieModel.setModel(null);
         pieModel = null;
+        super.removeTab();
     }
 }
 

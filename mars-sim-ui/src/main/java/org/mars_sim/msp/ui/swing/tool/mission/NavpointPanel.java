@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * NavpointPanel.java
- * @date 2022-07-31
+ * @date 2023-06-18
  * @author Scott Davis
  */
 
@@ -11,6 +11,7 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Insets;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -19,17 +20,19 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import javax.swing.JButton;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
 import javax.swing.table.AbstractTableModel;
 
-import org.mars_sim.mapdata.MapDataUtil;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.UnitType;
@@ -43,11 +46,10 @@ import org.mars_sim.msp.core.person.ai.mission.MissionListener;
 import org.mars_sim.msp.core.person.ai.mission.NavPoint;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.tool.map.Map;
 import org.mars_sim.msp.ui.swing.tool.map.MapPanel;
 import org.mars_sim.msp.ui.swing.tool.map.MineralMapLayer;
@@ -58,22 +60,18 @@ import org.mars_sim.msp.ui.swing.tool.map.VehicleTrailMapLayer;
 import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfo;
 import org.mars_sim.msp.ui.swing.unit_display_info.UnitDisplayInfoFactory;
 
-import com.alee.laf.button.WebButton;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
 
 /**
  * Tab panel for displaying a mission's navpoints.
  */
 @SuppressWarnings("serial")
 public class NavpointPanel
-extends WebPanel
-implements ListSelectionListener, MissionListener {
-
-	private static final int WIDTH = MapDataUtil.GLOBE_BOX_WIDTH / 2;
-	private static final int HEIGHT = MapDataUtil.GLOBE_BOX_HEIGHT / 2;
-	private static final int PADDING = 64;
-	private static final int TABLE_HEIGHT = 190;
+extends JPanel
+implements MissionListener {
+	
+	private static final int WIDTH = MapPanel.MAP_BOX_WIDTH;
+	private static final int HEIGHT = MapPanel.MAP_BOX_HEIGHT;
+	private static final double TWO_PI = Math.PI * 2D;
 	
 	// Private members.
 	private Mission missionCache;
@@ -85,47 +83,67 @@ implements ListSelectionListener, MissionListener {
 	private JTable navpointTable;
 
 	private Coordinates coordCache = new Coordinates(0, 0);
-	private MissionWindow missionWindow;
 	
-	private static Simulation sim = Simulation.instance();
-
-	private static UnitManager unitManager = sim.getUnitManager();
-	private static List<Landmark> landmarks = sim.getSurfaceFeatures().getLandmarks();
+	private UnitManager unitManager;
+	private List<Landmark> landmarks;
 
 	/**
 	 * Constructor.
 	 */
 	protected NavpointPanel(MissionWindow missionWindow) {
-		this.missionWindow = missionWindow;
-		
+		Simulation sim = missionWindow.getDesktop().getSimulation();
+
+		unitManager = sim.getUnitManager();
+		landmarks = SimulationConfig.instance().getLandmarkConfiguration().getLandmarkList();
+
 		// Set the layout.
 		setLayout(new BorderLayout());
 		
 		// Create the main panel.
-		WebPanel mainPane = new WebPanel(new BorderLayout(0, 0));
+		JPanel mainPane = new JPanel(new BorderLayout(0, 0));	
 		mainPane.setAlignmentX(Component.CENTER_ALIGNMENT);
+		mainPane.setAlignmentY(Component.CENTER_ALIGNMENT);
 		mainPane.setBorder(new MarsPanelBorder());
 		add(mainPane, BorderLayout.CENTER);
 		
 		// Create the map display panel.
-		WebPanel mapDisplayPane = new WebPanel(new BorderLayout(0, 0));
-		mapDisplayPane.setAlignmentX(Component.CENTER_ALIGNMENT);
-		WebPanel left = new WebPanel();
-        left.setPreferredSize(new Dimension(PADDING, HEIGHT));
-        WebPanel right = new WebPanel();
-        right.setPreferredSize(new Dimension(PADDING, HEIGHT));
-		mainPane.add(mapDisplayPane, BorderLayout.CENTER);
-		mainPane.add(left, BorderLayout.WEST);
-		mainPane.add(right, BorderLayout.EAST);
+		JPanel mapDisplayPane = new JPanel(new BorderLayout(0, 0));
+		JPanel mapPane = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+		mapPane.setAlignmentX(Component.CENTER_ALIGNMENT);
+		mapPane.setAlignmentY(Component.TOP_ALIGNMENT);
+		mapDisplayPane.add(mapPane, BorderLayout.CENTER);
+		
+		
+		// Create the navpoint table panel.
+		JPanel navpointTablePane = new JPanel(new BorderLayout());
+		navpointTablePane.setAlignmentX(Component.CENTER_ALIGNMENT);
+		navpointTablePane.setAlignmentY(Component.BOTTOM_ALIGNMENT);
+		navpointTablePane.setBorder(new MarsPanelBorder());
 
+		
+		///////////////////////////////////////////////////////////
+		
+		
+		// Define splitPane to house mapDisplayPane and ..
+		JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, mapDisplayPane, navpointTablePane);
+	    splitPane.setOneTouchExpandable(true);
+	    splitPane.setDividerLocation(HEIGHT + 10);
+	    mainPane.add(splitPane, BorderLayout.CENTER);
+		
+	    
+		///////////////////////////////////////////////////////////
+
+	    
 		// Create the map panel.
-		mapPanel = new MapPanel(missionWindow.getDesktop(), 500L);
+		mapPanel = new MapPanel(missionWindow.getDesktop(), this);
 		// Set up mouse control
-		mapPanel.setNavpointPanel(this);
+//		mapPanel.setNavpointPanel(this);
+		mapPanel.setMouseDragger(false);
 		mapPanel.addMouseListener(new MapListener());
 		mapPanel.addMouseMotionListener(new MouseMotionListener());
 		
 		mapPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		mapPanel.setAlignmentY(Component.CENTER_ALIGNMENT);
 		
 		trailLayer = new VehicleTrailMapLayer();
 		navpointLayer = new NavpointMapLayer(this);
@@ -138,19 +156,18 @@ implements ListSelectionListener, MissionListener {
 		mapPanel.addMapLayer(trailLayer, 4);
 		mapPanel.addMapLayer(navpointLayer, 5);
   
-        // Forcing map panel to be 300x300 size.
-        mapPanel.setSize(new Dimension(WIDTH, HEIGHT));
-        mapPanel.setPreferredSize(new Dimension(WIDTH, HEIGHT));
-        mapDisplayPane.add(mapPanel, BorderLayout.CENTER);
+        mapPanel.setPreferredSize(new Dimension(WIDTH, HEIGHT));  
+        
+        mapPane.add(mapPanel);
         
 		// Create the north button.
-        WebButton northButton = new WebButton(ImageLoader.getIcon(Msg.getString("img.navpoint.north"))); //$NON-NLS-1$
+        JButton northButton = new JButton(ImageLoader.getIconByName("map/navpoint_north")); //$NON-NLS-1$
 		northButton.addActionListener(e -> {
 			// Recenter the map to the north by a 1/8 map.
 			Coordinates centerCoords = mapPanel.getCenterLocation();
 			if (centerCoords != null) {
 				double phi = centerCoords.getPhi();
-				phi = phi - Map.HALF_MAP_ANGLE/4;
+				phi = phi - Map.QUARTER_HALF_MAP_ANGLE;
 				if (phi < 0D) phi = 0D;
 				mapPanel.showMap(new Coordinates(phi, centerCoords.getTheta()));
 			}
@@ -158,65 +175,63 @@ implements ListSelectionListener, MissionListener {
 		mapDisplayPane.add(northButton, BorderLayout.NORTH);
 		
 		// Create the west button.
-		WebButton westButton = new WebButton(ImageLoader.getIcon(Msg.getString("img.navpoint.west"))); //$NON-NLS-1$
+		JButton westButton = new JButton(ImageLoader.getIconByName("map/navpoint_west"));
 		westButton.setMargin(new Insets(1, 1, 1, 1));
 		westButton.addActionListener(e -> {
 			// Recenter the map to the west by 1/8 map.
 			Coordinates centerCoords = mapPanel.getCenterLocation();
 			if (centerCoords != null) {
 				double theta = centerCoords.getTheta();
-				theta = theta - Map.HALF_MAP_ANGLE/4;
-				if (theta < 0D) theta += (Math.PI * 2D);
+				theta = theta - Map.QUARTER_HALF_MAP_ANGLE;
+				if (theta < 0D) theta += (TWO_PI);
 				mapPanel.showMap(new Coordinates(centerCoords.getPhi(), theta));
 			}
 		});
 		mapDisplayPane.add(westButton, BorderLayout.WEST);
 		
 		// Create the east button.
-		WebButton eastButton = new WebButton(ImageLoader.getIcon(Msg.getString("img.navpoint.east"))); //$NON-NLS-1$
+		JButton eastButton = new JButton(ImageLoader.getIconByName("map/navpoint_east"));
 		eastButton.setMargin(new Insets(1, 1, 1, 1));
 		eastButton.addActionListener(e -> {
 			// Recenter the map to the east by 1/8 map.
 			Coordinates centerCoords = mapPanel.getCenterLocation();
 			if (centerCoords != null) {
 				double theta = centerCoords.getTheta();
-				theta = theta + Map.HALF_MAP_ANGLE/4;
-				if (theta < (Math.PI * 2D)) theta -= (Math.PI * 2D);
+				theta = theta + Map.QUARTER_HALF_MAP_ANGLE;
+				if (theta < (TWO_PI)) theta -= (TWO_PI);
 				mapPanel.showMap(new Coordinates(centerCoords.getPhi(), theta));
 			}
 		});
 		mapDisplayPane.add(eastButton, BorderLayout.EAST);
 		
 		// Create the south button.
-		WebButton southButton = new WebButton(ImageLoader.getIcon(Msg.getString("img.navpoint.south"))); //$NON-NLS-1$
+		JButton southButton = new JButton(ImageLoader.getIconByName("map/navpoint_south"));
 		southButton.addActionListener(e -> {
 			// Recenter the map to the south by 1/8 map.
 			Coordinates centerCoords = mapPanel.getCenterLocation();
 			if (centerCoords != null) {
 				double phi = centerCoords.getPhi();
-				phi = phi + Map.HALF_MAP_ANGLE/4;
+				phi = phi + Map.QUARTER_HALF_MAP_ANGLE;
 				if (phi > Math.PI) phi = Math.PI;
 				mapPanel.showMap(new Coordinates(phi, centerCoords.getTheta()));
 			}
 		});
 		mapDisplayPane.add(southButton, BorderLayout.SOUTH);
+			
+
+		///////////////////////////////////////////////////////////
 		
-		// Create the navpoint table panel.
-		WebPanel navpointTablePane = new WebPanel(new BorderLayout(0, 0));
-		navpointTablePane.setBorder(new MarsPanelBorder());
-		navpointTablePane.setPreferredSize(new Dimension(-1, TABLE_HEIGHT));
-		add(navpointTablePane, BorderLayout.SOUTH);
 		
 		// Create the navpoint scroll panel.
-		WebScrollPane navpointScrollPane = new WebScrollPane();
-        navpointTablePane.add(navpointScrollPane, BorderLayout.CENTER);
+		JScrollPane navpointScrollPane = new JScrollPane();
+        navpointTablePane.add(navpointScrollPane);
         
         // Create the navpoint table model.
         navpointTableModel = new NavpointTableModel();
         
         // Create the navpoint table.
-        navpointTable = new ZebraJTable(navpointTableModel);
-		TableStyle.setTableStyle(navpointTable);
+        navpointTable = new JTable(navpointTableModel);
+        navpointTable.setPreferredSize(new Dimension(WIDTH, MissionWindow.TABLE_HEIGHT));  
         navpointTable.setRowSelectionAllowed(true);
         navpointTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         navpointTable.getSelectionModel().addListSelectionListener(e -> {
@@ -226,7 +241,7 @@ implements ListSelectionListener, MissionListener {
 				VehicleMission travelMission = (VehicleMission) missionCache;
 				int index = navpointTable.getSelectedRow();
 				if (index > -1) {
-					NavPoint navpoint = travelMission.getNavpoint(index); 
+					NavPoint navpoint = travelMission.getNavpoints().get(index); 
 					navpointLayer.setSelectedNavpoint(navpoint);
 					mapPanel.showMap(navpoint.getLocation());
 				}
@@ -236,6 +251,15 @@ implements ListSelectionListener, MissionListener {
         navpointScrollPane.setViewportView(navpointTable);
 	}
 	
+	/**
+	 * Time has advanced.
+	 * 
+	 * @param pulse The clock change
+	 */
+	public void update(ClockPulse pulse) {
+		mapPanel.update(pulse);
+	}
+
 	/**
 	 * Updates coordinates in map, buttons, and globe Redraw map and globe if
 	 * necessary.
@@ -298,10 +322,7 @@ implements ListSelectionListener, MissionListener {
 	 * @param event
 	 */
 	public void displayUnits(MouseEvent event) {
-		double x = (event.getX() - (Map.DISPLAY_WIDTH / 2D) - 1);
-		double y = (event.getY() - (Map.DISPLAY_HEIGHT / 2D) - 1);
-
-		Coordinates clickedPosition = mapPanel.getCenterLocation().convertRectToSpherical(x, y, Map.PIXEL_RHO);
+		Coordinates clickedPosition = mapPanel.getMouseCoordinates(event.getX(), event.getY());
 
 		Iterator<Unit> i = unitManager.getDisplayUnits().iterator();
 
@@ -338,12 +359,7 @@ implements ListSelectionListener, MissionListener {
 
 		Coordinates mapCenter = mapPanel.getCenterLocation();
 		if (mapCenter != null) {
-			double rho = Map.PIXEL_RHO;
-
-			double x = (event.getX() - (Map.DISPLAY_WIDTH / 2D) - 1);
-			double y = (event.getY() - (Map.DISPLAY_HEIGHT / 2D) - 1);
-
-			Coordinates mousePos = mapPanel.getCenterLocation().convertRectToSpherical(x, y, rho);
+			Coordinates mousePos = mapPanel.getMouseCoordinates(event.getX(), event.getY());
 			boolean onTarget = false;
 
 			Iterator<Unit> i = unitManager.getDisplayUnits().iterator();
@@ -396,21 +412,6 @@ implements ListSelectionListener, MissionListener {
 	}
 	
 	/**
-	 * Implements from ListSelectionListener.
-	 * 
-	 * Note: this is called when a mission is selected on MissionWindow's mission list.
-	 */
-	public void valueChanged(ListSelectionEvent e) {		
-		Mission mission = (Mission) missionWindow.getMissionList().getSelectedValue();
-		if (mission != null)
-			setMission(mission);
-		else {
-			Settlement settlement = (Settlement) missionWindow.getSettlementList().getSelectedValue();
-			clearNavTab(settlement);
-		}
-	}
-	
-	/**
 	 * Sets the mission object.
 	 * 
 	 * @param newMission
@@ -425,10 +426,16 @@ implements ListSelectionListener, MissionListener {
 			}
 			// Update the cache
 			missionCache = newMission;
-			// Add this as listener for new mission.
-			missionCache.addMissionListener(this);
-			// Update the mission content on the Nav tab
-			updateNavTab();
+
+			if (missionCache != null) {
+				// Add this as listener for new mission.
+				missionCache.addMissionListener(this);
+				// Update the mission content on the Nav tab
+				updateNavTab();
+			}
+			else {
+				clearNavTab(null);
+			}
 		}
 	}
 	
@@ -436,35 +443,32 @@ implements ListSelectionListener, MissionListener {
 	/**
 	 * Updates the mission content on the Nav tab.
 	 */
-	public void updateNavTab() {
+	private void updateNavTab() {
 		// Updates coordinates in map
 		updateCoords(missionCache.getAssociatedSettlement().getCoordinates());
 		
-		if (!missionCache.getMembers().isEmpty()) {
-			if (missionCache instanceof VehicleMission) {
-				trailLayer.setSingleVehicle(((VehicleMission) missionCache).getVehicle());
-            }
-            
-			navpointLayer.setSingleMission(missionCache);
-			navpointLayer.setSelectedNavpoint(null);
-			navpointTableModel.updateNavpoints();
-            
-            if ((missionCache instanceof Exploration) || (missionCache instanceof Mining)) {
-                if (!mapPanel.hasMapLayer(mineralLayer)) mapPanel.addMapLayer(mineralLayer, 1);
-            }
-            else {
-                if (mapPanel.hasMapLayer(mineralLayer)) mapPanel.removeMapLayer(mineralLayer);
-            }
-            
-            mapPanel.showMap(missionCache.getCurrentMissionLocation());
+		if (missionCache instanceof VehicleMission) {
+			trailLayer.setSingleVehicle(((VehicleMission) missionCache).getVehicle());
 		}
 		
+		navpointLayer.setSingleMission(missionCache);
+		navpointLayer.setSelectedNavpoint(null);
+		navpointTableModel.updateNavpoints();
+		
+		if ((missionCache instanceof Exploration) || (missionCache instanceof Mining)) {
+			if (!mapPanel.hasMapLayer(mineralLayer)) mapPanel.addMapLayer(mineralLayer, 1);
+		}
+		else {
+			if (mapPanel.hasMapLayer(mineralLayer)) mapPanel.removeMapLayer(mineralLayer);
+		}
+		
+		mapPanel.showMap(missionCache.getCurrentMissionLocation());		
 	}
 	
 	/**
 	 * Clears the mission content on the Nav tab
 	 */
-	public void clearNavTab(Settlement settlement) {
+	private void clearNavTab(Settlement settlement) {
 		// Center the map to this settlement's coordinate
 		if (settlement != null)
 			updateCoords(settlement.getCoordinates());
@@ -477,12 +481,6 @@ implements ListSelectionListener, MissionListener {
         if (mapPanel.hasMapLayer(mineralLayer)) 
         	mapPanel.removeMapLayer(mineralLayer);
 		mapPanel.showMap(null);
-		
-		// Remove missionCache as previous mission listener.
-		if (missionCache != null) {
-			missionCache.removeMissionListener(this);
-			missionCache = null;
-		}
 	}
 	
 	/**
@@ -536,7 +534,7 @@ implements ListSelectionListener, MissionListener {
 		 * @return number of columns.
 		 */
 		public int getColumnCount() {
-            return 3;
+            return 4;
         }
 		
 		/**
@@ -550,6 +548,7 @@ implements ListSelectionListener, MissionListener {
             if (columnIndex == 0) return Msg.getString("NavpointPanel.column.name"); //$NON-NLS-1$
             else if (columnIndex == 1) return Msg.getString("NavpointPanel.column.location"); //$NON-NLS-1$
             else if (columnIndex == 2) return Msg.getString("NavpointPanel.column.description"); //$NON-NLS-1$
+            else if (columnIndex == 3) return Msg.getString("NavpointPanel.column.distance"); //$NON-NLS-1$
             else return "";
         }
 		
@@ -566,6 +565,7 @@ implements ListSelectionListener, MissionListener {
             	if (column == 0) return Msg.getString("NavpointPanel.column.navpoint") + " " + (row + 1); //$NON-NLS-1$
             	else if (column == 1) return navpoint.getLocation().getFormattedString();
             	else if (column == 2) return navpoint.getDescription();
+            	else if (column == 3) return Math.round(navpoint.getDistance()*10.0)/10.0;
             	else return Msg.getString("unknown"); //$NON-NLS-1$
             }   
             else return Msg.getString("unknown"); //$NON-NLS-1$
@@ -576,11 +576,9 @@ implements ListSelectionListener, MissionListener {
 		 */
 		public void updateNavpoints() {
 		    
-			if (missionCache instanceof VehicleMission) {
+			if (missionCache instanceof VehicleMission travelMission) {
 				navpoints.clear();
-				VehicleMission travelMission = (VehicleMission) missionCache;
-				for (int x=0; x < travelMission.getNumberOfNavpoints(); x++) 
-					navpoints.add(travelMission.getNavpoint(x));
+				navpoints.addAll(travelMission.getNavpoints());
 				fireTableDataChanged();
 			}
 			else {

@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * PowerGrid.java
- * @version 3.2.0 2021-06-20
+ * @date 2023-06-02
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure;
@@ -9,19 +9,26 @@ package org.mars_sim.msp.core.structure;
 import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.UnitEventType;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingException;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
+import org.mars_sim.msp.core.structure.building.function.FissionPowerSource;
+import org.mars_sim.msp.core.structure.building.function.ThermionicNuclearPowerSource;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
 import org.mars_sim.msp.core.structure.building.function.PowerMode;
+import org.mars_sim.msp.core.structure.building.function.PowerSource;
+import org.mars_sim.msp.core.structure.building.function.PowerSourceType;
 import org.mars_sim.msp.core.structure.building.function.PowerStorage;
 import org.mars_sim.msp.core.time.ClockPulse;
+import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.Temporal;
+import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * The PowerGrid class is a settlement's building power grid.
@@ -31,17 +38,15 @@ public class PowerGrid implements Serializable, Temporal {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 	/** default logger. */
-	private static final Logger logger = Logger.getLogger(PowerGrid.class.getName());
+	private static final SimLogger logger = SimLogger.getLogger(PowerGrid.class.getName());
 
-	private static String sourceName = logger.getName();
+	public static final double R_LOAD = 1000; // assume constant load resistance
 
-	public static double R_LOAD = 1000; // assume constant load resistance
-
-	public static double ROLLING_FACTOR = 1.5; 
+	public static final double ROLLING_FACTOR = 1.1; 
 	
-	public static double percentAverageVoltageDrop = 98D;
+	public static final double percentAverageVoltageDrop = 98D;
 
-	public static double HOURS_PER_MILLISOL = 0.0247; // MarsClock.SECONDS_IN_MILLISOL / 3600D;
+	public static final double HOURS_PER_MILLISOL = MarsClock.HOURS_PER_MILLISOL; // equals to 0.0247;
 
 	public double degradationRatePerSol = .0004;
 
@@ -64,9 +69,6 @@ public class PowerGrid implements Serializable, Temporal {
 	 */
 	public PowerGrid(Settlement settlement) {
 		this.settlement = settlement;
-
-		sourceName = sourceName.substring(sourceName.lastIndexOf(".") + 1, sourceName.length());
-
 		manager = settlement.getBuildingManager();
 		powerMode = PowerMode.POWER_UP;
 		powerGenerated = 0D;
@@ -124,18 +126,18 @@ public class PowerGrid implements Serializable, Temporal {
 	}
 
 	/**
-	 * Gets the stored power in the grid.
+	 * Gets the stored energy in the grid.
 	 * 
-	 * @return stored power in kW hr.
+	 * @return stored energy in kWh.
 	 */
 	public double getStoredEnergy() {
 		return totalEnergyStored;
 	}
 
 	/**
-	 * Sets the stored power in the grid.
+	 * Sets the stored energy in the grid.
 	 * 
-	 * @param newEnergyStored the new stored power (kW hr).
+	 * @param newEnergyStored the new stored energy (kWh).
 	 */
 	public void setStoredEnergy(double newEnergyStored) {
 		if (totalEnergyStored != newEnergyStored) {
@@ -147,16 +149,16 @@ public class PowerGrid implements Serializable, Temporal {
 	/**
 	 * Gets the stored energy capacity in the grid.
 	 * 
-	 * @return stored energy capacity in kW hr.
+	 * @return stored energy capacity in kWh.
 	 */
 	public double getStoredEnergyCapacity() {
 		return energyStorageCapacity;
 	}
 
 	/**
-	 * Sets the stored power capacity in the grid.
+	 * Sets the stored energy capacity in the grid.
 	 * 
-	 * @param newPowerStorageCapacity the new stored power capacity (kW hr).
+	 * @param newPowerStorageCapacity the new stored energy capacity (kWh).
 	 */
 	public void setStoredPowerCapacity(double newPowerStorageCapacity) {
 		if (energyStorageCapacity != newPowerStorageCapacity) {
@@ -204,9 +206,7 @@ public class PowerGrid implements Serializable, Temporal {
 	@Override
 	public boolean timePassing(ClockPulse pulse) {
 
-		if (logger.isLoggable(Level.FINEST)) {
-			logger.finest(Msg.getString("PowerGrid.log.settlementPowerSituation", settlement.getName()));
-		}
+		logger.log(settlement, Level.FINEST, 0, Msg.getString("PowerGrid.log.settlementPowerSituation", settlement.getName()));
 
 		// update the total power generated in the grid.
 		updateTotalPowerGenerated();
@@ -232,32 +232,118 @@ public class PowerGrid implements Serializable, Temporal {
 		return true;
 	}
 
+	/**
+	 * Updates the system efficiency factor.
+	 * 
+	 * @param time
+	 */
 	private void updateEfficiency(double time) {
 		double d_factor = degradationRatePerSol * time / 1000D;
 		systemEfficiency = systemEfficiency - systemEfficiency * d_factor;
 	}
 
+
 	/**
-	 * Calculate the flow of power/energy taking place due to the supply and demand
-	 * of power
+	 * Calculates the amount of electrical power generated.
+	 * 
+	 * @return power generated in kW
+	 */
+	public double stepUpDownPower(boolean increaseLoad) {
+		double power = 0D;
+
+		Iterator<Building> i = manager.getBuildings(FunctionType.POWER_GENERATION).iterator();
+		while (i.hasNext()) {
+			Building b = i.next();
+			Iterator<PowerSource> iP = b.getPowerGeneration().getPowerSources().iterator();
+			while (iP.hasNext()) {
+				PowerSource powerSource = iP.next();
+				
+				double previous = powerSource.getCurrentPower(b);
+				
+				if (powerSource.getType() == PowerSourceType.FISSION_POWER) {
+					if (increaseLoad) {
+						((FissionPowerSource)powerSource).increaseLoadCapacity();
+						// may use logger.log(b, Level.INFO, 10000, "Fission Reactor Power Capacity Stepped Up.")
+					}
+					else {
+						((FissionPowerSource)powerSource).decreaseLoadCapacity();
+						// may use logger.log(b, Level.INFO, 10000, "Fission Reactor Power Capacity Stepped Down.");
+					}
+				}
+				
+				else if (powerSource.getType() == PowerSourceType.THERMIONIC_NUCLEAR_POWER) {
+					if (increaseLoad) {
+						((ThermionicNuclearPowerSource)powerSource).increaseLoadCapacity();
+					}
+					else {
+						((ThermionicNuclearPowerSource)powerSource).decreaseLoadCapacity();
+					}
+				}
+				else
+					return power;
+				
+				double now = powerSource.getCurrentPower(b);
+				
+				double net = now - previous;
+				
+				if (!Double.isNaN(net) && !Double.isInfinite(net)) {
+					power += net;
+				}
+			}
+		}
+		return power;
+	}
+	
+		
+	/**
+	 * Calculates the flow of power/energy taking place due to the supply and demand
+	 * of power.
 	 * 
 	 * @param time
 	 */
 	private void updatePowerFlow(double time) {
+		
+		double neededPower = powerRequired * ROLLING_FACTOR - powerGenerated;
+		
 		// Check if there is enough power generated to fully supply each building.
-		if (powerRequired * ROLLING_FACTOR < powerGenerated) { // excess energy to charge grid batteries
+		if (neededPower < 0) { // excess energy to charge grid batteries
 
 			sufficientPower = true;
 			// Store excess power in power storage buildings.
 			double timeHr = time * HOURS_PER_MILLISOL; // MarsClock.convertMillisolsToSeconds(time) / 60D / 60D;
 			double excessEnergy = (powerGenerated - powerRequired) * timeHr * systemEfficiency;
 			storeExcessPower(excessEnergy, time);
+			
+			int rand = RandomUtil.getRandomInt(10);
+			if (rand == 10) {
+				// Step down the capacity of the fission power plant by a small percent
+				stepUpDownPower(false);
+			}
 		}
 
 		else { // insufficient power produced, need to pull energy from batteries to meet the
 				// demand
 			sufficientPower = false;
-			double neededPower = powerRequired - powerGenerated;
+			
+			int rand = RandomUtil.getRandomInt(50);
+			if (rand == 50) {
+				// Step up the capacity of the fission power plant by a small percent
+				stepUpDownPower(true);
+			}
+			
+			// increases the load capacity of fission reactors if available
+			double newPower0 = stepUpDownPower(true);
+
+			// Update the total generated power with contribution from increased power load capacity of fission reactors
+			setGeneratedPower(powerGenerated + newPower0);
+			
+			neededPower -= newPower0;
+			
+			if (neededPower > 0D) {
+				sufficientPower = true;
+				return;
+			}
+			
 			double timeInHour = time * HOURS_PER_MILLISOL; // MarsClock.convertMillisolsToSeconds(time) / 60D / 60D;
 			
 			// Assume the gauge of the cable is uniformly low, as represented by percentAverageVoltageDrop
@@ -268,71 +354,153 @@ public class PowerGrid implements Serializable, Temporal {
 			// subtract powerHr from the battery reserve
 			double retrieved = retrieveStoredEnergy(neededEnergy, time);
 
-			double delta_energy = neededEnergy - retrieved;
-
-			// Update the total generated power with contribution from batteries
-			setGeneratedPower(powerGenerated + retrieved);
+			neededEnergy -= retrieved;
+	
+			double newPower1 = retrieved / timeInHour;
 			
-			if (retrieved >= 0 && delta_energy >= 0) { // if the grid batteries has more than enough
+			// Update the total generated power with contribution from batteries
+			setGeneratedPower(powerGenerated + newPower1);
+			
+			neededPower -= newPower1;
+			
+			if (neededPower > 0D && retrieved >= 0) { 
+				// if the grid batteries has more than enough
 				sufficientPower = true;
+				return;
 			}
 
-			if (!sufficientPower) { // if still not having sufficient power
+			// If still not having sufficient power,
+			// increases the load capacity of fission reactors if available
+			double newPower2 = stepUpDownPower(true);
 
-				// compute power needed
-				neededPower = delta_energy / timeInHour;
+			// Update the total generated power with contribution from increased power load capacity of fission reactors
+			setGeneratedPower(powerGenerated + newPower2);
+			
+			neededPower -= newPower2;
+			
+			if (neededPower > 0D) {
+				sufficientPower = true;
+				return;
+			}
+			
+			// If still not having sufficient power, reduce power to some buildings
+			
+			Set<Building> buildings = manager.getBuildingSet();
 
-				// BuildingManager manager = settlement.getBuildingManager();
-				List<Building> buildings = manager.getBuildings();// getACopyOfBuildings();
+			// Reduce each building's power mode to low power until
+			// required power reduction is met.
+			double newPower3 = turnOnLowPower(neededPower, buildings);
+			
+			// Update the total generated power
+			setGeneratedPower(powerGenerated + newPower3);
+			
+			neededPower -= newPower3;
+			
+			// If power needs are still not met, turn off the power to each
+			// uninhabitable building until required power reduction is met.
+			if (neededPower > 0D) {
+				double newPower4 = turnOffNoninhabitable(neededPower, buildings);
+				
+				// Update the total generated power
+				setGeneratedPower(powerGenerated + newPower4);
+				
+				neededPower -= newPower4;
+			}
 
-				// Reduce each building's power mode to low power until
-				// required power reduction is met.
-				if (powerMode != PowerMode.POWER_DOWN) {
-					Iterator<Building> iLowPower = buildings.iterator();
-					while (iLowPower.hasNext() && (neededPower > 0D)) {
-						Building building = iLowPower.next();
-						if (!powerSurplus(building, PowerMode.FULL_POWER)) {
-							building.setPowerMode(PowerMode.POWER_DOWN);
-							neededPower -= building.getFullPowerRequired() - building.getPoweredDownPowerRequired();
-						}
-					}
-				}
+			// If power needs are still not met, turn off the power to each inhabitable
+			// building until required power reduction is met.
+			if (neededPower > 0D) {
+				double newPower5 = turnOffInhabitable(neededPower, buildings);
+				
+				// Update the total generated power
+				setGeneratedPower(powerGenerated + newPower5);
+				
+				neededPower -= newPower5;
+			}
 
-				// If power needs are still not met, turn off the power to each
-				// uninhabitable building until required power reduction is met.
-				if (neededPower > 0D) {
-					Iterator<Building> iNoPower = buildings.iterator();
-					while (iNoPower.hasNext() && (neededPower > 0D)) {
-						Building building = iNoPower.next();
-						if (!powerSurplus(building, PowerMode.POWER_DOWN) &&
-						// turn off the power to each uninhabitable building
-						// TODO : need to have a prioritized list of power usage
-								!(building.hasFunction(FunctionType.LIFE_SUPPORT))) {
-							building.setPowerMode(PowerMode.NO_POWER);
-							neededPower -= building.getPoweredDownPowerRequired();
-						}
-					}
-				}
-
-				// If power needs are still not met, turn off the power to each inhabitable
-				// building until required power reduction is met.
-				if (neededPower > 0D) {
-					Iterator<Building> iNoPower = buildings.iterator();
-					while (iNoPower.hasNext() && (neededPower > 0D)) {
-						Building building = iNoPower.next();
-						if (!powerSurplus(building, PowerMode.POWER_DOWN) &&
-						// turn off the power to each inhabitable building
-						// TODO : need to have a prioritized list of power usage
-								building.hasFunction(FunctionType.LIFE_SUPPORT)) {
-							building.setPowerMode(PowerMode.NO_POWER);
-							neededPower -= building.getPoweredDownPowerRequired();
-						}
-					}
-				}
+			if (neededPower <= 0D) {
+				sufficientPower = true;
 			}
 		}
 	}
 
+	/**
+	 * Turns on low power mode in non-inhabitable buildings.
+	 * 
+	 * @param neededPower
+	 * @param buildings
+	 */
+	private double turnOnLowPower(double neededPower, Set<Building> buildings) {
+		double newPower = 0;
+		if (powerMode != PowerMode.POWER_DOWN) {
+			Iterator<Building> iLowPower = buildings.iterator();
+			while (iLowPower.hasNext()) {
+				Building building = iLowPower.next();
+				// Future : should have a prioritized list of power usage
+				if (!powerSurplus(building, PowerMode.FULL_POWER) &&
+					!building.hasFunction(FunctionType.LIFE_SUPPORT)) {
+					building.setPowerMode(PowerMode.POWER_DOWN);
+					newPower += building.getFullPowerRequired() - building.getPoweredDownPowerRequired();
+					neededPower -= newPower;
+					if (neededPower <= 0) {
+						return newPower;
+					}
+				}
+			}
+		}
+		return newPower;
+	}
+	
+	/**
+	 * Turns off the power in non-inhabitable buildings.
+	 * 
+	 * @param neededPower
+	 * @param buildings
+	 */
+	private double turnOffNoninhabitable(double neededPower, Set<Building> buildings) {
+		double newPower = 0;
+		Iterator<Building> iNoPower = buildings.iterator();
+		while (iNoPower.hasNext()) {
+			Building building = iNoPower.next();
+			// Future : should have a prioritized list of power usage
+			if (!powerSurplus(building, PowerMode.POWER_DOWN) &&
+				!building.hasFunction(FunctionType.LIFE_SUPPORT)) {
+				building.setPowerMode(PowerMode.NO_POWER);
+				newPower += building.getPoweredDownPowerRequired();
+				neededPower -= newPower;
+				if (neededPower <= 0) {
+					return newPower;
+				}
+			}
+		}
+		return newPower;
+	}
+		
+	/**
+	 * Turns off the power in inhabitable buildings.
+	 * 
+	 * @param neededPower
+	 * @param buildings
+	 */
+	private double turnOffInhabitable(double neededPower, Set<Building> buildings) {
+		double newPower = 0;
+		Iterator<Building> iNoPower = buildings.iterator();
+		while (iNoPower.hasNext()) {
+			Building building = iNoPower.next();
+			// Future : should a prioritized list of power usage
+			if (!powerSurplus(building, PowerMode.POWER_DOWN) &&
+				building.hasFunction(FunctionType.LIFE_SUPPORT)) {
+				building.setPowerMode(PowerMode.NO_POWER);
+				newPower += building.getPoweredDownPowerRequired();
+				neededPower -= newPower;
+				if (neededPower <= 0) {
+					return newPower;
+				}
+			}
+		}
+		return newPower;
+	}
+	
 	/**
 	 * Updates the total power generated in the grid.
 	 * 
@@ -349,10 +517,8 @@ public class PowerGrid implements Serializable, Temporal {
 		}
 		setGeneratedPower(power);
 
-		if (logger.isLoggable(Level.FINEST)) {
-			logger.finest(Msg.getString("PowerGrid.log.totalPowerGenerated", //$NON-NLS-1$
+		logger.log(settlement, Level.FINEST, 0, Msg.getString("PowerGrid.log.totalPowerGenerated", //$NON-NLS-1$
 					Double.toString(power)));
-		}
 	}
 
 	/**
@@ -372,10 +538,8 @@ public class PowerGrid implements Serializable, Temporal {
 		}
 		setStoredEnergy(store);
 
-		if (logger.isLoggable(Level.FINEST)) {
-			logger.finest(Msg.getString("PowerGrid.log.totalPowerStored", //$NON-NLS-1$
+		logger.log(settlement, Level.FINEST, 0, Msg.getString("PowerGrid.log.totalPowerStored", //$NON-NLS-1$
 					Double.toString(totalEnergyStored)));
-		}
 	}
 
 	/**
@@ -386,40 +550,33 @@ public class PowerGrid implements Serializable, Temporal {
 	private void updateTotalRequiredPower() {
 		double power = 0D;
 		boolean powerUp = powerMode == PowerMode.POWER_UP;
-		List<Building> buildings = manager.getBuildings();
-		Iterator<Building> iUsed = buildings.iterator();
+		Iterator<Building> iUsed = manager.getBuildingSet().iterator();
 		while (iUsed.hasNext()) {
 			Building building = iUsed.next();
 			if (powerUp) {
 				building.setPowerMode(PowerMode.FULL_POWER);
 				power += building.getFullPowerRequired();
-				if (logger.isLoggable(Level.FINEST)) {
-					logger.finest(Msg.getString("PowerGrid.log.buildingFullPowerUsed", //$NON-NLS-1$
+				logger.log(settlement, Level.FINEST, 0, Msg.getString("PowerGrid.log.buildingFullPowerUsed", //$NON-NLS-1$
 							building.getNickName(), 
 							Double.toString(
 									Math.round(building.getFullPowerRequired()*100.00)/100.00
 									)));
-				}
 			}
 
 			power += building.getPoweredDownPowerRequired();
 
-			if (logger.isLoggable(Level.FINEST)) {
-				logger.finest(Msg.getString("PowerGrid.log.buildingPowerDownPowerUsed", //$NON-NLS-1$
+			logger.log(settlement, Level.FINEST, 0, Msg.getString("PowerGrid.log.buildingPowerDownPowerUsed", //$NON-NLS-1$
 						building.getNickName(), 
 						Double.toString(
 								Math.round(building.getPoweredDownPowerRequired()*100.00)/100.00
 								)));
-			}
 
 		}
 
 		setRequiredPower(power);
 
-		if (logger.isLoggable(Level.FINEST)) {
-			logger.finest(Msg.getString("PowerGrid.log.totalPowerRequired", //$NON-NLS-1$
+		logger.log(settlement, Level.FINEST, 0, Msg.getString("PowerGrid.log.totalPowerRequired", //$NON-NLS-1$
 					Double.toString(powerRequired)));
-		}
 	}
 
 	/**
@@ -438,10 +595,8 @@ public class PowerGrid implements Serializable, Temporal {
 
 		setStoredPowerCapacity(store);
 
-		if (logger.isLoggable(Level.FINEST)) {
-			logger.finest(Msg.getString("PowerGrid.log.totalPowerStorageCapacity", //$NON-NLS-1$
+		logger.log(settlement, Level.FINEST, 0, Msg.getString("PowerGrid.log.totalPowerStorageCapacity", //$NON-NLS-1$
 					Double.toString(energyStorageCapacity)));
-		}
 	}
 
 	/**
@@ -468,7 +623,7 @@ public class PowerGrid implements Serializable, Temporal {
 	}
 
 	/**
-	 * Stores any excess power grid in energy storage buildings if possible.
+	 * Stores any excess energy into the power grid via battery storage systems in buildings if possible.
 	 * 
 	 * @param excessEnergy excess grid energy (in kW hr).
 	 * @throws BuildingException if error storing excess energy.
@@ -526,7 +681,7 @@ public class PowerGrid implements Serializable, Temporal {
 	}
 
 	/**
-	 * Deliver stored energy from a battery
+	 * Receives energy from the grid to charge up a single battery storage system.
 	 * 
 	 * @param storage PowerStorage
 	 * @param excess  energy
@@ -595,29 +750,12 @@ public class PowerGrid implements Serializable, Temporal {
 		return smallest;
 	}
 
-//	/**
-//	 * Compute total stored energy in the grid.
-//	 * @return stored energy retrieved (kW hr).
-//	 
-//	private double computeTotalStoredEnergy() {
-//		double available = 0;
-//		//BuildingManager manager = settlement.getBuildingManager();
-//		Iterator<Building> i = manager.getBuildings(BuildingFunction.POWER_STORAGE).iterator();
-//		while (i.hasNext()) {
-//			Building building = i.next();
-//			PowerStorage storage = (PowerStorage) building.getFunction(BuildingFunction.POWER_STORAGE);
-//			if (storage.getkWattHourStored() > 0)
-//				available = available + storage.getkWattHourStored();
-//		}
-//		
-//		return available;
-//	}
-
 	/**
-	 * Retrieves stored energy from the grid.
+	 * Retrieves stored energy from many grid-connected batteries.
 	 * 
-	 * @param needed the energy needed (kW hr).
-	 * @return energy to be retrieved (kW hr).
+	 * @param needed the energy needed (kWh)
+	 * @param time the time (h)
+	 * @return energy to be retrieved (kWh)
 	 */
 	private double retrieveStoredEnergy(double energyNeeded, double time) {
 		double retrieved = 0;
@@ -655,7 +793,8 @@ public class PowerGrid implements Serializable, Temporal {
 	}
 
 	/**
-	 * Deliver stored energy from a battery
+	 * Delivers stored energy from a battery storage system to the grid.
+	 * Called by retrieveStoredEnergy
 	 * 
 	 * @param storage PowerStorage
 	 * @param needed  energy
@@ -742,7 +881,7 @@ public class PowerGrid implements Serializable, Temporal {
 	}
 
 	/**
-	 * Prepare object for garbage collection.
+	 * Prepares object for garbage collection.
 	 */
 	public void destroy() {
 		powerMode = null;

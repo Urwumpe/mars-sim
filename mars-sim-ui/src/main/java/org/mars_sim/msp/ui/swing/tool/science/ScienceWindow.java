@@ -11,15 +11,14 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.util.List;
 
+import javax.swing.JPanel;
+
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.science.ScientificStudy;
 import org.mars_sim.msp.core.science.ScientificStudyManager;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.toolwindow.ToolWindow;
-
-import com.alee.laf.panel.WebPanel;
 
 /**
  * Window for the science tool.
@@ -32,6 +31,7 @@ extends ToolWindow {
 
 	/** Tool name. */
 	public static final String NAME = Msg.getString("ScienceWindow.title"); //$NON-NLS-1$
+	public static final String ICON = "science";
 
 	// Data members
 	private AbstractStudyListPanel ongoingStudyListPane;
@@ -52,15 +52,15 @@ extends ToolWindow {
 		selectedStudy = null;
 
 		// Create content panel.
-		WebPanel mainPane = new WebPanel(new BorderLayout());
+		JPanel mainPane = new JPanel(new BorderLayout());
 		mainPane.setBorder(MainDesktopPane.newEmptyBorder());
 		setContentPane(mainPane);
 
 		// Create lists panel.
-		WebPanel listsPane = new WebPanel(new GridLayout(2, 1, 0, 0));
+		JPanel listsPane = new JPanel(new GridLayout(2, 1, 0, 0));
 		mainPane.add(listsPane, BorderLayout.WEST);
 
-		ScientificStudyManager mgr = Simulation.instance().getScientificStudyManager();
+		ScientificStudyManager mgr = desktop.getSimulation().getScientificStudyManager();
 		
 		// Create ongoing study list panel.
 		ongoingStudyListPane = new AbstractStudyListPanel(this, "OngoingStudyListPanel") {		
@@ -83,9 +83,6 @@ extends ToolWindow {
 		// Create study detail panel.
 		studyDetailPane = new StudyDetailPanel(this);
 		mainPane.add(studyDetailPane, BorderLayout.CENTER);
-
-		//if (desktop.getMainScene() != null)
-			//setClosable(false);
 
 		setMinimumSize(new Dimension(480, 480));
 		setMaximizable(true);
@@ -118,20 +115,13 @@ extends ToolWindow {
 
 	/**
 	 * Update the window.
+	 * @param pulse Unused clock pulse; window is time independent
 	 */
 	@Override
-	public void update() {
+	public void update(ClockPulse pulse) {
 		// Update all of the panels.
 		ongoingStudyListPane.update();
 		finishedStudyListPane.update();
 		studyDetailPane.update();
-	}
-
-	/**
-	 * Opens an info window for researcher.
-	 * @param researcher the researcher.
-	 */
-	void openResearcherWindow(Person researcher) {
-		desktop.openUnitWindow(researcher, false);
 	}
 }

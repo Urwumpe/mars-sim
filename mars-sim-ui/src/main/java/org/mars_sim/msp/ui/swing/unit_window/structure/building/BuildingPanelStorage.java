@@ -7,21 +7,22 @@
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
 import java.awt.BorderLayout;
-import java.awt.GridLayout;
+import java.awt.Dimension;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.Map.Entry;
 
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.building.function.Storage;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
 
 
 /**
@@ -31,9 +32,53 @@ import com.alee.laf.panel.WebPanel;
 @SuppressWarnings("serial")
 public class BuildingPanelStorage extends BuildingFunctionPanel {
 
-	private static final String STORE_ICON = Msg.getString("icon.stock"); //$NON-NLS-1$
+	private static final String STORE_ICON = "stock";
+
+	private static class StorageTableModel extends AbstractTableModel {
+		private List<String> name = new ArrayList<>();
+		private List<Integer> caps = new ArrayList<>();
+		
+		public StorageTableModel(Storage storage) {
+			Map<Integer, Double> resourceStorage = storage.getResourceStorageCapacity();
+			for (Entry<Integer, Double> resource : resourceStorage.entrySet()) {
+				// Create resource label.
+				name.add(ResourceUtil.findAmountResourceName(resource.getKey()));
+				caps.add(resource.getValue().intValue());
+			}
+		}
+
+		
+		public int getRowCount() {
+			return name.size();
+		}
+
+		public int getColumnCount() {
+			return 2;
+		}
+
+		public Class<?> getColumnClass(int columnIndex) {
+			if (columnIndex == 0) return String.class;
+			else return Integer.class;
+		}
+
+		public String getColumnName(int columnIndex) {
+			if (columnIndex == 0) return "Resource";
+			else return "Capacity (kg)";
+		}
+
+		public Object getValueAt(int row, int column) {
+			if (column == 0) {
+				return name.get(row);
+			}
+			else {
+				return caps.get(row);
+			}
+		}
+
+	}
 
 	private Storage storage;
+
 
 	/**
 	 * Constructor.
@@ -46,7 +91,7 @@ public class BuildingPanelStorage extends BuildingFunctionPanel {
 		// Use BuildingFunctionPanel constructor
 		super(
 			Msg.getString("BuildingPanelStorage.tabTitle"), 
-			ImageLoader.getNewIcon(STORE_ICON),
+			ImageLoader.getIconByName(STORE_ICON),
 			storage.getBuilding(), 
 			desktop
 		);
@@ -60,24 +105,20 @@ public class BuildingPanelStorage extends BuildingFunctionPanel {
 	@Override
 	protected void buildUI(JPanel center) {
 
-		Map<Integer, Double> resourceStorage = storage.getResourceStorageCapacity();
+		// Create scroll panel for storage table
+		JScrollPane scrollPanel = new JScrollPane();
+		scrollPanel.setPreferredSize(new Dimension(160, 120));
+		center.add(scrollPanel, BorderLayout.CENTER);
+	    scrollPanel.getViewport().setOpaque(false);
+	    scrollPanel.setOpaque(false);
 
-		// Create resource storage panel.
-		WebPanel resourceStoragePanel = new WebPanel(new GridLayout(resourceStorage.size(), 2, 0, 5));
-		addBorder(resourceStoragePanel, "Capacities");
-		center.add(resourceStoragePanel, BorderLayout.NORTH);
+		// Prepare medical table model
+		StorageTableModel model = new StorageTableModel(storage);
 
-		SortedSet<Integer> keys = new TreeSet<>(resourceStorage.keySet());
-		for (Integer resource : keys) {
-			// Create resource label.
-			WebLabel resourceLabel = new WebLabel(
-					ResourceUtil.findAmountResourceName(resource)
-					+ ":", WebLabel.LEFT);
-			resourceStoragePanel.add(resourceLabel);
-
-			double capacity = resourceStorage.get(resource);
-			WebLabel capacityLabel = new WebLabel((int) capacity + " kg", WebLabel.RIGHT);
-			resourceStoragePanel.add(capacityLabel);
-		}
+		// Prepare medical table
+		JTable storageTable = new JTable(model);
+		storageTable.setCellSelectionEnabled(false);
+		storageTable.setAutoCreateRowSorter(true);
+		scrollPanel.setViewportView(storageTable);
 	}
 }

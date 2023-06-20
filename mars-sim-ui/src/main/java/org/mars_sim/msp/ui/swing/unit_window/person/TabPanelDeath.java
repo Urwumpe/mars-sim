@@ -15,7 +15,7 @@ import java.awt.event.ActionListener;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
-import javax.swing.ImageIcon;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -35,14 +35,8 @@ import org.mars_sim.msp.core.person.health.DeathInfo;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
+import org.mars_sim.msp.ui.swing.tool.navigator.NavigatorWindow;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
-
-import com.alee.laf.button.WebButton;
-import com.alee.managers.icon.LazyIcon;
-import com.alee.managers.style.StyleId;
-//import com.alee.managers.language.data.TooltipWay;
-import com.alee.managers.tooltip.TooltipManager;
-import com.alee.managers.tooltip.TooltipWay;
 
 
 /**
@@ -53,7 +47,7 @@ public class TabPanelDeath
 extends TabPanel
 implements ActionListener {
 
-	private static final String RIP_ICON = Msg.getString("icon.rip"); //$NON-NLS-1$
+	private static final String RIP_ICON = "rip";
 
 	/** The Person instance. */
 	private Person person = null;
@@ -69,7 +63,7 @@ implements ActionListener {
 		// Use the TabPanel constructor
 		super(
 			null,
-			ImageLoader.getNewIcon(RIP_ICON),
+			ImageLoader.getIconByName(RIP_ICON),
 			Msg.getString("TabPanelDeath.title"), //$NON-NLS-1$
 			unit, desktop
 		);
@@ -96,7 +90,6 @@ implements ActionListener {
         causeTF.setText(death.getIllness().getName());
         causeTF.setEditable(false);
         causeTF.setColumns(20);
-        //causeTF.setFont(new Font("Serif", Font.PLAIN, 12));
         wrapper1.add(causeTF);//, BorderLayout.CENTER);
         deathLabelPanel.add(wrapper1);
 
@@ -109,7 +102,6 @@ implements ActionListener {
         timeTF.setText(death.getTimeOfDeath());
         timeTF.setEditable(false);
         timeTF.setColumns(20);
-        //timeTF.setFont(new Font("Serif", Font.PLAIN, 12));
         wrapper2.add(timeTF);//, BorderLayout.CENTER);
         deathLabelPanel.add(wrapper2);
 
@@ -122,7 +114,6 @@ implements ActionListener {
         malTF.setText(death.getMalfunction());
         malTF.setEditable(false);
         malTF.setColumns(20);
-        //malTF.setFont(new Font("Serif", Font.PLAIN, 12));
         wrapper3.add(malTF);//, BorderLayout.CENTER);
         deathLabelPanel.add(wrapper3);
 
@@ -145,11 +136,11 @@ implements ActionListener {
 		innerPanel.add(locationLabelPanel);
 
 		// Prepare center map button
-		final ImageIcon centerIcon = new LazyIcon("center").getIcon();
-		WebButton centerMapButton = new WebButton(StyleId.buttonUndecorated, centerIcon);
+		final Icon centerIcon = ImageLoader.getIconByName(NavigatorWindow.ICON);
+		JButton centerMapButton = new JButton(centerIcon);
 		centerMapButton.setMargin(new Insets(1, 1, 1, 1));
 		centerMapButton.addActionListener(this);
-		TooltipManager.setTooltip (centerMapButton, Msg.getString("TabPanelDeath.tooltip.centerMap"), TooltipWay.down);
+		centerMapButton.setToolTipText(Msg.getString("TabPanelDeath.tooltip.centerMap"));
 		locationLabelPanel.add(centerMapButton);
 
 		// Prepare location label
@@ -164,7 +155,7 @@ implements ActionListener {
 				public void actionPerformed(ActionEvent event) {
 					DeathInfo death = ((Person) getUnit()).getPhysicalCondition().getDeathDetails();
 					if (!(death.getContainerUnit() instanceof MarsSurface))
-						getDesktop().openUnitWindow(death.getContainerUnit(), false);
+						getDesktop().showDetails(death.getContainerUnit());
 				}
 			});
 			locationLabelPanel.add(topContainerButton);
@@ -175,7 +166,6 @@ implements ActionListener {
 	        TF4.setText(death.getPlaceOfDeath());
 	        TF4.setEditable(false);
 	        TF4.setColumns(20);
-	        //malTF.setFont(new Font("Serif", Font.PLAIN, 12));
 	        wrapper4.add(TF4);//, BorderLayout.CENTER);
 	        locationLabelPanel.add(wrapper4);
 		}

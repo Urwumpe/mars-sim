@@ -1,7 +1,7 @@
-/**
+/*
  * Mars Simulation Project
  * DriveGroundVehicle.java
- * @version 3.2.0 2021-06-20
+ * @date 2023-01-11
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -43,23 +43,21 @@ public class DriveGroundVehicle extends OperateVehicle {
 	private static final TaskPhase AVOID_OBSTACLE = new TaskPhase(Msg.getString("Task.phase.avoidObstacle")); //$NON-NLS-1$
 	private static final TaskPhase WINCH_VEHICLE = new TaskPhase(Msg.getString("Task.phase.winchVehicle")); //$NON-NLS-1$
 
-	/** The stress modified per millisol. */
-	private static final double STRESS_MODIFIER = .2D;
+	// Side directions.
+	private static final int NONE = 0;
+	private static final int LEFT = 1;
+	private static final int RIGHT = 2;
+
 	/** The computing resources [in CUs] needed per km. */
 	private static final double CU_PER_KM = .05;
 	
-	// Side directions.
-	private final static int NONE = 0;
-	private final static int LEFT = 1;
-	private final static int RIGHT = 2;
-
 	// Data members
 	private int sideDirection = NONE;
     /** Computing Units used per millisol. */		
 	private double computingUsed = 0;
 	
 	/**
-	 * Default Constructor.
+	 * Default Constructor for a person operator.
 	 * 
 	 * @param person            the person to perform the task
 	 * @param vehicle           the vehicle to be driven
@@ -71,8 +69,7 @@ public class DriveGroundVehicle extends OperateVehicle {
 			double startTripDistance) {
 
 		// Use OperateVehicle constructor
-		super(NAME, person, vehicle, destination, startTripTime, startTripDistance, STRESS_MODIFIER, 
-				(300D + RandomUtil.getRandomDouble(20D)));
+		super(NAME, person, vehicle, destination, startTripTime, startTripDistance, (300D + RandomUtil.getRandomDouble(20D)));
 		
 		// Set initial parameters
 		setDescription(Msg.getString("Task.description.driveGroundVehicle.detail", vehicle.getName())); // $NON-NLS-1$
@@ -82,12 +79,20 @@ public class DriveGroundVehicle extends OperateVehicle {
 		logger.log(person, Level.INFO, 20_000, "Took the wheel of the rover.");
 	}
 
+	/**
+	 * Default Constructor for a robot operator.
+	 * 
+	 * @param robot
+	 * @param vehicle
+	 * @param destination
+	 * @param startTripTime
+	 * @param startTripDistance
+	 */
 	public DriveGroundVehicle(Robot robot, GroundVehicle vehicle, Coordinates destination, MarsClock startTripTime,
 			double startTripDistance) {
 
 		// Use OperateVehicle constructor
-		super(NAME, robot, vehicle, destination, startTripTime, startTripDistance, STRESS_MODIFIER, true,
-				(300D + RandomUtil.getRandomDouble(20D)));
+		super(NAME, robot, vehicle, destination, startTripTime, startTripDistance, (300D + RandomUtil.getRandomDouble(20D)));
 		
 		// Set initial parameters
 		setDescription(Msg.getString("Task.description.driveGroundVehicle.detail", vehicle.getName())); // $NON-NLS-1$
@@ -98,7 +103,7 @@ public class DriveGroundVehicle extends OperateVehicle {
 	}
 
 	/**
-	 * Constructs with a given starting phase.
+	 * Constructs this task for a person with a given starting phase.
 	 * 
 	 * @param person            the person to perform the task
 	 * @param vehicle           the vehicle to be driven
@@ -111,8 +116,7 @@ public class DriveGroundVehicle extends OperateVehicle {
 			double startTripDistance, TaskPhase startingPhase) {
 
 		// Use OperateVehicle constructor
-		super(NAME, person, vehicle, destination, startTripTime, startTripDistance, STRESS_MODIFIER, 
-				(100D + RandomUtil.getRandomDouble(20D)));
+		super(NAME, person, vehicle, destination, startTripTime, startTripDistance, (100D + RandomUtil.getRandomDouble(20D)));
 		
 		// Set initial parameters
 		setDescription(Msg.getString("Task.description.driveGroundVehicle.detail", vehicle.getName())); // $NON-NLS-1$
@@ -126,12 +130,21 @@ public class DriveGroundVehicle extends OperateVehicle {
 
 	}
 
+	/**
+	 * Constructs this task for a robot with a given starting phase.
+	 * 
+	 * @param robot
+	 * @param vehicle
+	 * @param destination
+	 * @param startTripTime
+	 * @param startTripDistance
+	 * @param startingPhase
+	 */
 	public DriveGroundVehicle(Robot robot, GroundVehicle vehicle, Coordinates destination, MarsClock startTripTime,
 			double startTripDistance, TaskPhase startingPhase) {
 
 		// Use OperateVehicle constructor
-		super(NAME, robot, vehicle, destination, startTripTime, startTripDistance, STRESS_MODIFIER, true,
-				(100D + RandomUtil.getRandomDouble(20D)));
+		super(NAME, robot, vehicle, destination, startTripTime, startTripDistance, (100D + RandomUtil.getRandomDouble(20D)));
 		
 		// Set initial parameters
 		setDescription(Msg.getString("Task.description.driveGroundVehicle.detail", vehicle.getName())); // $NON-NLS-1$
@@ -155,8 +168,8 @@ public class DriveGroundVehicle extends OperateVehicle {
 		time = super.performMappedPhase(time);
 
 		if (getPhase() == null) {
-//			throw new IllegalArgumentException("Task phase is null");
-			logger.log(worker, Level.INFO, 10_000, "Had an unknown phase when driving.");
+			logger.log(worker, Level.WARNING, 10_000, 
+					"Unknown phase. Just called endTask() in OperateVehicle.");
 			// If it called endTask() in OperateVehicle, then Task is no longer available
 			// WARNING: do NOT call endTask() here or it will end up calling endTask() 
 			// recursively.
@@ -197,7 +210,7 @@ public class DriveGroundVehicle extends OperateVehicle {
 	}
 
 	/**
-	 * Perform task in obstacle phase.
+	 * Performs task in obstacle phase.
 	 * 
 	 * @param time the amount of time to perform the task (in millisols)
 	 * @return time remaining after performing phase (in millisols)

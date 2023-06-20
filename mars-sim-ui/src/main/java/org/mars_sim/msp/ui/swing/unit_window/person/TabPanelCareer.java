@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * TabPanelCareer.java
- * @date 2021-12-05
+ * @date 2023-06-17
  * @author Manny KUng
  */
 
@@ -10,60 +10,53 @@ package org.mars_sim.msp.ui.swing.unit_window.person;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Vector;
 
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.SpringLayout;
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
-import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableColumnModel;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.Unit;
+import org.mars_sim.msp.core.data.History.HistoryItem;
 import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.Mind;
+import org.mars_sim.msp.core.person.ai.job.util.Assignment;
+import org.mars_sim.msp.core.person.ai.job.util.AssignmentType;
 import org.mars_sim.msp.core.person.ai.job.util.Job;
-import org.mars_sim.msp.core.person.ai.job.util.JobAssignment;
-import org.mars_sim.msp.core.person.ai.job.util.JobAssignmentType;
-import org.mars_sim.msp.core.person.ai.job.util.JobHistory;
+import org.mars_sim.msp.core.person.ai.job.util.AssignmentHistory;
 import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.job.util.JobUtil;
+import org.mars_sim.msp.core.person.ai.role.Role;
 import org.mars_sim.msp.core.person.ai.role.RoleType;
 import org.mars_sim.msp.core.person.ai.role.RoleUtil;
 import org.mars_sim.msp.core.person.health.DeathInfo;
 import org.mars_sim.msp.core.structure.ChainOfCommand;
 import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.time.MarsClockFormat;
+import org.mars_sim.msp.core.time.MarsTime;
+import org.mars_sim.msp.core.time.MarsTimeFormat;
+import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
+import org.mars_sim.msp.ui.swing.StyleManager;
 import org.mars_sim.msp.ui.swing.tool.StarRater;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
-
-import com.alee.laf.combobox.WebComboBox;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-//import com.alee.managers.language.data.TooltipWay;
-import com.alee.managers.tooltip.TooltipManager;
-import com.alee.managers.tooltip.TooltipWay;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
 /**
  * The TabPanelCareer is a tab panel for viewing a person's career path and job
- * history.
+ * history and current role.
  */
 @SuppressWarnings("serial")
 public class TabPanelCareer extends TabPanel implements ActionListener {
@@ -71,8 +64,8 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 	/** default logger. */
 	private static SimLogger logger = SimLogger.getLogger(TabPanelCareer.class.getName());
 
-	private static final String CAREER_ICON = Msg.getString("icon.career"); //$NON-NLS-1$
-	
+	private static final String CAREER_ICON = "career";
+
 	private static final int RATING_DAYS = 7;
 
 	/** data cache */
@@ -88,20 +81,13 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 	private RoleType roleCache;
 	private String dateTimeRatingSubmitted;
 
-	private JobAssignmentType statusCache = JobAssignmentType.APPROVED;// PENDING;
+	private AssignmentType statusCache = AssignmentType.APPROVED;// PENDING;
 
-	private JTable table;
-
-	private WebLabel jobLabel;
-	private WebLabel roleLabel;
-	private WebLabel jobChangeLabel;
-	private WebLabel roleChangeLabel;
-	private WebLabel ratingLabel;
-
-	private WebComboBox jobComboBox;
-	private WebComboBox roleComboBox;
+	private JComboBox<String> jobComboBox;
+	private JComboBox<String> roleComboBox;
 
 	private JobHistoryTableModel jobHistoryTableModel;
+	private RoleHistoryTableModel roleHistoryTableModel;
 
 	private StarRater starRater;
 	private StarRater aveRater;
@@ -110,9 +96,10 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 	private Person person;
 	private Settlement settlement;
 
-	private final Font courierNew12 = new Font("Courier New", Font.ITALIC, 12);
+	private MasterClock masterClock;
 
-	private static MarsClock marsClock;
+	private JLabel changeNotice;
+
 
 	/**
 	 * Constructor.
@@ -120,24 +107,21 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 	 * @param unit    {@link Unit} the unit to display.
 	 * @param desktop {@link MainDesktopPane} the main desktop.
 	 */
-	public TabPanelCareer(Unit unit, MainDesktopPane desktop) {
+	public TabPanelCareer(Person unit, MainDesktopPane desktop) {
 		// Use the TabPanel constructor
 		super(
 			null,	
-			ImageLoader.getNewIcon(CAREER_ICON),
+			ImageLoader.getIconByName(CAREER_ICON),
 			Msg.getString("TabPanelCareer.title"), //$NON-NLS-1$
-			unit, desktop
+			desktop
 		);
 
-		person = (Person) unit;
-
-		if (marsClock == null)
-			marsClock	= Simulation.instance().getMasterClock().getMarsClock();
+		person = unit;
+		masterClock = getSimulation().getMasterClock();
 
 		if (person.getAssociatedSettlement() != null) {
 			settlement = person.getAssociatedSettlement();
 		}
-
 		else {
 			if (person.isBuried()) {
 				settlement = person.getBuriedSettlement();
@@ -161,121 +145,58 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 		dead = person.getPhysicalCondition().isDead();
 		deathInfo = person.getPhysicalCondition().getDeathDetails();
 
-		WebPanel firstPanel = new WebPanel(new BorderLayout());
-		northPanel.add(firstPanel, BorderLayout.NORTH);
-
-		// Prepare job spring panel
-		WebPanel topSpringPanel = new WebPanel(new SpringLayout());
-		firstPanel.add(topSpringPanel, BorderLayout.NORTH);
-
-		// Prepare job label
-		jobLabel = new WebLabel(Msg.getString("TabPanelCareer.jobType"), WebLabel.RIGHT); //$NON-NLS-1$
-		topSpringPanel.add(jobLabel);
-		TooltipManager.setTooltip(jobLabel, Msg.getString("TabPanelCareer.jobType.tooltip"), TooltipWay.down);
+		AttributePanel attrPanel = new AttributePanel(4);
+		northPanel.add(attrPanel, BorderLayout.NORTH);
 
 		// Prepare job combo box
 		jobCache = mind.getJob();
-		List<String> jobNames = new ArrayList<String>();
+		Vector<String> jobNames = new Vector<>();
 		for (Job job : JobUtil.getJobs()) {
 			jobNames.add(job.getName(person.getGender()));
 		}
 		Collections.sort(jobNames);
 
 		// Prepare job combo box
-		jobComboBox = new WebComboBox(jobNames.toArray());
+		jobComboBox = new JComboBox<>(jobNames);
 		jobComboBox.setSelectedItem(jobCache.getName());
 		jobComboBox.addActionListener(this);
+		jobComboBox.setToolTipText(Msg.getString("TabPanelCareer.jobType.tooltip"));
+		attrPanel.addLabelledItem(Msg.getString("TabPanelCareer.jobType"), jobComboBox);
 
-		// Prepare job panel
-		WebPanel jobPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT)); // new GridLayout(3, 1, 0, 0)); //
-		jobPanel.add(jobComboBox);
-		topSpringPanel.add(jobPanel);
 
-		TooltipManager.setTooltip(jobComboBox, Msg.getString("TabPanelCareer.jobComboBox.tooltip"),
-				TooltipWay.down);
-
-		// check if a job reassignment is still pending for review
-		// if true, disable the combobox
-
-		// Prepare role label
-		roleLabel = new WebLabel(Msg.getString("TabPanelCareer.roleType"), WebLabel.RIGHT); //$NON-NLS-1$
-		roleLabel.setSize(10, 2);
-		topSpringPanel.add(roleLabel);// , JLabel.BOTTOM);
-
+		// Prepare role selector
 		roleCache = person.getRole().getType();
 		List<String> roleNames = RoleUtil.getRoleNames(settlement.getNumCitizens());
-
-		// Prepare role combo box
-		roleComboBox = new WebComboBox(roleNames.toArray());
+		roleComboBox = new JComboBox<>(roleNames.toArray(new String[0]));
 		roleComboBox.setSelectedItem(roleCache.getName());
 		roleComboBox.addActionListener(this);
+		roleComboBox.setToolTipText(Msg.getString("TabPanelCareer.roleType.tooltip"));
+		attrPanel.addLabelledItem(Msg.getString("TabPanelCareer.roleType"), roleComboBox);
 
-		// Prepare role panel
-		WebPanel rolePanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
-		rolePanel.add(roleComboBox);
-		topSpringPanel.add(rolePanel);
-
-		TooltipManager.setTooltip(roleComboBox, Msg.getString("TabPanelCareer.roleComboBox.tooltip"),
-				TooltipWay.down);
-
-		jobChangeLabel = new WebLabel("");
-		jobChangeLabel.setHorizontalAlignment(SwingConstants.CENTER);
-		jobChangeLabel.setFont(courierNew12);
-		jobChangeLabel.setForeground(Color.blue);
-		firstPanel.add(jobChangeLabel, BorderLayout.CENTER);
-		TooltipManager.setTooltip(jobChangeLabel, Msg.getString("TabPanelCareer.roleType.tooltip"), TooltipWay.down);//$NON-NLS-1$
-
-		roleChangeLabel = new WebLabel("");
-		roleChangeLabel.setHorizontalAlignment(SwingConstants.CENTER);
-		roleChangeLabel.setFont(courierNew12);
-		roleChangeLabel.setForeground(Color.blue);
-		firstPanel.add(roleChangeLabel, BorderLayout.SOUTH);
-		TooltipManager.setTooltip(roleChangeLabel, Msg.getString("TabPanelCareer.roleType.tooltip"), TooltipWay.down);//$NON-NLS-1$
-
-		// Prepare SpringLayout
-		SpringUtilities.makeCompactGrid(topSpringPanel, 2, 2, // rows, cols
-				150, 3, // initX, initY
-				3, 1); // xPad, yPad
-
-		WebPanel ratingPanel = new WebPanel(new BorderLayout());
-		northPanel.add(ratingPanel, BorderLayout.CENTER);
-
-		List<JobAssignment> list = person.getJobHistory().getJobAssignmentList();
-
-		WebPanel springPanel = new WebPanel(new SpringLayout());
-		ratingPanel.add(springPanel, BorderLayout.CENTER);
-
-		WebLabel aveRatingLabel = new WebLabel("Overall Performance : ", WebLabel.RIGHT);
-		springPanel.add(aveRatingLabel);
-
+		// Create ratings
+		List<Assignment> list = person.getJobHistory().getJobAssignmentList();
 		aveRater = new StarRater(5, calculateAveRating(list));
 		aveRater.setEnabled(false);
-		springPanel.add(aveRater);
+		aveRater.setToolTipText(Msg.getString("TabPanelCareer.aveRater.tooltip"));
+		attrPanel.addLabelledItem("Overall Performance", aveRater);
 
-		TooltipManager.setTooltip(aveRatingLabel, Msg.getString("TabPanelCareer.aveRater.tooltip"), //$NON-NLS-1$
-				TooltipWay.down);
-
-		WebLabel raterLabel = new WebLabel("Your Rating : ", WebLabel.RIGHT);
-		springPanel.add(raterLabel);
+		// Create Star rating
 		starRater = new StarRater(5, 0, 0);
-
-		TooltipManager.setTooltip(raterLabel, Msg.getString("TabPanelCareer.raterLabel.tooltip"), TooltipWay.down);//$NON-NLS-1$
-		TooltipManager.setTooltip(starRater, Msg.getString("TabPanelCareer.starRater.tooltip"), TooltipWay.down);//$NON-NLS-1$
-
+		starRater.setToolTipText(Msg.getString("TabPanelCareer.starRater.tooltip"));//$NON-NLS-1$
 		starRater.addStarListener(new StarRater.StarListener() {
 			public void handleSelection(int selection) {
 				if (starRater.isEnabled()) {
 
-					int sol = marsClock.getMissionSol();
-					dateTimeRatingSubmitted = MarsClockFormat.getTruncatedDateTimeStamp(marsClock);
+					MarsTime mTime = masterClock.getMarsTime();
+					int sol = mTime.getMissionSol();
+					dateTimeRatingSubmitted = mTime.getTruncatedDateTimeStamp();
 					printLog = true;
-					ratingLabel.setText("Job Rating submitted on " + dateTimeRatingSubmitted);
-					ratingLabel.setHorizontalAlignment(SwingConstants.CENTER);
+					displayNotice("Job Rating submitted on " + dateTimeRatingSubmitted, false);
 					starRater.setRating(selection);
 
 					int size = list.size();
 					// check if a new job reassignment has just been submitted
-					if (list.get(size - 1).getStatus() == JobAssignmentType.PENDING) {
+					if (list.get(size - 1).getStatus() == AssignmentType.PENDING) {
 						list.get(size - 2).setJobRating(selection);
 						list.get(size - 2).setSolRatingSubmitted(sol);
 					} else {
@@ -290,20 +211,11 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 				}
 			}
 		});
+		attrPanel.addLabelledItem("Your Rating", starRater);
 
-		springPanel.add(starRater);
-
-		// Prepare SpringLayout
-		SpringUtilities.makeCompactGrid(springPanel, 2, 2, // rows, cols
-				80, 10, // initX, initY
-				5, 10); // xPad, yPad
-
-		ratingLabel = new WebLabel("");
-		// ratingLabel.setSize(300, 30);
-		ratingLabel.setHorizontalAlignment(SwingConstants.CENTER);
-		ratingLabel.setFont(courierNew12);
-		ratingLabel.setForeground(Color.blue);
-		ratingPanel.add(ratingLabel, BorderLayout.SOUTH);
+		changeNotice = new JLabel("");
+		changeNotice.setHorizontalAlignment(SwingConstants.CENTER);
+		northPanel.add(changeNotice, BorderLayout.SOUTH);
 
 		// Check if user submitted a job rating
 		checkingJobRating(list);
@@ -320,69 +232,62 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 			starRater.setEnabled(false);
 
 		} else
-			// Added checking for the status of Job Reassignment
+			// Add checking for the status of Job Reassignment
 			checkJobReassignment(person, list);
 
 		// Prepare job title panel
-		WebPanel jobHistoryPanel = new WebPanel(new BorderLayout(0, 0));
-		content.add(jobHistoryPanel, BorderLayout.CENTER);
+		JPanel historyPanel = new JPanel(new BorderLayout(0, 0));
+		content.add(historyPanel, BorderLayout.CENTER);
 
-		// Prepare job title label
-		WebLabel historyLabel = new WebLabel(Msg.getString("TabPanelCareer.history"), WebLabel.CENTER); //$NON-NLS-1$
-		// historyLabel.setBounds(0, 0, width, height);
-		historyLabel.setFont(SUBTITLE_FONT);
-		historyLabel.setPadding(7, 0, 1, 0);
+		// Job history
+		JPanel jobHistoryPanel = new JPanel(new BorderLayout(0, 0));
+		historyPanel.add(jobHistoryPanel, BorderLayout.NORTH);
+		JLabel historyLabel = new JLabel(Msg.getString("TabPanelCareer.history"), JLabel.CENTER); //$NON-NLS-1$
+		StyleManager.applySubHeading(historyLabel);
 		jobHistoryPanel.add(historyLabel, BorderLayout.NORTH);
-
-		// Create schedule table model
-		jobHistoryTableModel = new JobHistoryTableModel();
-
-		// Create attribute scroll panel
-		WebScrollPane scrollPanel = new WebScrollPane();
-//		scrollPanel.setBorder(new MarsPanelBorder());
+		jobHistoryTableModel = new JobHistoryTableModel(person);
+		JScrollPane scrollPanel = new JScrollPane();
 		jobHistoryPanel.add(scrollPanel, BorderLayout.CENTER);
-
-		// Create schedule table
-		table = new ZebraJTable(jobHistoryTableModel);
+		JTable table = new JTable(jobHistoryTableModel);
 		table.setPreferredScrollableViewportSize(new Dimension(225, 100));
-		table.getColumnModel().getColumn(0).setPreferredWidth(25);
-		table.getColumnModel().getColumn(1).setPreferredWidth(50);
-		table.getColumnModel().getColumn(2).setPreferredWidth(50);
-		table.getColumnModel().getColumn(3).setPreferredWidth(50);
-		table.getColumnModel().getColumn(4).setPreferredWidth(50);
-		table.setRowSelectionAllowed(true);
-//		table.setCellSelectionEnabled(false);
-		// table.setDefaultRenderer(Integer.class, new NumberCellRenderer());
+
+		TableColumnModel tc = table.getColumnModel();
+		tc.getColumn(0).setPreferredWidth(25);
+		tc.getColumn(1).setPreferredWidth(50);
+		tc.getColumn(2).setPreferredWidth(50);
+		tc.getColumn(3).setPreferredWidth(50);
+		tc.getColumn(4).setPreferredWidth(50);
+
 		scrollPanel.setViewportView(table);
-
-		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
-		renderer.setHorizontalAlignment(SwingConstants.CENTER);
-		table.getColumnModel().getColumn(0).setCellRenderer(renderer);
-		table.getColumnModel().getColumn(1).setCellRenderer(renderer);
-		table.getColumnModel().getColumn(2).setCellRenderer(renderer);
-		table.getColumnModel().getColumn(3).setCellRenderer(renderer);
-		table.getColumnModel().getColumn(4).setCellRenderer(renderer);
-
-		// Added sorting
-		table.setAutoCreateRowSorter(true);
 		
-		TableStyle.setTableStyle(table);
+		// Role history
+		JPanel roleHistoryPanel = new JPanel(new BorderLayout(0, 0));
+		historyPanel.add(roleHistoryPanel, BorderLayout.SOUTH);
+		JLabel roleLabel = new JLabel("Role History", JLabel.CENTER); //$NON-NLS-1$
+		StyleManager.applySubHeading(roleLabel);
+		roleHistoryPanel.add(roleLabel, BorderLayout.NORTH);
+		roleHistoryTableModel = new RoleHistoryTableModel(person);
+		JScrollPane rscrollPanel = new JScrollPane();
+		roleHistoryPanel.add(rscrollPanel, BorderLayout.CENTER);
+		JTable rtable = new JTable(roleHistoryTableModel);
+		rtable.setPreferredScrollableViewportSize(new Dimension(225, 100));
+		rscrollPanel.setViewportView(rtable);
+
 		update();
-		jobHistoryTableModel.update();
 	}
 
 	/*
 	 * Checks a job rating is submitted or a job reassignment is submitted and is
-	 * still not being reviewed
+	 * still not being reviewed.
 	 *
 	 * @param list
 	 */
-	public void checkingJobRating(List<JobAssignment> list) {
+	public void checkingJobRating(List<Assignment> list) {
 		int size = list.size();
 		if (solRatingSubmitted == -1) {
 			// the TabPanelCareer was closed and retrieve the saved value of
 			// solRatingSubmitted from JobAssignment
-			if (list.get(size - 1).getStatus() == JobAssignmentType.PENDING) {
+			if (list.get(size - 1).getStatus() == AssignmentType.PENDING) {
 				solRatingSubmitted = list.get(size - 2).getSolRatingSubmitted();
 			} else {
 				solRatingSubmitted = list.get(size - 1).getSolRatingSubmitted();
@@ -393,15 +298,15 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 			// no rating has ever been submitted. Thus he/she has a new job assignment
 			starRater.setEnabled(true);
 			starRater.setSelection(0);
-			ratingLabel.setText("");
+			displayNotice("", false);
 		} else {
-			int solElapsed = marsClock.getMissionSol();
+			int solElapsed = masterClock.getMarsTime().getMissionSol();
 
 			if (solElapsed > solRatingSubmitted + RATING_DAYS) {
 				// if 7 days have passed since the rating submitted, re-enable the star rater
 				starRater.setEnabled(true);
 				starRater.setSelection(0);
-				ratingLabel.setText("");
+				displayNotice("", false);
 				dateTimeRatingSubmitted = null;
 				solRatingSubmitted = -1;
 				printLog = true;
@@ -417,7 +322,7 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 				String s = "";
 				if (dateTimeRatingSubmitted != null) {
 					s = "Job Rating last submitted on " + dateTimeRatingSubmitted;
-					ratingLabel.setText(s);
+					displayNotice(s, false);
 					if (printLog) {
 						logger.info(person, s);
 						printLog = false;
@@ -432,10 +337,15 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 		}
 	}
 
+	private void displayNotice(String s, boolean error) {
+		changeNotice.setText(s);
+		changeNotice.setForeground((error ? Color.RED : Color.BLUE));
+	}
+	
 	/*
-	 * Calculate the cumulative career performance score of a person
+	 * Calculates the cumulative career performance score of a person.
 	 */
-	public int calculateAveRating(List<JobAssignment> list) {
+	public int calculateAveRating(List<Assignment> list) {
 		double score = 0;
 		int size = list.size();
 		for (int i = 0; i < size; i++) {
@@ -449,9 +359,8 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 
 	/*
 	 * Checks for any role change or reassignment.
-	 * Note that change in population affects the list of role types
+	 * Note that change in population affects the list of role types.
 	 */
-	@SuppressWarnings("unchecked")
 	public void checkRoleChange() {
 		List<String> names = RoleUtil.getRoleNames(settlement.getNumCitizens());
 
@@ -467,80 +376,92 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
         	}
         }
 
-		// Prepare role combo box
+		// Prepares role combo box
 		RoleType newRole = person.getRole().getType();
 
 		if (roleCache != newRole) {
 			roleCache = newRole;
 			roleComboBox.setSelectedItem(roleCache.getName());
-			roleChangeLabel.setText("Role just changed to " + newRole);
+			changeNotice.setText("Role just changed to " + newRole);
 		}
 	}
 
 
 	/*
-	 * Checks for the status of Job Reassignment
+	 * Checks for the status of job reassignment.
 	 */
-	public void checkJobReassignment(Person person, List<JobAssignment> list) {
+	public void checkJobReassignment(Person person, List<Assignment> list) {
 		int pop = settlement.getNumCitizens();
 
 		int last = list.size() - 1;
 
-		JobAssignmentType status = list.get(last).getStatus();
+		AssignmentType status = list.get(last).getStatus();
 
 		if (pop > ChainOfCommand.POPULATION_WITH_COMMANDER) {
 
-			if (status == JobAssignmentType.PENDING) {
-				statusCache = JobAssignmentType.PENDING;
+			if (status == AssignmentType.PENDING) {
+				statusCache = AssignmentType.PENDING;
 				jobComboBox.setEnabled(false);
-				jobChangeLabel.setForeground(Color.blue);
+				
 				String s = "Job Reassignment submitted on " + list.get(last).getTimeSubmitted();
-				jobChangeLabel.setText(s);
-				if (firstNotification) logger.info(person, s);
+				changeNotice.setText(s);
+				
+				if (firstNotification) 
+					logger.info(person, s);
+				
 				firstNotification = false;
 			}
 
 			// detects a change of status from pending to approved
-			else if (statusCache == JobAssignmentType.PENDING) {
-				if (status.equals(JobAssignmentType.APPROVED)) {
-					statusCache = JobAssignmentType.APPROVED;
+			else if (statusCache == AssignmentType.PENDING) {
+				if (status.equals(AssignmentType.APPROVED)) {
+					statusCache = AssignmentType.APPROVED;
 					logger.info(person, "Job reassignment reviewed and approved.");
-					JobType selectedJob = list.get(last).getJobType();
-					jobCache = selectedJob;
-					// must update the jobCache prior to setSelectedItem
-					// or else a new job reassignment will be submitted
-					jobComboBox.setSelectedItem(selectedJob.getName());
+					
+					JobType selectedJob = JobType.getJobTypeByName(list.get(last).getType());
+
+					if (jobCache != selectedJob) {
+						jobCache = selectedJob;
+						// Note: must update the jobCache prior to calling setSelectedItem
+						// or else a new job reassignment will be submitted
+						jobComboBox.setSelectedItem(selectedJob.getName());
+						changeNotice.setText("Job just changed to " + selectedJob);
+					}
 
 					person.getMind().setJobLock(true);
 
-				} else if (status == JobAssignmentType.NOT_APPROVED) {
-					statusCache = JobAssignmentType.NOT_APPROVED;
+				} else if (status == AssignmentType.NOT_APPROVED) {
+					statusCache = AssignmentType.NOT_APPROVED;
 					logger.info(person, "Job reassignment reviewed and NOT approved.");
 
-					JobType selectedJob = list.get(last - 1).getJobType();
-					jobCache = selectedJob;
-					// must update the jobCache prior to setSelectedItem
-					// or else a new job reassignment will be submitted
-					jobComboBox.setSelectedItem(selectedJob.getName());
-
+					JobType selectedJob = JobType.getJobTypeByName(list.get(last - 1).getType());
+	
+					if (jobCache != selectedJob) {
+						jobCache = selectedJob;
+						// Note: must update the jobCache prior to calling setSelectedItem
+						// or else a new job reassignment will be submitted
+						jobComboBox.setSelectedItem(selectedJob.getName());
+						changeNotice.setText("Job just restored back to " + selectedJob);
+					}
 				}
 
 				jobComboBox.setEnabled(true);
-				jobChangeLabel.setText("");
+				changeNotice.setText("");
 
 				// Note: determine if new rating submission should be allowed immediately at the
 				// beginning of a new assignment
 				solRatingSubmitted = -1;
 				starRater.setSelection(0);
 				starRater.setEnabled(true);
-				ratingLabel.setText("");
 
 				// updates the jobHistoryList in jobHistoryTableModel
 				jobHistoryTableModel.update();
 
-				RoleType roleNew = person.getRole().getType();
-				if (roleCache != roleNew) {
-					roleCache = roleNew;
+				RoleType newRole = person.getRole().getType();
+				if (roleCache != newRole) {
+					roleCache = newRole;
+					roleComboBox.setSelectedItem(roleCache.getName());
+					changeNotice.setText("Role just changed to " + newRole);
 				}
 
 			}
@@ -551,11 +472,15 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 		else {
 			// Update the jobComboBox if pop is less than
 			// POPULATION_WITH_COMMANDER
-			JobType selectedJob = list.get(last).getJobType();
-			jobCache = selectedJob;
-			// must update the jobCache prior to setSelectedItem
-			// or else a new job reassignment will be submitted
-			jobComboBox.setSelectedItem(selectedJob.getName());
+			JobType selectedJob = JobType.getJobTypeByName(list.get(last).getType());
+			
+			if (jobCache != selectedJob) {
+				jobCache = selectedJob;
+				// Note: must update the jobCache prior to calling setSelectedItem
+				// or else a new job reassignment will be submitted
+				jobComboBox.setSelectedItem(selectedJob.getName());
+				changeNotice.setText("Job just changed to " + selectedJob);
+			}
 		}
 	}
 
@@ -564,8 +489,6 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 	 */
 	@Override
 	public void update() {
-		TableStyle.setTableStyle(table);
-
 		boolean dead = false;
 
 		dead = person.getPhysicalCondition().isDead();
@@ -582,9 +505,10 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 
 		} else {
 
+			// Check for the role change
 			checkRoleChange();
 
-			List<JobAssignment> list = person.getJobHistory().getJobAssignmentList();
+			List<Assignment> list = person.getJobHistory().getJobAssignmentList();
 
 			// Added checking if user submitted a job rating
 			checkingJobRating(list);
@@ -593,12 +517,15 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 			checkJobReassignment(person, list);
 
 			// check for the passing of each day
-			int solElapsed = marsClock.getMissionSol();
+			int solElapsed = masterClock.getMarsTime().getMissionSol();
 
 			// If the rating or job reassignment request is at least one day ago
 			if (solCache != solElapsed) {
 				solCache = solElapsed;
 			} // end of if (solElapsed != solCache)
+
+			jobHistoryTableModel.update();
+			roleHistoryTableModel.update();
 		} // end of else if not dead
 	}
 
@@ -620,26 +547,34 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 				if ((selectedRole.isChief() || selectedRole.isCouncil())
 						&& (!roleCache.isChief() || !roleCache.isCouncil())) {
 					box = JOptionPane.showConfirmDialog(desktop.getMainWindow().getFrame(),
-							"Are you sure you want to promote the role to " + selectedRole.getName() + " ?");
+							"Are you sure you want to promote the person's role from " 
+							 + roleCache + " to " + selectedRole.getName() + " ?");
 				}
 
 				else if ((roleCache.isChief() || roleCache.isCouncil())
 						&& (!selectedRole.isChief() || !selectedRole.isCouncil())) {
 					box = JOptionPane.showConfirmDialog(desktop.getMainWindow().getFrame(),
-							"Are you sure you want to demote the role to " + selectedRole.getName() + " ?");
+							"Are you sure you want to demote the person's role from "
+							 + roleCache + " to "  + selectedRole.getName() + " ?");
 				}
 
 				else {
 					box = JOptionPane.showConfirmDialog(desktop.getMainWindow().getFrame(),
-							"Are you sure you want to change the role to " + selectedRole.getName() + " ?");
+							"Are you sure you want to change the person's role from "
+							 + roleCache + " to " + selectedRole.getName() + " ?");
 				}
 
 				if (box == JOptionPane.YES_OPTION) {
-					roleCache = selectedRole;
+	
 					person.getRole().changeRoleType(selectedRole);
+					
+					logger.info(person, "Player just changed his/her role from " 
+							+ roleCache.getName() + " to " + selectedRole.getName() + ".");
+					
+					roleCache = selectedRole;
 				}
 				else {
-					roleComboBox.setSelectedItem(selectedRole.getName());
+					roleComboBox.setSelectedItem(roleCache.getName());
 				}
 			}
 		}
@@ -647,11 +582,13 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 		else if (source == jobComboBox) {
 
 			JobType selectedJob = JobType.getJobTypeByName((String) jobComboBox.getSelectedItem());
-			JobType jobCache = person.getMind().getJob();
+//			JobType jobCache = person.getMind().getJob();
 
 			if (selectedJob != jobCache) {
 				int box = JOptionPane.showConfirmDialog(desktop.getMainWindow().getFrame(),
-						"Are you sure you want to change the job to " + selectedJob.getName() + " ?");
+						"Are you sure you want to change the person's job from "
+						 + jobCache + " to " + selectedJob.getName() + " ?");
+				
 				if (box == JOptionPane.YES_OPTION) {
 					considerJobChange(jobCache, selectedJob);
 				}
@@ -663,7 +600,7 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 	}
 
 	/**
-	 * Determine if the job change request should be granted
+	 * Determines if the job change request should be granted.
 	 *
 	 * @param jobStrCache
 	 * @param selectedJobStr
@@ -673,16 +610,12 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 		// if job is Politician, loads and set to the previous job and quit;
 		if (jobCache == JobType.POLITICIAN) {
 			jobComboBox.setSelectedItem(jobCache.getName());
-			jobChangeLabel.setForeground(Color.red);
-			jobChangeLabel.setText("Mayor cannot switch job arbitrarily!");
-			jobChangeLabel.setHorizontalAlignment(SwingConstants.CENTER);
+			displayNotice("Mayor cannot switch job arbitrarily!", true);
 		}
 
 		else if (selectedJob == JobType.POLITICIAN) {
 			jobComboBox.setSelectedItem(jobCache.getName());
-			jobChangeLabel.setForeground(Color.red);
-			jobChangeLabel.setText("Politician job is reserved for Mayor only.");
-			jobChangeLabel.setHorizontalAlignment(SwingConstants.CENTER);
+			displayNotice("Politician job is reserved for Mayor only.", true);
 		}
 
 		else if (jobCache != selectedJob) {
@@ -693,19 +626,17 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 
 			// if the population is beyond 4
 			if (pop > ChainOfCommand.POPULATION_WITH_COMMANDER) {
-
-				jobChangeLabel.setForeground(Color.BLUE);
-
-				String s = "Job Reassignment submitted on " + MarsClockFormat.getTruncatedDateTimeStamp(marsClock);
-				jobChangeLabel.setText(s);
+				String s = "Job Reassignment submitted on " + MarsTimeFormat.getTruncatedDateTimeStamp(
+											masterClock.getMarsTime());
+				displayNotice(s, false);
 				logger.info(person, s);
 				firstNotification = true;
 
-				JobHistory jh = person.getJobHistory();
+				AssignmentHistory jh = person.getJobHistory();
 
-				statusCache = JobAssignmentType.PENDING;
+				statusCache = AssignmentType.PENDING;
 
-				jh.savePendingJob(selectedJob, JobUtil.USER, statusCache, null, true);
+				jh.savePendingJob(selectedJob.getName(), JobUtil.USER, statusCache, null, true);
 				// Set the combobox selection back to its previous job type for the time being
 				// until the reassignment is approved
 				jobComboBox.setSelectedItem(jobCache.getName());
@@ -717,11 +648,10 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 			}
 
 			else if (pop > 0 && pop <= ChainOfCommand.POPULATION_WITH_COMMANDER) {
-				jobChangeLabel.setForeground(Color.RED);
-				jobChangeLabel.setText("");
+				displayNotice("", false);
 				jobComboBox.setSelectedItem(selectedJob.getName());
 				// pop is small, things need to be flexible. Thus automatic approval
-				statusCache = JobAssignmentType.APPROVED;
+				statusCache = AssignmentType.APPROVED;
 				person.getMind().reassignJob(selectedJob, true, JobUtil.USER, statusCache,
 						JobUtil.USER);
 
@@ -740,10 +670,6 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 	public void destroy() {
 		super.destroy();
 		
-		table = null;
-		jobLabel = null;
-		jobChangeLabel = null;
-		ratingLabel = null;
 		jobComboBox = null;
 		roleComboBox = null;
 		jobHistoryTableModel = null;
@@ -753,23 +679,89 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 	/**
 	 * Internal class used as model for the attribute table.
 	 */
-	class JobHistoryTableModel extends AbstractTableModel {
+	private static class RoleHistoryTableModel extends AbstractTableModel {
 
 		private static final long serialVersionUID = 1L;
 
-		private JobHistory jobHistory;
-		private JobAssignment ja;
-
-		private List<JobAssignment> jobAssignmentList;
+		private Role role;
+		private int origSize;
+		private List<HistoryItem<RoleType>> roleChanges;
 
 		/**
 		 * hidden constructor.
 		 *
 		 * @param unit {@link Unit}
 		 */
-		JobHistoryTableModel() {
-			jobHistory = person.getJobHistory();
+		RoleHistoryTableModel(Person p) {
+			role = p.getRole();
+			roleChanges = role.getChanges();
+			origSize = roleChanges.size();
+		}
+
+		@Override
+		public int getRowCount() {
+			return roleChanges.size();
+		}
+
+		@Override
+		public int getColumnCount() {
+			return 2;
+		}
+
+		@Override
+		public Class<?> getColumnClass(int columnIndex) {
+			return String.class;
+		}
+
+		@Override
+		public String getColumnName(int columnIndex) {
+			return switch(columnIndex) {
+				case 0 -> Msg.getString("TabPanelCareer.column.time"); //$NON-NLS-1$
+				case 1 -> "Role";
+				default -> null;
+			};
+		}
+
+		public Object getValueAt(int row, int column) {
+			HistoryItem<RoleType> ja = roleChanges.get(row);
+			return switch(column) {
+				case 0 -> ja.getWhen().getTruncatedDateTimeStamp(); 
+				case 1 -> ja.getWhat().getName();
+				default -> null;
+			};
+		}
+
+		/**
+		 * Prepares the job history of the person.
+		 */
+		void update() {
+			if (roleChanges.size() != origSize) {
+				origSize = roleChanges.size();
+				fireTableDataChanged();
+			}
+		}
+	}
+
+	/**
+	 * Internal class used as model for the attribute table.
+	 */
+	private static class JobHistoryTableModel extends AbstractTableModel {
+
+		private static final long serialVersionUID = 1L;
+
+		private AssignmentHistory jobHistory;
+		private List<Assignment> jobAssignmentList;
+		private int origSize;
+
+		/**
+		 * hidden constructor.
+		 *
+		 * @param unit {@link Unit}
+		 */
+		JobHistoryTableModel(Person p) {
+			jobHistory = p.getJobHistory();
 			jobAssignmentList = jobHistory.getJobAssignmentList();
+			origSize = jobAssignmentList.size();
 		}
 
 		@Override
@@ -787,60 +779,42 @@ public class TabPanelCareer extends TabPanel implements ActionListener {
 
 		@Override
 		public Class<?> getColumnClass(int columnIndex) {
-			Class<?> dataType = super.getColumnClass(columnIndex);
-			if (columnIndex == 0)
-				dataType = String.class;
-			else if (columnIndex == 1)
-				dataType = String.class;
-			else if (columnIndex == 2)
-				dataType = String.class;
-			else if (columnIndex == 3)
-				dataType = String.class;
-			else if (columnIndex == 4)
-				dataType = String.class;
-			return dataType;
+			return String.class;
 		}
 
 		@Override
 		public String getColumnName(int columnIndex) {
-			if (columnIndex == 0)
-				return Msg.getString("TabPanelCareer.column.time"); //$NON-NLS-1$
-			else if (columnIndex == 1)
-				return Msg.getString("TabPanelCareer.column.jobType"); //$NON-NLS-1$
-			else if (columnIndex == 2)
-				return Msg.getString("TabPanelCareer.column.initiated"); //$NON-NLS-1$
-			else if (columnIndex == 3)
-				return Msg.getString("TabPanelCareer.column.status"); //$NON-NLS-1$
-			else if (columnIndex == 4)
-				return Msg.getString("TabPanelCareer.column.authorized"); //$NON-NLS-1$
-			else
-				return null;
+			return switch(columnIndex) {
+				case 0 -> Msg.getString("TabPanelCareer.column.time"); //$NON-NLS-1$
+				case 1 -> Msg.getString("TabPanelCareer.column.jobType"); //$NON-NLS-1$
+				case 2 -> Msg.getString("TabPanelCareer.column.initiated"); //$NON-NLS-1$
+				case 3 -> Msg.getString("TabPanelCareer.column.status"); //$NON-NLS-1$
+				case 4 -> Msg.getString("TabPanelCareer.column.authorized"); //$NON-NLS-1$
+				default -> null;
+			};
 		}
 
 		public Object getValueAt(int row, int column) {
 			int r = jobAssignmentList.size() - row - 1;
-			ja = jobAssignmentList.get(r);
-			// System.out.println(" r is " + r);
-			if (column == 0)
-				return ja.getTimeSubmitted(); // MarsClock.getDateTimeStamp(ja.getTimeSubmitted());
-			else if (column == 1)
-				return ja.getJobType();
-			else if (column == 2)
-				return ja.getInitiator();
-			else if (column == 3)
-				return ja.getStatus();
-			else if (column == 4)
-				return ja.getAuthorizedBy();
-			else
-				return null;
+			Assignment ja = jobAssignmentList.get(r);
+			return switch(column) {
+				case 0 -> ja.getTimeSubmitted(); // MarsClock.getDateTimeStamp(ja.getTimeSubmitted());
+				case 1 -> ja.getType();
+				case 2 -> ja.getInitiator();
+				case 3 -> ja.getStatus();
+				case 4 -> ja.getAuthorizedBy();
+				default -> null;
+			};
 		}
 
 		/**
-		 * Prepares the job history of the person
+		 * Prepares the job history of the person.
 		 */
 		void update() {
-			jobAssignmentList = jobHistory.getJobAssignmentList();
-			fireTableDataChanged();
+			if (origSize != jobAssignmentList.size()) {
+				origSize = jobAssignmentList.size();
+				fireTableDataChanged();
+			}
 		}
 	}
 }

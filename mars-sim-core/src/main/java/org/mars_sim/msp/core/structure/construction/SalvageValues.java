@@ -11,7 +11,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.goods.GoodsManager;
 import org.mars_sim.msp.core.person.Person;
@@ -22,10 +21,10 @@ import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.BuildingManager;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
-import org.mars_sim.msp.core.structure.building.function.VehicleGarage;
 import org.mars_sim.msp.core.structure.building.function.LifeSupport;
 import org.mars_sim.msp.core.structure.building.function.LivingAccommodations;
 import org.mars_sim.msp.core.structure.building.function.RoboticStation;
+import org.mars_sim.msp.core.structure.building.function.VehicleGarage;
 import org.mars_sim.msp.core.time.MarsClock;
 
 /**
@@ -46,7 +45,9 @@ implements Serializable {
 	private Map<Integer, Double> settlementSalvageValueCache;
 	private MarsClock settlementSalvageValueCacheTime;
 
-	private static UnitManager unitManager = Simulation.instance().getUnitManager();
+	private static UnitManager unitManager;
+	
+	private static MarsClock marsClock;
 
 	/**
 	 * Constructor.
@@ -83,13 +84,12 @@ implements Serializable {
 	 */
 	public double getSettlementSalvageProfit(int constructionSkill) {
 
-		MarsClock currentTime = Simulation.instance().getMasterClock().getMarsClock();
 		if ((settlementSalvageValueCacheTime == null) || 
-				(MarsClock.getTimeDiff(currentTime, settlementSalvageValueCacheTime) > 1000D)) {
+				(MarsClock.getTimeDiff(marsClock, settlementSalvageValueCacheTime) > 1000D)) {
 			if (settlementSalvageValueCache == null) 
 				settlementSalvageValueCache = new HashMap<>();
 			settlementSalvageValueCache.clear();
-			settlementSalvageValueCacheTime = new MarsClock(currentTime);
+			settlementSalvageValueCacheTime = new MarsClock(marsClock);
 		}
 
 		if (!settlementSalvageValueCache.containsKey(constructionSkill)) {
@@ -196,7 +196,7 @@ implements Serializable {
 		double result = 0D;
 
 		BuildingManager buildingManager = settlement.getBuildingManager();
-		Iterator<Building> i = buildingManager.getBuildings().iterator();//getACopyOfBuildings().iterator();.getACopyOfBuildings().iterator();
+		Iterator<Building> i = buildingManager.getBuildingSet().iterator();
 		while (i.hasNext()) {
 			Building building = i.next();
 			double salvageProfit = getNewBuildingSalvageProfit(building, constructionSkill);
@@ -357,12 +357,13 @@ implements Serializable {
 	}
 
 	/**
-	 * Reloads instances after loading from a saved sim
+	 * Loads instances.
 	 * 
 	 * @param u {@link UnitManager}
 	 */
-	public static void initializeInstances(UnitManager u) {
+	public static void initializeInstances(UnitManager u, MarsClock mc) {
 		unitManager = u;
+		marsClock = mc;
 	}
 	
 	/**

@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
- * Mission.java
- * @date 2022-08-10
+ * AbstractMission.java
+ * @date 2023-06-09
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.mission;
@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Simulation;
+import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitManager;
 import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.data.UnitSet;
@@ -36,13 +37,15 @@ import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PersonConfig;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.job.util.JobType;
-import org.mars_sim.msp.core.person.ai.mission.MissionPhase.Stage;
 import org.mars_sim.msp.core.person.ai.social.RelationshipUtil;
 import org.mars_sim.msp.core.person.ai.task.util.Task;
 import org.mars_sim.msp.core.person.ai.task.util.Worker;
+import org.mars_sim.msp.core.project.Stage;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.robot.ai.job.RobotJob;
+import org.mars_sim.msp.core.structure.ObjectiveType;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.Temporal;
@@ -51,7 +54,7 @@ import org.mars_sim.msp.core.tool.RandomUtil;
 
 
 /**
- * The Mission class represents a large multi-person task There is at most one
+ * The AbstractMission class represents a large multi-person task There is at most one
  * instance of a mission per person. A Mission may have one or more people
  * associated with it.
  */
@@ -83,13 +86,11 @@ public abstract class AbstractMission implements Mission, Temporal {
 	/** default logger. */
 	private static final SimLogger logger = SimLogger.getLogger(AbstractMission.class.getName());
 
-	private static final String OUTSIDE = "Outside";
-
 	private static final int MAX_CAP = 8;
 
-	private static final MissionPhase COMPLETED_PHASE = new MissionPhase("completed", MissionPhase.Stage.CLOSEDOWN);
-	private static final MissionPhase ABORTED_PHASE = new MissionPhase("aborted", MissionPhase.Stage.CLOSEDOWN);
-	protected static final MissionPhase REVIEWING = new MissionPhase("reviewing", MissionPhase.Stage.PREPARATION);
+	private static final MissionPhase COMPLETED_PHASE = new MissionPhase("completed", Stage.CLOSEDOWN);
+	private static final MissionPhase ABORTED_PHASE = new MissionPhase("aborted", Stage.CLOSEDOWN);
+	protected static final MissionPhase REVIEWING = new MissionPhase("reviewing", Stage.PREPARATION);
 
 
 	protected static final MissionStatus NOT_ENOUGH_MEMBERS = new MissionStatus("Mission.status.noMembers");
@@ -116,7 +117,7 @@ public abstract class AbstractMission implements Mission, Temporal {
 
 	/** The Name of this mission. */
 	private String missionName;
-	/** Unique identifer  */
+	/** Unique identifier  */
 	private int identifier;
 	/** The full mission designation. */
 	private String fullMissionDesignation = "";
@@ -318,34 +319,37 @@ public abstract class AbstractMission implements Mission, Temporal {
 	}
 
 	/**
-	 * Registers this historical event.
+	 * Registers this historical mission event about a Member
 	 * 
-	 * @param person
+	 * @param member
 	 * @param type
 	 * @param message
 	 */
 	private void registerHistoricalEvent(Worker member, EventType type, String message) {
-		String container = null;
+		Unit container = null;
 		String hometown = null;
-		String coordinates = null;
+		Coordinates coordinates = null;
 		if (member.isInSettlement()) {
-			container = member.getBuildingLocation().getNickName();
-			hometown = member.getAssociatedSettlement().getName();
-			coordinates = member.getAssociatedSettlement().getCoordinates().getCoordinateString();
+			Building workPlace = member.getBuildingLocation();
+			if (workPlace != null) {
+				container = workPlace;
+			}
+			else {
+				container = member.getAssociatedSettlement();
+			}
+			coordinates = member.getAssociatedSettlement().getCoordinates();
 		} else if (member.isInVehicle()) {
-			container = member.getVehicle().getName();
-			hometown = member.getVehicle().getCoordinates().toString();
-			coordinates = member.getVehicle().getCoordinates().getCoordinateString();
+			container = member.getVehicle();
+			coordinates = member.getVehicle().getCoordinates();
 		} else {
-			container = OUTSIDE;
-			hometown = member.getAssociatedSettlement().getName();
-			coordinates = member.getCoordinates().toString();
+			container = null;
+			coordinates = member.getCoordinates();
 		}
 
 		// Creating mission joining event.
 		HistoricalEvent newEvent = new MissionHistoricalEvent(type, this,
 				message, missionName, member.getName(), 
-				container, hometown, coordinates);
+				container, member.getAssociatedSettlement().getName(), coordinates);
 		eventManager.registerNewEvent(newEvent);
 	}
 
@@ -446,6 +450,7 @@ public abstract class AbstractMission implements Mission, Temporal {
 	 * 
 	 * @param newName
 	 */
+	@Override
     public void setName(String newName) {
 		this.missionName = newName;
     }
@@ -461,11 +466,20 @@ public abstract class AbstractMission implements Mission, Temporal {
 	}
 
 	/**
+	 * Get the Stage
+	 */
+	@Override
+	public Stage getStage() {
+		return (done ? Stage.DONE :
+				// If no phase that Mission is building built so stage is PREP
+				(phase != null ? phase.getStage() : Stage.PREPARATION));
+	}
+
+	/**
 	 * Gets the current phase of the mission.
 	 *
 	 * @return phase
 	 */
-	@Override
 	public MissionPhase getPhase() {
 		return phase;
 	}
@@ -478,7 +492,7 @@ public abstract class AbstractMission implements Mission, Temporal {
 	 * @throws MissionException if newPhase is not in the mission's collection of
 	 *                          phases.
 	 */
-	protected final void setPhase(MissionPhase newPhase, String subjectOfPhase) {
+	protected void setPhase(MissionPhase newPhase, String subjectOfPhase) {
 		if (newPhase == null) {
 			throw new IllegalArgumentException("newPhase is null");
 		}
@@ -636,9 +650,10 @@ public abstract class AbstractMission implements Mission, Temporal {
 
 	/**
 	 * Abort the mission by the user. Will stop currnet phase.
+	 * @param reason Cause for abort
 	 */
 	@Override
-	public final void abortMission() {
+	public final void abortMission(String reason) {
 		abortMission(MISSION_ABORTED, null);
 	}
 
@@ -649,6 +664,7 @@ public abstract class AbstractMission implements Mission, Temporal {
 	 */
 	protected void abortMission(MissionStatus reason, EventType event) {
 		aborted = true;
+		logger.info(getStartingPerson(), "Mission " + getName() + " aborted " + reason.getName());
 	}
 
 	/**
@@ -681,12 +697,24 @@ public abstract class AbstractMission implements Mission, Temporal {
 		}
 	}
 
+
+	/**
+	 * An internal problem has happened to end the mission.
+	 * 
+	 * @param source
+	 * @param reason
+	 */
+	protected void endMissionProblem(Loggable source, String reason) {
+		MissionStatus status = new MissionStatus(INTERNAL_PROBLEM, reason);
+		logger.severe(source, getName() + ": " + status.getName());
+		endMission(status);
+	}
+	
 	/**
 	 * Finalizes the mission. Reason for ending mission. Mission can
 	 * override this to perform necessary finalizing operations.
 	 *
 	 * @param endStatus A status to add for the end of Mission
-	 *
 	 */
 	protected void endMission(MissionStatus endStatus) {
 		if (done) {
@@ -699,7 +727,7 @@ public abstract class AbstractMission implements Mission, Temporal {
 			missionStatus.add(endStatus);
 		}
 
-		// If no mission flags have been added then it was accomplised
+		// If no mission flags have been added then it was accomplished
 		String listOfStatuses = missionStatus.stream().map(MissionStatus::getName).collect(Collectors.joining(", "));
 		MissionPhase finalPhase;
 		if (missionStatus.isEmpty() && !aborted) {
@@ -747,6 +775,13 @@ public abstract class AbstractMission implements Mission, Temporal {
 
 		// If task is effort-driven and person too ill, do not assign task.
 
+		Task currentTask = person.getMind().getTaskManager().getTask();
+		
+		if (currentTask != null && currentTask.getName().equals(task.getName()))
+			// If the person has been doing this task, 
+			// then there is no need of adding it.
+			return true;
+		
         if (canPerformTask) {
 			canPerformTask = person.getMind().getTaskManager().addTask(task);
 		}
@@ -772,6 +807,13 @@ public abstract class AbstractMission implements Mission, Temporal {
 		if (!robot.getSystemCondition().isBatteryAbove(5))
 			return false;
 
+		Task currentTask = robot.getBotMind().getBotTaskManager().getTask();
+		
+		if (currentTask != null && currentTask.getName().equals(task.getName()))
+			// If the robot has been doing this task, 
+			// then there is no need of adding it.
+			return true;
+		
 		return robot.getBotMind().getBotTaskManager().addTask(task);
 	}
 
@@ -1066,6 +1108,10 @@ public abstract class AbstractMission implements Mission, Temporal {
 		return Collections.emptySet();
 	}
 
+	@Override
+	public Set<ObjectiveType> getObjectiveSatisified() {
+		return Collections.emptySet();
+	}
 	/**
 	 * Checks if the current phase has ended or not.
 	 *
@@ -1242,15 +1288,6 @@ public abstract class AbstractMission implements Mission, Temporal {
 		fireMissionUpdate(MissionEventType.DESIGNATION_EVENT, fullMissionDesignation);
 	}
 
-	/**
-	 * An internal problem has happened so end the mission.
-	 */
-	protected void endMissionProblem(Loggable source, String reason) {
-		MissionStatus status = new MissionStatus(INTERNAL_PROBLEM, reason);
-		logger.severe(source, getName() + ": " + status.getName());
-		endMission(status);
-	}
-
 	@Override
 	public Set<MissionStatus> getMissionStatus() {
 		return missionStatus;
@@ -1274,6 +1311,10 @@ public abstract class AbstractMission implements Mission, Temporal {
 		return priority;
 	}
 
+	protected void setPriority(int newPriority) {
+		priority = newPriority;
+	}
+	
 	/**
 	 * Checks if this worker can participate.
 	 * 

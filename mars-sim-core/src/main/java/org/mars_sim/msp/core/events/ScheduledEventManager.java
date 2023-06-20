@@ -8,7 +8,6 @@ package org.mars_sim.msp.core.events;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -17,14 +16,19 @@ import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.time.Temporal;
 
 /**
- * This class manaages a list off future scheduled events.
+ * This class manages a list off future scheduled events.
  */
 public class ScheduledEventManager implements Serializable, Temporal {
-    
+
+	private static final long serialVersionUID = 1L;
+	
     /**
-     * Represents anevent that is scheduled for future exeuction.
+     * Represents an event that is scheduled for future execution.
      */
     public class ScheduledEvent implements Comparable<ScheduledEvent>, Serializable {
+
+		private static final long serialVersionUID = 1L;
+		
         private MarsClock when;
         private ScheduledEventHandler handler;
 
@@ -39,7 +43,7 @@ public class ScheduledEventManager implements Serializable, Temporal {
         }
         
         /**
-         * Get the description of the target handler.
+         * Gets the description of the target handler.
          */
         public String getDescription() {
             return handler.getEventDescription();
@@ -67,7 +71,8 @@ public class ScheduledEventManager implements Serializable, Temporal {
         }
 
         /**
-         * Compare the scheduled events according to when the event is scheduled
+         * Compares the scheduled events according to when the event is scheduled.
+         * 
          * @param o
          * @return
          */
@@ -85,8 +90,9 @@ public class ScheduledEventManager implements Serializable, Temporal {
     }
 
     /**
-     * Add an event ti be executed in the future
-     * @param duration Duratin in miliisol until the event is executed
+     * Adds an event ti be executed in the future.
+     * 
+     * @param duration Duration in miliisols until the event is executed
      * @param handler Handler when the event expires
      */
     public ScheduledEvent addEvent(int duration, ScheduledEventHandler handler) {
@@ -94,10 +100,25 @@ public class ScheduledEventManager implements Serializable, Temporal {
         MarsClock when = new MarsClock(marsClock);
         when.addTime(duration);
 
+        return addEvent(when, handler);
+    }
+
+    /**
+     * Adds an event to be executed in the future at a specific time.
+     * 
+     * @param when Time on Mars this event will happen
+     * @param handler Handler when the event expires
+     */
+    public ScheduledEvent addEvent(MarsClock when, ScheduledEventHandler handler) {
+        if (MarsClock.getTimeDiff(when, marsClock) < 0) {
+            // Event time has already past so set it to now
+            when = new MarsClock(marsClock);
+        }
         ScheduledEvent result = new ScheduledEvent(when, handler);
         addEvent(result);
         return result;
     }
+
 
     private void addEvent(ScheduledEvent newEvent) {
         synchronized(eventQueue) {
@@ -105,8 +126,26 @@ public class ScheduledEventManager implements Serializable, Temporal {
             Collections.sort(eventQueue);
         }
     }
+
     /**
-     * What events are scheduled for the futureS
+     * Removes a previously registered event against a handler.
+     * 
+     * @param handler Handler to be removed
+     */
+    public void removeEvent(ScheduledEventHandler handler) {
+        synchronized(eventQueue) {
+            for(ScheduledEvent event : eventQueue) {
+                if (event.handler.equals(handler)) {
+                    eventQueue.remove(event);
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Returns a list of events are scheduled for the future.
+     * 
      * @return
      */
     public List<ScheduledEvent> getEvents() {
@@ -114,7 +153,8 @@ public class ScheduledEventManager implements Serializable, Temporal {
     }
 
     /**
-     * Process any expired events
+     * Processes any expired events.
+     * 
      * @param clockPulse
      */
     @Override
@@ -127,7 +167,7 @@ public class ScheduledEventManager implements Serializable, Temporal {
                 // Keep executing events that have past
                 while((next != null) && next.when.getTotalMillisols() <= currentTime.getTotalMillisols()) {
                     eventQueue.remove(next);
-                    int repeatInterval = next.handler.execute();
+                    int repeatInterval = next.handler.execute(currentTime);
                     if (repeatInterval > 0) {
                         // Update the when and add back intot he queue
                         next.when.addTime(repeatInterval);

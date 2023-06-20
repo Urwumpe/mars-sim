@@ -62,14 +62,14 @@
 			bring -->
 		<!-- default value : 1.5 Valid from 1.0 to 3.0 -->
 		<rover-life-support-range-error-margin
-			value="1.5" />
+			value="1.2" />
 
 		<!-- This vehicle range error margin imposed on the fuel of the vehicle. -->
 		<!-- This value will multiply with the amount of fuel needed for the mission -->
 		<!-- The higher the value, the more fuel a rover will bring -->
 		<!-- default value : 1.3 Valid from 1.0 to 3.0 -->
 		<rover-fuel-range-error-margin
-			value="1.3" />
+			value="1.25" />
 
 	</mission-control>
 
@@ -127,12 +127,15 @@
 		<!-- default-population: the default population capacity for the template. -->
 		<!-- number-of-robots: the default number of robots for the template. -->
 		<!-- sponsor: the name of the sponsoring organization for the template. -->
+		
+		<!-- Six Phase 1 templates -->
 		<template name="Phase 1-MS"/>
 		<template name="Phase 1-US"/>
 		<template name="Phase 1-CN"/>
 		<template name="Phase 1-IN"/>
 		<template name="Phase 1-RU"/>
-		<template name="Phase 1-SX"/>			
+		<template name="Phase 1-SX"/>
+		<!-- Nine Phase 2 templates -->		
 		<template name="Phase 2-MS"/>
 		<template name="Phase 2-US"/>		
 		<template name="Phase 2-EU"/>
@@ -142,13 +145,16 @@
 		<template name="Phase 2-KR"/>
 		<template name="Phase 2-RU"/>
 		<template name="Phase 2-SX"/>
+		<!-- Six Phase 3 templates -->			
 		<template name="Phase 3-MS"/>	
 		<template name="Phase 3-US"/>
 		<template name="Phase 3-CN"/>
 		<template name="Phase 3-IN"/>
 		<template name="Phase 3-RU"/>
 		<template name="Phase 3-SX"/>
+		<!-- One Phase 4 templates -->			
 		<template name="Alpha Base"/>
+		<!-- Two Phase outpost templates -->			
 		<template name="Trading Outpost"/>
 		<template name="Mining Outpost"/>																			
 	</settlement-template-list>

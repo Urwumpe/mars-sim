@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
+import org.mars_sim.msp.core.Entity;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.UnitManager;
@@ -35,7 +36,7 @@ import org.mars_sim.msp.core.tool.RandomUtil;
 /**
  * A class representing a scientific study.
  */
-public class ScientificStudy implements Serializable, Temporal, Comparable<ScientificStudy> {
+public class ScientificStudy implements Entity, Serializable, Temporal, Comparable<ScientificStudy> {
 	// POJO holding collaborators effort
 	private static final class CollaboratorStats implements Serializable {
 		private static final long serialVersionUID = 1L;
@@ -120,8 +121,8 @@ public class ScientificStudy implements Serializable, Temporal, Comparable<Scien
 	/** A major topics this scientific study is aiming at. */
 	private List<String> topics;
 
-	private static MarsClock marsClock = Simulation.instance().getMasterClock().getMarsClock();
-	private static ScienceConfig scienceConfig = SimulationConfig.instance().getScienceConfig();
+	private static MarsClock marsClock;
+	private static ScienceConfig scienceConfig;
 
 	/**
 	 * Constructor.
@@ -1062,6 +1063,8 @@ public class ScientificStudy implements Serializable, Temporal, Comparable<Scien
 					"Finished writing proposal for " + getName() 
 					+ " study. Starting to invite collaborative researchers.");
 				// Picks research topics 
+				if (scienceConfig == null)
+					scienceConfig = SimulationConfig.instance().getScienceConfig();
 				topics.add(scienceConfig.getATopic(science));
 				setPhase(INVITATION_PHASE);
 			}
@@ -1187,4 +1190,32 @@ public class ScientificStudy implements Serializable, Temporal, Comparable<Scien
             return other.name == null;
 		} else return name.equals(other.name);
     }
+
+	/**
+	 * Get the percentage [0 -> 1.0] of the completion of the current phase
+	 */
+	public double getPhaseProgress() {
+		switch(phase) {
+			case PROPOSAL_PHASE:
+				return proposalWorkTime / baseProposalTime;
+			case INVITATION_PHASE:
+				return (double)maxCollaborators / collaborators.size();
+			case PAPER_PHASE: {
+				double total = getTotalPrimaryPaperWorkTimeRequired() + (collaborators.size() * baseCollaborativePaperWritingTime);
+				double completed = getPrimaryPaperWorkTimeCompleted()
+							+ collaborators.values().stream().mapToDouble(v -> v.paperWorkTime).sum();
+				return completed/total;
+			}
+			case RESEARCH_PHASE: {
+				double total = getTotalPrimaryResearchWorkTimeRequired() + (collaborators.size() * baseCollaborativeResearchTime);	
+				double completed = getPrimaryResearchWorkTimeCompleted()
+							+ collaborators.values().stream().mapToDouble(v -> v.reseachWorkTime).sum();
+				return completed/total;
+			}
+			case PEER_REVIEW_PHASE:
+				return getPeerReviewTimeCompleted() / basePeerReviewTime;
+			default: 
+				return 0D;
+		}
+	}
 }

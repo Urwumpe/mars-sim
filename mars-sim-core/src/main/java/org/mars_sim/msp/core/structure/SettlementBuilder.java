@@ -1,18 +1,18 @@
 /*
  * Mars Simulation Project
  * SettlementBuilder.java
- * @date 2022-06-11
+ * @date 2023-04-17
  * @author Barry Evans
  */
 package org.mars_sim.msp.core.structure;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.time.StopWatch;
@@ -32,9 +32,11 @@ import org.mars_sim.msp.core.person.GenderType;
 import org.mars_sim.msp.core.person.Member;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.fav.Favorite;
-import org.mars_sim.msp.core.person.ai.job.util.JobAssignmentType;
+import org.mars_sim.msp.core.person.ai.job.util.AssignmentType;
 import org.mars_sim.msp.core.person.ai.job.util.JobType;
 import org.mars_sim.msp.core.person.ai.job.util.JobUtil;
+import org.mars_sim.msp.core.person.ai.role.RoleType;
+import org.mars_sim.msp.core.person.ai.role.RoleUtil;
 import org.mars_sim.msp.core.person.ai.social.RelationshipType;
 import org.mars_sim.msp.core.person.ai.social.RelationshipUtil;
 import org.mars_sim.msp.core.reportingAuthority.ReportingAuthority;
@@ -48,11 +50,7 @@ import org.mars_sim.msp.core.robot.RobotSpec;
 import org.mars_sim.msp.core.robot.RobotType;
 import org.mars_sim.msp.core.robot.ai.job.RobotJob;
 import org.mars_sim.msp.core.tool.RandomUtil;
-import org.mars_sim.msp.core.vehicle.Drone;
-import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
-import org.mars_sim.msp.core.vehicle.Rover;
-import org.mars_sim.msp.core.vehicle.Vehicle;
-import org.mars_sim.msp.core.vehicle.VehicleType;
+import org.mars_sim.msp.core.vehicle.VehicleFactory;
 
 /**
  * This class will create new complete Settlements from a template.
@@ -81,7 +79,7 @@ public final class SettlementBuilder {
 	}
 
 	/**
-	 * Create all the initial Settlements
+	 * Creates all the initial Settlements.
 	 */
 	public void createInitialSettlements(Scenario bootstrap) {
 		logger.config(bootstrap.getName() + " scenario loading...");
@@ -96,9 +94,11 @@ public final class SettlementBuilder {
 	}
 
 	/**
-	 * This create a single fully populated Settlement according to the
-	 * specification. This includes all sub-units, e.g. Vehicles & Persons
+	 * This creates a single fully populated Settlement according to the
+	 * specification. 
+	 * Note: it includes all sub-units, e.g. Vehicles & Persons
 	 * along with any initial Parts & Resources.
+	 * 
 	 * @param spec
 	 * @return
 	 */
@@ -112,17 +112,9 @@ public final class SettlementBuilder {
 		Settlement settlement = createSettlement(template, spec);
 		outputTimecheck(settlement, watch, "Create Settlement");
 
-		createVehicles(template, settlement);
-		outputTimecheck(settlement, watch, "Create Vehicles");
-
-		createEquipment(template, settlement);
-		outputTimecheck(settlement, watch, "Create Equipment");
-
-		createResources(template, settlement);
-		outputTimecheck(settlement, watch, "Create Resources");
-
-		createParts(template, settlement);
-		outputTimecheck(settlement, watch, "Create Parts");
+		// Deliver the supplies
+		createSupplies(template, settlement);
+		outputTimecheck(settlement, watch, "Create Supplies");
 
 		// TOCO get off the Initial Settlement
 		String crew = spec.getCrew();
@@ -132,7 +124,10 @@ public final class SettlementBuilder {
 			createPreconfiguredPeople(settlement, crew);
 			outputTimecheck(settlement, watch, "Create Preconfigured People");
 		}
-		createPeople(settlement);
+		createPeople(settlement, settlement.getInitialPopulation(), false);
+		
+		// Establish a system of governance at a settlement.
+		settlement.getChainOfCommand().establishSettlementGovernance();
 		outputTimecheck(settlement, watch, "Create People");
 		
 		// Manually add job positions
@@ -144,7 +139,7 @@ public final class SettlementBuilder {
 		outputTimecheck(settlement, watch, "Create Preconfigured Robots");
 
 		// Create more robots to fill the settlement(s)
-		createRobots(settlement);
+		createRobots(settlement, settlement.getInitialNumOfRobots());
 		outputTimecheck(settlement, watch, "Create Robots");
 
 		watch.stop();
@@ -155,6 +150,21 @@ public final class SettlementBuilder {
 		return settlement;
 	}
 
+	/**
+	 * Creates the supplies in a settlement.
+	 * 
+	 * @param settlement Target settlement
+	 * @param supplies The definition of the Supplies
+	 */
+	public void createSupplies(SettlementSupplies supplies, Settlement settlement) {
+		createVehicles(supplies, settlement);
+
+		createEquipment(supplies, settlement);
+
+		createResources(supplies, settlement);
+
+		createParts(supplies, settlement);
+	}
 
 	private static void outputTimecheck(Settlement settlement, StopWatch watch, String phase) {
 		if (MEASURE_PHASES) {
@@ -162,6 +172,22 @@ public final class SettlementBuilder {
 			logger.config(settlement, phase + " took " + watch.getTime() + " ms");
 			watch.unsplit();
 		}
+	}
+
+	/**
+	 * Generate a unique name for the Settlement
+	 * @return
+	 */
+	private String generateName(ReportingAuthority sponsor) {
+		List<String> remainingNames = new ArrayList<>(sponsor.getSettlementNames());
+
+		List<String> usedNames = unitManager.getSettlements().stream()
+							.map(s -> s.getName()).collect(Collectors.toList());
+
+		remainingNames.removeAll(usedNames);
+		int idx = RandomUtil.getRandomInt(remainingNames.size());
+
+		return remainingNames.get(idx);
 	}
 
 	private Settlement createSettlement(SettlementTemplate template, InitialSettlement spec) {
@@ -175,7 +201,7 @@ public final class SettlementBuilder {
 		// Get settlement name
 		String name = spec.getName();
 		if (name == null) {
-			name = Settlement.generateName(ra);
+			name = generateName(ra);
 		}
 
 		// Get settlement longitude
@@ -201,42 +227,21 @@ public final class SettlementBuilder {
 		return settlement;
 	}
 
-	private void createVehicles(SettlementTemplate template, Settlement settlement) {
-		Map<String, Integer> vehicleMap = template.getVehicles();
-		Iterator<String> j = vehicleMap.keySet().iterator();
-		ReportingAuthority sponsor = settlement.getSponsor();
-		while (j.hasNext()) {
-			String vehicleType = j.next();
-			int number = vehicleMap.get(vehicleType);
-			vehicleType = vehicleType.toLowerCase();
-			for (int x = 0; x < number; x++) {
-				String name = Vehicle.generateName(vehicleType, sponsor);
-				if (LightUtilityVehicle.NAME.equalsIgnoreCase(vehicleType)) {
-					LightUtilityVehicle luv = new LightUtilityVehicle(name, vehicleType, settlement);
-					unitManager.addUnit(luv);
-					settlement.addOwnedVehicle(luv);
-				}
-				else if (VehicleType.DELIVERY_DRONE.getName().equalsIgnoreCase(vehicleType)) {
-					Drone drone = new Drone(name, vehicleType, settlement);
-					unitManager.addUnit(drone);
-					settlement.addOwnedVehicle(drone);
-				}
-				else {
-					Rover rover = new Rover(name, vehicleType, settlement);
-					unitManager.addUnit(rover);
-					settlement.addOwnedVehicle(rover);
-				}
+	private void createVehicles(SettlementSupplies template, Settlement settlement) {
+		for(Entry<String, Integer> v : template.getVehicles().entrySet()) {
+			String vehicleType = v.getKey();
+			for (int x = 0; x < v.getValue(); x++) {
+				VehicleFactory.createVehicle(unitManager, settlement, vehicleType);
 			}
 		}
 	}
-
 
 	/**
 	 * Creates the initial equipment at a settlement.
 	 *
 	 * @throws Exception if error constructing equipment.
 	 */
-	private void createEquipment(SettlementTemplate template, Settlement settlement) {
+	private void createEquipment(SettlementSupplies template, Settlement settlement) {
 		Map<String, Integer> equipmentMap = template.getEquipment();
 		for (String type : equipmentMap.keySet()) {
 			int number = equipmentMap.get(type);
@@ -255,13 +260,12 @@ public final class SettlementBuilder {
 	 *
 	 * @throws Exception if Robots can not be constructed.
 	 */
-	private void createRobots(Settlement settlement) {
+	public void createRobots(Settlement settlement, int target) {
 		// Randomly create all remaining robots to fill the settlements to capacity.
-		int initial = settlement.getInitialNumOfRobots();
 		RobotDemand demand = new RobotDemand(settlement);
 
 		// Note : need to call updateAllAssociatedRobots() first to compute numBots in Settlement
-		while (settlement.getIndoorRobotsCount() < initial) {
+		while (settlement.getIndoorRobotsCount() < target) {
 			// Get a robotType randomly
 			RobotType robotType = demand.getBestNewRobot();
 
@@ -301,7 +305,7 @@ public final class SettlementBuilder {
 	 *
 	 * @throws Exception if error storing resources.
 	 */
-	private void createResources(SettlementTemplate template, Settlement settlement) {
+	private void createResources(SettlementSupplies template, Settlement settlement) {
 
 		Map<AmountResource, Double> resourceMap = template.getResources();
 		for (Entry<AmountResource, Double> value : resourceMap.entrySet()) {
@@ -319,7 +323,7 @@ public final class SettlementBuilder {
 	 *
 	 * @throws Exception if error creating parts.
 	 */
-	private void createParts(SettlementTemplate template, Settlement settlement) {
+	private void createParts(SettlementSupplies template, Settlement settlement) {
 
 		Map<Part, Integer> partMap = template.getParts();
 		for (Entry<Part, Integer> item : partMap.entrySet()) {
@@ -332,21 +336,28 @@ public final class SettlementBuilder {
 	/**
 	 * Creates initial people based on available capacity at settlements.
 	 *
-	 * @throws Exception if people can not be constructed.
+	 * @param settlement Hosting settlement
+	 * @param targetPopulation Population goal
+	 * @param assignRoles Should roles be assigned to the new people?
 	 */
-	private void createPeople(Settlement settlement) {
+	public void createPeople(Settlement settlement, int targetPopulation, boolean assignRoles) {
 
-		int initPop = settlement.getInitialPopulation();
-		ReportingAuthority sponsor = settlement.getSponsor();
+		ReportingAuthority sponsor = settlement.getReportingAuthority();
+		long males = settlement.getAllAssociatedPeople().stream()
+												.filter(p -> p.getGender() == GenderType.MALE).count();
+		int targetMales = (int) (sponsor.getGenderRatio() * targetPopulation);
 
 		// Fill up the settlement by creating more people
-		while (settlement.getIndoorPeopleCount() < initPop) {
-
-			GenderType gender = GenderType.FEMALE;
-			if (RandomUtil.getRandomDouble(1.0D) <= sponsor.getGenderRatio()) {
+		while (settlement.getNumCitizens() < targetPopulation) {
+			// Choose the next gender based on the current ratio of M/F
+			GenderType gender;
+			if (males < targetMales) {
 				gender = GenderType.MALE;
+				males++;
 			}
-			Person person = null;
+			else {
+				gender = GenderType.FEMALE;
+			}
 
 			// This is random and may change on each call
 			String country = sponsor.getDefaultCountry();
@@ -355,7 +366,7 @@ public final class SettlementBuilder {
 			String fullname = Person.generateName(country, gender);
 
 			// Use Builder Pattern for creating an instance of Person
-			person = Person.create(fullname, settlement)
+			Person person = Person.create(fullname, settlement)
 					.setGender(gender)
 					.setCountry(country)
 					.setSponsor(sponsor)
@@ -375,10 +386,12 @@ public final class SettlementBuilder {
 			person.getPreference().initializePreference();
 			// Assign a job
 			person.getMind().getAJob(true, JobUtil.MISSION_CONTROL);
-		}
 
-		// Establish a system of governance at a settlement.
-		settlement.getChainOfCommand().establishSettlementGovernance();
+			if (assignRoles) {
+				RoleType choosen = RoleUtil.findBestRole(person);
+				person.setRole(choosen);
+			}
+		}
 	}
 
 	/**
@@ -399,7 +412,7 @@ public final class SettlementBuilder {
 		Map<Person, Map<String, Integer>> addedCrew = new HashMap<>();
 
 		// Get person's settlement or same sponsor
-		ReportingAuthority defaultSponsor = settlement.getSponsor();
+		ReportingAuthority defaultSponsor = settlement.getReportingAuthority();
 
 		// Create all configured people.
 		for (Member m : crew.getTeam()) {
@@ -484,7 +497,7 @@ public final class SettlementBuilder {
 					JobType job = JobType.getJobTypeByName(jobName);
 					if (job != null) {
 						// Designate a specific job to a person
-						person.getMind().assignJob(job, true, JobUtil.MISSION_CONTROL, JobAssignmentType.APPROVED,
+						person.getMind().assignJob(job, true, JobUtil.MISSION_CONTROL, AssignmentType.APPROVED,
 								JobUtil.MISSION_CONTROL);
 					}
 				}
@@ -524,7 +537,8 @@ public final class SettlementBuilder {
 
 
 	/**
-	 * Creates all configured pre-configured crew relationships
+	 * Creates all configured pre-configured crew relationships.
+	 * 
 	 * @param addedCrew
 	 */
 	private void createConfiguredRelationships(Map<Person, Map<String, Integer>> addedCrew) {
@@ -542,7 +556,7 @@ public final class SettlementBuilder {
 				for (Person potentialFriend : addedCrew.keySet()) {
 					if (potentialFriend.getName().equals(friendName)) {
 						int opinion = friend.getValue();
-			            RelationshipUtil.changeOpinion(person, potentialFriend, RelationshipType.EXISTING_RELATIONSHIP, opinion);
+			            RelationshipUtil.changeOpinion(person, potentialFriend, RelationshipType.FACE_TO_FACE_COMMUNICATION, opinion);
 					}
 				}
 			}

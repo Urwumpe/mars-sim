@@ -12,7 +12,6 @@ import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,6 +20,12 @@ import java.util.List;
 import java.util.Map;
 
 import javax.swing.BoundedRangeModel;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JProgressBar;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.Msg;
@@ -39,13 +44,7 @@ import org.mars_sim.msp.core.structure.construction.ConstructionStage;
 import org.mars_sim.msp.core.structure.construction.ConstructionStageInfo;
 import org.mars_sim.msp.core.structure.construction.ConstructionVehicleType;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.progressbar.WebProgressBar;
-import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
+import org.mars_sim.msp.ui.swing.StyleManager;
 
 /**
  * A panel for displaying construction custom mission information.
@@ -59,9 +58,9 @@ implements ConstructionListener {
     private MainDesktopPane desktop;
     private BuildingConstructionMission mission;
     private ConstructionSite site;
-    private WebLabel stageLabel;
+    private JLabel stageLabel;
     private BoundedRangeModel progressBarModel;
-    private WebButton settlementButton;
+    private JButton settlementButton;
     private RemainingMaterialsTableModel remainingMaterialsTableModel;
 
     /**
@@ -78,69 +77,69 @@ implements ConstructionListener {
         // Set layout.
         setLayout(new BorderLayout());
 
-        WebPanel contentsPanel = new WebPanel(new GridLayout(4, 1));
+        JPanel contentsPanel = new JPanel(new GridLayout(4, 1));
         add(contentsPanel, BorderLayout.NORTH);
 
-        WebPanel titlePanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+        JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         contentsPanel.add(titlePanel);
 
         String titleLabelString = Msg.getString("ConstructionMissionCustomInfoPanel.titleLabel"); //$NON-NLS-1$
-        WebLabel titleLabel = new WebLabel(titleLabelString);
+        JLabel titleLabel = new JLabel(titleLabelString);
         titlePanel.add(titleLabel);
 
-        WebPanel settlementPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel settlementPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         contentsPanel.add(settlementPanel);
 
         String settlementLabelString = Msg.getString("ConstructionMissionCustomInfoPanel.settlementLabel"); //$NON-NLS-1$
-        WebLabel settlementLabel = new WebLabel(settlementLabelString);
+        JLabel settlementLabel = new JLabel(settlementLabelString);
         settlementPanel.add(settlementLabel);
 
-        settlementButton = new WebButton("   ");
+        settlementButton = new JButton("   ");
         settlementPanel.add(settlementButton);
         settlementButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 if (mission != null) {
                     Settlement settlement = mission.getAssociatedSettlement();
-                    if (settlement != null) getDesktop().openUnitWindow(settlement, false);
+                    if (settlement != null) getDesktop().showDetails(settlement);
                 }
             }
         });
 
-        WebPanel stagePanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel stagePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         contentsPanel.add(stagePanel);
 
         String stageLabelString = Msg.getString("ConstructionMissionCustomInfoPanel.stageLabel"); //$NON-NLS-1$
-        stageLabel = new WebLabel(stageLabelString);
+        stageLabel = new JLabel(stageLabelString);
         stagePanel.add(stageLabel);
 
-        WebPanel progressBarPanel = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel progressBarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         contentsPanel.add(progressBarPanel);
 
-        WebProgressBar progressBar = new WebProgressBar();
+        JProgressBar progressBar = new JProgressBar();
         progressBarModel = progressBar.getModel();
         progressBar.setStringPainted(true);
         progressBarPanel.add(progressBar);
 
-        WebPanel lowerContentsPanel = new WebPanel(new BorderLayout(0, 0));
+        JPanel lowerContentsPanel = new JPanel(new BorderLayout(0, 0));
         add(lowerContentsPanel, BorderLayout.CENTER);
 
         // Create remaining construction materials label panel.
-        WebPanel remainingMaterialsLabelPane = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel remainingMaterialsLabelPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
         lowerContentsPanel.add(remainingMaterialsLabelPane, BorderLayout.NORTH);
 
         // Create remaining construction materials label.
         String remainingMaterialsLabelString = Msg.getString("ConstructionMissionCustomInfoPanel.remainingMaterialsLabel"); //$NON-NLS-1$
-        WebLabel remainingMaterialsLabel = new WebLabel(remainingMaterialsLabelString);
+        JLabel remainingMaterialsLabel = new JLabel(remainingMaterialsLabelString);
         remainingMaterialsLabelPane.add(remainingMaterialsLabel);
 
         // Create a scroll pane for the remaining construction materials table.
-        WebScrollPane remainingMaterialsScrollPane = new WebScrollPane();
+        JScrollPane remainingMaterialsScrollPane = new JScrollPane();
         remainingMaterialsScrollPane.setPreferredSize(new Dimension(-1, -1));
         lowerContentsPanel.add(remainingMaterialsScrollPane, BorderLayout.CENTER);
 
         // Create the remaining construction materials table and model.
         remainingMaterialsTableModel = new RemainingMaterialsTableModel();
-        WebTable remainingMaterialsTable = new WebTable(remainingMaterialsTableModel);
+        JTable remainingMaterialsTable = new JTable(remainingMaterialsTableModel);
         remainingMaterialsScrollPane.setViewportView(remainingMaterialsTable);
 
         // Add tooltip.
@@ -257,10 +256,9 @@ implements ConstructionListener {
             result.append("Status: building ").append(info.getName()).append(Msg.BR);
             result.append("Stage Type: ").append(info.getType()).append(Msg.BR);
             result.append("Work Type: Construction").append(Msg.BR);
-            DecimalFormat formatter = new DecimalFormat("0.0");
-            String requiredWorkTime = formatter.format(stage.getRequiredWorkTime() / 1000D);
+            String requiredWorkTime = StyleManager.DECIMAL_PLACES1.format(stage.getRequiredWorkTime() / 1000D);
             result.append("Work Time Required: ").append(requiredWorkTime).append(" Sols").append(Msg.BR);
-            String completedWorkTime = formatter.format(stage.getCompletedWorkTime() / 1000D);
+            String completedWorkTime = StyleManager.DECIMAL_PLACES1.format(stage.getCompletedWorkTime() / 1000D);
             result.append("Work Time Completed: ").append(completedWorkTime).append(" Sols").append(Msg.BR);
             result.append("Architect Construction Skill Required: ").append(info.getArchitectConstructionSkill()).append(Msg.BR);
 

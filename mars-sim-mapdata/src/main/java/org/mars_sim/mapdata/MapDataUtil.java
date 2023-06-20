@@ -1,101 +1,90 @@
 /*
  * Mars Simulation Project
  * MapDataUtil.java
- * @date 2022-08-02
+ * @date 2023-06-03
  * @author Scott Davis
  */
 
  package org.mars_sim.mapdata;
+
+import java.util.Collection;
 
 /**
   * Static utility class for accessing Mars map data.
   */
  public final class MapDataUtil {
  	
-	/** Note: Make sure GLOBE_BOX_HEIGHT matches the number of vertical pixels of the globe surface map. */ 
- 	public static final int GLOBE_BOX_HEIGHT = 300;
- 	public static final int GLOBE_BOX_WIDTH = GLOBE_BOX_HEIGHT;
- 	public static final int MAP_BOX_HEIGHT = GLOBE_BOX_HEIGHT;
- 	public static final int MAP_BOX_WIDTH = GLOBE_BOX_WIDTH;
- 	
-	/** Note: Make sure MAP_HEIGHT matches the number of vertical pixels of the surface source map. */ 
-	public static final int MAP_HEIGHT = 1440; //1024; 1440; 2048; 2880 
-	/** Note: Make sure MAP_HEIGHT matches the number of horizontal pixels of the surface source map. */ 
-	public static final int MAP_WIDTH = 2880; //2048; 2880; 4096; 5760
-	
- 	public static final double RATIO = 1.0 * GLOBE_BOX_HEIGHT / 300 * MAP_WIDTH / 2880;
- 	
- 	private static final int ELEVATION_MAP_HEIGHT = MEGDRMapReader.HEIGHT;
- 	private static final int ELEVATION_MAP_WIDTH = MEGDRMapReader.WIDTH;
- 	
- 	private static final double PI = Math.PI;
+	private static final double PI = Math.PI;
  	private static final double TWO_PI = Math.PI * 2D;
 
-     // Singleton instance.
-     private static MapDataUtil instance;
-     private static MapDataFactory mapDataFactory;
-     private static MEGDRMapReader reader;
+	// Singleton instance.
+	private static MapDataUtil instance;
+	private static MapDataFactory mapDataFactory;
+	private static MEGDRMapReader reader;
 
- 	private static int[] elevationArray;
+ 	private static short[] elevationArray;
+ 	
+ 	private static short height;
+ 	private static short width;
  	
      /**
       * Private constructor for static utility class.
       */
      private MapDataUtil() {
          mapDataFactory = new MapDataFactory();
-         reader = new MEGDRMapReader();
+         reader = new MEGDRMapReader(0);
+         
+         height = reader.getHeight();
+         width = reader.getWidth();
      }
      
-     public int[] getElevationArray() {
+     /**
+      * Gets the elevation array.
+      * 
+      * @return
+      */
+     public short[] getElevationArray() {
+    	 
      	if (elevationArray == null)	
-     		elevationArray = reader.loadElevation();
+     		elevationArray = reader.loadElevation(0);
   
  		return elevationArray;
  	}
  	
-     /**
- 	 * Gets the elevation as an integer at a given location.
+    /**
+ 	 * Gets the elevation as a short integer at a given location.
  	 * 
  	 * @param phi   the phi location.
  	 * @param theta the theta location.
  	 * @return the elevation as an integer.
  	 */
- 	public int getElevationInt(double phi, double theta) {
-// 		// Make sure phi is between 0 and PI.
-// 		while (phi > PI)
-// 			phi -= PI;
-// 		while (phi < 0)
-// 			phi += PI;
-//
-// 		// Adjust theta with PI for the map offset.
-// 		// Note: the center of the map is when theta = 0
-// 		if (theta > PI)
-// 			theta -= PI;
-// 		else
-// 			theta += PI;
-// 		
-// 		// Make sure theta is between 0 and 2 PI.
-// 		while (theta > TWO_PI)
-// 			theta -= TWO_PI;
-// 		while (theta < 0)
-// 			theta += TWO_PI;
-
- 		int row = (int) Math.round(phi * ELEVATION_MAP_HEIGHT / PI);
+ 	public short getElevation(double phi, double theta) {
+ 		// Note that row 0 and column 0 are at top left 
+ 		short row = (short) Math.round(phi * height / PI);
  		
- 		if (row == ELEVATION_MAP_HEIGHT) 
+ 		if (row == height) 
  			row--;
  		
- 		int column = ELEVATION_MAP_WIDTH /2 + (int) Math.round(theta * ELEVATION_MAP_WIDTH / TWO_PI);
+ 		short column = (short) (width / 2 + Math.round(theta * width / TWO_PI));
 
- 		if (column == ELEVATION_MAP_WIDTH)
+ 		if (column == width)
  			column--;
 
- 		int index = row * ELEVATION_MAP_WIDTH + column;
+ 		int index = row * width + column;
  		
- 		if (index > ELEVATION_MAP_HEIGHT * ELEVATION_MAP_WIDTH)
- 			index = ELEVATION_MAP_HEIGHT * ELEVATION_MAP_WIDTH - 1;
+ 		if (index > height * width)
+ 			index = height * width - 1;
  		
- 		return getElevationArray()[index];
+
+ 		short [] data = getElevationArray();
+ 		
+        short result = 0;
+        
+        if (data != null) {
+            result = data[index];
+        }
+
+        return result;
  	}
  	
      /**
@@ -115,26 +104,16 @@
       * 
       * @return surface map data.
       */
-     public MapData getSurfaceMapData() {
-         return mapDataFactory.getMapData(MapDataFactory.SURFACE_MAP_DATA);
+     public MapData getMapData(String mapType) {
+         return mapDataFactory.getMapData(mapType);
      }
-     
+
      /**
-      * Gets the topographical map data.
+      * Gets the map types available.
       * 
-      * @return topographical map data.
+      * @return
       */
-     public MapData getTopoMapData() {
-         return mapDataFactory.getMapData(MapDataFactory.TOPO_MAP_DATA);
-     }
-     
-     /**
-      * Gets the geology map data.
-      * 
-      * @return geology map data.
-      */
-     public MapData getGeologyMapData() {
-         return mapDataFactory.getMapData(MapDataFactory.GEOLOGY_MAP_DATA);
-     }
-     
+    public Collection<MapMetaData> getMapTypes() {
+        return mapDataFactory.getLoadedTypes();
+    }
  }

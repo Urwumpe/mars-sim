@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * EquipmentGood.java
- * @date 2022-10-04
+ * @date 2023-05-16
  * @author Barry Evans
  */
 package org.mars_sim.msp.core.goods;
@@ -10,7 +10,6 @@ import java.util.Collection;
 
 import org.mars_sim.msp.core.equipment.Container;
 import org.mars_sim.msp.core.equipment.ContainerUtil;
-import org.mars_sim.msp.core.equipment.EVASuit;
 import org.mars_sim.msp.core.equipment.EquipmentFactory;
 import org.mars_sim.msp.core.equipment.EquipmentType;
 import org.mars_sim.msp.core.person.Person;
@@ -54,7 +53,7 @@ public class EquipmentGood extends Good {
     private EquipmentType equipmentType;
 
     EquipmentGood(EquipmentType type) {
-        super( type.getName(), EquipmentType.getResourceID(type));
+        super(type.getName(), EquipmentType.getResourceID(type));
         this.equipmentType = type;
     }
 
@@ -129,7 +128,7 @@ public class EquipmentGood extends Good {
 		double quantity = 0;
     	double factor = 0;
         if (equipmentType == EquipmentType.EVA_SUIT) {
-    		mass = EVASuit.emptyMass;
+    		mass = EquipmentFactory.getEquipmentMass(equipmentType);
     		quantity = settlement.getNumEVASuit();
     		
             // Need to increase the value for EVA
@@ -205,13 +204,11 @@ public class EquipmentGood extends Good {
 		double totalPhaseOverfill = 0D;
 
 		// Scan resources that can be held in this Container
-		// TODO This can be pre-calculated in the constructor as a one off for a list of Goods
 		for(AmountResource resource : ResourceUtil.getAmountResources()) {
 			if (ContainerUtil.getContainerClassToHoldResource(resource.getID()) == equipmentType) {
 				double settlementCapacity = settlement.getAmountResourceCapacity(resource.getID());
 
-				Good content = GoodsUtil.getGood(resource.getID());
-				double resourceDemand = owner.getDemandValue(content);
+				double resourceDemand = owner.getDemandValueWithID(resource.getID());
 
 				if (resourceDemand > settlementCapacity) {
 					double resourceOverfill = resourceDemand - settlementCapacity;
@@ -290,9 +287,11 @@ public class EquipmentGood extends Good {
 	 */
 	private static double getWholeEVASuitDemand(GoodsManager owner) {
 		double demand = 0;
-		// TODO Pre-build in constructor to avoid getGood lookup
-		for (int id : ItemResourceUtil.EVASUIT_PARTS_ID) {
-			demand += owner.getDemandValue(GoodsUtil.getGood(id));
+	
+		if (ItemResourceUtil.evaSuitPartIDs != null && !ItemResourceUtil.evaSuitPartIDs.isEmpty()) {
+			for (int id : ItemResourceUtil.evaSuitPartIDs) {
+				demand += owner.getDemandValueWithID(id);
+			}
 		}
 		return demand;
 	}

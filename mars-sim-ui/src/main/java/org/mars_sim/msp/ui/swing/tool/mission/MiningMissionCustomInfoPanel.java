@@ -16,11 +16,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 import javax.swing.BorderFactory;
+import javax.swing.JButton;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 
-import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.environment.SurfaceFeatures;
 import org.mars_sim.msp.core.person.ai.mission.Mining;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
@@ -33,12 +36,6 @@ import org.mars_sim.msp.core.vehicle.LightUtilityVehicle;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
 import org.mars_sim.msp.ui.swing.NumberCellRenderer;
 
-import com.alee.laf.button.WebButton;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
-import com.alee.laf.table.WebTable;
-
 /**
  * A panel for displaying mining mission information.
  */
@@ -48,11 +45,11 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 	// Data members
 	private Mining mission;
 	private MainDesktopPane desktop;
-	private WebButton luvButton;
+	private JButton luvButton;
 	private ConcentrationTableModel concentrationTableModel;
 	private ExcavationTableModel excavationTableModel;
 
-	private SurfaceFeatures surfaceFeatures = Simulation.instance().getSurfaceFeatures();
+	private SurfaceFeatures surfaceFeatures;
 	
 	/**
 	 * Constructor
@@ -68,45 +65,46 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 
 		// Initialize data members.
 		this.desktop = desktop;
+		surfaceFeatures = desktop.getSimulation().getSurfaceFeatures();
 
 		// Create LUV panel.
-		WebPanel luvPane = new WebPanel(new FlowLayout(FlowLayout.LEFT));
+		JPanel luvPane = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		add(luvPane, BorderLayout.NORTH);
 
 		// Create LUV label.
-		WebLabel luvLabel = new WebLabel("Light Utility Vehicle: ");
+		JLabel luvLabel = new JLabel("Light Utility Vehicle: ");
 		luvPane.add(luvLabel);
 
 		// Create LUV button.
-		luvButton = new WebButton("   ");
+		luvButton = new JButton("   ");
 		luvButton.setVisible(false);
 		luvButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				// Open window for light utility vehicle.
 				LightUtilityVehicle luv = mission.getLightUtilityVehicle();
 				if (luv != null)
-					getDesktop().openUnitWindow(luv, false);
+					getDesktop().showDetails(luv);
 			}
 		});
 		luvPane.add(luvButton);
 
 		// Create center panel.
-		WebPanel centerPane = new WebPanel(new GridLayout(2, 1));
+		JPanel centerPane = new JPanel(new GridLayout(2, 1));
 		add(centerPane, BorderLayout.CENTER);
 
 		// Create concentration panel.
-		WebPanel concentrationPane = new WebPanel(new BorderLayout());
+		JPanel concentrationPane = new JPanel(new BorderLayout());
 		concentrationPane.setBorder(BorderFactory.createTitledBorder("Mineral Concentrations  "));
 		centerPane.add(concentrationPane);
 
 		// Create concentration scroll panel.
-		WebScrollPane concentrationScrollPane = new WebScrollPane();
+		JScrollPane concentrationScrollPane = new JScrollPane();
 		concentrationScrollPane.setPreferredSize(new Dimension(-1, -1));
 		concentrationPane.add(concentrationScrollPane, BorderLayout.CENTER);
 
 		// Create concentration table.
 		concentrationTableModel = new ConcentrationTableModel();
-		WebTable concentrationTable = new WebTable(concentrationTableModel);
+		JTable concentrationTable = new JTable(concentrationTableModel);
 		concentrationTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2));
 		concentrationScrollPane.setViewportView(concentrationTable);
 
@@ -116,18 +114,18 @@ public class MiningMissionCustomInfoPanel extends MissionCustomInfoPanel {
 		concentrationTable.getColumnModel().getColumn(2).setCellRenderer(centerRenderer);
 		
 		// Create excavation panel.
-		WebPanel excavationPane = new WebPanel(new BorderLayout());
+		JPanel excavationPane = new JPanel(new BorderLayout());
 		excavationPane.setBorder(BorderFactory.createTitledBorder("Minerals Excavated - Aboard Vehicle  "));
 		centerPane.add(excavationPane);
 
 		// Create excavation scroll panel.
-		WebScrollPane excavationScrollPane = new WebScrollPane();
+		JScrollPane excavationScrollPane = new JScrollPane();
 		excavationScrollPane.setPreferredSize(new Dimension(-1, -1));
 		excavationPane.add(excavationScrollPane, BorderLayout.CENTER);
 
 		// Create excavation table.
 		excavationTableModel = new ExcavationTableModel();
-		WebTable excavationTable = new WebTable(excavationTableModel);
+		JTable excavationTable = new JTable(excavationTableModel);
 		excavationTable.setDefaultRenderer(Double.class, new NumberCellRenderer(2));
 		excavationScrollPane.setViewportView(excavationTable);
 		

@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * Rover.java
- * @date 2021-10-16
+ * @date 2023-06-05
  * @author Scott Davis
  */
 
@@ -21,13 +21,12 @@ import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.air.AirComposition;
 import org.mars_sim.msp.core.data.UnitSet;
-import org.mars_sim.msp.core.equipment.Equipment;
 import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.PersonConfig;
 import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionType;
+import org.mars_sim.msp.core.person.ai.mission.RoverMission;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
 import org.mars_sim.msp.core.person.ai.task.LoadingController;
 import org.mars_sim.msp.core.person.ai.task.util.Worker;
@@ -38,6 +37,7 @@ import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Airlock;
 import org.mars_sim.msp.core.structure.Lab;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.structure.building.function.SystemType;
 import org.mars_sim.msp.core.time.ClockPulse;
 
 /**
@@ -80,7 +80,8 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 	public static final int NITROGEN_ID = ResourceUtil.nitrogenID;
 	public static final int CO2_ID = ResourceUtil.co2ID;
 	public static final int WATER_ID = ResourceUtil.waterID;
-	public static final int METHANE_ID = ResourceUtil.methaneID;
+//	public static final int METHANE_ID = ResourceUtil.methaneID;
+	public static final int METHANOL_ID = ResourceUtil.methanolID;
 	public static final int FOOD_ID = ResourceUtil.foodID;
 
 	public static final int FOOD_WASTE_ID = ResourceUtil.foodWasteID;
@@ -96,6 +97,8 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 	private static final double GAS_RATIO;
 	/** The minimum required O2 partial pressure. At 11.94 kPa (1.732 psi) */
 	private static final double MIN_O2_PRESSURE;
+	
+	public static final AmountResource METHANOL_AR = ResourceUtil.methanolAR;
 	
 	// Data members
 	/** The rover's capacity for crew members. */
@@ -151,18 +154,17 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 	 * Constructs a Rover object at a given settlement
 	 *
 	 * @param name        the name of the rover
-	 * @param type the configuration type of the vehicle.
+	 * @param spec the configuration type of the vehicle.
 	 * @param settlement  the settlement the rover is parked at
 	 */
-	public Rover(String name, String type, Settlement settlement) {
+	public Rover(String name, VehicleSpec spec, Settlement settlement) {
 		// Use GroundVehicle constructor
-		super(name, type, settlement, MAINTENANCE_WORK_TIME);
+		super(name, spec, settlement, MAINTENANCE_WORK_TIME);
 
 		occupants = new UnitSet<>();
 		robotOccupants = new UnitSet<>();
 
 		// Set crew capacity
-		VehicleSpec spec = simulationConfig.getVehicleConfiguration().getVehicleSpec(type);
 		crewCapacity = spec.getCrewSize();
 		robotCrewCapacity = crewCapacity;
 
@@ -197,6 +199,17 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 		// Create the rover's airlock.
 		airlock = new VehicleAirlock(this, 2, spec.getAirlockLoc(), spec.getAirlockInteriorLoc(),
 										 spec.getAirlockExteriorLoc());
+		
+	}
+
+	/**
+	 * Sets the scope string.
+	 */
+	@Override
+	protected void setupScopeString() {
+		super.setupScopeString();
+		
+		malfunctionManager.addScopeString(SystemType.ROVER.getName());
 	}
 
 	/**
@@ -675,7 +688,7 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 	}
 
 	/**
-	 * Adjust the air pressure of the rover
+	 * Adjusts the air pressure of the rover.
 	 *
 	 * @param time
 	 */
@@ -883,19 +896,6 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 	}
 
 	/**
-	 * Gets the resource type id that this vehicle uses as fuel, namely, methane
-	 *
-	 * @return resource type id
-	 */
-	public int getFuelType() {
-		return METHANE_ID;
-	}
-
-	public AmountResource getFuelTypeAR() {
-		return ResourceUtil.methaneAR;
-	}
-
-	/**
 	 * Sets unit's location coordinates
 	 *
 	 * @param newLocation the new location of the unit
@@ -903,47 +903,27 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 	public void setCoordinates(Coordinates newLocation) {
 		super.setCoordinates(newLocation);
 
-		if (occupants != null && !occupants.isEmpty()) {
-			for (Person p: occupants) {
-				p.setCoordinates(newLocation);
-			}
-		}
-
-		if (robotOccupants != null && !robotOccupants.isEmpty()) {
-			for (Robot r: robotOccupants) {
-				r.setCoordinates(newLocation);
-			}
-		}
-
-		if (getEquipmentSet() != null && !getEquipmentSet().isEmpty()) {
-			for (Equipment e: getEquipmentSet()) {
-				e.setCoordinates(newLocation);
-			}
-		}
-
 		// Set towed vehicle (if any) to new location.
 		if (towedVehicle != null)
 			towedVehicle.setCoordinates(newLocation);
 	}
 
 	/**
-	 * Gets the range of the vehicle
+	 * Gets the range of the vehicle.
 	 *
 	 * @return the range of the vehicle (in km)
 	 * @throws Exception if error getting range.
 	 */
-	public double getRange(MissionType missionType) {
-		// Note: multiply by 0.9 would account for the extra distance travelled in between sites
-		double fuelRange = super.getRange(missionType) * FUEL_RANGE_FACTOR;
-		// Obtains the max mission range [in km] based on the type of mission
-		// Note: total route ~= mission radius * 2
-		double missionRange = super.getMissionRange(missionType) * MISSION_RANGE_FACTOR;
+	@Override
+	public double getRange() {
+		// Note: multiply by 0.95 would account for the extra distance travelled in between sites
+		double fuelRange = super.getRange() * FUEL_RANGE_FACTOR;
 
 		// Estimate the distance traveled per sol
 		double distancePerSol = getEstimatedTravelDistancePerSol();
 
 		// Gets the life support resource margin
-		double margin = Vehicle.getLifeSupportRangeErrorMargin();
+		double margin = getLifeSupportRangeErrorMargin();
 
 		// Check food capacity as range limit.
 		PersonConfig personConfig = SimulationConfig.instance().getPersonConfig();
@@ -964,15 +944,8 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 		double oxygenCapacity = getAmountResourceCapacity(OXYGEN_ID);
 		double oxygenSols = oxygenCapacity / (oxygenConsumptionRate * crewCapacity);
 		double oxygenRange = distancePerSol * oxygenSols / margin;
-//    	if (oxygenRange < fuelRange) fuelRange = oxygenRange;
 
-		double max = Math.min(oxygenRange, Math.min(foodRange, Math.min(waterRange, Math.min(missionRange, fuelRange))));
-
-//		String s0 = this + " - " + missionName + " \n";
-//		String s1 = String.format(" Radius : %5.0f km   Fuel : %5.0f km   Dist/sol : %5.0f km   Max : %5.0f km",
-//				missionRange, fuelRange, distancePerSol, max);
-//		System.out.print(s0);
-//		System.out.println(s1);
+		double max = Math.min(oxygenRange, Math.min(foodRange, Math.min(waterRange, fuelRange)));
 
 		return max;
 	}
@@ -1009,9 +982,26 @@ public class Rover extends GroundVehicle implements Crewable, LifeSupportInterfa
 		}
 	}
 
-	@Override
-	public String getNickName() {
-		return getName();
+	/**
+	 * Gets the time limit of the trip based on life support capacity.
+	 *
+	 * @param useBuffer use time buffer in estimation if true.
+	 * @return time (millisols) limit.
+	 */
+	public double getTotalTripTimeLimit(boolean useBuffer) {
+		return RoverMission.getTotalTripTimeLimit(this, getCrewCapacity(), useBuffer);
+	}
+	
+	/**
+	 * Gets the time limit of the trip based on life support capacity.
+	 * Called by ExplorationSitePanel.
+	 * 
+	 * @param number of members
+	 * @param useBuffer use time buffer in estimation if true.
+	 * @return time (millisols) limit.
+	 */
+	public double getTotalTripTimeLimit(int member, boolean useBuffer) {
+		return RoverMission.getTotalTripTimeLimit(this, member, useBuffer);
 	}
 
 	public boolean setLUV(LightUtilityVehicle luv) {

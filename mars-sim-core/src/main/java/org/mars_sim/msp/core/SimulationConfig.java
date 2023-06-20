@@ -21,11 +21,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 
@@ -36,6 +35,7 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.jdom2.input.SAXBuilder;
+import org.mars_sim.msp.common.FileLocator;
 import org.mars_sim.msp.core.environment.LandmarkConfig;
 import org.mars_sim.msp.core.environment.MineralMapConfig;
 import org.mars_sim.msp.core.food.FoodProductionConfig;
@@ -44,7 +44,6 @@ import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.malfunction.MalfunctionConfig;
 import org.mars_sim.msp.core.manufacture.ManufactureConfig;
 import org.mars_sim.msp.core.person.PersonConfig;
-import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.person.health.MedicalConfig;
 import org.mars_sim.msp.core.quotation.QuotationConfig;
 import org.mars_sim.msp.core.reportingAuthority.ReportingAuthorityFactory;
@@ -125,11 +124,8 @@ public class SimulationConfig implements Serializable {
 	private static final String DEFAULT_UNUSEDCORES = "unused-cores";
 
 	private static final String MISSION_CONFIGURATION = "mission-configuration";
-	private static final String MISSION_TYPE = "mission-type";
-	private static final String BOOST = "boost";
-	private static final String NAME = "name";
 	private static final String EVA_LIGHT = "min-eva-light";
-
+	private static final String CONTENT_URL = "content-url";
 
 	private transient String marsStartDate = null;
 	private transient String earthStartDate = null;
@@ -179,8 +175,6 @@ public class SimulationConfig implements Serializable {
 	private transient List<String> excludedList;
 
 	private transient ReportingAuthorityFactory raFactory;
-
-	private transient Map<MissionType, Integer> missionBoosts = new EnumMap<>(MissionType.class);
 
 	private double minEVALight;
 
@@ -239,8 +233,13 @@ public class SimulationConfig implements Serializable {
 		// Load simulation document
 		Document simulationDoc = parseXMLFileAsJDOMDocument(SIMULATION_FILE, true);
 
-		// Load time configurations
+		// Load key attributes
 		Element root = simulationDoc.getRootElement();
+		String contentURL = root.getAttributeValue(CONTENT_URL);
+		if (contentURL != null) {
+			FileLocator.setContentURL(contentURL);
+		}
+		// Load time configurations
 		Element timeConfig = root.getChild(TIME_CONFIGURATION);
 		earthStartDate = loadValue(timeConfig, EARTH_START_DATE_TIME);	
 		marsStartDate = loadValue(timeConfig, MARS_START_DATE_TIME);
@@ -258,11 +257,6 @@ public class SimulationConfig implements Serializable {
 
 		// LOad MIssion Types
 		Element missionConfig = root.getChild(MISSION_CONFIGURATION);
-		for(Element mission : missionConfig.getChildren(MISSION_TYPE)) {
-			MissionType mt = MissionType.valueOf(mission.getAttributeValue(NAME).toUpperCase());
-			int boost = Integer.parseInt(mission.getAttributeValue(BOOST));
-			missionBoosts.put(mt, boost);
-		}
 		minEVALight = loadDoubleValue(missionConfig, EVA_LIGHT, 0D, 1000D);
 		checkXMLFileVersion();
 
@@ -546,13 +540,6 @@ public class SimulationConfig implements Serializable {
 	 */
 
 	/**
-	 * Any mission boosts applied
-	 */
-	public Map<MissionType, Integer> getMissionBoosts() {
-		return missionBoosts;
-	}
-
-	/**
 	 * Gets the ratio of simulation time to real time in simulation.xml
 	 *
 	 * @return ratio
@@ -618,17 +605,17 @@ public class SimulationConfig implements Serializable {
 	public double getMinEVALight() {
 		return minEVALight;
 	}
-
+	
 	/**
 	 * Gets the Earth date/time when the simulation starts.
 	 *
-	 * @return date/time as string in "MM/dd/yyyy hh:mm:ss" format.
-	 * @throws Exception if value is null or empty.
+	 * @return 
 	 */
-	public String getEarthStartDateTime() {
-		return earthStartDate;
+	public LocalDateTime getEarthStartDate() {
+		return LocalDateTime.parse(earthStartDate,
+						DateTimeFormatter.ofPattern("yyyy-MM-dd kk:mm:ss.SSS"));
 	}
-
+	
 	/**
 	 * Gets the Mars date/time when the simulation starts.
 	 *
@@ -1038,14 +1025,16 @@ public class SimulationConfig implements Serializable {
 		medicalConfig = new MedicalConfig(parseXMLFileAsJDOMDocument(MEDICAL_FILE, true));
 		landmarkConfig = new LandmarkConfig(parseXMLFileAsJDOMDocument(LANDMARK_FILE, true));
 		mineralMapConfig = new MineralMapConfig(parseXMLFileAsJDOMDocument(MINERAL_MAP_FILE, true));
+		manufactureConfig = new ManufactureConfig(parseXMLFileAsJDOMDocument(MANUFACTURE_FILE, true));
 		malfunctionConfig = new MalfunctionConfig(parseXMLFileAsJDOMDocument(MALFUNCTION_FILE, true));
 		cropConfig = new CropConfig(parseXMLFileAsJDOMDocument(CROP_FILE, true), personConfig);
-		vehicleConfig = new VehicleConfig(parseXMLFileAsJDOMDocument(VEHICLE_FILE, true));
+		vehicleConfig = new VehicleConfig(parseXMLFileAsJDOMDocument(VEHICLE_FILE, true), manufactureConfig);
 		ResourceProcessConfig resourceProcessConfig = new ResourceProcessConfig(parseXMLFileAsJDOMDocument(RESPROCESS_FILE, true));
 		buildingConfig = new BuildingConfig(parseXMLFileAsJDOMDocument(BUILDING_FILE, true), resourceProcessConfig);
 		resupplyConfig = new ResupplyConfig(parseXMLFileAsJDOMDocument(RESUPPLY_FILE, true), partPackageConfig);
-		settlementConfig = new SettlementConfig(parseXMLFileAsJDOMDocument(SETTLEMENT_FILE, true), partPackageConfig);
-		manufactureConfig = new ManufactureConfig(parseXMLFileAsJDOMDocument(MANUFACTURE_FILE, true));
+		settlementConfig = new SettlementConfig(parseXMLFileAsJDOMDocument(SETTLEMENT_FILE, true),
+												partPackageConfig, resupplyConfig);
+
 		constructionConfig = new ConstructionConfig(parseXMLFileAsJDOMDocument(CONSTRUCTION_FILE, true));
 		foodProductionConfig = new FoodProductionConfig(parseXMLFileAsJDOMDocument(FOODPRODUCTION_FILE, true));
 		mealConfig = new MealConfig(parseXMLFileAsJDOMDocument(MEAL_FILE, true));

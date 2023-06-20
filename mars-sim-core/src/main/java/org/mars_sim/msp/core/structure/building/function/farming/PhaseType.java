@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * PhaseType.java
- * @date 2021-11-26
+ * @date 2023-05-06
  * @author Manny Kung
  */
 
@@ -77,6 +77,17 @@ public enum PhaseType {
 	//HARVESTING("Harvesting"),
 	//FINISHED("Finished"),
 
+	/* For Herbs */
+	//INCUBATION
+	//PLANTING
+	//GERMINATION
+	FOLIAGE ("Foliage"),
+	//FLOWERING
+	//SEED_FILL
+	//POD_MATURING			
+	//HARVESTING
+	//FINISHED
+	
 	/* For Leaves */
 	//INCUBATION("Incubation"),
 	//PLANTING("Planting"),

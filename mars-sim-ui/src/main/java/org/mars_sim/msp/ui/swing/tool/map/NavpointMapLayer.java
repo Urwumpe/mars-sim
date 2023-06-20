@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * NavpointMapLayer.java
- * @date 2022-07-31
+ * @date 2023-04-29
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.tool.map;
@@ -11,6 +11,7 @@ import java.awt.Graphics;
 
 import javax.swing.Icon;
 
+import org.mars_sim.mapdata.MapMetaData;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.IntPoint;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
@@ -24,9 +25,9 @@ import org.mars_sim.msp.ui.swing.ImageLoader;
 public class NavpointMapLayer implements MapLayer {
 
 	// Static members
-	private static final String BLUE_ICON_NAME = "FlagBlue";
-	private static final String WHITE_ICON_NAME = "FlagWhite";
-	private static final String GREEN_ICON_NAME = "FlagGreen";
+	private static final String BLUE_ICON_NAME = "map/flag_blue";
+	private static final String WHITE_ICON_NAME = "map/flag_white";
+	private static final String GREEN_ICON_NAME = "map/flag_green";
 	
 	// Domain members
 	private static final int MAP_X_OFFSET = 5;
@@ -51,9 +52,9 @@ public class NavpointMapLayer implements MapLayer {
 		// Initialize domain data.
 		this.displayComponent = displayComponent;
 
-		navpointIconColor = ImageLoader.getIcon(BLUE_ICON_NAME);
-		navpointIconWhite = ImageLoader.getIcon(WHITE_ICON_NAME);
-		navpointIconSelected = ImageLoader.getIcon(GREEN_ICON_NAME);
+		navpointIconColor = ImageLoader.getIconByName(BLUE_ICON_NAME);
+		navpointIconWhite = ImageLoader.getIconByName(WHITE_ICON_NAME);
+		navpointIconSelected = ImageLoader.getIconByName(GREEN_ICON_NAME);
 	}
 
 	/**
@@ -82,20 +83,21 @@ public class NavpointMapLayer implements MapLayer {
 	 * @param mapType   the type of map.
 	 * @param g         graphics context of the map display.
 	 */
-	public void displayLayer(Coordinates mapCenter, String mapType, Graphics g) {
+	@Override
+	public void displayLayer(Coordinates mapCenter, Map baseMap, Graphics g) {
 		if (singleMission != null) {
 			if (singleMission instanceof VehicleMission)
-				displayMission((VehicleMission) singleMission, mapCenter, mapType, g);
+				displayMission((VehicleMission) singleMission, mapCenter, baseMap, g);
 		} else {
 			for (Mission mission : missionManager.getMissions()) {
 				if (mission instanceof VehicleMission)
-					displayMission((VehicleMission) mission, mapCenter, mapType, g);
+					displayMission((VehicleMission) mission, mapCenter, baseMap, g);
 			}
 		}
 
 		// Make sure selected navpoint is always on top.
 		if (selectedNavpoint != null)
-			displayNavpoint(selectedNavpoint, mapCenter, mapType, g);
+			displayNavpoint(selectedNavpoint, mapCenter, baseMap, g);
 	}
 
 	/**
@@ -103,12 +105,12 @@ public class NavpointMapLayer implements MapLayer {
 	 * 
 	 * @param mission   the travel mission to display.
 	 * @param mapCenter the location of the center of the map.
-	 * @param mapType   the type of map.
+	 * @param baseMap   the type of map.
 	 * @param g         graphics context of the map display.
 	 */
-	private void displayMission(VehicleMission mission, Coordinates mapCenter, String mapType, Graphics g) {
-		for (int x = 0; x < mission.getNumberOfNavpoints(); x++) {
-			displayNavpoint(mission.getNavpoint(x), mapCenter, mapType, g);
+	private void displayMission(VehicleMission mission, Coordinates mapCenter, Map baseMap, Graphics g) {
+		for (NavPoint np : mission.getNavpoints()) {
+			displayNavpoint(np, mapCenter, baseMap, g);
 		}
 	}
 
@@ -117,24 +119,25 @@ public class NavpointMapLayer implements MapLayer {
 	 * 
 	 * @param navpoint  the navpoint to display.
 	 * @param mapCenter the location of the center of the map.
-	 * @param mapType   the type of map.
+	 * @param baseMap   the type of map.
 	 * @param g         graphics context of the map display.
 	 */
-	private void displayNavpoint(NavPoint navpoint, Coordinates mapCenter, String mapType, Graphics g) {
+	private void displayNavpoint(NavPoint navpoint, Coordinates mapCenter, Map baseMap, Graphics g) {
 
 		if (mapCenter != null && mapCenter.getAngle(navpoint.getLocation()) < Map.HALF_MAP_ANGLE) {
-
+			MapMetaData mapType = baseMap.getType();
+			
 			// Chose a navpoint icon based on the map type.
 			Icon navIcon = null;
 			if (navpoint == selectedNavpoint)
 				navIcon = navpointIconSelected;
-			else if (TopoMarsMap.TYPE.equals(mapType) || GeologyMarsMap.TYPE.equals(mapType))
+			else if (mapType.isColourful())
 				navIcon = navpointIconWhite;
 			else
 				navIcon = navpointIconColor;
 
 			// Determine the draw location for the icon.
-			IntPoint location = MapUtils.getRectPosition(navpoint.getLocation(), mapCenter, mapType);
+			IntPoint location = MapUtils.getRectPosition(navpoint.getLocation(), mapCenter, baseMap);
 			IntPoint drawLocation = new IntPoint(location.getiX()+MAP_X_OFFSET, 
 					(location.getiY()+MAP_Y_OFFSET - navIcon.getIconHeight()));
 

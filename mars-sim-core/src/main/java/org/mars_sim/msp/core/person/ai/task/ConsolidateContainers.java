@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * ConsolidateContainers.java
- * @date 2021-10-21
+ * @date 2023-05-17
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -9,8 +9,6 @@ package org.mars_sim.msp.core.person.ai.task;
 import java.util.Iterator;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Unit;
-import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.equipment.Container;
 import org.mars_sim.msp.core.equipment.EquipmentOwner;
 import org.mars_sim.msp.core.equipment.ResourceHolder;
@@ -19,7 +17,6 @@ import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.task.util.Task;
 import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
-import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.building.function.FunctionType;
@@ -48,14 +45,15 @@ extends Task {
     /** The stress modified per millisol. */
     private static final double STRESS_MODIFIER = -.1D;
     
-    /** The amount of resources (kg) one person of average strength can load per millisol. */
+    /** The amount of resources (kg) a worker of average strength can load per millisol. */
     private static final double LOAD_RATE = 20D;
     
     /** Time (millisols) duration. */
     private static final double DURATION = 30D;
     
     /**
-     * Constructor.
+     * Constructor 1.
+     * 
      * @param person the person performing the task.
      * @throws Exception if error constructing task.
      */
@@ -81,7 +79,7 @@ extends Task {
         }
         
         else {
-            logger.severe(person, "A top inventory could not be determined for consolidating containers");
+            logger.severe(person, "Not in a proper location for consolidating containers.");
             endTask();
         }
         
@@ -90,9 +88,20 @@ extends Task {
         setPhase(CONSOLIDATING);
     }
     
+    /**
+     * Constructor 2.
+     * 
+     * @param robot the robot performing the task.
+     * @throws Exception if error constructing task.
+     */
     public ConsolidateContainers(Robot robot) {
         // Use Task constructor
         super(NAME, robot, true, false, STRESS_MODIFIER, DURATION);
+        
+        if (robot.isOutside()) {
+        	endTask();
+        	return;
+        }
         
         if (robot.isInVehicle()) {
             // If robot is in rover, walk to passenger activity spot.
@@ -106,7 +115,7 @@ extends Task {
         }
         
         else {
-            logger.severe(robot, "A top inventory could not be determined for consolidating containers");
+            logger.severe(robot, "Not in a proper location for consolidating containers");
             endTask();
         }
         
@@ -114,53 +123,6 @@ extends Task {
         addPhase(CONSOLIDATING);
         setPhase(CONSOLIDATING);
     }    
-    
-    /**
-     * Checks if containers need resource consolidation at the worker's location.
-     * 
-     * @param worker the worker.
-     * @return true if containers need resource consolidation.
-     */
-    public static boolean needResourceConsolidation(Worker worker) {
-        return needsConsolidation(worker.getTopContainerUnit());
-    }
-    
-    /**
-     * Consolidate the container's resources.
-     * 
-     * @param inv
-     * @return
-     */
-    private static boolean needsConsolidation(Unit container) {   	        
-        int partialContainers = 0;
-        
-        boolean useTopInventory = container.getUnitType() == UnitType.SETTLEMENT;
-        
-        // In Vehicles do not use main store; keep in Containers
-        for (Container e: ((EquipmentOwner)container).findAllContainers()) {
-            if (e.getStoredMass() > 0D) {
-                // Only check one type of amount resource for container.
-                int resource = e.getResource();
-                // Check if this resource from this container could be loaded into the settlement/vehicle's inventory.
-                if (useTopInventory && (resource > 0) 
-                		&& ((EquipmentOwner)container).hasAmountResourceRemainingCapacity(resource)) {
-                	return true;
-                }
-
-                // Check if container is only partially full of resource.
-                if (e.hasAmountResourceRemainingCapacity(resource)) {
-                    // If another container is also partially full of resource, they can be consolidated.
-                	partialContainers++;
-                    if (partialContainers > 2) {
-                    	// Need at least 3 containers
-                        return true;
-                    }
-                }
-            }
-        }
-    	
-    	return false;
-    }
     
     @Override
     protected double performMappedPhase(double time) {
@@ -176,7 +138,8 @@ extends Task {
     }
     
     /**
-     * Perform the consolidating phase.
+     * Performs the consolidating phase.
+     * 
      * @param time the amount of time (millisol) to perform the consolidating phase.
      * @return the amount of time (millisol) left after performing the consolidating phase.
      */
@@ -186,7 +149,7 @@ extends Task {
     	
         // Determine consolidation load rate.
     	int strength = worker.getNaturalAttributeManager().getAttribute(NaturalAttributeType.STRENGTH);	
-        
+    	
         double strengthModifier = .1D + (strength * .018D);
         double totalAmountLoading = LOAD_RATE * strengthModifier * time;
         double remainingAmountLoading = totalAmountLoading;

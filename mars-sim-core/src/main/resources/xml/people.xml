@@ -219,24 +219,39 @@
 		<!-- Default: 0.62 dry Weight -->
 		<food-consumption-rate value="0.62" />
 
-		<!-- TODO: account for carbohydrates & protein content (1). http://settlement.arc.nasa.gov/75SummerStudy/Chapt3.html#Food
+		<!-- TODO: account for carbohydrates & protein content 
+		
+			(1). http://settlement.arc.nasa.gov/75SummerStudy/Chapt3.html#Food
+			
 			A heavy workload requires about 3000 Cal/day...consist of 2000 g of water,
 			470 g dry weight of various carbohydrates and fats, 60 to 70 g dry weight
-			of proteins, and adequate quantities of various minerals and vitamins (2).
-			http://settlement.arc.nasa.gov/Contest/Results/96/winner/seis.html#HUMAN
-			Food solids: 0.62Kg , Water in food: 1.15Kg (3). Food energy per mass: http://en.wiki2.org/wiki/Food_energy
+			of proteins, and adequate quantities of various minerals and vitamins 
+			
+			(2). http://settlement.arc.nasa.gov/Contest/Results/96/winner/seis.html#HUMAN
+			
+			Food solids: 0.62Kg , Water in food: 1.15Kg 
+			
+			(3). Food energy per mass: http://en.wiki2.org/wiki/Food_energy
 			a. Fats and ethanol have 37 and 29 kJ/g (8.8 and 6.9 kcal/g) b. Proteins
 			and most carbohydrates have about 17 kJ/g (4.1 kcal/g) c. Notes: 1. Each
-			meal is 0.62kg / 4 2. Assume a daily intake of: 0.1 kg of fats, 0.4 kg of
+			meal is 0.62kg / 4 2. 
+			
+			Assume a daily intake of: 0.1 kg of fats, 0.4 kg of
 			proteins and carbo, 0.12 of fibers and others, Daily intake : .1 * 1000 *
-			33 kJ + .4 * 1000 * 17 kJ + ... = 10100 kJ or 2415.2 kcal Each meal has 0.1550
+			33 kJ + .4 * 1000 * 17 kJ + ... = 10100 kJ or 2415.2 kcal 
+			
+			Each meal has 0.1550
 			kg or 2525 kJ 1 kg ==> 16290.323 kJ FOOD_COMPOSITION_ENERGY_RATIO = 16290.323
+			
 			(4). A standard conversion in the Systeme Internation de'Unites is that one
 			calorie equals 4.186 joules, which is how much energy is given off in heat
-			to raise 1 kg of water 1 degree Celsius. 4.186 J = 1 cal OR 4.186 kJ = 1
-			Cal or 1 kcal a). 1 small kilocalorie (kcal) is equal to 1 large food calorie
-			(Cal): 1 kcal = 1 Cal b). 1 small kilocalorie (kcal) is equal to 1000 small
-			calories (cal): 1 kcal = 1000 cal -->
+			to raise 1 kg of water 1 degree Celsius. 
+			
+			4.186 J = 1 cal OR 4.186 kJ = 1	Cal or 1 kcal 
+			
+			a). 1 small kilocalorie (kcal) is equal to 1 large food calorie	(Cal): 1 kcal = 1 Cal b). 
+			
+			1 small kilocalorie (kcal) is equal to 1000 small calories (cal): 1 kcal = 1000 cal -->
 
 		<!-- Number of millisols a person can survive without oxygen -->
 		<!-- Note: 1 millisol = 88.77 seconds -->
@@ -762,6 +777,182 @@
 	</person-name-list>
 
 	<country-list>
+		<country name="Brazil">
+			<first-name-list>
+				<!-- Brazil : will replace with Brazilian names -->
+				<first-name value="Paulo" gender="male" />
+				<first-name value="Eduardo" gender="male" />		
+				<first-name value="Marcos" gender="male" />
+				
+				<!--http://iheartbrazil.com/brazilian-boy-names/ -->
+				<first-name value="Jose" gender="male" />
+				<first-name value="Joao" gender="male" />
+				<first-name value="Antonio" gender="male" />
+				<first-name value="Francisco" gender="male" />
+				<first-name value="Carlos" gender="male" />
+				<first-name value="Pedro" gender="male" />
+				<first-name value="Lucas" gender="male" />
+				<first-name value="Luiz" gender="male" />
+						
+				<first-name value="Adriano" gender="male" />
+				<first-name value="Afonso" gender="male" />
+				<first-name value="Alexandre" gender="male" />
+				<first-name value="Andre" gender="male" />
+				<first-name value="Arthur" gender="male" />
+				<first-name value="Augusto" gender="male" />
+				
+				<first-name value="Benicio" gender="male" />
+				<first-name value="Benjamim" gender="male" />
+				<first-name value="Bento" gender="male" />
+				<first-name value="Breno" gender="male" />
+				<first-name value="Bernardo" gender="male" />
+				<first-name value="Bruno" gender="male" />
+				
+				<first-name value="Caio" gender="male" />
+				<first-name value="Carlos" gender="male" />
+				<first-name value="Caua" gender="male" />
+				<first-name value="Cesar" gender="male" />
+				<first-name value="Cleiton" gender="male" />
+				<first-name value="Claudio" gender="male" />
+				<first-name value="Cristiano" gender="male" />
+
+				<first-name value="Damiao" gender="male" />
+				<first-name value="Danilo" gender="male" />
+				<first-name value="Davi" gender="male" />
+				<first-name value="Diego" gender="male" />
+				<first-name value="Domingos" gender="male" />
+				
+				
+				<!--http://iheartbrazil.com/brazilian-girl-names/ -->
+				<first-name value="Michele" gender="female" />
+				
+				<first-name value="Bruna" gender="female" />
+				
+				<first-name value="Maria" gender="female" />
+				<first-name value="Ana" gender="female" />
+				<first-name value="Francisca" gender="female" />
+				<first-name value="Antonia" gender="female" />
+				<first-name value="Adriana" gender="female" />
+				<first-name value="Juliana" gender="female" />
+				<first-name value="Marcia" gender="female" />
+				<first-name value="Fernanda" gender="female" />
+				<first-name value="Patricia" gender="female" />
+				<first-name value="Aline" gender="female" />
+				
+				
+				<first-name value="Adriene" gender="female" />
+				<first-name value="Agata" gender="female" />
+				<first-name value="Alessandra" gender="female" />
+
+				<first-name value="Amelia" gender="female" />
+				<first-name value="Anita" gender="female" />
+				<first-name value="Aline" gender="female" />
+				<first-name value="Alzira" gender="female" />
+				<first-name value="Ana" gender="female" />
+
+				<first-name value="Analu" gender="female" />
+				<first-name value="Andreia" gender="female" />
+				<first-name value="Aparecida" gender="female" />
+				<first-name value="Aurea" gender="female" />
+				
+				
+				<first-name value="Beatriz" gender="female" />
+
+				<first-name value="Belinda" gender="female" />
+				<first-name value="Bethania" gender="female" />
+				<first-name value="Bibiana" gender="female" />
+				<first-name value="Bruna" gender="female" />
+				
+				<first-name value="Camila" gender="female" />
+
+				<first-name value="Carina" gender="female" />
+				<first-name value="Carla" gender="female" />
+				<first-name value="Carolina" gender="female" />
+				<first-name value="Cassia" gender="female" />
+				<first-name value="Catarina" gender="female" />
+
+				<first-name value="Celia" gender="female" />
+				<first-name value="Cintia" gender="female" />
+				<first-name value="Conceicao" gender="female" />
+				<first-name value="Claudia" gender="female" />
+				<first-name value="Cristiana" gender="female" />
+
+			</first-name-list>
+			<last-name-list>
+				<!--http://iheartbrazil.com/brazilian-last-names/ -->
+				
+				<last-name value="Pontes" />
+				<last-name value="Melo" />
+				<last-name value="Vasconcellos" />
+				
+				<last-name value="Silva" />
+				<last-name value="Santos" />
+				<last-name value="Olveira" />
+				<last-name value="Souza" />
+				<last-name value="Rodrigues" />
+				<last-name value="Ferreira" />
+				<last-name value="Alves" />
+
+				<last-name value="Anjos" />
+				<last-name value="Assuncao" />
+				<last-name value="Batista" />
+				<last-name value="Santiago" />
+				<last-name value="Trindade" />
+
+				<last-name value="Graca" />
+				<last-name value="Pereira" />
+				<last-name value="Lima" />
+				<last-name value="carvalho" />
+				<last-name value="Gomes" />
+
+				<last-name value="Costa" />
+				<last-name value="Ribeiro" />
+				<last-name value="Martins" />
+				<last-name value="Almeida" />
+				<last-name value="Lopes" />
+
+				<last-name value="Soares" />
+				<last-name value="Fernandes" />
+				<last-name value="Vieira" />
+				<last-name value="Barbosa" />
+				<last-name value="Rocha" />
+
+				<last-name value="Dias" />
+				<last-name value="Nascimento" />
+				<last-name value="Andrade" />
+
+				<last-name value="Moreira" />
+				<last-name value="Nunes" />
+				<last-name value="Marques" />
+				<last-name value="Machado" />
+				<last-name value="Mendes" />
+
+				<last-name value="Freitas" />
+				<last-name value="Cardoso" />
+				<last-name value="Ramos" />
+				<last-name value="Goncalves" />
+				<last-name value="Santana" />
+
+				<last-name value="Teixeira" />
+				<last-name value="Araujo" />
+				<last-name value="Conceicao" />
+				<last-name value="Bezerra" />
+				<last-name value="Campos" />
+
+				<last-name value="Reis" />
+				<last-name value="Moraes" />
+				<last-name value="Borges" />
+				<last-name value="Castro" />
+				<last-name value="Monteiro" />
+
+				<last-name value="Moura" />
+				<last-name value="Miranda" />
+				<last-name value="Garcia" />
+				<last-name value="Duarte" />
+				<last-name value="Medeiros" />				
+			</last-name-list>
+		</country>
+	
 		<country name="China">
 			<first-name-list>
 				<!-- Derived from https://en.wiki2.org/wiki/List_of_Chinese_astronauts

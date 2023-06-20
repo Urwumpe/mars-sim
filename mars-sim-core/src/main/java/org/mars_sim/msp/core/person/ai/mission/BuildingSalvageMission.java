@@ -21,6 +21,7 @@ import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.equipment.EVASuit;
 import org.mars_sim.msp.core.equipment.EquipmentType;
+import org.mars_sim.msp.core.mission.ConstructionMission;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.person.ai.task.SalvageBuilding;
@@ -46,7 +47,8 @@ import org.mars_sim.msp.core.vehicle.Vehicle;
 /**s
  * Mission for salvaging a construction stage at a building construction site.
  */
-public class BuildingSalvageMission extends AbstractMission {
+public class BuildingSalvageMission extends AbstractMission 
+	implements ConstructionMission {
 
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
@@ -311,7 +313,7 @@ public class BuildingSalvageMission extends AbstractMission {
 
 		SalvageValues values = settlement.getConstructionManager().getSalvageValues();
 		Map<Building, Double> salvageBuildings = new HashMap<>();
-		Iterator<Building> i = settlement.getBuildingManager().getACopyOfBuildings().iterator();
+		Iterator<Building> i = settlement.getBuildingManager().getBuildingSet().iterator();
 		while (i.hasNext()) {
 			Building building = i.next();
 			double salvageProfit = values.getNewBuildingSalvageProfit(building, constructionSkill);
@@ -584,6 +586,9 @@ public class BuildingSalvageMission extends AbstractMission {
 			while (i.hasNext()) {
 				GroundVehicle vehicle = i.next();
 				vehicle.setReservedForMission(false);
+				if (vehicle.getMission().equals(this)) {
+					vehicle.setMission(null);
+				}
 
 				// Store construction vehicle in settlement.
 				settlement.addParkedVehicle(vehicle);
@@ -604,6 +609,7 @@ public class BuildingSalvageMission extends AbstractMission {
 	 * 
 	 * @return list of construction vehicles.
 	 */
+	@Override
 	public List<GroundVehicle> getConstructionVehicles() {
 		if (constructionVehicles != null && !constructionVehicles.isEmpty()) {
 			return new ArrayList<>(constructionVehicles);
@@ -670,9 +676,9 @@ public class BuildingSalvageMission extends AbstractMission {
 		// Cancel construction mission if there are any beacon vehicles within range
 		// that need help.
 		Vehicle vehicleTarget = null;
-		Vehicle vehicle = RoverMission.getVehicleWithGreatestRange(missionType, settlement, true);
+		Vehicle vehicle = RoverMission.getVehicleWithGreatestRange(settlement, true);
 		if (vehicle != null) {
-			vehicleTarget = RescueSalvageVehicle.findBeaconVehicle(settlement, vehicle.getRange(missionType));
+			vehicleTarget = RescueSalvageVehicle.findBeaconVehicle(settlement, vehicle.getRange());
 			if (vehicleTarget != null) {
 				if (!RescueSalvageVehicle.isClosestCapableSettlement(settlement, vehicleTarget)) {
 					result = true;

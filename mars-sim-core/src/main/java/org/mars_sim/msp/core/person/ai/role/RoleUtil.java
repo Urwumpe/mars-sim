@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.job.util.Job;
 import org.mars_sim.msp.core.person.ai.job.util.JobType;
@@ -23,6 +22,7 @@ import org.mars_sim.msp.core.person.ai.job.util.JobUtil;
 import org.mars_sim.msp.core.person.ai.training.TrainingType;
 import org.mars_sim.msp.core.person.ai.training.TrainingUtils;
 import org.mars_sim.msp.core.structure.ChainOfCommand;
+import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
  * The RoleUtil class determines the roles of the settlers in a simulation.
@@ -101,10 +101,12 @@ public class RoleUtil implements Serializable {
 				roles.add(rt);
 			}
 		}
-		// Remove that role
-		roles.remove(leastFilledRole);
-		// Add that role back to the first position
-		roles.add(0, leastFilledRole);
+
+		// Move the least polluted role to the front
+		if (leastFilledRole != null) {
+			roles.remove(leastFilledRole);
+			roles.add(0, leastFilledRole);
+		}
 
 		for (RoleType rt : roles) {
 			boolean isRoleAvailable = chain.isRoleAvailable(rt);
@@ -122,6 +124,11 @@ public class RoleUtil implements Serializable {
 			}
 		}
 
+		// No role ????
+		if (selectedRole == null) {
+			int idx = RandomUtil.getRandomInt(roles.size() - 1);
+			selectedRole = roles.get(idx);
+		}
 		return selectedRole;
 	}
 
@@ -189,21 +196,6 @@ public class RoleUtil implements Serializable {
 
 		return trainingScore;
 
-	}
-
-	/**
-	 * Records the role change and fire the unit update.
-	 *
-	 * @param person
-	 * @param roleType
-	 */
-	public static void recordNewRole(Person person, RoleType roleType) {
-		// Save the new role in roleHistory
-		person.getRole().addRoleHistory(roleType);
-		// Fire the role event
-		person.fireUnitUpdate(UnitEventType.ROLE_EVENT, roleType);
-
-		//logger.info(person, "New Role " + roleType.getName());
 	}
 
 	/**

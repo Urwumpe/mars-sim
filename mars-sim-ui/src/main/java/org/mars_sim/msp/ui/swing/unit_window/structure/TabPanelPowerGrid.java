@@ -1,28 +1,29 @@
 /*
  * Mars Simulation Project
  * TabPanelPowerGrid.java
- * @date 2022-07-09
+ * @date 2023-05-23
  * @author Scott Davis
  */
 package org.mars_sim.msp.ui.swing.unit_window.structure;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
+import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.util.Iterator;
 import java.util.List;
 
-import javax.swing.ImageIcon;
+import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
+import javax.swing.Icon;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.JTextField;
-import javax.swing.SpringLayout;
 import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.JTableHeader;
@@ -41,14 +42,12 @@ import org.mars_sim.msp.core.structure.building.function.PowerStorage;
 import org.mars_sim.msp.core.structure.building.function.SolarPowerSource;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
+import org.mars_sim.msp.ui.swing.StyleManager;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
+import org.mars_sim.msp.ui.swing.utils.UnitModel;
+import org.mars_sim.msp.ui.swing.utils.UnitTableLauncher;
 
-import com.alee.laf.checkbox.WebCheckBox;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
 
 /**
  * This is a tab panel for a settlement's power grid information.
@@ -56,10 +55,8 @@ import com.alee.laf.scroll.WebScrollPane;
 @SuppressWarnings("serial")
 public class TabPanelPowerGrid extends TabPanel {
 
-	private static final String FUSE_ICON = Msg.getString("icon.fuse"); //$NON-NLS-1$
+	private static final String POWER_ICON = "power";
 	
-	private static final String kW = " kW";
-	private static final String kWh = " kWh";
 	private static final String PERCENT_PER_SOL = " % per sol";
 	private static final String PERCENT = " %";
 	private static final String[] toolTips = {"Power Status", "Building Name",
@@ -81,21 +78,27 @@ public class TabPanelPowerGrid extends TabPanel {
 	/** The total solar cell efficiency cache. */
 	private double solarCellEfficiencyCache;
 	
+	private double percentPower;
+
+	private double percentEnergy;
+
+	
 	/** The Settlement instance. */
 	private Settlement settlement;
 	
 	private JTable powerTable;
 
-	private JTextField powerGeneratedTF;
-	private JTextField powerUsedTF;
-	private JTextField energyStorageCapacityTF;
-	private JTextField energyStoredTF;
-	private JTextField solarCellEfficiencyTF;
+	private JLabel solarCellEfficiencyTF;
+	private JLabel percentPowerLabel;
+	private JLabel percentEnergyLabel;
+	
+	private JScrollPane powerScrollPane;
 
-	private WebScrollPane powerScrollPane;
-
-	private WebCheckBox checkbox;
-
+	private JRadioButton r0;
+	private JRadioButton r1;
+	private JRadioButton r2;
+	private JRadioButton r3;
+	
 	/** Table model for power info. */
 	private PowerTableModel powerTableModel;
 	/** The settlement's power grid. */
@@ -107,147 +110,134 @@ public class TabPanelPowerGrid extends TabPanel {
 
 	private List<Building> buildings;
 
-	private MainDesktopPane desktop;
 	/**
 	 * Constructor.
 	 * 
 	 * @param unit    the unit to display.
 	 * @param desktop the main desktop.
 	 */
-	public TabPanelPowerGrid(Unit unit, MainDesktopPane desktop) {
+	public TabPanelPowerGrid(Settlement unit, MainDesktopPane desktop) {
 		// Use the TabPanel constructor
 		super(
 			null,
-			ImageLoader.getNewIcon(FUSE_ICON),
+			ImageLoader.getIconByName(POWER_ICON),
 			Msg.getString("TabPanelPowerGrid.title"), //$NON-NLS-1$
-			unit, desktop
+			desktop
 		);
-		this.desktop = desktop;
-		settlement = (Settlement) unit;
+		settlement = unit;
 	}
 	
 	@Override
 	protected void buildUI(JPanel content) {
 		powerGrid = settlement.getPowerGrid();
 		manager = settlement.getBuildingManager();
-		buildings = manager.getBuildingsWithPowerGeneration();
+		buildings = manager.getBuildingsF1NoF2F3(
+				FunctionType.POWER_GENERATION, FunctionType.LIFE_SUPPORT, FunctionType.RESOURCE_PROCESSING);
 
 		JPanel topContentPanel = new JPanel(new BorderLayout());
 		content.add(topContentPanel, BorderLayout.NORTH);
 
 		// Prepare spring layout power info panel.
-		WebPanel powerInfoPanel = new WebPanel(new SpringLayout());
+		AttributePanel powerInfoPanel = new AttributePanel(4);
 		topContentPanel.add(powerInfoPanel);
 
 		// Prepare power generated tf.
 		powerGeneratedCache = powerGrid.getGeneratedPower();
-		powerGeneratedTF = addTextField(powerInfoPanel, Msg.getString("TabPanelPowerGrid.totalPowerGenerated"),
-										DECIMAL_PLACES1.format(powerGeneratedCache) + kW,
-										Msg.getString("TabPanelPowerGrid.totalPowerGenerated.tooltip"));
-
 		// Prepare power used tf.
 		powerUsedCache = powerGrid.getRequiredPower();
-		powerUsedTF = addTextField(powerInfoPanel, Msg.getString("TabPanelPowerGrid.totalPowerUsed"),
-								   DECIMAL_PLACES1.format(powerUsedCache) + kW,
-								   Msg.getString("TabPanelPowerGrid.totalPowerUsed.tooltip"));
-
+		// Prepare the power usage percent
+		percentPower = Math.round(powerGeneratedCache/powerUsedCache * 1000.0)/10.0;
+		
+		percentPowerLabel = powerInfoPanel.addTextField(Msg.getString("TabPanelPowerGrid.powerUsage"),
+				percentPower + PERCENT + " (" + StyleManager.DECIMAL_KW.format(powerUsedCache) 
+				+ " / " + StyleManager.DECIMAL_KW.format(powerGeneratedCache) + ")",
+				Msg.getString("TabPanelPowerGrid.powerUsage.tooltip"));
+		
 		// Prepare power storage capacity tf.
 		energyStorageCapacityCache = powerGrid.getStoredEnergyCapacity();
-		energyStorageCapacityTF = addTextField(powerInfoPanel, Msg.getString("TabPanelPowerGrid.energyStorageCapacity"),
-											   DECIMAL_PLACES1.format(energyStorageCapacityCache) + kWh,
-											   Msg.getString("TabPanelPowerGrid.energyStorageCapacity.tooltip"));
-
 		// Prepare power stored tf.
 		energyStoredCache = powerGrid.getStoredEnergy();
-		energyStoredTF = addTextField(powerInfoPanel, Msg.getString("TabPanelPowerGrid.totalEnergyStored"),
-									  DECIMAL_PLACES1.format(energyStoredCache) + kWh,
-									  Msg.getString("TabPanelPowerGrid.totalEnergyStored.tooltip"));
+		// Prepare the energy usage percent
+		percentEnergy = Math.round(energyStoredCache/energyStorageCapacityCache * 1000.0)/10.0;
 
+		percentEnergyLabel = powerInfoPanel.addTextField(Msg.getString("TabPanelPowerGrid.energyUsage"),
+				percentEnergy + PERCENT + " (" + StyleManager.DECIMAL_KWH.format(energyStoredCache) 
+				+ " / " + StyleManager.DECIMAL_KWH.format(energyStorageCapacityCache) + ")",
+				Msg.getString("TabPanelPowerGrid.energyUsage.tooltip"));
+		
 		// Create solar cell eff tf
 		solarCellEfficiencyCache = getAverageEfficiency();
-		solarCellEfficiencyTF = addTextField(powerInfoPanel, Msg.getString("TabPanelPowerGrid.solarPowerEfficiency"),
-											 DECIMAL_PLACES2.format(solarCellEfficiencyCache * 100D) + PERCENT,
+		solarCellEfficiencyTF = powerInfoPanel.addTextField(Msg.getString("TabPanelPowerGrid.solarPowerEfficiency"),
+											 StyleManager.DECIMAL_PLACES2.format(solarCellEfficiencyCache * 100D) + PERCENT,
 											 Msg.getString("TabPanelPowerGrid.solarPowerEfficiency.tooltip"));
-
 
 		// Create degradation rate tf.
 		double solarPowerDegradRate = SolarPowerSource.DEGRADATION_RATE_PER_SOL;
-		addTextField(powerInfoPanel, Msg.getString("TabPanelPowerGrid.solarPowerDegradRate"),
-									DECIMAL_PLACES2.format(solarPowerDegradRate * 100D) + PERCENT_PER_SOL,
+		powerInfoPanel.addTextField(Msg.getString("TabPanelPowerGrid.solarPowerDegradRate"),
+									StyleManager.DECIMAL_PLACES2.format(solarPowerDegradRate * 100D) + PERCENT_PER_SOL,
 									Msg.getString("TabPanelPowerGrid.solarPowerDegradRate.tooltip"));
 
-		// Create override check box panel.
-		WebPanel checkboxPane = new WebPanel(new FlowLayout(FlowLayout.CENTER));
-		topContentPanel.add(checkboxPane, BorderLayout.SOUTH);
+		// Create a button panel
+		JPanel buttonPanel = new JPanel(new GridLayout(1, 3));
+		topContentPanel.add(buttonPanel, BorderLayout.SOUTH);
+		
+		buttonPanel.setBorder(BorderFactory.createTitledBorder("Choose Buildings"));
+		buttonPanel.setToolTipText("Select the type of buildings");
 
-		// Create override check box.
-		checkbox = new WebCheckBox(Msg.getString("TabPanelPowerGrid.checkbox.value")); //$NON-NLS-1$
-		checkbox.setToolTipText(Msg.getString("TabPanelPowerGrid.checkbox.tooltip")); //$NON-NLS-1$
-		checkbox.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				setNonGenerating(checkbox.isSelected());
-			}
-		});
-		checkbox.setSelected(false);
-		checkboxPane.add(checkbox);
+		ButtonGroup group0 = new ButtonGroup();
+
+		r0 = new JRadioButton("Power Bldgs", true);
+		r1 = new JRadioButton("Bldgs w/ Gen");
+		r2 = new JRadioButton("Bldgs w/o Gen");
+		r3 = new JRadioButton("All");
+
+		group0.add(r0);
+		group0.add(r1);
+		group0.add(r2);
+		group0.add(r3);
+		
+		buttonPanel.add(r0);
+		buttonPanel.add(r1);
+		buttonPanel.add(r2);
+		buttonPanel.add(r3);
+
+		PolicyRadioActionListener actionListener = new PolicyRadioActionListener();
+		r0.addActionListener(actionListener);
+		r1.addActionListener(actionListener);
+		r2.addActionListener(actionListener);
+		r3.addActionListener(actionListener);
+		
 
 		// Create scroll panel for the outer table panel.
-		powerScrollPane = new WebScrollPane();
+		powerScrollPane = new JScrollPane();
 		// powerScrollPane.setPreferredSize(new Dimension(257, 230));
 		// increase vertical mousewheel scrolling speed for this one
 		powerScrollPane.getVerticalScrollBar().setUnitIncrement(16);
-		powerScrollPane.setHorizontalScrollBarPolicy(WebScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		powerScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 		content.add(powerScrollPane, BorderLayout.CENTER);
 
 		// Prepare power table model.
 		powerTableModel = new PowerTableModel(settlement);
 
 		// Prepare power table.
-		powerTable = new ZebraJTable(powerTableModel);
+		powerTable = new JTable(powerTableModel);
 		// Call up the building window when clicking on a row on the table
-		powerTable.addMouseListener(new MouseListener() {
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				if (e.getClickCount() == 2 && !e.isConsumed()) {
-					// Get the mouse-selected row
-		            int r = powerTable.getSelectedRow();
-		            SwingUtilities.invokeLater(() -> 
-		            	desktop.openUnitWindow((Unit)powerTable.getValueAt(r, 1), false));
-				}
-			}
-			@Override
-			public void mousePressed(MouseEvent e) {
-				// nothing
-			}
-			@Override
-			public void mouseReleased(MouseEvent e) {
-				// nothing
-			}
-			@Override
-			public void mouseEntered(MouseEvent e) {
-				// nothing
-			}
-			@Override
-			public void mouseExited(MouseEvent e) {
-				// nothing
-			}
-		});
+		powerTable.addMouseListener(new UnitTableLauncher(getDesktop()));
 
 		powerTable.setRowSelectionAllowed(true);
-		
-		powerTable.getColumnModel().getColumn(0).setPreferredWidth(10);
-		powerTable.getColumnModel().getColumn(1).setPreferredWidth(100);
-		powerTable.getColumnModel().getColumn(2).setPreferredWidth(50);
-		powerTable.getColumnModel().getColumn(3).setPreferredWidth(50);
-		powerTable.getColumnModel().getColumn(4).setPreferredWidth(50);
+		TableColumnModel powerColumns = powerTable.getColumnModel();
+		powerColumns.getColumn(0).setPreferredWidth(10);
+		powerColumns.getColumn(1).setPreferredWidth(100);
+		powerColumns.getColumn(2).setPreferredWidth(50);
+		powerColumns.getColumn(3).setPreferredWidth(50);
+		powerColumns.getColumn(4).setPreferredWidth(50);
 		
 		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
 		renderer.setHorizontalAlignment(SwingConstants.RIGHT);
-		// powerTable.getColumnModel().getColumn(0).setCellRenderer(renderer);
-		powerTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
-		powerTable.getColumnModel().getColumn(2).setCellRenderer(renderer);
-		powerTable.getColumnModel().getColumn(3).setCellRenderer(renderer);
-		powerTable.getColumnModel().getColumn(4).setCellRenderer(renderer);
+//		powerColumns.getColumn(1).setCellRenderer(renderer);
+		powerColumns.getColumn(2).setCellRenderer(renderer);
+		powerColumns.getColumn(3).setCellRenderer(renderer);
+		powerColumns.getColumn(4).setCellRenderer(renderer);
 		
 		// Set up tooltips for the column headers
 		ToolTipHeader tooltipHeader = new ToolTipHeader(powerTable.getColumnModel());
@@ -258,29 +248,34 @@ public class TabPanelPowerGrid extends TabPanel {
 		powerTable.setPreferredScrollableViewportSize(new Dimension(225, -1));
 		// powerTable.setAutoResizeMode(WebTable.AUTO_RESIZE_ALL_COLUMNS);
 		powerTable.setAutoCreateRowSorter(true);
-		TableStyle.setTableStyle(powerTable);
 
 		powerScrollPane.setViewportView(powerTable);
-
-		// Lay out the spring panel.
-		SpringUtilities.makeCompactGrid(powerInfoPanel, 6, 2, // rows, cols
-				20, 10, // initX, initY
-				10, 1); // xPad, yPad
-
 	}
 
-	/**
-	 * Sets if non-generating buildings should be shown.
-	 * 
-	 * @param value true or false.
-	 */
-	private void setNonGenerating(boolean value) {
-		if (value)
-			buildings = manager.getSortedBuildings();
-		else
-			buildings = manager.getBuildingsWithPowerGeneration();
-		powerTableModel.update();
+
+	class PolicyRadioActionListener implements ActionListener {
+	    @Override
+	    public void actionPerformed(ActionEvent event) {
+	        JRadioButton button = (JRadioButton) event.getSource();
+
+			if (button == r0) {
+				buildings = manager.getBuildingsF1NoF2F3(
+						FunctionType.POWER_GENERATION, FunctionType.LIFE_SUPPORT, FunctionType.RESOURCE_PROCESSING);
+			}
+			else if (button == r1) {
+				buildings = manager.getBuildingsWithPowerGeneration();
+			}
+			else if (button == r2) {
+				buildings = manager.getBuildingsNoF1F2(FunctionType.POWER_GENERATION, FunctionType.THERMAL_GENERATION);
+			}
+			else if (button == r3) {
+				buildings = manager.getSortedBuildings();
+			}
+
+			powerTableModel.update();
+	    }
 	}
+	
 
 	/**
 	 * Gets a list of buildings should be shown.
@@ -288,10 +283,7 @@ public class TabPanelPowerGrid extends TabPanel {
 	 * @return a list of buildings
 	 */
 	private List<Building> getBuildings() {
-		if (checkbox.isSelected())
-			return manager.getSortedBuildings();
-		else
-			return manager.getBuildingsWithPowerGeneration();
+		return buildings;
 	}
 
 	public double getAverageEfficiency() {
@@ -325,43 +317,46 @@ public class TabPanelPowerGrid extends TabPanel {
 	public void update() {
 		if (!uiDone)
 			initializeUI();
-		
-		TableStyle.setTableStyle(powerTable);
 
 		// Update power generated TF
 		double gen = powerGrid.getGeneratedPower();
-		if (powerGeneratedCache != gen) {
-			powerGeneratedCache = gen;
-			powerGeneratedTF.setText(DECIMAL_PLACES1.format(powerGeneratedCache) + kW);
-		}
-
 		// Update power used TF.
 		double req = powerGrid.getRequiredPower();
-		if (powerUsedCache != req) {
-			double average = .5 * (powerUsedCache + req);
-			powerUsedCache = req;
-			powerUsedTF.setText(DECIMAL_PLACES1.format(average) + kW);
-		}
 
+		if (powerGeneratedCache != gen || powerUsedCache != req) {
+			powerGeneratedCache = gen;
+			powerUsedCache = req;
+//			double powerAverage = .5 * (gen + req);
+			percentPower = Math.round(powerUsedCache / powerGeneratedCache * 1000.0)/10.0;
+
+			String s = percentPower + " % (" + StyleManager.DECIMAL_KW.format(powerUsedCache) 
+					+ " / " + StyleManager.DECIMAL_KW.format(powerGeneratedCache) + ")";
+			
+			percentPowerLabel.setText(s);		
+		}
+		
 		// Update power storage capacity TF.
 		double cap = powerGrid.getStoredEnergyCapacity();
-		if (energyStorageCapacityCache != cap) {
-			energyStorageCapacityCache = cap;
-			energyStorageCapacityTF.setText(DECIMAL_PLACES1.format(energyStorageCapacityCache) + kWh);
-		}
-
 		// Update power stored TF.
 		double store = powerGrid.getStoredEnergy();
-		if (energyStoredCache != store) {
+		
+		if (energyStorageCapacityCache != cap || energyStoredCache != store) {
+			energyStorageCapacityCache = cap;
 			energyStoredCache = store;
-			energyStoredTF.setText(DECIMAL_PLACES1.format(energyStoredCache) + kWh);
+			percentEnergy = Math.round(energyStoredCache / energyStorageCapacityCache * 1000.0)/10.0;
+					
+			String s = percentEnergy + " % (" + StyleManager.DECIMAL_KWH.format(energyStoredCache) 
+			+ " / " + StyleManager.DECIMAL_KWH.format(energyStorageCapacityCache) + ")";
+			
+			percentEnergyLabel.setText(s);
 		}
+
 
 		// Update solar cell efficiency TF
 		double eff = getAverageEfficiency();
 		if (solarCellEfficiencyCache != eff) {
 			solarCellEfficiencyCache = eff;
-			solarCellEfficiencyTF.setText(DECIMAL_PLACES2.format(eff * 100D) + PERCENT);
+			solarCellEfficiencyTF.setText(StyleManager.DECIMAL_PLACES2.format(eff * 100D) + PERCENT);
 		}
 		// Update power table.
 		powerTableModel.update();
@@ -370,20 +365,21 @@ public class TabPanelPowerGrid extends TabPanel {
 	/**
 	 * Internal class used as model for the power table.
 	 */
-	private class PowerTableModel extends AbstractTableModel {
+	private class PowerTableModel extends AbstractTableModel
+				implements UnitModel  {
 
 		/** default serial id. */
 		private static final long serialVersionUID = 1L;
 
-		private ImageIcon dotRed;
-		private ImageIcon dotYellow;
-		private ImageIcon dotGreen;
+		private Icon dotRed;
+		private Icon dotYellow;
+		private Icon dotGreen;
 
 		private PowerTableModel(Settlement settlement) {
 
-			dotRed = ImageLoader.getIcon(Msg.getString("img.dotRed")); //$NON-NLS-1$
-			dotYellow = ImageLoader.getIcon(Msg.getString("img.dotYellow")); //$NON-NLS-1$
-			dotGreen = ImageLoader.getIcon(Msg.getString("img.dotGreen_full")); //$NON-NLS-1$
+			dotRed = ImageLoader.getIconByName("dot/red"); 
+			dotYellow = ImageLoader.getIconByName("dot/yellow"); 
+			dotGreen = ImageLoader.getIconByName("dot/green"); 
 
 		}
 
@@ -398,7 +394,7 @@ public class TabPanelPowerGrid extends TabPanel {
 		public Class<?> getColumnClass(int columnIndex) {
 			Class<?> dataType = super.getColumnClass(columnIndex);
 			if (columnIndex == 0)
-				dataType = ImageIcon.class;
+				dataType = Icon.class;
 			else if (columnIndex == 1)
 				dataType = Object.class;
 			else if (columnIndex == 2)
@@ -449,16 +445,12 @@ public class TabPanelPowerGrid extends TabPanel {
 				double generated = 0D;
 				if (building.hasFunction(FunctionType.POWER_GENERATION)) {
 					try {
-						// PowerGeneration generator = (PowerGeneration)
-						// building.getFunction(BuildingFunction.POWER_GENERATION);
 						generated = building.getPowerGeneration().getGeneratedPower();
 					} catch (Exception e) {
 					}
 				}
 				if (building.hasFunction(FunctionType.THERMAL_GENERATION)) {
 					try {
-						// ThermalGeneration heater = (ThermalGeneration)
-						// building.getFunction(BuildingFunction.THERMAL_GENERATION);
 						generated += building.getThermalGeneration().getGeneratedPower();
 					} catch (Exception e) {
 					}
@@ -495,16 +487,13 @@ public class TabPanelPowerGrid extends TabPanel {
 				buildings = tempBuildings;
 				powerScrollPane.validate();
 			}
-			/*
-			 * int newSize = buildings.size(); if (size != newSize) { size = newSize;
-			 * buildings =
-			 * settlement.getBuildingManager().getBuildingsWithPowerGeneration();
-			 * //Collections.sort(buildings); } else { List<Building> newBuildings =
-			 * settlement.getBuildingManager().getACopyOfBuildings(); if
-			 * (!buildings.equals(newBuildings)) { buildings = newBuildings;
-			 * //Collections.sort(buildings); } }
-			 */
+
 			fireTableDataChanged();
+		}
+
+		@Override
+		public Unit getAssociatedUnit(int row) {
+			return buildings.get(row);
 		}
 	}
 
@@ -516,14 +505,14 @@ public class TabPanelPowerGrid extends TabPanel {
 		super.destroy();
 		
 		powerTable = null;
-		powerGeneratedTF = null;
-		powerUsedTF = null;
-		energyStorageCapacityTF = null;
-		energyStoredTF = null;
 		solarCellEfficiencyTF = null;
 		powerScrollPane = null;
 
-		checkbox = null;
+		r0 = null;
+		r1 = null;
+		r2 = null;
+		r3 = null;
+		
 		powerTableModel = null;
 		powerGrid = null;
 		manager = null;

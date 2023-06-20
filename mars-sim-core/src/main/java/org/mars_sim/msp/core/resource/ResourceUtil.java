@@ -29,7 +29,6 @@ public class ResourceUtil implements Serializable {
 
 	/** default logger. */
 	private static SimLogger logger = SimLogger.getLogger(ResourceUtil.class.getName());
-
 	
 	public static final int FIRST_AMOUNT_RESOURCE_ID = 200;
 	public static final int FIRST_ITEM_RESOURCE_ID = 500;
@@ -45,12 +44,14 @@ public class ResourceUtil implements Serializable {
 	public static final String NITROGEN = "nitrogen";
 	public static final String CO2 = "carbon dioxide";
 	public static final String CO = "carbon monoxide";
+	
 	public static final String CHLORINE = "chlorine";
+	public static final String ETHYLENE = "ethylene";
+	public static final String PROPHYLENE = "prophylene";
 	
 	public static final String HYDROGEN = "hydrogen";
 	public static final String METHANE = "methane";
 	public static final String METHANOL = "methanol";
-	
 	
 	public static final String SOIL = "soil";
 	public static final String ICE = "ice";
@@ -64,7 +65,7 @@ public class ResourceUtil implements Serializable {
 	public static final String ROCK_SAMPLES = "rock samples";
 	public static final String CONCRETE = "concrete";
 	public static final String MORTAR = "mortar";
-	public static final String CEMENT = "mortar";
+	public static final String CEMENT = "cement";
 
 	public static final String SAND = "sand";
 
@@ -76,8 +77,10 @@ public class ResourceUtil implements Serializable {
 	public static final String SOLID_WASTE = "solid waste";
 	public static final String TOXIC_WASTE = "toxic waste";
 
+	public static final String BRINE_WATER = "brine water";
 	public static final String GREY_WATER = "grey water";
 	public static final String BLACK_WATER = "black water";
+	
 	public static final String TABLE_SALT = "table salt";
 	public static final String ROCK_SALT = "rock salt";
 	public static final String EPSOM_SALT = "epsom salt";
@@ -152,8 +155,11 @@ public class ResourceUtil implements Serializable {
 	public static int methaneID;
 	public static int methanolID;
 	public static int coID;
+	
 	public static int chlorineID;
-
+	public static int ethyleneID;
+	public static int prophyleneID;
+			
 	public static int iceID;
 
 	public static int regolithID;
@@ -169,6 +175,8 @@ public class ResourceUtil implements Serializable {
 
 	public static int blackWaterID;
 	public static int greyWaterID;
+	
+	public static int brineWaterID;
 
 	public static int mortarID;
 	public static int concreteID;
@@ -219,6 +227,7 @@ public class ResourceUtil implements Serializable {
 	
 	public static AmountResource hydrogenAR;
 	public static AmountResource methaneAR;
+	public static AmountResource methanolAR;
 	public static AmountResource nitrogenAR;
 	
 	public static AmountResource argonAR;
@@ -254,7 +263,7 @@ public class ResourceUtil implements Serializable {
 	}
 
 	/**
-	 * Default Constructor for ResoureUtil
+	 * Default Constructor for ResoureUtil.
 	 */
 	private ResourceUtil() {
 		resources = SimulationConfig.instance().getResourceConfiguration().getAmountResources();
@@ -265,7 +274,7 @@ public class ResourceUtil implements Serializable {
 
 
 	/**
-	 * Create a set of life support resources.
+	 * Creates a set of life support resources.
 	 */
 	private static void createLifeSupportResources() {
 		lifeSupportResources = new HashSet<>();
@@ -299,7 +308,7 @@ public class ResourceUtil implements Serializable {
 	}
 	
 	/**
-	 * Create a set of essential resources.
+	 * Creates a set of essential resources.
 	 */
 	private static void createEssentialResources() {
 		essentialResources = new HashSet<>();
@@ -348,15 +357,8 @@ public class ResourceUtil implements Serializable {
 		ResourceUtil.INSTANCE = instance;
 	}
 
-	public void initializeNewSim() {
-		// Create maps
-		createMaps();
-		// Map the static instances
-		mapInstances();
-	}
-
 	/**
-	 * Recreates the Amount Resource instances in all map
+	 * Recreates the Amount Resource instances in all map.
 	 */
 	public void initializeInstances() {
 		// Create maps
@@ -366,7 +368,7 @@ public class ResourceUtil implements Serializable {
 	}
 
 	/**
-	 * Creates maps of amount resources
+	 * Creates maps of amount resources.
 	 */
 	public static synchronized void createMaps() {
 		if (amountResourceMap == null) {
@@ -389,6 +391,9 @@ public class ResourceUtil implements Serializable {
 		}
 	}
 
+	/**
+	 * Maps ids to amount resources.
+	 */
 	private static void mapInstances() {
 
 		// AmountResource instances as Integer
@@ -406,12 +411,15 @@ public class ResourceUtil implements Serializable {
 		nitrogenID = findIDbyAmountResourceName(NITROGEN); 
 
 		chlorineID = findIDbyAmountResourceName(CHLORINE); 
+		ethyleneID = findIDbyAmountResourceName(ETHYLENE); 
+		prophyleneID = findIDbyAmountResourceName(PROPHYLENE); 
 		
 		iceID = findIDbyAmountResourceName(ICE); 
 
 		blackWaterID = findIDbyAmountResourceName(BLACK_WATER);
 		greyWaterID = findIDbyAmountResourceName(GREY_WATER);
-
+		brineWaterID = findIDbyAmountResourceName(BRINE_WATER);
+		
 		cropWasteID = findIDbyAmountResourceName(CROP_WASTE);
 		foodWasteID = findIDbyAmountResourceName(FOOD_WASTE);
 		toxicWasteID = findIDbyAmountResourceName(TOXIC_WASTE);
@@ -489,6 +497,7 @@ public class ResourceUtil implements Serializable {
 		coAR = findAmountResource(CO);
 		hydrogenAR = findAmountResource(HYDROGEN);
 		methaneAR = findAmountResource(METHANE);
+		methanolAR = findAmountResource(METHANOL); 
 		iceAR = findAmountResource(ICE);
 		greyWaterAR = findAmountResource(GREY_WATER);
 		blackWaterAR = findAmountResource(BLACK_WATER);
@@ -547,7 +556,12 @@ public class ResourceUtil implements Serializable {
 	 * @throws ResourceException if resource could not be found.
 	 */
 	public static int findIDbyAmountResourceName(String name) {
-		return findAmountResource(name).getID();
+		AmountResource ar = findAmountResource(name);
+		if (ar != null)
+			return ar.getID();
+		
+		logger.severe("The name '" + name + "' does not exist.");
+		return -1;
 	}
 
 	/**
@@ -569,7 +583,7 @@ public class ResourceUtil implements Serializable {
 	}
 
 	/**
-	 * convenience method that calls {@link #getAmountResources()} and turns the
+	 * A convenience method that calls {@link #getAmountResources()} and turns the
 	 * result into an alphabetically ordered list of strings.
 	 *
 	 * @return {@link List}<{@link String}>

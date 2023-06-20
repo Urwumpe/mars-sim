@@ -11,23 +11,27 @@ import java.util.Collection;
 import java.util.Set;
 
 import org.mars_sim.msp.core.Coordinates;
+import org.mars_sim.msp.core.Entity;
 import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.task.util.Worker;
+import org.mars_sim.msp.core.project.Stage;
+import org.mars_sim.msp.core.structure.ObjectiveType;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.time.MarsClock;
 
 /**
- * Represents the behave that a Mission exhbits
+ * Represents the behave that a Mission exhibits.
  */
-public interface Mission extends Serializable {
+public interface Mission extends Entity, Serializable {
 
 	/**
-	 * Abort the mission by the user. Will stop currnet phase.
+	 * Aborts the mission by the user. Will stop current phase.
+	 * @param reason Reason to abort
 	 */
-	void abortMission();
+	void abortMission(String reason);
 
 	/**
-	 * Abort just thec urrent phase, the next phase will be started.
+	 * Aborts just the current phase, the next phase will be started.
 	 */
 	void abortPhase();
 
@@ -46,7 +50,8 @@ public interface Mission extends Serializable {
 	String getName();
 
 	/**
-	 * Set the Mission name.
+	 * Sets the Mission name.
+	 * 
 	 * @param name New Name.
 	 */
     void setName(String name);
@@ -86,6 +91,12 @@ public interface Mission extends Serializable {
 	 */
 	MissionType getMissionType();
 
+	/**
+	 * Get the objectives that Mission satisfies. 
+	 * @return May be an empty set.
+	 */
+	Set<ObjectiveType> getObjectiveSatisified();
+
     /**
 	 * Gets the mission qualification value for the member. Member is qualified in
 	 * joining the mission if the value is larger than 0. The larger the
@@ -98,11 +109,10 @@ public interface Mission extends Serializable {
 	double getMissionQualification(Worker member);
 
 	/**
-	 * Gets the current phase of the mission.
-	 *
-	 * @return phase
+	 * Get the stage of the Mission
+	 * @return
 	 */
-	MissionPhase getPhase();
+	Stage getStage();
 
     /**
 	 * Gets the description of the current phase.
@@ -174,7 +184,7 @@ public interface Mission extends Serializable {
 	 * Performs the mission.
 	 *
 	 * @param member the member performing the mission.
-	 * @return Can teh work participate
+	 * @return Can the member participate ?
 	 */
 	boolean performMission(Worker member);
 

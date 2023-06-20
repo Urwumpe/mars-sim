@@ -16,7 +16,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.net.URL;
 
-import javax.swing.ImageIcon;
+import javax.swing.Icon;
+import javax.swing.JButton;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JViewport;
@@ -25,18 +27,11 @@ import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
+import org.mars_sim.msp.ui.swing.tool.JStatusBar;
 import org.mars_sim.msp.ui.swing.toolwindow.ToolWindow;
-
-import com.alee.extended.canvas.WebCanvas;
-import com.alee.extended.label.WebStyledLabel;
-import com.alee.extended.link.UrlLinkAction;
-import com.alee.extended.link.WebLink;
-import com.alee.extended.statusbar.WebStatusBar;
-import com.alee.laf.button.WebButton;
-import com.alee.managers.style.StyleId;
-import com.alee.managers.tooltip.TooltipManager;
-import com.alee.managers.tooltip.TooltipWay;
+import org.mars_sim.msp.ui.swing.utils.SwingHelper;
 
 /**
  * The GuideWindow is a tool window that displays built-in html pages such as User Guide, Quick Tutorial, Keyboard Shortcuts, etc.
@@ -46,14 +41,14 @@ public class GuideWindow extends ToolWindow implements ActionListener, Hyperlink
 
 	/** Tool name. */
 	public static final String NAME = Msg.getString("GuideWindow.title"); //$NON-NLS-1$
-	public static final String HOME_ICON = Msg.getString("img.home"); //$NON-NLS-1$
+	public static final String ICON = "action/help";
 	
 	public static final String WIKI_URL = Msg.getString("GuideWindow.githubwiki.url"); //$NON-NLS-1$
 	public static final String WIKI_TEXT = Msg.getString("GuideWindow.githubwiki.title"); //$NON-NLS-1$
     
-	public static WebLink link;
+	private JButton link;
 	
-	private WebStyledLabel urlLabel;
+	private JLabel urlLabel;
 	
 	/** Data members. */
 	/** our HTML content pane. */
@@ -63,11 +58,11 @@ public class GuideWindow extends ToolWindow implements ActionListener, Hyperlink
 	/** The guide window URL. */
 	private URL guideURL;
 	
-	private ImageIcon icon = new ImageIcon(GuideWindow.class.getResource(HOME_ICON));
+	private Icon homeIcon = ImageLoader.getIconByName("home");
 	
-	private WebButton homeButton = new WebButton(icon);
-	private WebButton backButton = new WebButton("<");
-	private WebButton forwardButton = new WebButton(">");
+	private JButton homeButton = new JButton(homeIcon);
+	private JButton backButton = new JButton("<");
+	private JButton forwardButton = new JButton(">");
 
 	/**
 	 * Constructor.
@@ -116,11 +111,15 @@ public class GuideWindow extends ToolWindow implements ActionListener, Hyperlink
 		JPanel linkPanel = new JPanel(new FlowLayout(2, 2, FlowLayout.LEFT));
 		topPanel.add(linkPanel, BorderLayout.EAST);
 		
-		link = new WebLink(StyleId.linkShadow, new UrlLinkAction(WIKI_URL));
+		link = new JButton(WIKI_TEXT);
 		link.setAlignmentY(1f);
-		link.setText(WIKI_TEXT);
-		TooltipManager.setTooltip(link, "Open mars-sim wiki in GitHub", TooltipWay.down);
+		link.setToolTipText("Open mars-sim wiki in GitHub");
 		linkPanel.add(link);
+		link.addActionListener(e -> {
+							SwingHelper.openBrowser(WIKI_URL);
+							}
+						);
+
 
 		// Initialize the status bar
 		mainPane.add(initializeStatusBar(),  BorderLayout.SOUTH);
@@ -160,16 +159,15 @@ public class GuideWindow extends ToolWindow implements ActionListener, Hyperlink
     /**
      * Initializes status bar and its content.
      */
-    private WebStatusBar initializeStatusBar() {
-    	WebStatusBar statusBar = new WebStatusBar();
+    private JStatusBar initializeStatusBar() {
+    	JStatusBar statusBar = new JStatusBar(1, 1, 20);
 
-        urlLabel = new WebStyledLabel(StyleId.styledlabelShadow);
+        urlLabel = new JLabel();
         urlLabel.setFont(new Font("Times New Roman", Font.ITALIC, 10));
         urlLabel.setForeground(Color.DARK_GRAY);
-		statusBar.add(urlLabel);
+		statusBar.addLeftComponent(urlLabel, false);
 
-        final WebCanvas resizeCorner = new WebCanvas(StyleId.canvasGripperSE);
-        statusBar.addToEnd(resizeCorner);
+		statusBar.addRightCorner();
 
         return statusBar;
     }

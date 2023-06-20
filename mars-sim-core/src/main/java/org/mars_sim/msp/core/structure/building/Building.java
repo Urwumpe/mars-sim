@@ -42,6 +42,7 @@ import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.task.MaintainBuilding;
 import org.mars_sim.msp.core.person.ai.task.Repair;
 import org.mars_sim.msp.core.person.ai.task.util.Task;
+import org.mars_sim.msp.core.resource.PartConfig;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.science.ScienceType;
@@ -189,9 +190,10 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	private BuildingCategory category;
 	
 	private static HistoricalEventManager eventManager;
+	private static BuildingConfig buildingConfig;
 
 	/**
-	 * Constructor 1. Constructs a Building object.
+	 * Constructor 1 : Constructs a Building object.
 	 *
 	 * @param template the building template.
 	 * @param manager  the building's building manager.
@@ -213,7 +215,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Constructor 2 Constructs a Building object.
+	 * Constructor 2 : Constructs a Building object.
 	 *
 	 * @param id           the building's unique ID number.
 	 * @param buildingType the building Type.
@@ -235,8 +237,10 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 
 		this.loc = bounds.getPosition();
 		this.facing = bounds.getFacing();
-
-		BuildingSpec spec = SimulationConfig.instance().getBuildingConfiguration().getBuildingSpec(buildingType);
+		
+		buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
+		
+		BuildingSpec spec = buildingConfig.getBuildingSpec(buildingType);
 
 		construction = spec.getConstruction();
 		powerModeCache = PowerMode.FULL_POWER;
@@ -282,8 +286,13 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 		malfunctionManager = new MalfunctionManager(this, spec.getWearLifeTime(), totalMaintenanceTime);
 		// Add 'Building' to malfunction manager.
 		malfunctionManager.addScopeString(SystemType.BUILDING.getName());
-		// Add building's type to malfunction manager.
+		
+		// Add building type to the standard scope
+		PartConfig.addScopes(spec.getBuildingType());
+		
+		// Add building type to malfunction manager.
 		malfunctionManager.addScopeString(spec.getBuildingType());
+		
 		
 		// Add each function to the malfunction scope.
 		for (Function sfunction : functions) {
@@ -293,13 +302,16 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 			}
 		}
 
+		// Compute maintenance needed parts prior to starting
+//		malfunctionManager.determineNewMaintenanceParts();
+		
 		// If no life support then no internal repairs
 		malfunctionManager.setSupportsInside(hasFunction(FunctionType.LIFE_SUPPORT));
 	}
 
 
 	/**
-	 * Constructor 3 (for use by Mock Building in Unit testing)
+	 * Constructor 3 : (for use by Mock Building in Unit testing).
 	 *
 	 * @return manager
 	 */
@@ -314,7 +326,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Constructor 4 (for use by Unit testing)
+	 * Constructor 4 : (for use by Unit testing).
 	 *
 	 * @return manager
 	 */
@@ -333,7 +345,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Get the category of this building
+	 * Gets the category of this building.
 	 */
 	public BuildingCategory getCategory() {
 		return category;
@@ -540,7 +552,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Gets a function type that has with openly available (empty) activity spot
+	 * Gets a function type that has with openly available (empty) activity spot.
 	 *
 	 * @return FunctionType
 	 */
@@ -553,7 +565,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Gets a function that has with openly available (empty) activity spot
+	 * Gets a function that has with openly available (empty) activity spot.
 	 *
 	 * @return FunctionType
 	 */
@@ -742,7 +754,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Remove the building's functions from the settlement.
+	 * Removes the building's functions from the settlement.
 	 */
 	public void removeFunctionsFromSettlement() {
 
@@ -753,7 +765,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Remove a building function
+	 * Removes a building function.
 	 *
 	 * @param function
 	 */
@@ -797,7 +809,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Returns the volume of the building in liter
+	 * Returns the volume of the building in liter.
 	 *
 	 * @return volume in liter
 	 */
@@ -844,9 +856,9 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 		for (Function function : functions) {
 			double power = function.getFullPowerRequired();
 			if (power > 0) {
-//				System.out.println(nickName + " : "
+//			Test for System.out.println(nickName + " : "
 //					+ function.getFunctionType().toString() + " : "
-//					+ Math.round(power * 10.0)/10.0 + " kW");
+//					+ Math.round(power * 10.0)/10.0 + " kW")
 				result += power;
 			}
 		}
@@ -900,7 +912,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Sets the value of the heat generated
+	 * Sets the value of the heat generated.
 	 *
 	 * @param heatGenerated
 	 */
@@ -911,7 +923,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Sets the required power for heating
+	 * Sets the required power for heating.
 	 *
 	 * @param powerReq
 	 */
@@ -966,7 +978,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Calculates the number of people in the airlock
+	 * Calculates the number of people in the airlock.
 	 *
 	 * @return number of people
 	 */
@@ -984,7 +996,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 
 
 	/**
-	 * Gets the number of people
+	 * Gets the number of people.
 	 *
 	 * @return
 	 */
@@ -1001,7 +1013,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 
 
 	/**
-	 * Gets a collection of inhabitants
+	 * Gets a collection of inhabitants.
 	 *
 	 * @return
 	 */
@@ -1014,7 +1026,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Gets a collection of robots
+	 * Gets a collection of robots.
 	 *
 	 * @return
 	 */
@@ -1102,7 +1114,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/*
-	 * Checks for possible meteorite impact for this building
+	 * Checks for possible meteorite impact for this building.
 	 */
 	private void checkForMeteoriteImpact(ClockPulse pulse) {
 		// Reset the impact time
@@ -1193,13 +1205,11 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 						
 					HistoricalEvent hEvent = new HazardEvent(
 							EventType.HAZARD_ACTS_OF_GOD,
-							getAssociatedSettlement(),
+							this,
 							mal.getMalfunctionMeta().getName(),
 							"",
 							victimNames,
-							getName(), 
-							getAssociatedSettlement().getName(),
-							getAssociatedSettlement().getCoordinates().getCoordinateString());
+							this);
 
 					if (eventManager == null)
 						eventManager = Simulation.instance().getEventManager();
@@ -1302,16 +1312,6 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 		return getSettlement();
 	}
 
-	public void reinit() {
-		settlement = unitManager.getSettlementByID(settlementID);
-
-		// Get the building's functions
-		if (functions == null) {
-			BuildingSpec spec = SimulationConfig.instance().getBuildingConfiguration().getBuildingSpec(buildingType);
-			functions = buildFunctions(spec);
-		}
-	}
-
 	// TODO this is wrong as names can change. This is just used to identify if there are multiple floors.
 	public boolean isAHabOrHub() {
         return buildingType.contains(" Hab")
@@ -1358,6 +1358,17 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
+	 * Gets all the amount resource resource stored, including inside equipment.
+	 *
+	 * @param resource
+	 * @return quantity
+	 */
+	@Override
+	public double getAllAmountResourceStored(int resource) {
+		return getSettlement().getAllAmountResourceStored(resource);
+	}
+	
+	/**
 	 * Stores the amount resource
 	 *
 	 * @param resource the amount resource
@@ -1370,7 +1381,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Retrieves the resource
+	 * Retrieves the resource.
 	 *
 	 * @param resource
 	 * @param quantity
@@ -1382,7 +1393,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Gets the capacity of a particular amount resource
+	 * Gets the capacity of a particular amount resource.
 	 *
 	 * @param resource
 	 * @return capacity
@@ -1393,7 +1404,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Obtains the remaining storage space of a particular amount resource
+	 * Obtains the remaining storage space of a particular amount resource.
 	 *
 	 * @param resource
 	 * @return quantity
@@ -1415,7 +1426,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 	
 	/**
-	 * Gets all stored amount resources
+	 * Gets all stored amount resources.
 	 *
 	 * @return all stored amount resources.
 	 */
@@ -1423,7 +1434,17 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	public Set<Integer> getAmountResourceIDs() {
 		return getSettlement().getAmountResourceIDs();
 	}
-
+	
+	/**
+	 * Gets all stored amount resources in eqmInventory, including inside equipment.
+	 *
+	 * @return all stored amount resources.
+	 */
+	@Override
+	public Set<Integer> getAllAmountResourceIDs() {
+		return getSettlement().getAllAmountResourceIDs();
+	}
+	
 	/**
 	 * Sets the unit's container unit.
 	 *
@@ -1436,7 +1457,8 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 				return;
 			}
 			// 1. Set Coordinates
-			setCoordinates(newContainer.getCoordinates());
+//			setCoordinates(newContainer.getCoordinates());
+			setNullCoordinates();
 			// 2. Set LocationStateType
 			currentStateType = LocationStateType.INSIDE_SETTLEMENT;
 			// 3. Set containerID
@@ -1460,7 +1482,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Gets the holder's unit instance
+	 * Gets the holder's unit instance.
 	 *
 	 * @return the holder's unit instance
 	 */
@@ -1486,7 +1508,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Gets the remaining quantity of an item resource
+	 * Gets the remaining quantity of an item resource.
 	 *
 	 * @param resource
 	 * @return quantity
@@ -1511,6 +1533,18 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 		return super.equals(obj);
 	}
 
+	public void reinit() {
+		settlement = unitManager.getSettlementByID(settlementID);
+
+		if (buildingConfig == null)
+			buildingConfig = SimulationConfig.instance().getBuildingConfiguration();
+		// Get the building's functions
+		if (functions == null) {
+			BuildingSpec spec = buildingConfig.getBuildingSpec(buildingType);
+			functions = buildFunctions(spec);
+		}
+	}
+	
 	/**
 	 * Gets the hash code for this object.
 	 *
@@ -1522,7 +1556,7 @@ public class Building extends Structure implements Malfunctionable, Indoor,
 	}
 
 	/**
-	 * Prepare object for garbage collection.
+	 * Prepares object for garbage collection.
 	 */
 	public void destroy() {
 		functions = null;

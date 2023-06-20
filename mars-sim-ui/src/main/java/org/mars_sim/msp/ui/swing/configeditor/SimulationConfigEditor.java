@@ -10,7 +10,6 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
@@ -33,7 +32,9 @@ import javax.swing.ComboBoxModel;
 import javax.swing.DefaultCellEditor;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -71,16 +72,11 @@ import org.mars_sim.msp.core.reportingAuthority.ReportingAuthorityFactory;
 import org.mars_sim.msp.core.structure.InitialSettlement;
 import org.mars_sim.msp.core.structure.SettlementConfig;
 import org.mars_sim.msp.core.tool.RandomUtil;
-import org.mars_sim.msp.ui.swing.JComboBoxMW;
+import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainWindow;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
+import org.mars_sim.msp.ui.swing.StyleManager;
+import org.mars_sim.msp.ui.swing.UIConfig;
 
-import com.alee.laf.WebLookAndFeel;
-import com.alee.laf.combobox.WebComboBox;
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.window.WebFrame;
-import com.alee.managers.UIManagers;
-import com.alee.managers.style.StyleId;
 
 /**
  * A temporary simulation configuration editor dialog. Will be replaced by
@@ -159,9 +155,6 @@ public class SimulationConfigEditor {
 	// Data members.
 	private boolean hasError, isCrewEditorOpen = true;
 
-	private Font DIALOG_14 = new Font("Dialog", Font.PLAIN, 14);
-	private Font DIALOG_16 = new Font("Dialog", Font.BOLD, 16);
-
 	private InitialSettlementModel settlementTableModel;
 	private JTable settlementTable;
 
@@ -170,7 +163,7 @@ public class SimulationConfigEditor {
 
 	private JLabel errorLabel;
 	private JButton startButton;
-	private WebFrame<?> f;
+	private JFrame f;
 
 	private CrewEditor crewEditor;
 
@@ -205,20 +198,14 @@ public class SimulationConfigEditor {
 		crewConfig = new CrewConfig();
 		scenarioConfig = new ScenarioConfig();
 
+		// Preload the config to set up the preferred LAF
+		UIConfig configs = new UIConfig();
+		configs.parseFile();
+		StyleManager.setStyles(configs.getPropSets());
+
 		hasError = false;
 
-		try {
-			// use the weblaf skin
-			WebLookAndFeel.install();
-			UIManagers.initialize();
-		} catch (Exception ex) {
-			logger.log(Level.WARNING, Msg.getString("MainWindow.log.lookAndFeelError"), ex); //$NON-NLS-1$
-		}
-
-		// Setup weblaf's IconManager
-		MainWindow.initIconManager();
-
-		f = new WebFrame();
+		f = new JFrame();
 
 		f.setIconImage(MainWindow.getIconImage());
 
@@ -256,34 +243,28 @@ public class SimulationConfigEditor {
 
 			String commanderName = personConfig.getCommander().getFullName();
 			String sponsor = personConfig.getCommander().getSponsorStr();
-			WebLabel gameModeLabel = new WebLabel(Msg.getString("SimulationConfigEditor.gameMode", "Command Mode"), JLabel.CENTER); //$NON-NLS-1$
-			gameModeLabel.setStyleId(StyleId.labelShadow);
-			gameModeLabel.setFont(DIALOG_16);
+			JLabel gameModeLabel = new JLabel(Msg.getString("SimulationConfigEditor.gameMode", "Command Mode"), JLabel.CENTER); //$NON-NLS-1$
+			StyleManager.applyHeading(gameModeLabel);
 			topPanel.add(gameModeLabel);
 
 			JPanel ccPanel = new JPanel(new GridLayout(1, 3));
 			topPanel.add(ccPanel);
 
-			WebLabel commanderLabel = new WebLabel("   " + Msg.getString("SimulationConfigEditor.commanderName",
+			JLabel commanderLabel = new JLabel("   " + Msg.getString("SimulationConfigEditor.commanderName",
 					commanderName), JLabel.LEFT); //$NON-NLS-1$
-			commanderLabel.setFont(DIALOG_14);
-			commanderLabel.setStyleId(StyleId.labelShadow);
 			ccPanel.add(commanderLabel);
 
 			ccPanel.add(new JLabel());
 
-			WebLabel sponsorLabel = new WebLabel(Msg.getString("SimulationConfigEditor.sponsorInfo",
+			JLabel sponsorLabel = new JLabel(Msg.getString("SimulationConfigEditor.sponsorInfo",
 					sponsor)  + "                 ", JLabel.RIGHT); //$NON-NLS-1$
-			sponsorLabel.setFont(DIALOG_14);
-			sponsorLabel.setStyleId(StyleId.labelShadow);
 			ccPanel.add(sponsorLabel);
 
 		}
 
 		else {
-			WebLabel gameModeLabel = new WebLabel(Msg.getString("SimulationConfigEditor.gameMode", "Sandbox Mode"), JLabel.CENTER); //$NON-NLS-1$
-			gameModeLabel.setFont(DIALOG_16);
-			gameModeLabel.setStyleId(StyleId.labelShadow);
+			JLabel gameModeLabel = new JLabel(Msg.getString("SimulationConfigEditor.gameMode", "Sandbox Mode"), JLabel.CENTER); //$NON-NLS-1$
+			StyleManager.applyHeading(gameModeLabel);
 			topPanel.add(gameModeLabel);
 		}
 
@@ -311,7 +292,7 @@ public class SimulationConfigEditor {
 		configurationButtonOuterPanel.add(configurationButtonInnerTopPanel, BorderLayout.NORTH);
 
 		// Create add settlement button.
-		JButton addButton = new JButton(Msg.getString("SimulationConfigEditor.button.add")); //$NON-NLS-1$
+		JButton addButton = new JButton(ImageLoader.getIconByName("action/add")); //$NON-NLS-1$
 		addButton.setToolTipText(Msg.getString("SimulationConfigEditor.tooltip.add")); //$NON-NLS-1$
 		addButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent evt) {
@@ -321,7 +302,7 @@ public class SimulationConfigEditor {
 		configurationButtonInnerTopPanel.add(addButton);
 
 		// Create remove settlement button.
-		JButton removeButton = new JButton(Msg.getString("SimulationConfigEditor.button.remove")); //$NON-NLS-1$
+		JButton removeButton = new JButton(ImageLoader.getIconByName("action/remove")); //$NON-NLS-1$
 		removeButton.setToolTipText(Msg.getString("SimulationConfigEditor.tooltip.remove")); //$NON-NLS-1$
 		removeButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -370,14 +351,16 @@ public class SimulationConfigEditor {
 		};
 
 		// Add an Export button
-		JButton exportButton = new JButton("Export"); //$NON-NLS-1$
+		JButton exportButton = new JButton(ImageLoader.getIconByName("action/export")); //$NON-NLS-1$
+		exportButton.setToolTipText("Export");
 		exportButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent evt) {
 				exportScenario();
 			}
 		});
 		configControl.getPane().add(exportButton);
-		JButton importButton = new JButton("Import"); //$NON-NLS-1$
+		JButton importButton = new JButton(ImageLoader.getIconByName("action/import")); //$NON-NLS-1$
+		importButton.setToolTipText("Import");
 		importButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent evt) {
 				importScenario();
@@ -394,13 +377,11 @@ public class SimulationConfigEditor {
 		if (mode == GameMode.COMMAND) {
 			// Create the sponsor note label
 			JLabel noteLabel = new JLabel("    " + Msg.getString("SimulationConfigEditor.sponsorNote"), JLabel.LEFT); //$NON-NLS-1$
-			noteLabel.setFont(new Font("Serif", Font.ITALIC, 14));
-			noteLabel.setForeground(java.awt.Color.BLUE);
 			bottomPanel.add(noteLabel, BorderLayout.SOUTH);
 		}
 
 		// Create the start button.
-		startButton = new JButton("  " + Msg.getString("SimulationConfigEditor.button.newSim") + "  "); //$NON-NLS-1$
+		startButton = new JButton(Msg.getString("SimulationConfigEditor.button.newSim")); //$NON-NLS-1$
 		startButton.setToolTipText(Msg.getString("SimulationConfigEditor.tooltip.newSim")); //$NON-NLS-1$
 		startButton.addActionListener(new ActionListener() {
 
@@ -427,7 +408,7 @@ public class SimulationConfigEditor {
 		bottomButtonPanel.add(startButton);
 
 		// Edit Authority button.
-		JButton authorityButton = new JButton("Authorities"); //$NON-NLS-1$
+		JButton authorityButton = new JButton(ImageLoader.getIconByName("sponsor")); //$NON-NLS-1$
 		authorityButton.setToolTipText(Msg.getString("SimulationConfigEditor.tooltip.authorityEditor")); //$NON-NLS-1$
 		authorityButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent evt) {
@@ -436,7 +417,7 @@ public class SimulationConfigEditor {
 		});
 
 		// Edit Crew button.
-		JButton crewButton = new JButton("Crew"); //$NON-NLS-1$
+		JButton crewButton = new JButton(ImageLoader.getIconByName("people")); //$NON-NLS-1$
 		crewButton.setToolTipText(Msg.getString("SimulationConfigEditor.tooltip.crewEditor")); //$NON-NLS-1$
 		crewButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent evt) {
@@ -579,9 +560,6 @@ public class SimulationConfigEditor {
 		settlementTable.getColumnModel().getColumn(InitialSettlementModel.LAT_COL).setPreferredWidth(35);
 		settlementTable.getColumnModel().getColumn(InitialSettlementModel.LON_COL).setPreferredWidth(35);
 		settlementTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-		settlementTable.setBackground(java.awt.Color.WHITE);
-
-		TableStyle.setTableStyle(settlementTable);
 
 		settlementScrollPane.setViewportView(settlementTable);
 
@@ -591,7 +569,7 @@ public class SimulationConfigEditor {
 		// Create combo box for editing crew column in settlement table.
 		// Use a custom model to inherit new Crews
 		TableColumn crewColumn = settlementTable.getColumnModel().getColumn(InitialSettlementModel.CREW_COL);
-		JComboBoxMW<String> crewCB = new JComboBoxMW<>();
+		JComboBox<String> crewCB = new JComboBox<>();
 		crewCB.setModel(new UserConfigurableComboModel(crewConfig, true));
 		crewColumn.setCellEditor(new DefaultCellEditor(crewCB));
 
@@ -610,7 +588,7 @@ public class SimulationConfigEditor {
 
 	private void setTemplateEditor(JTable table, int column) {
 		TableColumn templateColumn = table.getColumnModel().getColumn(column);
-		JComboBoxMW<String> templateCB = new JComboBoxMW<>();
+		JComboBox<String> templateCB = new JComboBox<>();
 		for (String st : settlementConfig.getItemNames()) {
 			templateCB.addItem(st);
 		}
@@ -631,9 +609,6 @@ public class SimulationConfigEditor {
 		arrivalTable.getColumnModel().getColumn(ArrivingSettlementModel.LAT_COL).setPreferredWidth(35);
 		arrivalTable.getColumnModel().getColumn(ArrivingSettlementModel.LON_COL).setPreferredWidth(35);
 		arrivalTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-		arrivalTable.setBackground(java.awt.Color.WHITE);
-
-		TableStyle.setTableStyle(arrivalTable);
 
 		parentScrollPane.setViewportView(arrivalTable);
 
@@ -655,7 +630,7 @@ public class SimulationConfigEditor {
 
 	private void setSponsorEditor(JTable table, int column) {
 		TableColumn sponsorColumn = table.getColumnModel().getColumn(column);
-		WebComboBox sponsorCB = new WebComboBox();
+		JComboBox<String> sponsorCB = new JComboBox<>();
 		sponsorCB.setModel(new UserConfigurableComboModel(raFactory, false));
 		sponsorColumn.setCellEditor(new DefaultCellEditor(sponsorCB));
 	}
@@ -811,7 +786,7 @@ public class SimulationConfigEditor {
 		return new Coordinates(Coordinates.getRandomLatitude(), Coordinates.getRandomLongitude());
 	}
 
-	public WebFrame<?> getFrame() {
+	public JFrame getFrame() {
 		return f;
 	}
 

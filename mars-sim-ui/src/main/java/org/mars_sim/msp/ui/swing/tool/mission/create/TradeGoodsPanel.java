@@ -7,10 +7,8 @@
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.text.ParseException;
@@ -19,6 +17,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 
 import javax.swing.JButton;
 import javax.swing.JFormattedTextField;
@@ -39,16 +38,18 @@ import org.mars_sim.msp.core.goods.CommerceUtil;
 import org.mars_sim.msp.core.goods.Good;
 import org.mars_sim.msp.core.goods.GoodCategory;
 import org.mars_sim.msp.core.goods.GoodsUtil;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.PhaseType;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 @SuppressWarnings("serial")
 class TradeGoodsPanel extends WizardPanel {
-
+	/** default logger. */
+	private static SimLogger logger = SimLogger.getLogger(TradeGoodsPanel.class.getName());
+	
 	private boolean buyGoods;
 	private JLabel errorMessageLabel;
 	private JTable goodsTable;
@@ -81,8 +82,7 @@ class TradeGoodsPanel extends WizardPanel {
 		// Create title label.
 		String tradeString = "sold";
 		if (buyGoods) tradeString = "bought";
-		JLabel titleLabel = new JLabel("Choose good amounts to be " + tradeString + ".", JLabel.CENTER);
-		titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD));
+		JLabel titleLabel = createTitleLabel("Choose good amounts to be " + tradeString + ".");
 		add(titleLabel, BorderLayout.NORTH);
 
 		// Create available goods panel.
@@ -99,7 +99,6 @@ class TradeGoodsPanel extends WizardPanel {
 		availableGoodsPane.add(goodsScrollPane, BorderLayout.CENTER);
 		goodsTableModel = new GoodsTableModel();
 		goodsTable = new JTable(goodsTableModel);
-		TableStyle.setTableStyle(goodsTable);
 		goodsTable.setAutoCreateRowSorter(true);
 		goodsTable.setRowSelectionAllowed(true);
 		goodsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -215,7 +214,6 @@ class TradeGoodsPanel extends WizardPanel {
 		tradedGoodsPane.add(tradeScrollPane, BorderLayout.CENTER);
 		tradeTableModel = new TradeTableModel();
 		tradeTable = new JTable(tradeTableModel);
-		TableStyle.setTableStyle(tradeTable);
 		tradeTable.setAutoCreateRowSorter(true);
 		tradeTable.setRowSelectionAllowed(true);
 		tradeTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -234,8 +232,7 @@ class TradeGoodsPanel extends WizardPanel {
 		tradeScrollPane.setViewportView(tradeTable);
 
 		// Create the message label.
-		errorMessageLabel = new JLabel(" ", JLabel.CENTER);
-		errorMessageLabel.setForeground(Color.RED);
+		errorMessageLabel = createErrorLabel();
 		add(errorMessageLabel, BorderLayout.SOUTH);
 	}
 
@@ -252,7 +249,8 @@ class TradeGoodsPanel extends WizardPanel {
 
 	/**
 	 * Commits changes from this wizard panel.
-	 * @retun true if changes can be committed.
+	 * 
+	 * @return true if changes can be committed.
 	 */
 	boolean commitChanges() {
 		boolean result = false;
@@ -268,7 +266,7 @@ class TradeGoodsPanel extends WizardPanel {
 			}
 		}
 		catch (Exception e) {
-//			e.printStackTrace(System.err);
+			logger.log(Level.SEVERE, "Issues with getting the goods from tradeTableModel: " + e.getMessage());
 		}
 		return result;
 	}
@@ -445,7 +443,7 @@ class TradeGoodsPanel extends WizardPanel {
 					goodsMap.put(good, amount);
 				}
 				catch (Exception e) {
-//					e.printStackTrace(System.err);
+					logger.log(Level.SEVERE, "Issues with updating the goods map: " + e.getMessage());
 				}
 			}
 			fireTableDataChanged();

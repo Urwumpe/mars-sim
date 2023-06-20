@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * Drone.java
- * @date 2021-10-16
+ * @date 2023-06-05
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.vehicle;
@@ -10,10 +10,10 @@ import java.util.Collection;
 
 import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
-import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
 import org.mars_sim.msp.core.person.ai.task.LoadingController;
 import org.mars_sim.msp.core.person.ai.task.util.Worker;
+import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.time.ClockPulse;
@@ -26,8 +26,9 @@ public class Drone extends Flyer {
 	// default logger.
 	private static final SimLogger logger = SimLogger.getLogger(Drone.class.getName());
 
-	/** Vehicle name. */
-	public static final String NAME = VehicleType.DELIVERY_DRONE.getName();
+	public static final int METHANOL_ID = ResourceUtil.methanolID;
+	
+	public static final AmountResource METHANOL_AR = ResourceUtil.methanolAR;
 
 	/** The fuel range modifier. */
 	public static final double FUEL_RANGE_FACTOR = 0.95;
@@ -35,18 +36,16 @@ public class Drone extends Flyer {
 	public static final double MISSION_RANGE_FACTOR = 1.9;
 	/** The amount of work time to perform maintenance (millisols) */
 	public static final double MAINTENANCE_WORK_TIME = 100D;
-
-	public static final int METHANE = ResourceUtil.methaneID;
-
+	
 	/**
 	 * Constructs a Rover object at a given settlement
 	 *
 	 * @param name        the name of the rover
-	 * @param type the configuration type of the vehicle.
+	 * @param spec the configuration type of the vehicle.
 	 * @param settlement  the settlement the rover is parked at
 	 */
-	public Drone(String name, String type, Settlement settlement) {
-		super(name, type, settlement, MAINTENANCE_WORK_TIME);
+	public Drone(String name, VehicleSpec spec, Settlement settlement) {
+		super(name, spec, settlement, MAINTENANCE_WORK_TIME);
 	}
 
 
@@ -99,15 +98,14 @@ public class Drone extends Flyer {
 	}
 
 	/**
-	 * Gets the resource type id that this vehicle uses as fuel, namely, methane
+	 * Gets the amount resource type that this vehicle uses as fuel
 	 *
-	 * @return resource type id
+	 * @return amount resource
 	 */
-	@Override
-	public int getFuelType() {
-		return ResourceUtil.methaneID;
+	public AmountResource getFuelTypeAR() {
+		return METHANOL_AR;
 	}
-
+	
 	/**
 	 * Gets the range of the vehicle
 	 *
@@ -115,13 +113,8 @@ public class Drone extends Flyer {
 	 * @throws Exception if error getting range.
 	 */
 	@Override
-	public double getRange(MissionType missionType) {
+	public double getRange() {
 		// Note: multiply by 0.9 would account for the extra distance travelled in between sites
-		double fuelRange = super.getRange(missionType) * FUEL_RANGE_FACTOR;
-		// Obtains the max mission range [in km] based on the type of mission
-		// Note: total route ~= mission radius * 2
-		double missionRange = super.getMissionRange(missionType) * MISSION_RANGE_FACTOR;
-
-		return Math.min(missionRange, fuelRange);
+		return super.getRange() * FUEL_RANGE_FACTOR;
 	}
 }

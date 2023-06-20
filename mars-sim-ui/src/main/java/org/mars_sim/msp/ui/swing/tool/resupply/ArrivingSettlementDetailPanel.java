@@ -8,179 +8,87 @@ package org.mars_sim.msp.ui.swing.tool.resupply;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.awt.Font;
 
-import javax.swing.SpringLayout;
-import javax.swing.SwingUtilities;
+import javax.swing.BorderFactory;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 
 import org.mars_sim.msp.core.Msg;
-import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.events.HistoricalEvent;
-import org.mars_sim.msp.core.events.HistoricalEventCategory;
-import org.mars_sim.msp.core.events.HistoricalEventListener;
-import org.mars_sim.msp.core.events.SimpleEvent;
+import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.interplanetary.transport.settlement.ArrivingSettlement;
-import org.mars_sim.msp.core.person.EventType;
-import org.mars_sim.msp.core.time.ClockListener;
+import org.mars_sim.msp.core.structure.SettlementConfig;
+import org.mars_sim.msp.core.structure.SettlementSupplies;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
-import org.mars_sim.msp.core.time.MasterClock;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
-import org.mars_sim.msp.ui.swing.tool.mission.MissionWindow;
+import org.mars_sim.msp.ui.swing.StyleManager;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
 
 /**
  * A panel showing a selected arriving settlement details.
  */
 @SuppressWarnings("serial")
 public class ArrivingSettlementDetailPanel
-extends WebPanel
-implements ClockListener, HistoricalEventListener {
+extends JPanel
+{
 
 	// Data members
-	private WebLabel nameValueLabel;
-	private WebLabel stateValueLabel;
-	private WebLabel arrivalDateValueLabel;
-	private WebLabel timeArrivalValueLabel;
-	private WebLabel templateValueLabel;
-	private WebLabel locationValueLabel;
-	private WebLabel populationValueLabel;
+	private JLabel nameValueLabel;
+	private JLabel stateValueLabel;
+	private JLabel arrivalDateValueLabel;
+	private JLabel timeArrivalValueLabel;
+	private JLabel templateValueLabel;
+	private JLabel locationValueLabel;
+	private JLabel populationValueLabel;
 
 	private ArrivingSettlement arrivingSettlement;
 	
 	private MainDesktopPane desktop;
 	
-	private MarsClock currentTime;
-	
 	private int solsToArrival = -1;
+	private SettlementSuppliesPanel suppliesPanel;
 	
 	/**
 	 * Constructor.
 	 */
 	public ArrivingSettlementDetailPanel(MainDesktopPane desktop) {
 
-		// Use WebPanel constructor.
+		// Use JPanel constructor.
 		super();
 		this.desktop = desktop;
 	
-		MasterClock masterClock = desktop.getSimulation().getMasterClock();
-		currentTime = masterClock.getMarsClock();
 		
 		setLayout(new BorderLayout(0, 10));
-		setBorder(new MarsPanelBorder());
 
 		// Create the title label.
-		WebLabel titleLabel = new WebLabel(
+		JLabel titleLabel = new JLabel(
 			Msg.getString("ArrivingSettlementDetailPanel.arrivingSettlement"), //$NON-NLS-1$
-			WebLabel.CENTER
+			JLabel.CENTER
 		);
-		titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD));
+		StyleManager.applyHeading(titleLabel);
 		titleLabel.setPreferredSize(new Dimension(-1, 25));
 		add(titleLabel, BorderLayout.NORTH);
 
-		// Create the info panel.
-		WebPanel infoPane = new WebPanel(new SpringLayout());
-		add(infoPane, BorderLayout.CENTER);
+		JPanel detailsPane = new JPanel(new BorderLayout());
+		detailsPane.setBorder(BorderFactory.createEtchedBorder());
+		add(detailsPane, BorderLayout.CENTER);
 
-		// Create name panel.
-//		WebPanel namePane = new WebPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-//		infoPane.add(namePane);
+		// Create the info panel.
+		AttributePanel infoPane = new AttributePanel(7);
+		detailsPane.add(infoPane, BorderLayout.NORTH);
 
 		// Create name title label.
-		WebLabel nameTitleLabel = new WebLabel(Msg.getString("ArrivingSettlementDetailPanel.name"), WebLabel.RIGHT); //$NON-NLS-1$
-		infoPane.add(nameTitleLabel);
+		nameValueLabel = infoPane.addTextField(Msg.getString("ArrivingSettlementDetailPanel.name"), "", null);
+		stateValueLabel = infoPane.addTextField(Msg.getString("ArrivingSettlementDetailPanel.state"), "", null);
+		templateValueLabel = infoPane.addTextField(Msg.getString("ArrivingSettlementDetailPanel.layoutTemplate"), "", null);
+		populationValueLabel = infoPane.addTextField(Msg.getString("ArrivingSettlementDetailPanel.immigrants"), "", null);
+		arrivalDateValueLabel = infoPane.addTextField(Msg.getString("ArrivingSettlementDetailPanel.arrivalDate"), "", null);
+		timeArrivalValueLabel = infoPane.addTextField(Msg.getString("ArrivingSettlementDetailPanel.timeUntilArrival"), "", null);
+		locationValueLabel = infoPane.addTextField(Msg.getString("ArrivingSettlementDetailPanel.location"), "", null);
 
-		// Create name value label.
-		nameValueLabel = new WebLabel("", WebLabel.LEFT); //$NON-NLS-1$
-		infoPane.add(nameValueLabel);
-
-		// Create state panel.
-//		WebPanel statePane = new WebPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-//		infoPane.add(statePane);
-
-		// Create state title label.
-		WebLabel stateTitleLabel = new WebLabel(Msg.getString("ArrivingSettlementDetailPanel.state"), WebLabel.RIGHT); //$NON-NLS-1$
-		infoPane.add(stateTitleLabel);
-
-		// Create state value label.
-		stateValueLabel = new WebLabel("", WebLabel.LEFT); //$NON-NLS-1$
-		infoPane.add(stateValueLabel);
-
-		// Create template panel.
-//		WebPanel templatePane = new WebPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-//		infoPane.add(templatePane);
-
-		// Create template title label.
-		WebLabel templateTitleLabel = new WebLabel(Msg.getString("ArrivingSettlementDetailPanel.layoutTemplate"), WebLabel.RIGHT); //$NON-NLS-1$
-		infoPane.add(templateTitleLabel);
-
-		// Create template value label.
-		templateValueLabel = new WebLabel("", WebLabel.LEFT); //$NON-NLS-1$
-		infoPane.add(templateValueLabel);
-
-		// Create population panel.
-//		WebPanel populationPane = new WebPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-//		infoPane.add(populationPane);
-
-		// Create population title label.
-		WebLabel populationTitleLabel = new WebLabel(Msg.getString("ArrivingSettlementDetailPanel.immigrants"), WebLabel.RIGHT); //$NON-NLS-1$
-		infoPane.add(populationTitleLabel);
-
-		// Create population value label.
-		populationValueLabel = new WebLabel("", WebLabel.LEFT); //$NON-NLS-1$
-		infoPane.add(populationValueLabel);
-
-		// Create arrival date panel.
-//		WebPanel arrivalDatePane = new WebPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-//		infoPane.add(arrivalDatePane);
-
-		// Create arrival date title label.
-		WebLabel arrivalDateTitleLabel = new WebLabel(Msg.getString("ArrivingSettlementDetailPanel.arrivalDate"), WebLabel.RIGHT); //$NON-NLS-1$
-		infoPane.add(arrivalDateTitleLabel);
-
-		// Create arrival date value label.
-		arrivalDateValueLabel = new WebLabel("", WebLabel.LEFT); //$NON-NLS-1$
-		infoPane.add(arrivalDateValueLabel);
-
-		// Create time arrival panel.
-//		WebPanel timeArrivalPane = new WebPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-//		infoPane.add(timeArrivalPane);
-
-		// Create time arrival title label.
-		WebLabel timeArrivalTitleLabel = new WebLabel(Msg.getString("ArrivingSettlementDetailPanel.timeUntilArrival"), WebLabel.RIGHT); //$NON-NLS-1$
-		infoPane.add(timeArrivalTitleLabel);
-
-		// Create time arrival value label.
-		timeArrivalValueLabel = new WebLabel("", WebLabel.LEFT); //$NON-NLS-1$
-		infoPane.add(timeArrivalValueLabel);
-
-		// Create location panel.
-//		WebPanel locationPane = new WebPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-//		infoPane.add(locationPane);
-
-		// Create location title label.
-		WebLabel locationTitleLabel = new WebLabel(Msg.getString("ArrivingSettlementDetailPanel.location"), WebLabel.RIGHT); //$NON-NLS-1$
-		infoPane.add(locationTitleLabel);
-
-		// Create location value label.
-		locationValueLabel = new WebLabel("", WebLabel.LEFT); //$NON-NLS-1$
-		infoPane.add(locationValueLabel);
-
-		// Lay out the spring panel.
-		SpringUtilities.makeCompactGrid(infoPane, 
-						7, 2, // rows, cols
-						30, 10, // initX, initY
-						7, 3); // xPad, yPad
-
-		// Set as clock listener for a rate of 1 pulse per 2 seconds
-		masterClock.addClockListener(this, 2000L);
-
-		// Set as historical event listener.
-		Simulation.instance().getEventManager().addListener(this);
+		suppliesPanel = new SettlementSuppliesPanel();
+		detailsPane.add(suppliesPanel.getComponent(), BorderLayout.CENTER);
 	}
 
 	/**
@@ -194,6 +102,15 @@ implements ClockListener, HistoricalEventListener {
 				clearInfo();
 			}
 			else {
+				SettlementConfig sConfig = SimulationConfig.instance().getSettlementConfiguration();
+				SettlementSupplies template = sConfig.getItem(arrivingSettlement.getTemplate());
+				if (template != null) {
+					suppliesPanel.show(template);
+				}
+				else {
+					suppliesPanel.clear();
+				}
+
 				updateArrivingSettlementInfo();
 			}
 		}
@@ -210,6 +127,8 @@ implements ClockListener, HistoricalEventListener {
 		templateValueLabel.setText(""); //$NON-NLS-1$
 		locationValueLabel.setText(""); //$NON-NLS-1$
 		populationValueLabel.setText(""); //$NON-NLS-1$
+
+		suppliesPanel.clear();
 	}
 
 	/** 
@@ -220,7 +139,8 @@ implements ClockListener, HistoricalEventListener {
 		stateValueLabel.setText(arrivingSettlement.getTransitState().getName());
 		arrivalDateValueLabel.setText(arrivingSettlement.getArrivalDate().getDateTimeStamp());
 
-		updateTimeToArrival();
+		MarsClock marsTime = desktop.getSimulation().getMasterClock().getMarsClock();
+		updateTimeToArrival(marsTime);
 
 		templateValueLabel.setText(arrivingSettlement.getTemplate());
 		locationValueLabel.setText(arrivingSettlement.getLandingLocation().getFormattedString());
@@ -231,8 +151,9 @@ implements ClockListener, HistoricalEventListener {
 
 	/**
 	 * Update the time to arrival label.
+	 * @param currentTime
 	 */
-	private void updateTimeToArrival() {
+	private void updateTimeToArrival(MarsClock currentTime) {
 		String timeArrival = Msg.getString("ArrivingSettlementDetailPanel.noTime"); //$NON-NLS-1$
 		solsToArrival = -1;
 		double timeDiff = MarsClock.getTimeDiff(arrivingSettlement.getArrivalDate(), currentTime);
@@ -246,80 +167,23 @@ implements ClockListener, HistoricalEventListener {
 		timeArrivalValueLabel.setText(timeArrival);
 	}
 
-
-	@Override
-	public void eventAdded(int index, SimpleEvent se, HistoricalEvent he) {
-		if (HistoricalEventCategory.TRANSPORT == he.getCategory() && 
-				EventType.TRANSPORT_ITEM_MODIFIED.equals(he.getType())) {
-			if ((arrivingSettlement != null) && he.getSource().equals(arrivingSettlement)) {
-				SwingUtilities.invokeLater(new Runnable() {
-					@Override
-					public void run() {
-						// Update arriving settlement info.
-						if (arrivingSettlement != null) {
-							updateArrivingSettlementInfo();
-						}
-					}
-				});
-			}
-		}
-	}
-
-	@Override
-	public void eventsRemoved(int startIndex, int endIndex) {
-		// Do nothing.
-	}
-
-	public void updateArrival() {
+	private void updateArrival(MarsClock currentTime) {
 		// Determine if change in time to arrival display value.
 		if ((arrivingSettlement != null) && (solsToArrival >= 0)) {
 			double timeDiff = MarsClock.getTimeDiff(arrivingSettlement.getArrivalDate(), currentTime);
 			double newSolsToArrival = (int) Math.abs(timeDiff / 1000D);
 			if (newSolsToArrival != solsToArrival) {
-				SwingUtilities.invokeLater(new Runnable() {
-					@Override
-					public void run() {
-						// Update time to arrival label.
-						if (arrivingSettlement != null) {
-							updateTimeToArrival();
-						}
-					}
-				});
+				// Update time to arrival label.
+					updateTimeToArrival(currentTime);
 			}
 		}
 	}
 
-	
-	@Override
-	public void clockPulse(ClockPulse pulse) {
-		if (desktop.isToolWindowOpen(MissionWindow.NAME)) {
-			updateArrival();
-		}				
-	}
-	
-	@Override
-	public void pauseChange(boolean isPaused, boolean showPane) {
-		// placeholder
-	}
-	
 	/**
-	 * Prepares the panel for deletion.
-	 */
-	public void destroy() {
-		desktop.getSimulation().getEventManager().removeListener(this);
-		desktop.getSimulation().getMasterClock().removeClockListener(this);
-		
-		nameValueLabel = null;
-		stateValueLabel = null;
-		arrivalDateValueLabel = null;
-		timeArrivalValueLabel = null;
-		templateValueLabel = null;
-		locationValueLabel = null;
-		populationValueLabel = null;
-		arrivingSettlement = null;		
-		desktop = null;
-
-		currentTime = null;
+	 * Time has moved forward
+	 * @param pulse Amount of clock movement
+	 */	
+	void update(ClockPulse pulse) {
+		updateArrival(pulse.getMarsTime());			
 	}
-
 }

@@ -15,23 +15,18 @@ import java.awt.event.ActionListener;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.text.NumberFormat;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.Vector;
 
 import javax.swing.ButtonGroup;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
-import javax.swing.ListModel;
 import javax.swing.SpringLayout;
 import javax.swing.SwingUtilities;
 import javax.swing.border.TitledBorder;
@@ -46,11 +41,10 @@ import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
 import org.mars_sim.msp.core.SimulationConfig;
-import org.mars_sim.msp.core.interplanetary.transport.TransitState;
-import org.mars_sim.msp.core.interplanetary.transport.Transportable;
-import org.mars_sim.msp.core.interplanetary.transport.resupply.Resupply;
-import org.mars_sim.msp.core.interplanetary.transport.resupply.ResupplyUtil;
+import org.mars_sim.msp.core.UnitManager;
+import org.mars_sim.msp.core.interplanetary.transport.TransportManager;
 import org.mars_sim.msp.core.interplanetary.transport.settlement.ArrivingSettlement;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.SettlementTemplate;
 import org.mars_sim.msp.core.time.MarsClock;
@@ -64,7 +58,9 @@ import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
  */
 @SuppressWarnings("serial")
 public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
-	
+	/** default logger. */
+	private static SimLogger logger = SimLogger.getLogger(ArrivingSettlementEditingPanel.class.getName());
+
 	private static final int MAX_FUTURE_ORBITS = 10;
 	
 	// Data members
@@ -99,9 +95,13 @@ public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
 	private JComboBoxMW<String> sponsorCB;
 
 	private ModifyTransportItemDialog modifyTransportItemDialog;
-	private ResupplyWindow resupplyWindow;
 	private NewTransportItemDialog newTransportItemDialog;
 	private ArrivingSettlement settlement;
+
+	private MarsClock marsClock;
+
+	private TransportManager transportManager;
+	private UnitManager unitManager;
 
 	/**
 	 * Constructor.
@@ -114,13 +114,15 @@ public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
 	 */
 	public ArrivingSettlementEditingPanel(ArrivingSettlement settlement, ResupplyWindow resupplyWindow,
 			ModifyTransportItemDialog modifyTransportItemDialog, NewTransportItemDialog newTransportItemDialog) {
-		// User TransportItemEditingPanel constructor
 		super(settlement);
 		this.modifyTransportItemDialog = modifyTransportItemDialog;
-		this.resupplyWindow = resupplyWindow;
 		this.newTransportItemDialog = newTransportItemDialog;
 		// Initialize data members.
 		this.settlement = settlement;
+		Simulation sim = resupplyWindow.getDesktop().getSimulation();
+		this.marsClock = sim.getMasterClock().getMarsClock();
+		this.transportManager = sim.getTransportManager();
+		this.unitManager = sim.getUnitManager();
 
 		setBorder(new MarsPanelBorder());
 		setLayout(new BorderLayout(0, 0));
@@ -276,7 +278,7 @@ public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
 		arrivalDateSelectionPane.add(arrivalDateTitleLabel);
 
 		// Get default arriving settlement Martian time.
-		MarsClock arrivingTime = Simulation.instance().getMasterClock().getMarsClock();
+		MarsClock arrivingTime = marsClock;
 		if (settlement != null) {
 			arrivingTime = settlement.getArrivalDate();
 		}
@@ -734,27 +736,6 @@ public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
 				break;
 			}
 		}
-		
-//		for (int x = 0; x < size; x++) {
-//
-////			String latStr = ((String) (settlementTableModel.getValueAt(x, LAT))).trim().toUpperCase();
-////			String longStr = ((String) (settlementTableModel.getValueAt(x, LON))).trim().toUpperCase();				
-//			
-//			if (latStr == null || latStr.length() < 2) {
-//				return Msg.getString("Coodinates.error.latitudeMissing"); //$NON-NLS-1$
-//			}
-//
-//			if (longStr == null || longStr.length() < 2) {
-//				return Msg.getString("Coodinates.error.longitudeMissing"); //$NON-NLS-1$
-//			}
-//
-//			Coordinates c = new Coordinates(latStr, longStr);
-//			if (!coordinatesSet.add(c)) {
-//				System.out.println(c);
-//				repeated = true;
-//				break;
-//			}
-//		}
 
 		if (repeated) {
 			return Msg.getString("Coodinates.error.latitudeLongitudeRepeating"); //$NON-NLS-1$
@@ -774,62 +755,59 @@ public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
 
 		try {
 
-			List<Integer> sols = new ArrayList<>();
 			if (timeArrivalString.equals("-"))
 				timeArrivalString = "-1";
 			double timeArrival = Double.parseDouble(timeArrivalString);
-			// int inputSols = Integer.parseInt(solsTF.getText());
 			if (timeArrival < 0D) {
 				validation_result = false;
 				enableButton(false);
-//				System.out.println("Invalid entry! Sol must be greater than zero.");
 				errorString = Msg.getString("ArrivingSettlementEditingPanel.error.negativeSols"); //$NON-NLS-1$
 				errorLabel.setText(errorString);
 			} else {
 				boolean good = true;
-				// Add checking if that sol has already been taken
-				JList<?> jList = resupplyWindow.getIncomingListPane().getIncomingList();
-				ListModel<?> model = jList.getModel();
+				// // Add checking if that sol has already been taken
+				// JList<?> jList = resupplyWindow.getIncomingListPane().getIncomingList();
+				// ListModel<?> model = jList.getModel();
 
-				for (int i = 0; i < model.getSize(); i++) {
-					Transportable transportItem = (Transportable) model.getElementAt(i);
+				// for (int i = 0; i < model.getSize(); i++) {
+				// 	Transportable transportItem = (Transportable) model.getElementAt(i);
 
-					if ((transportItem != null)) {
-						if (transportItem instanceof Resupply) {
-							// Create modify resupply mission dialog.
-							Resupply resupply = (Resupply) transportItem;
-							MarsClock arrivingTime = resupply.getArrivalDate();
-							int solsDiff = (int) Math.round((MarsClock.getTimeDiff(arrivingTime, marsClock) / 1000D));
-							sols.add(solsDiff);
+				// 	if ((transportItem != null)) {
+				// 		if (transportItem instanceof Resupply) {
+				// 			// Create modify resupply mission dialog.
+				// 			Resupply resupply = (Resupply) transportItem;
+				// 			MarsClock arrivingTime = resupply.getArrivalDate();
+				// 			int solsDiff = (int) Math.round((MarsClock.getTimeDiff(arrivingTime, marsClock) / 1000D));
+				// 			sols.add(solsDiff);
 
-						} else if (transportItem instanceof ArrivingSettlement) {
-							// Create modify arriving settlement dialog.
-							ArrivingSettlement newS = (ArrivingSettlement) transportItem;
-							if (!newS.equals(settlement)) {
-								MarsClock arrivingTime = newS.getArrivalDate();
-								int solsDiff = (int) Math
-										.round((MarsClock.getTimeDiff(arrivingTime, marsClock) / 1000D));
-								sols.add(solsDiff);
-							}
-						}
-					}
-				}
+				// 		} else if (transportItem instanceof ArrivingSettlement) {
+				// 			// Create modify arriving settlement dialog.
+				// 			ArrivingSettlement newS = (ArrivingSettlement) transportItem;
+				// 			if (!newS.equals(settlement)) {
+				// 				MarsClock arrivingTime = newS.getArrivalDate();
+				// 				int solsDiff = (int) Math
+				// 						.round((MarsClock.getTimeDiff(arrivingTime, marsClock) / 1000D));
+				// 				sols.add(solsDiff);
+				// 			}
+				// 		}
+				// 	}
+				//}
 
 				// System.out.println("sols.size() : " + sols.size() );
 
-				Iterator<Integer> i = sols.iterator();
-				while (i.hasNext()) {
-					int sol = i.next();
-					if (sol == (int) timeArrival) {
-//						System.out.println("Invalid entry! Sol " + sol + " has already been taken.");
-						validation_result = false;
-						good = false;
-						enableButton(false);
-						errorString = Msg.getString("ArrivingSettlementEditingPanel.error.duplicatedSol"); //$NON-NLS-1$
-						errorLabel.setText(errorString);
-						break;
-					}
-				}
+// 				Iterator<Integer> i = sols.iterator();
+// 				while (i.hasNext()) {
+// 					int sol = i.next();
+// 					if (sol == (int) timeArrival) {
+// //						System.out.println("Invalid entry! Sol " + sol + " has already been taken.");
+// 						validation_result = false;
+// 						good = false;
+// 						enableButton(false);
+// 						errorString = Msg.getString("ArrivingSettlementEditingPanel.error.duplicatedSol"); //$NON-NLS-1$
+// 						errorLabel.setText(errorString);
+// 						break;
+// 					}
+// 				}
 
 				if (good) {
 					validation_result = true;
@@ -930,7 +908,6 @@ public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
 			String template = (String) templateCB.getSelectedItem();
 			int popNum = Integer.parseInt(populationTF.getText());
 			int numOfRobots = Integer.parseInt(numOfRobotsTF.getText());
-//			MarsClock arrivalDate = getArrivalDate();
 			int arrivalSols = 1;
 			Coordinates landingLoc = getLandingLocation();
 			String sponsor = (String) sponsorCB.getSelectedItem();
@@ -939,7 +916,7 @@ public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
 							arrivalSols, landingLoc,
 							popNum, numOfRobots);
 			populateArrivingSettlement(newArrivingSettlement);
-			Simulation.instance().getTransportManager().addNewTransportItem(newArrivingSettlement);
+			transportManager.addNewTransportItem(newArrivingSettlement);
 			return true;
 		} else {
 			return false;
@@ -963,21 +940,6 @@ public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
 		// Populate arrival date.
 		MarsClock arrivalDate = getArrivalDate();
 		settlement.setArrivalDate(arrivalDate);
-
-		// Populate launch date.
-		MarsClock launchDate = new MarsClock(arrivalDate);
-		launchDate.addTime(-1D * ResupplyUtil.getAverageTransitTime() * 1000D);
-		settlement.setLaunchDate(launchDate);
-
-		// Set transit state based on launch and arrival time.
-		TransitState state = TransitState.PLANNED;
-		if (MarsClock.getTimeDiff(marsClock, launchDate) > 0D) {
-			state = TransitState.IN_TRANSIT;
-			if (MarsClock.getTimeDiff(marsClock, arrivalDate) > 0D) {
-				state = TransitState.ARRIVED;
-			}
-		}
-		settlement.setTransitState(state);
 
 		// Set population number.
 		int popNum = Integer.parseInt(populationTF.getText());
@@ -1017,7 +979,7 @@ public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
 
 				result = new MarsClock(orbit, month, sol, millisols, -1);
 			} catch (NumberFormatException e) {
-				e.printStackTrace(System.err);
+				logger.severe("Selecting arrivalDateRB but MarsClock is invalid: " + e.getMessage());
 			}
 		} else if (timeUntilArrivalRB.isSelected()) {
 			// Determine arrival date from time until arrival text field.
@@ -1029,7 +991,7 @@ public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
 					result.addTime(marsClock.getMillisol());
 				}
 			} catch (NumberFormatException e) {
-				e.printStackTrace(System.err);
+				logger.severe("Selecting timeUntilArrivalRB but MarsClock is invalid: " + e.getMessage());
 			}
 		}
 
@@ -1049,13 +1011,5 @@ public class ArrivingSettlementEditingPanel extends TransportItemEditingPanel {
 				+ ((String)longitudeDirectionCB.getSelectedItem()).substring(1, 2);
 		// System.out.println("fullLonString : " + fullLonString);
 		return new Coordinates(fullLatString, fullLonString);
-	}
-
-	/**
-	 * Prepare this window for deletion.
-	 */
-	public void destroy() {
-		modifyTransportItemDialog = null;
-		newTransportItemDialog = null;
 	}
 }

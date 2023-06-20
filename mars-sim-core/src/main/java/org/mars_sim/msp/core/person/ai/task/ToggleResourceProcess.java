@@ -6,8 +6,8 @@
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.UnitType;
@@ -97,10 +97,10 @@ public class ToggleResourceProcess extends Task {
 		if (!toBeToggledOn) {
 			setName(TOGGLE_OFF);
 			setDescription(TOGGLE_OFF);
-			logger.info(resourceProcessBuilding, process + " : " + worker + " made an attempt to toggle it off.");
+			logger.fine(resourceProcessBuilding, process + " : " + worker + " made an attempt to toggle it off.");
 		} else {
 			setDescription(TOGGLE_ON);
-			logger.info(resourceProcessBuilding, process + " : " + worker + " made an attempt to toggle it on.");
+			logger.fine(resourceProcessBuilding, process + " : " + worker + " made an attempt to toggle it on.");
 		}
 
 		if (resourceProcessBuilding.hasFunction(FunctionType.LIFE_SUPPORT))
@@ -200,10 +200,10 @@ public class ToggleResourceProcess extends Task {
 			}
 
 			if (resourceProcessBuilding.hasFunction(FunctionType.LIFE_SUPPORT))
-				logger.info(resourceProcessBuilding, process + " : " + worker
+				logger.fine(resourceProcessBuilding, process + " : " + worker
 						+ " just toggled it " + toggle + " manually.");
 			else
-				logger.info(resourceProcessBuilding, process + " : " + worker
+				logger.fine(resourceProcessBuilding, process + " : " + worker
 						+ " just toggled it " + toggle + " remotely.");
 
 			// Only need to run the finished phase once and for all
@@ -222,12 +222,12 @@ public class ToggleResourceProcess extends Task {
 
 		boolean done = false;
 		// Pick an administrative building for remote access to the resource building
-		List<Building> mgtBuildings = worker.getSettlement().getBuildingManager()
-				.getBuildings(FunctionType.MANAGEMENT);
+		Set<Building> mgtBuildings = worker.getSettlement().getBuildingManager()
+				.getBuildingSet(FunctionType.MANAGEMENT);
 
 		if (!mgtBuildings.isEmpty()) {
 
-			List<Building> notFull = new ArrayList<>();
+			Set<Building> notFull = new HashSet<>();
 
 			for (Building b : mgtBuildings) {
 				if (b.hasFunction(FunctionType.ADMINISTRATION)) {
@@ -241,8 +241,7 @@ public class ToggleResourceProcess extends Task {
 
 			if (!done) {
 				if (!notFull.isEmpty()) {
-					int rand = RandomUtil.getRandomInt(mgtBuildings.size() - 1);
-					walkToMgtBldg(mgtBuildings.get(rand));
+					walkToMgtBldg(RandomUtil.getARandSet(mgtBuildings));
 				} else {
 					clearTask(process.getProcessName() + ": Management space unavailable.");
 				}

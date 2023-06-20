@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.IntFunction;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -27,6 +26,7 @@ import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.UnitListener;
 import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.equipment.ContainerUtil;
+import org.mars_sim.msp.core.equipment.Equipment;
 import org.mars_sim.msp.core.equipment.EquipmentType;
 import org.mars_sim.msp.core.events.HistoricalEvent;
 import org.mars_sim.msp.core.goods.GoodsUtil;
@@ -35,7 +35,6 @@ import org.mars_sim.msp.core.malfunction.Malfunction;
 import org.mars_sim.msp.core.malfunction.MalfunctionManager;
 import org.mars_sim.msp.core.person.EventType;
 import org.mars_sim.msp.core.person.Person;
-import org.mars_sim.msp.core.person.ai.mission.MissionPhase.Stage;
 import org.mars_sim.msp.core.person.ai.task.LoadVehicleGarage;
 import org.mars_sim.msp.core.person.ai.task.LoadingController;
 import org.mars_sim.msp.core.person.ai.task.OperateVehicle;
@@ -45,6 +44,7 @@ import org.mars_sim.msp.core.person.ai.task.util.Task;
 import org.mars_sim.msp.core.person.ai.task.util.TaskJob;
 import org.mars_sim.msp.core.person.ai.task.util.TaskPhase;
 import org.mars_sim.msp.core.person.ai.task.util.Worker;
+import org.mars_sim.msp.core.project.Stage;
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.robot.Robot;
@@ -52,10 +52,11 @@ import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.tool.RandomUtil;
-import org.mars_sim.msp.core.vehicle.Drone;
+import org.mars_sim.msp.core.vehicle.GroundVehicle;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
+import org.mars_sim.msp.core.vehicle.VehicleController;
 import org.mars_sim.msp.core.vehicle.VehicleType;
 
 /**
@@ -73,9 +74,24 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 	protected static final int WATER_ID = ResourceUtil.waterID;
 	protected static final int FOOD_ID = ResourceUtil.foodID;
 	
-	/** The multiplication factor for the amount of oxygen needed. */
-	private static final double FUEL_OXIDIZER_FACTOR = 2.25;
+	/** How often are remaining resources checked. */
+	private static final int RESOURCE_CHECK_DURATION = 40;
+	/** The speed mod due to driving at night. */
+	private static final double NIGHT_TIME_SPEED_MOD = 0.3;
 	
+	/** The small insignificant amount of distance in km. */
+	private static final double SMALL_DISTANCE = .1;
+	/** Modifier for number of parts needed for a trip. */
+	private static final double PARTS_NUMBER_MODIFIER = MalfunctionManager.PARTS_NUMBER_MODIFIER;
+	/** Estimate number of broken parts per malfunctions */
+	private static final double AVERAGE_NUM_MALFUNCTION = MalfunctionManager.AVERAGE_NUM_MALFUNCTION;
+	/** Default speed if no operators have ever driven. */
+	private static final double DEFAULT_SPEED = 10D;
+		
+	// Travel Mission status
+	protected static final String AT_NAVPOINT = "At a navpoint";
+	protected static final String TRAVEL_TO_NAVPOINT = "Traveling to navpoint";
+
 	/** Mission phases. */
 	private static final MissionPhase LOADING = new MissionPhase("loading", Stage.PREPARATION);
 	private static final MissionPhase DEPARTING = new MissionPhase("departing", Stage.PREPARATION);
@@ -90,27 +106,11 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 	private static final MissionStatus UNREPAIRABLE_MALFUNCTION = new MissionStatus("Mission.status.unrepairable");
 
 	// Static members
-	private static Integer batteryID = ItemResourceUtil.findIDbyItemResourceName(ItemResourceUtil.BATTERY_MODULE);
-	private static Integer wheelID = ItemResourceUtil.findIDbyItemResourceName(ItemResourceUtil.ROVER_WHEEL);
-	private static Set<Integer> unNeededParts = ItemResourceUtil.convertNamesToResourceIDs(
+	private static final Integer wheelID = ItemResourceUtil.findIDbyItemResourceName(ItemResourceUtil.ROVER_WHEEL);
+	private static Set<Integer> unNeededParts = ItemResourceUtil.convertNameArray2ResourceIDs(
 															new String[] {
 																	ItemResourceUtil.FIBERGLASS});
 																	
-	// Travel Mission status
-	protected static final String AT_NAVPOINT = "At a navpoint";
-	protected static final String TRAVEL_TO_NAVPOINT = "Traveling to navpoint";
-
-	/** How often are remaining resources checked. */
-	private static final int RESOURCE_CHECK_DURATION = 40;
-	/** The small insignificant amount of distance in km. */
-	private static final double SMALL_DISTANCE = .1;
-	/** Modifier for number of parts needed for a trip. */
-	private static final double PARTS_NUMBER_MODIFIER = MalfunctionManager.PARTS_NUMBER_MODIFIER;
-	/** Estimate number of broken parts per malfunctions */
-	private static final double AVERAGE_NUM_MALFUNCTION = MalfunctionManager.AVERAGE_NUM_MALFUNCTION;
-
-	/** Default speed if no operators have ever driven. */
-	private static final double DEFAULT_SPEED = 10D;
 	
 	
 	// Data members
@@ -135,8 +135,6 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 	private transient double cachedDistance = -1;
 	/** The current traveling status of the mission. */
 	private String travelStatus;
-	/** The cache for the mission vehicle. */
-	private String vehicleNameCache;
 	/** The vehicle currently used in the mission. */
 	private Vehicle vehicle;
 	/** The last operator of this vehicle in the mission. */
@@ -194,6 +192,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 		}
 
 		addNavpoint(startingNavPoint);
+		
 		lastStopNavpoint = startingNavPoint;
 
 		setTravelStatus(AT_NAVPOINT);
@@ -221,7 +220,11 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 		}
 
 		Worker startingMember = getStartingPerson();
-		logger.info(startingMember, "Preparing " + getName() + " using " + getVehicle().getName() + ".");
+		if (getVehicle() != null)
+			logger.info(startingMember, "Preparing " + getName() + " using " + getVehicle().getName() + ".");
+		
+		// Charges up the battery instantly
+		getVehicle().getController().topUpBatteryEnergy();
 	}
 
 	/**
@@ -282,15 +285,6 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 		return true;
 
 	}
-
-	/**
-	 * Gets the mission's vehicle name
-	 *
-	 * @return vehicle or null if none.
-	 */
-	public String getVehicleName() {
-		return vehicleNameCache;
-	}
 	
 	/**
 	 * Gets the mission's vehicle if there is one.
@@ -304,6 +298,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 	
 	/**
 	 * Gets the current loading plan for this Mission phase.
+	 * 
 	 * @return
 	 */
 	@Override
@@ -339,13 +334,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 		if (newVehicle != null) {
 			vehicle = newVehicle;
 			startingTravelledDistance = vehicle.getOdometerMileage();
-			newVehicle.setReservedForMission(true);
-			vehicle.addUnitListener(this);
-			
-			// Record the vehicle name
-			vehicleNameCache = vehicle.getName();
-			
-			fireMissionUpdate(MissionEventType.VEHICLE_EVENT);
+			claimVehicle(vehicle);
 		}
 		else {
 			throw new IllegalArgumentException("newVehicle is null.");
@@ -363,15 +352,31 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 
 	/**
 	 * Leaves the mission's vehicle and unreserves it.
+	 * @param v Vehicle to be released
 	 */
-	protected final void leaveVehicle() {
-		if (hasVehicle()) {
-			vehicle.setReservedForMission(false);
-			vehicle.removeUnitListener(this);
-			vehicle = null;
-
+	protected final void releaseVehicle(Vehicle v) {
+		if ((v != null) && this.equals(v.getMission())) {
+			v.setReservedForMission(false);
+			v.setMission(null);
+			v.removeUnitListener(this);
 			fireMissionUpdate(MissionEventType.VEHICLE_EVENT);
 		}
+	}
+
+	/**
+	 * Claim the mission's vehicle and reserve it.
+	 * @param v Vehicle to be claimed
+	 */
+	protected final void claimVehicle(Vehicle v) {
+		if (v.getMission() != null) {
+			logger.warning(v, "Aready assigned to a Mission when assigning " + getName());
+		}
+
+		v.setReservedForMission(true);
+		v.addUnitListener(this);
+		v.setMission(this);
+		
+		fireMissionUpdate(MissionEventType.VEHICLE_EVENT);
 	}
 
 	/**
@@ -411,62 +416,8 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 	 * @return list of available vehicles.
 	 * @throws MissionException if problem determining if vehicles are usable.
 	 */
-	private Collection<Vehicle> getAvailableVehicles(Settlement settlement) {
-		if (getMissionType() == MissionType.DELIVERY) {
-			return getDrones(settlement);
-		}
-		else {
-			return getRovers(settlement);
-		}
-	}
+	protected abstract Collection<Vehicle> getAvailableVehicles(Settlement settlement);
 
-	/**
-	 * Gets a collection of available drones at a settlement that are usable for
-	 * this mission.
-	 * 
-	 * @param settlement
-	 * @return
-	 */
-	private Collection<Vehicle> getDrones(Settlement settlement) {
-		Collection<Vehicle> result = new ConcurrentLinkedQueue<>();
-		Collection<Drone> list = settlement.getParkedDrones();
-		if (list.isEmpty())
-			return result;
-		for (Drone v : list) {
-			if (!v.haveStatusType(StatusType.MAINTENANCE)
-					&& !v.getMalfunctionManager().hasMalfunction()
-					&& isUsableVehicle(v)
-					&& !v.isReserved()) {
-				result.add(v);
-			}
-		}
-		return result;
-	}
-	
-	/**
-	 * Gets a collection of available rovers at a settlement that are usable for
-	 * this mission.
-	 * 
-	 * @param settlement
-	 * @return
-	 */
-	private Collection<Vehicle> getRovers(Settlement settlement) {
-		Collection<Vehicle> result = new ConcurrentLinkedQueue<>();
-		Collection<Vehicle> list = settlement.getParkedVehicles();
-		if (list.isEmpty())
-			return result;
-		for (Vehicle v : list) {
-			if (VehicleType.isRover(v.getVehicleType())
-					&& !v.haveStatusType(StatusType.MAINTENANCE)
-					&& v.getMalfunctionManager().getMalfunctions().isEmpty()
-					&& isUsableVehicle(v)
-					&& !v.isReserved()) {
-				result.add(v);
-			}
-		}
-		return result;
-	}
-	
 	/**
 	 * Finalizes the mission.
 	 *
@@ -502,7 +453,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 
 		if (continueToEndMission) {
 			setPhaseEnded(true);
-			leaveVehicle();
+			releaseVehicle(vehicle);
 			super.endMission(endStatus);
 		}
 	}
@@ -563,9 +514,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 						reason.getName(),
 						getName(),
 						getStartingPerson().getName(),
-						vehicle.getName(),
-						vehicle.getAssociatedSettlement().getName(),
-						vehicle.getCoordinates().getCoordinateString()
+						vehicle
 						);
 		
 				eventManager.registerNewEvent(newEvent);
@@ -959,15 +908,15 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 	protected final double getEstimatedTripTime(boolean useMargin, double distance) {
 		double result = 0;
 		// Determine average driving speed for all mission members.
-		double averageSpeed = getAverageVehicleSpeedForOperators();
+		double averageSpeed = getAverageVehicleSpeedForOperators() * ((1 + NIGHT_TIME_SPEED_MOD) / 2);
 		logger.log(vehicle, Level.FINE, 10_000, "Estimated average speed: " + Math.round(averageSpeed * 100.0)/100.0 + " kph.");
 		if (averageSpeed > 0) {
 			result = distance / averageSpeed * MarsClock.MILLISOLS_PER_HOUR;
 		}
 
-		// If buffer, multiply by 1.2
+		// If buffer, multiply by the the life support margin
 		if (useMargin) {
-			result *= 1.2;
+			result *= Vehicle.getLifeSupportRangeErrorMargin();
 		}
 		return result;
 	}
@@ -991,12 +940,16 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 			}
 		}
 
+		if (totalSpeed < 0)
+			totalSpeed = 0;
+		
 		if (count > 0) {
 			result = totalSpeed / count;
 		}
 		if (result == 0) {
 			result = vehicle.getBaseSpeed();
 		}
+	
 		return result;
 	}
 
@@ -1043,18 +996,18 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 			double amount = 0;
 
 			// Must use the same logic in all cases otherwise too few fuel will be loaded
-			amount = MissionUtil.getFuelNeededForTrip(vehicle, distance, 
-							vehicle.getConservativeFuelEconomy(), useMargin);
+			amount = vehicle.getFuelNeededForTrip(distance, useMargin);
 
-			result.put(vehicle.getFuelType(), amount);
-			
-			// if useMargin is true, include more oxygen
-			double amountOxygen = FUEL_OXIDIZER_FACTOR * amount;
-			
-			// if useMargin is true, include just 2x the amount of methane 
-			if (!useMargin)	amountOxygen = 2 * amount;
+			int fuelTypeID = vehicle.getFuelTypeID();
+			if (fuelTypeID > 0) {
+				result.put(vehicle.getFuelTypeID(), amount);
+				// if useMargin is true, include more oxygen
+				double amountOxygen = VehicleController.RATIO_OXIDIZER_FUEL * amount;
+				
+				if (!useMargin)	amountOxygen = amount;
 
-			result.put(ResourceUtil.oxygenID, amountOxygen);
+				result.put(ResourceUtil.oxygenID, amountOxygen);
+			}
 		}
 		
 		return result;
@@ -1100,15 +1053,15 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 
 		// Manually override the number of wheels and battery needed for each mission
 		// since the automated process is not reliable
-		if (VehicleType.isRover(vehicle.getVehicleType())) {
-
-			if (vehicle.getVehicleType() == VehicleType.EXPLORER_ROVER) 
+		switch(vehicle.getVehicleType()) {
+			case EXPLORER_ROVER:
 				result.computeIfAbsent(wheelID, k -> 2);
-			else if (vehicle.getVehicleType() == VehicleType.CARGO_ROVER
-					|| vehicle.getVehicleType() == VehicleType.TRANSPORT_ROVER) 
+				break;
+			case CARGO_ROVER, TRANSPORT_ROVER:
 				result.computeIfAbsent(wheelID, k -> 4);
-			
-			result.computeIfAbsent(batteryID, k -> 1);
+				break;
+			default:
+				break;
 		}
 		
 		return result;
@@ -1117,7 +1070,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 	/**
 	 * Checks if there are enough resources available in the vehicle for the
 	 * remaining mission. If there is not then the Mission is aborted and rerouted
-	 * to an Emergency settlement if possible. Otherwise a beacon is activiated.
+	 * to an Emergency settlement if possible. Otherwise a beacon is activated.
 
 	 * @return true if enough resources.
 	 */
@@ -1127,7 +1080,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 			lastResourceCheck = currentMSols;
 			int missingResourceId = hasEnoughResources(getResourcesNeededForRemainingMission(false));
 			if (missingResourceId >= 0) {
-				// Create Missiion Flag
+				// Create Mission Flag
 				MissionStatus status = MissionStatus.createResourceStatus(missingResourceId);
 				abortMission(status, EventType.MISSION_NOT_ENOUGH_RESOURCES);
 			}
@@ -1155,11 +1108,24 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 				double amount = (Double) value;
 				double amountStored = vehicle.getAmountResourceStored(id);
 
+				// Check inside vehicle
+				if (VehicleType.isRover(vehicle.getVehicleType())) {
+					Rover rover = (Rover) vehicle;
+					// Check people's possession
+					for (Person person: rover.getCrew()) {
+						amountStored += person.getAmountResourceStored(id);
+					}
+					// Check vehicle's equipment
+					for (Equipment equipment: rover.getEquipmentSet()) {
+						amountStored += equipment.getAmountResourceStored(id);
+					}
+				}
+				
 				if (amountStored < amount) {
 					String newLog = "Not enough "
 							+ ResourceUtil.findAmountResourceName(id) + " to continue with "
 							+ getName() + " - Required: " + Math.round(amount * 100D) / 100D + " kg - Vehicle stored: "
-							+ Math.round(amountStored * 100D) / 100D + " kg";
+							+ Math.round(amountStored * 100D) / 100D + " kg.";
 					logger.log(vehicle, Level.WARNING, 10_000, newLog);
 					return id;
 				}
@@ -1201,8 +1167,8 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 			double newDistance = getCurrentMissionLocation().getDistance(newDestination.getCoordinates());
 			boolean enough = true;
 
-			// for delivery mission, Will need to alert the player differently if it runs out of fuel
-			if (getMissionType() != MissionType.DELIVERY) {
+			// for drone mission, Will need to alert the player differently if it runs out of fuel
+			if (vehicle instanceof GroundVehicle) {
 
 				enough = hasEnoughResources(getResourcesNeededForTrip(false, newDistance)) < 0;
 
@@ -1218,9 +1184,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 								reason.getName(),
 								getName(),
 								getStartingPerson().getName(),
-								vehicle.getName(),
-								oldHome.getName(),
-								vehicle.getCoordinates().getCoordinateString()
+								vehicle
 								);
 						eventManager.registerNewEvent(newEvent);
 					}
@@ -1251,24 +1215,13 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 	public void setEmergencyBeacon(Worker member, Vehicle vehicle, boolean beaconOn, String reason) {
 
 		if (beaconOn) {
-			String settlement = null;
-
-			if (member.getUnitType() == UnitType.PERSON) {
-				settlement = ((Person)member).getAssociatedSettlement().getName();
-			}
-			else {
-				settlement = ((Robot)member).getAssociatedSettlement().getName();
-			}
-
 			// Creating mission emergency beacon event.
 			HistoricalEvent newEvent = new MissionHistoricalEvent(EventType.MISSION_EMERGENCY_BEACON_ON,
 					this,
 					reason,
 					this.getName(),
 					member.getName(),
-					vehicle.getName(),
-					vehicle.getAssociatedSettlement().getName(),
-					vehicle.getCoordinates().getCoordinateString()
+					vehicle
 					);
 
 			eventManager.registerNewEvent(newEvent);
@@ -1284,7 +1237,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 	}
 
 	/**
-	 * Ges to the nearest settlement and end collection phase if necessary.
+	 * Gets to the nearest settlement and end collection phase if necessary.
 	 */
 	public void goToNearestSettlement() {
 		Settlement nearestSettlement = MissionUtil.findClosestSettlement(getCurrentMissionLocation());
@@ -1503,8 +1456,8 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 		// Need to recalculate what is left to travel to get resoruces loaded
 		// for return
 		distanceProposed = 0D;
+		
 		computeTotalDistanceProposed();
-
 	}
 	
 	/**
@@ -1609,8 +1562,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 	 * 
 	 * @return navpoint index or -1 if none.
 	 */
-	@Override
-	public final int getNextNavpointIndex() {
+	protected final int getNextNavpointIndex() {
 		if (navIndex < navPoints.size())
 			return navIndex;
 		else
@@ -1624,37 +1576,20 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 	 * @throws MissionException if the new navpoint is out of range.
 	 */
 	protected final void setNextNavpointIndex(int newNavIndex) {
-		if (newNavIndex < getNumberOfNavpoints()) {
+		if (newNavIndex < navPoints.size()) {
 			navIndex = newNavIndex;
 		} else
 			logger.severe(getPhase() + "'s newNavIndex " + newNavIndex + " is out of bounds.");
 	}
 
 	/**
-	 * Gets the navpoint at an index value.
+	 * Gets the navpoints
 	 * 
-	 * @param index the index value
 	 * @return navpoint
-	 * @throws IllegaArgumentException if no navpoint at that index.
 	 */
 	@Override
-	public NavPoint getNavpoint(int index) {
-		if ((index >= 0) && (index < getNumberOfNavpoints()))
-			return navPoints.get(index);
-		else {
-			logger.severe(getName() + " navpoint " + index + " is null.");
-			return null;
-		}
-	}
-
-	/**
-	 * Gets the number of navpoints on the trip.
-	 * 
-	 * @return number of navpoints
-	 */
-	@Override
-	public int getNumberOfNavpoints() {
-		return navPoints.size();
+	public List<NavPoint> getNavpoints() {
+		return navPoints;
 	}
 	
 	/**
@@ -1789,10 +1724,14 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 
 		if (addMissionStatus(status)) {
 			// If the MissionFlag is not present then do it
-			// A resource is mission
-			determineEmergencyDestination(status);
-
-			logger.info(getVehicle(), status.getName());
+			
+			// If mission is still at home then leave the vehicle
+			if (getStage() == Stage.PREPARATION) {
+				releaseVehicle(vehicle);
+			}
+			else {
+				determineEmergencyDestination(status);
+			}
 
 			// Create an event if needed
 			if (eventType != null) {
@@ -1801,9 +1740,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 						status.getName(),
 						getName(),
 						getStartingPerson().getName(),
-						vehicle.getName(),
-						getStartingSettlement().getName(),
-						vehicle.getCoordinates().getCoordinateString()
+						vehicle
 						);
 				eventManager.registerNewEvent(newEvent);
 			}
@@ -1873,7 +1810,7 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 				int offset = 2;
 				if (getPhase().equals(TRAVELLING))
 					offset = 1;
-				setNextNavpointIndex(getNumberOfNavpoints() - offset);
+				setNextNavpointIndex(navPoints.size() - offset);
 				updateTravelDestination();
 			}
 			
@@ -1970,8 +1907,8 @@ public abstract class AbstractVehicleMission extends AbstractMission implements 
 		else if (TRAVEL_TO_NAVPOINT.equals(travelStatus))
 			index = getNextNavpointIndex();
 
-		for (int x = index + 1; x < getNumberOfNavpoints(); x++) {
-			NavPoint next = getNavpoint(x); 
+		for (int x = index + 1; x < navPoints.size(); x++) {
+			NavPoint next = navPoints.get(x); 
 			if (next != null)
 				navDist += next.getDistance();
 		}

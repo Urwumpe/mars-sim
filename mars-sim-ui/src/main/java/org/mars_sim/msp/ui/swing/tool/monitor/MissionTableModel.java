@@ -6,7 +6,6 @@
  */
 package org.mars_sim.msp.ui.swing.tool.monitor;
 
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,8 +16,7 @@ import org.mars_sim.msp.core.GameManager;
 import org.mars_sim.msp.core.GameManager.GameMode;
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Simulation;
-import org.mars_sim.msp.core.person.ai.mission.BuildingConstructionMission;
-import org.mars_sim.msp.core.person.ai.mission.BuildingSalvageMission;
+import org.mars_sim.msp.core.mission.ConstructionMission;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionEvent;
 import org.mars_sim.msp.core.person.ai.mission.MissionEventType;
@@ -26,10 +24,10 @@ import org.mars_sim.msp.core.person.ai.mission.MissionListener;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.person.ai.mission.MissionManagerListener;
 import org.mars_sim.msp.core.person.ai.mission.MissionPlanning;
-import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.person.ai.mission.PlanType;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.vehicle.GroundVehicle;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 
@@ -85,7 +83,6 @@ public class MissionTableModel extends AbstractTableModel
 
 	private Settlement commanderSettlement;
 
-	private DecimalFormat decFormatter = new DecimalFormat("#,###,##0.0");
 	private boolean monitorMissions = false;
 
 	private static MissionManager missionManager = Simulation.instance().getMissionManager();
@@ -94,11 +91,11 @@ public class MissionTableModel extends AbstractTableModel
 		columnNames = new String[COLUMNCOUNT];
 		columnTypes = new Class[COLUMNCOUNT];
 		columnNames[DATE_FILED] = Msg.getString("MissionTableModel.column.filed"); //$NON-NLS-1$
-		columnTypes[DATE_FILED] = String.class;
+		columnTypes[DATE_FILED] = MarsClock.class;
 		columnNames[DATE_EMBARKED] = Msg.getString("MissionTableModel.column.embarked"); //$NON-NLS-1$
-		columnTypes[DATE_EMBARKED] = String.class;
+		columnTypes[DATE_EMBARKED] = MarsClock.class;
 		columnNames[DATE_RETURNED] = Msg.getString("MissionTableModel.column.returned"); //$NON-NLS-1$
-		columnTypes[DATE_RETURNED] = String.class;
+		columnTypes[DATE_RETURNED] = MarsClock.class;
 		columnNames[STARTING_MEMBER] = Msg.getString("MissionTableModel.column.name"); //$NON-NLS-1$
 		columnTypes[STARTING_MEMBER] = String.class;
 		columnNames[TYPE_ID] = Msg.getString("MissionTableModel.column.typeID"); //$NON-NLS-1$
@@ -238,7 +235,7 @@ public class MissionTableModel extends AbstractTableModel
 	}
 
 	/**
-	 * Return the type of the column requested.
+	 * Returns the type of the column requested.
 	 *
 	 * @param columnIndex Index of column.
 	 * @return Class of specified column.
@@ -252,7 +249,7 @@ public class MissionTableModel extends AbstractTableModel
 	}
 
 	/**
-	 * Return the name of the column requested.
+	 * Returns the name of the column requested.
 	 *
 	 * @param columnIndex Index of column.
 	 * @return name of specified column.
@@ -266,7 +263,7 @@ public class MissionTableModel extends AbstractTableModel
 	}
 
 	/**
-	 * Return the object at the specified row indexes.
+	 * Returns the object at the specified row indexes.
 	 *
 	 * @param row Index of the row object.
 	 * @return Object at the specified row.
@@ -327,7 +324,7 @@ public class MissionTableModel extends AbstractTableModel
 			if (column0 > -1)
 				SwingUtilities.invokeLater(new MissionTableCellUpdater(index, column0));
 
-			if (MissionType.isVehicleMission(((Mission)event.getSource()).getMissionType())) {
+			if (event.getSource() instanceof VehicleMission) {
 
 				int column1 = -1;
 				int column2 = -1;
@@ -383,7 +380,7 @@ public class MissionTableModel extends AbstractTableModel
 	}
 
 	/**
-	 * Return the value of a Cell
+	 * Returns the value of a Cell.
 	 *
 	 * @param rowIndex    Row index of the cell.
 	 * @param columnIndex Column index of the cell.
@@ -410,6 +407,7 @@ public class MissionTableModel extends AbstractTableModel
 
 				case DATE_RETURNED : {
 					result = mission.getLog().getDateFinished();
+
 				}
 					break;
 
@@ -447,17 +445,10 @@ public class MissionTableModel extends AbstractTableModel
 				case VEHICLE: {
 					result = "";
 					Vehicle reserved = null;
-					if (mission instanceof VehicleMission) {
-						reserved = ((VehicleMission)mission).getVehicle();
-					} else if (mission.getMissionType() == MissionType.BUILDING_CONSTRUCTION) {
-						BuildingConstructionMission constructionMission = (BuildingConstructionMission) mission;
+					if (mission instanceof VehicleMission vm) {
+						reserved = vm.getVehicle();
+					} else if (mission instanceof ConstructionMission constructionMission) {
 						List<GroundVehicle> constVehicles = constructionMission.getConstructionVehicles();
-						if (!constVehicles.isEmpty()) {
-							reserved = constVehicles.get(0);
-						}
-					} else if (mission.getMissionType() == MissionType.BUILDING_SALVAGE) {
-						BuildingSalvageMission salvageMission = (BuildingSalvageMission) mission;
-						List<GroundVehicle> constVehicles = salvageMission.getConstructionVehicles();
 						if (!constVehicles.isEmpty()) {
 							reserved = constVehicles.get(0);
 						}
@@ -479,31 +470,24 @@ public class MissionTableModel extends AbstractTableModel
 					break;
 
 				case NAVPOINT_NUM: {
-					if (MissionType.isVehicleMission(mission.getMissionType())) {
-						VehicleMission vehicleMission = (VehicleMission) mission;
-						result = vehicleMission.getNumberOfNavpoints();
+					if (mission instanceof VehicleMission vm) {
+						result = vm.getNavpoints().size();
 					} else
 						result = 0;
 				}
 					break;
 
 				case TRAVELLED_DISTANCE: {
-					if (MissionType.isVehicleMission(mission.getMissionType())) {
-						VehicleMission vehicleMission = (VehicleMission) mission;
-						result = decFormatter.format(vehicleMission.getTotalDistanceTravelled());
+					if (mission instanceof VehicleMission vm) {
+						result = vm.getTotalDistanceTravelled();
 					} else
 						result = 0;
 				}
 					break;
 
 				case TOTAL_REMAINING_DISTANCE: {
-					if (MissionType.isVehicleMission(mission.getMissionType())) {
-						VehicleMission vehicleMission = (VehicleMission) mission;
-						try {
-							result = decFormatter.format(vehicleMission.getTotalDistanceRemaining());
-						} catch (Exception e) {
-							result = 0;
-						}
+					if (mission instanceof VehicleMission vm) {
+						result = vm.getTotalDistanceRemaining();
 					} else
 						result = 0;
 				}
@@ -511,13 +495,8 @@ public class MissionTableModel extends AbstractTableModel
 				break;
 
 				case REMAINING_DISTANCE_TO_NEXT_NAVPOINT: {
-					if (MissionType.isVehicleMission(mission.getMissionType())) {
-						VehicleMission vehicleMission = (VehicleMission) mission;
-						try {
-							result = decFormatter.format(vehicleMission.getDistanceCurrentLegRemaining());
-						} catch (Exception e) {
-							result = 0;
-						}
+					if (mission instanceof VehicleMission vm) {
+						result = vm.getDistanceCurrentLegRemaining();
 					} else
 						result = 0;
 				}
@@ -525,13 +504,8 @@ public class MissionTableModel extends AbstractTableModel
 				break;
 				
 				case PROPOSED_ROUTE_DISTANCE: {
-					if (MissionType.isVehicleMission(mission.getMissionType())) {
-						VehicleMission vehicleMission = (VehicleMission) mission;
-						try {
-							result = decFormatter.format(vehicleMission.getDistanceProposed());
-						} catch (Exception e) {
-							result = 0;
-						}
+					if (mission instanceof VehicleMission vm) {
+						result = vm.getDistanceProposed();
 					} else
 						result = 0;
 				}

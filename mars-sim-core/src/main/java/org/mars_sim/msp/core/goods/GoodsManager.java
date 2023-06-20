@@ -7,6 +7,7 @@
 package org.mars_sim.msp.core.goods;
 
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,6 +27,7 @@ import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
+import org.mars_sim.msp.core.time.MarsClock;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.core.vehicle.VehicleType;
 
@@ -36,13 +38,20 @@ public class GoodsManager implements Serializable {
 
 	private class FutureHandler implements ScheduledEventHandler {
 
+		private static final long serialVersionUID = 1L;
+
 		@Override
 		public String getEventDescription() {
 			return "Refresh Buy/Sell list";
 		}
 
+		/**
+		 * Time to updated lists.
+		 * 
+		 * @param now Current time not used.
+		 */
 		@Override
-		public int execute() {
+		public int execute(MarsClock now) {
 			calculateBuyList();
 			calculateSellList();
 			return LIST_VALIDITY;
@@ -149,9 +158,9 @@ public class GoodsManager implements Serializable {
 	 */
 	public GoodsManager(Settlement settlement, int sunRiseOffSet) {
 		this.settlement = settlement;
-
 		// Schedule an event to recalculate shopping lists just after sunrise
 		settlement.getFutureManager().addEvent(sunRiseOffSet + 10, new FutureHandler());
+		
 		populateGoodsValues();
 	}
 
@@ -171,7 +180,7 @@ public class GoodsManager implements Serializable {
 	}
 
 	/**
-	 * Gets a list of item to be excluded in a buying negotiation
+	 * Gets a list of item to be excluded in a buying negotiation.
 	 *
 	 * @return
 	 */
@@ -547,7 +556,8 @@ public class GoodsManager implements Serializable {
 	}
 
 	/**
-	 * Get the current list of items on this Settlement wants to buy
+	 * Gets the current list of items on this Settlement wants to buy.
+	 * 
 	 * @return Mapping from Good to the item
 	 */
 	public Map<Good, ShoppingItem> getBuyList() {
@@ -555,7 +565,8 @@ public class GoodsManager implements Serializable {
 	}
 
 	/**
-	 * Get the current list of items on this Settlement is willing to sell
+	 * Gets the current list of items on this Settlement is willing to sell.
+	 * 
 	 * @return Mapping from Good to the item
 	 */
 	public Map<Good, ShoppingItem> getSellList() {
@@ -563,7 +574,7 @@ public class GoodsManager implements Serializable {
     }
 
 	/**
-	 * Gets the price per item for a good
+	 * Gets the price per item for a good.
 	 *
 	 * @param id the good id
 	 * @return
@@ -573,7 +584,7 @@ public class GoodsManager implements Serializable {
 	}
 
 	/**
-	 * Gets the price for a good
+	 * Gets the price for a good.
 	 *
 	 * @param good the good
 	 * @return
@@ -610,17 +621,16 @@ public class GoodsManager implements Serializable {
 	}
 
 	/**
-	 * Gets the demand value of an amount resource.
+	 * Gets the demand value from an resource id.
 	 *
 	 * @param good's id.
 	 * @return demand value
 	 */
-	public double getAmountDemandValue(int id) {
+	public double getDemandValueWithID(int id) {
 		if (demandCache.containsKey(id))
 			return demandCache.get(id);
 		else
-			logger.severe(settlement,
-					" - Amount resource " + ResourceUtil.findAmountResourceName(id) + "(" + id + ")" + " not valid.");
+			logger.severe(settlement, "id: " + id + " not valid.");
 		return 1;
 	}
 
@@ -700,7 +710,7 @@ public class GoodsManager implements Serializable {
 	}
 	
 	/**
-	 * Reloads instances after loading from a saved sim
+	 * Reloads instances after loading from a saved sim.
 	 *
 	 * @param s  {@link SimulationConfg}
 	 * @param m  {@link MissionManager}
@@ -711,9 +721,9 @@ public class GoodsManager implements Serializable {
 		Good.initializeInstances(sc, m);
 		CommerceUtil.initializeInstances(m, u);
 	}
-
+	
 	/**
-	 * Prepare object for garbage collection.
+	 * Prepares object for garbage collection.
 	 */
 	public void destroy() {
 
@@ -734,15 +744,16 @@ public class GoodsManager implements Serializable {
 	}
 
 	/**
-	 * The owning Settlement of this manager
+	 * Returns the owning Settlement of this manager.
 	 */
 	Settlement getSettlement() {
 		return settlement;
 	}
 
 	/**
-	 * Find the best trading deal for the parent Settlement using a certain Vehicle 
-	 * for a Commerce mission
+	 * Finds the best trading deal for the parent Settlement using a certain Vehicle 
+	 * for a Commerce mission.
+	 * 
 	 * @param commerce Type of Commerce
 	 * @param delivery Vehicle doing the Delivery
 	 */
@@ -764,20 +775,12 @@ public class GoodsManager implements Serializable {
 	public void clearDeal(MissionType commerce) {
 		deals.remove(commerce);
 	}
-
-	/**
-	 * Custom read to re-init deals variable
-	 */
-	private void readObject(java.io.ObjectInputStream in)
-    	throws IOException, ClassNotFoundException {
-		in.defaultReadObject();
-		deals = new EnumMap<>(MissionType.class);
-		buyList = Collections.emptyMap();
-		sellList = Collections.emptyMap();
-	}
-
 	
+	/**
+	 * Calculates the sell list.
+	 */
 	private void calculateSellList() {
+		
 		// This logic is a draft and need more refinement
 		Map<Good,ShoppingItem> newSell = new HashMap<>();
 		List<Good> excluded = GoodsManager.getExclusionBuyList();
@@ -808,7 +811,7 @@ public class GoodsManager implements Serializable {
 	}
 
 	/**
-	 * Calaculate the current buying list for this Settlement.
+	 * Calculates the current buying list for this Settlement.
 	 */
 	private void calculateBuyList() {
 
@@ -837,5 +840,17 @@ public class GoodsManager implements Serializable {
 
 		// Any deal are now invalid
 		deals.clear();
+	}
+	
+	/**
+	 * Custom read to re-init deals variable.
+	 */
+	private void readObject(ObjectInputStream in)
+    	throws IOException, ClassNotFoundException {
+		in.defaultReadObject();
+		
+		deals = new EnumMap<>(MissionType.class);
+		buyList = Collections.emptyMap();
+		sellList = Collections.emptyMap();
 	}
 }

@@ -1,15 +1,12 @@
 /*
  * Mars Simulation Project
  * ReviewMissionPlan.java
- * @date 2022-09-28
+ * @date 2022-12-22
  * @author Manny Kung
  */
 package org.mars_sim.msp.core.person.ai.task;
 
-import java.util.Collections;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 
@@ -20,10 +17,9 @@ import org.mars_sim.msp.core.person.Person;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeManager;
 import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
-import org.mars_sim.msp.core.person.ai.job.util.JobAssignment;
+import org.mars_sim.msp.core.person.ai.job.util.Assignment;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionPlanning;
-import org.mars_sim.msp.core.person.ai.mission.MissionType;
 import org.mars_sim.msp.core.person.ai.mission.PlanType;
 import org.mars_sim.msp.core.person.ai.mission.SiteMission;
 import org.mars_sim.msp.core.person.ai.mission.VehicleMission;
@@ -41,7 +37,7 @@ import org.mars_sim.msp.core.structure.building.function.Management;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 /**
- * This class is a task for reviewing mission plans
+ * The task for reviewing mission plans.
  */
 public class ReviewMissionPlan extends Task {
 
@@ -62,34 +58,6 @@ public class ReviewMissionPlan extends Task {
 	// Static members
 	/** The stress modified per millisol. */
 	private static final double STRESS_MODIFIER = -.1D;
-
-	// Mapping of the preferred MissionType for each Objective
-	private static final Map<ObjectiveType, Set<MissionType>> OBJECTIVE_TO_MISSION = new EnumMap<>(ObjectiveType.class);
-	
-	static {
-		OBJECTIVE_TO_MISSION.put(ObjectiveType.BUILDERS_HAVEN,
-				   Set.of(MissionType.COLLECT_REGOLITH,
-						  MissionType.MINING));
-		OBJECTIVE_TO_MISSION.put(ObjectiveType.CROP_FARM,
-							   Set.of(MissionType.COLLECT_ICE,
-									  MissionType.BIOLOGY));
-		OBJECTIVE_TO_MISSION.put(ObjectiveType.TOURISM,
-							   Set.of(MissionType.AREOLOGY,
-									  MissionType.BIOLOGY,
-									  MissionType.EXPLORATION,
-									  MissionType.METEOROLOGY,
-									  MissionType.TRAVEL_TO_SETTLEMENT));
-		OBJECTIVE_TO_MISSION.put(ObjectiveType.TRADE_CENTER,
-								Set.of(MissionType.TRADE, 
-										MissionType.DELIVERY));
-		OBJECTIVE_TO_MISSION.put(ObjectiveType.TRANSPORTATION_HUB,
-								Set.of(MissionType.TRAVEL_TO_SETTLEMENT,
-									   MissionType.EXPLORATION));
-		OBJECTIVE_TO_MISSION.put(ObjectiveType.MANUFACTURING_DEPOT,
-								Set.of(MissionType.MINING,
-									   MissionType.COLLECT_REGOLITH));
-	}
-
 	
 	// Data members
 	/** The administration building the person is using. */
@@ -248,9 +216,8 @@ public class ReviewMissionPlan extends Task {
 	    GoodsManager goodsManager = reviewerSettlement.getGoodsManager();
 	    
 		Person leader = m.getStartingPerson();
-    	MissionType mt = m.getMissionType();
     	
-		List<JobAssignment> list = leader.getJobHistory().getJobAssignmentList();
+		List<Assignment> list = leader.getJobHistory().getJobAssignmentList();
 		int last = list.size() - 1;
 		
 		// 1. Reviews requester's cumulative job rating
@@ -268,46 +235,14 @@ public class ReviewMissionPlan extends Task {
 		int relation = assessLeader(leader, reviewerSettlement);
 
 		// 3. Mission Qualification Score
-		double qual = 0;
-		
-		switch (mt) {
-		case AREOLOGY :
-		case BIOLOGY:
-		case METEOROLOGY:
-		case RESCUE_SALVAGE_VEHICLE:
-		case TRAVEL_TO_SETTLEMENT:
-			qual = .5;
-			break;
-
-		case COLLECT_REGOLITH:
-			qual = .15;
-			break;
-			
-		case COLLECT_ICE:
-		case EXPLORATION:
-			qual = .25;
-			break;
-
-		case MINING:
-			qual = .3;
-			break;
-			
-		case TRADE:
-			qual = .35;
-			break;
-			
-		default:
-			qual = .4;
-    	}
-    
-		qual = qual * m.getMissionQualification(person);
-		qual = 2.5 * Math.round(qual * 10.0)/10.0;
+		double qual = m.getMissionQualification(person) * 0.4D;
 		
 		// 4. Settlement objective score, is the Mission type
 		// is preferred for the Objective
 		double obj = 0;
 		ObjectiveType objective = reviewerSettlement.getObjective();
-		if (OBJECTIVE_TO_MISSION.getOrDefault(objective, Collections.emptySet()).contains(mt)) {
+		Set<ObjectiveType> satisfiedObjectives = m.getObjectiveSatisified();
+		if (satisfiedObjectives.contains(objective)) {
 			switch (objective) {
 			case BUILDERS_HAVEN:
 				obj += 5D * goodsManager.getBuildersFactor(); 
@@ -339,45 +274,30 @@ public class ReviewMissionPlan extends Task {
 
 		// 5. emergency
 		int emer = 0;
-		if ((mt == MissionType.EMERGENCY_SUPPLY)
-				|| (mt == MissionType.RESCUE_SALVAGE_VEHICLE)) {
-			emer = 50;
-		}	
+		// if ((mt == MissionType.EMERGENCY_SUPPLY)
+		// 		|| (mt == MissionType.RESCUE_SALVAGE_VEHICLE)) {
+		// 	emer = 50;
+		// }	
 		
 		// 6. Site Value
 		double siteValue = 0;
 		if (m instanceof SiteMission) {
 			siteValue = ((SiteMission)m).getTotalSiteScore(reviewerSettlement);
-			
-			// Why do we adjust these score ?
-			if (mt == MissionType.COLLECT_ICE) {
-				siteValue /= 40D;
-			}
-			else if (mt == MissionType.COLLECT_REGOLITH) {
-				siteValue /= 30D;
-			}
-			else if (mt == MissionType.MINING) {
-				siteValue /= 20D;
-			}
-			else if (mt == MissionType.EXPLORATION) {
-				siteValue /= 20D;
-			}
 		}
 
 		// 7. proposed route distance (note that a negative score represents a penalty)
 		int dist = 0;
-		if (m instanceof VehicleMission) {
-			int range = m.getAssociatedSettlement().getMissionRadius(mt);
-			if (range > 0) {
-				int proposed = (int)(((VehicleMission) m).getDistanceProposed());
-				
-				// Scoring rule:
-				// At range = 0, the score is 10
-				// The half the range, the score is -40
-
-				// Calculate the dist score
-				dist = (int)(- 100.0 / range * proposed + 10);
-			}
+		if (m instanceof VehicleMission vm) {
+			double range = vm.getVehicle().getRange();
+			double proposed = vm.getDistanceProposed();
+			
+			// Scoring rule:
+			// At range = 0, the score is 0
+			// At half the range, the score is -100
+			// At full range, the score is -200
+			
+			// Calculate the dist score
+			dist = (int)(- (200.0 * proposed)/ range);
 		}
 		
 		// 8. Leadership and Charisma
@@ -403,7 +323,7 @@ public class ReviewMissionPlan extends Task {
 
 		StringBuilder msg = new StringBuilder();
 		msg.append("Grading ").append(m.getName());
-		msg.append(" plan -");
+		msg.append(" Plan -");
 		msg.append(" Rating: ").append(rating); 
 		msg.append(", Rels: ").append(relation); 
 		msg.append(", Quals: ").append(qual); 
@@ -414,13 +334,14 @@ public class ReviewMissionPlan extends Task {
 		msg.append(", Lead: ").append(leadership); 							
 		msg.append(", Review: ").append(reviewerRole); 
 		msg.append(", Luck: ").append(luck); 
-		msg.append(" = Subtotal: ").append(score);
+		msg.append("; Subtotal: ").append(score);
 		
 		logger.log(worker, Level.INFO, 0,  msg.toString());
 	}
 
 	/**
-	 * Assess the relationship of the reviewer with the Mission Leader
+	 * Assesses the relationship of the reviewer with the Mission Leader.
+	 * 
 	 * @param leader
 	 * @param reviewerSettlement
 	 */
@@ -441,7 +362,7 @@ public class ReviewMissionPlan extends Task {
 	}	
 
 	/**
-	 * Assess the reviewer based on their Role
+	 * Assesses the reviewer based on their Role.
 	 */
 	private int assessReviewer() {
 		RoleType role = person.getRole().getType();
@@ -475,31 +396,15 @@ public class ReviewMissionPlan extends Task {
 	 * @param reviewerSettlement
 	 * @param mp
 	 */
-	private void completeReview(Mission m, Settlement reviewerSettlement, MissionPlanning mp) {  
-    	MissionType mt = m.getMissionType();
-    	
+	private void completeReview(Mission m, Settlement reviewerSettlement, MissionPlanning mp) {      	
 		// 2. Relationship Score 
 		Person leader = m.getStartingPerson();
 		int relation = assessLeader(leader, reviewerSettlement);
 		
 		// 6. Site Value
 		double siteValue = 0;
-		if (m instanceof SiteMission) {
-			siteValue = ((SiteMission)m).getTotalSiteScore(reviewerSettlement);
-			
-			// Why do we adjust these score ?
-			if (mt == MissionType.COLLECT_ICE) {
-				siteValue /= 10D;
-			}
-			else if (mt == MissionType.COLLECT_REGOLITH) {
-				siteValue /= 7.5;
-			}
-			else if (mt == MissionType.MINING) {
-				siteValue /= 5D;
-			}
-			else if (mt == MissionType.EXPLORATION) {
-				siteValue /= 5D;
-			}
+		if (m instanceof SiteMission sm) {
+			siteValue = sm.getTotalSiteScore(reviewerSettlement);
 		}
 
 		// 9. reviewer role weight
@@ -512,11 +417,11 @@ public class ReviewMissionPlan extends Task {
 
 		StringBuilder msg = new StringBuilder();
 		msg.append("Grading ").append(m.getName());
-		msg.append(" plan -");
+		msg.append(" Plan -");
 		msg.append(" Rels: ").append(relation); 
 		msg.append(", Site: ").append(Math.round(siteValue*10.0)/10.0); 							
 		msg.append(", Review: ").append(reviewerRole); 
-		msg.append(" = Subtotal: ").append(score);
+		msg.append("; Subtotal: ").append(score);
 		
 		logger.log(worker, Level.INFO, 0,  msg.toString());
 	}

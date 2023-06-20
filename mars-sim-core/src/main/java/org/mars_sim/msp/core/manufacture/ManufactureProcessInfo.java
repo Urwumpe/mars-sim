@@ -11,6 +11,11 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.mars_sim.msp.core.resource.AmountResource;
+import org.mars_sim.msp.core.resource.ItemResource;
+import org.mars_sim.msp.core.resource.ItemResourceUtil;
+import org.mars_sim.msp.core.resource.ResourceUtil;
+
 /**
  * Information about a type of manufacturing process.
  */
@@ -31,9 +36,33 @@ public class ManufactureProcessInfo implements Serializable, Comparable<Manufact
 	private double processTimeRequired;
 	private double powerRequired;
 	
-	private List<ManufactureProcessItem> inputList;
-	private List<ManufactureProcessItem> outputList;
-
+	private List<ManufactureProcessItem> inputList = new ArrayList<>();
+	private List<ManufactureProcessItem> outputList = new ArrayList<>();
+	
+	/*
+	 * Constructor 1.
+	 */
+	public ManufactureProcessInfo() {
+	}
+	
+	/*
+	 * Copy constructor.
+	 */
+	public ManufactureProcessInfo(ManufactureProcessInfo another) {
+	    this.name = another.name;
+	    this.description = another.description;
+	    this.techLevelRequired = another.techLevelRequired;
+	    this.skillLevelRequired = another.skillLevelRequired;
+	    this.effortLevel = another.effortLevel;
+	    this.workTimeRequired = another.workTimeRequired;
+	    this.processTimeRequired = another.processTimeRequired;
+	    this.powerRequired = another.powerRequired;
+		
+	    // Warning: below is shallow copy only, NOT deep copy 
+	    this.inputList = List.copyOf(another.inputList);
+	    this.outputList = List.copyOf(another.outputList);
+	}
+	
 	/**
 	 * Gets the process name.
 	 * 
@@ -244,6 +273,33 @@ public class ManufactureProcessInfo implements Serializable, Comparable<Manufact
 		this.outputList = outputList;
 	}
 
+	/**
+	 * Calculates the total input mass.
+	 * 
+	 * @return
+	 */
+	public double calculateTotalInputMass() {
+		double mass = 0;
+		
+		for (ManufactureProcessItem item : inputList) {
+			String name = item.getName();
+	
+			AmountResource ar = ResourceUtil.findAmountResource(name);
+			if (ar != null) {
+				mass += item.getAmount();
+			}		
+			else {
+				ItemResource ir = ItemResourceUtil.findItemResource(name);
+				if (ir != null) {
+					double quantity = item.getAmount();
+					mass += quantity * ir.getMassPerItem();
+				}
+			}
+		}
+		
+		return mass;
+	}
+	
 	@Override
 	public String toString() {
 		return name;

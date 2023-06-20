@@ -66,7 +66,7 @@ public class MalfunctionCreateCommand extends AbstractUnitCommand {
 
 		malfunctionManager.triggerMalfunction(malfunction, true, source);
 
-		context.println(malfunctionManager.getUnit().getName() + " just had '" 
+		context.println(malfunctionManager.getEntity().getName() + " just had '" 
 				+ malfunction.getName() + "'");
 		return true;
 	}
@@ -116,7 +116,8 @@ public class MalfunctionCreateCommand extends AbstractUnitCommand {
 	}
 
 	/**
-	 * Pick a Malfunctionable from a list of options.
+	 * Picks a Malfunctionable from a list of options.
+	 * 
 	 * @param context The conversation taking part
 	 * @param optionDesc Description of the options presented
 	 * @param options Malfunctionables to choose from
@@ -124,7 +125,7 @@ public class MalfunctionCreateCommand extends AbstractUnitCommand {
 	 */
 	private static Malfunctionable pickSelection(Conversation context, String optionDesc,
 												 List<? extends Malfunctionable> options) {
-		List <String> names = new  ArrayList<>();
+		List <String> names = new ArrayList<>();
 		for (Malfunctionable o : options) {
 			names.add(o.getName());
 		} 

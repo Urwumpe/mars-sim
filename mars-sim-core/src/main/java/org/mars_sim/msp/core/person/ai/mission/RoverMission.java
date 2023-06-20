@@ -7,6 +7,7 @@
 package org.mars_sim.msp.core.person.ai.mission;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -47,6 +48,7 @@ import org.mars_sim.msp.core.vehicle.Crewable;
 import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.StatusType;
 import org.mars_sim.msp.core.vehicle.Vehicle;
+import org.mars_sim.msp.core.vehicle.VehicleType;
 
 /**
  * A mission that involves driving a rover vehicle along a series of navpoints.
@@ -67,10 +69,10 @@ public abstract class RoverMission extends AbstractVehicleMission {
 	private static final double WATER_MARGIN = 1.5;
 	
 	/* The marginal factor for the amount of oxygen to be brought during a mission. */
-	private static final double OXYGEN_MARGIN = 1.5;
+	private static final double OXYGEN_MARGIN = 1.25;
 	
 	/* The marginal factor for the amount of food to be brought during a mission. */
-	private static final double FOOD_MARGIN = 2.25;
+	private static final double FOOD_MARGIN = 1.75;
 
 	/* What is the lowest fullness of an EVASuit to be usable. */
 	private static final double EVA_LOWEST_FILL = 0.5D;
@@ -108,6 +110,32 @@ public abstract class RoverMission extends AbstractVehicleMission {
 	}
 
 	/**
+	 * Gets a collection of available Rovers at a settlement that are usable for
+	 * this mission.
+	 *
+	 * @param settlement the settlement to find vehicles.
+	 * @return list of available vehicles.
+	 * @throws MissionException if problem determining if vehicles are usable.
+	 */
+	@Override
+	protected Collection<Vehicle> getAvailableVehicles(Settlement settlement) {
+		Collection<Vehicle> result = new ArrayList<>();
+		Collection<Vehicle> list = settlement.getParkedVehicles();
+		if (list.isEmpty())
+			return result;
+		for (Vehicle v : list) {
+			if (VehicleType.isRover(v.getVehicleType())
+					&& !v.haveStatusType(StatusType.MAINTENANCE)
+					&& v.getMalfunctionManager().getMalfunctions().isEmpty()
+					&& isUsableVehicle(v)
+					&& !v.isReserved()) {
+				result.add(v);
+			}
+		}
+		return result;
+	}
+
+	/**
 	 * Gets the available vehicle at the settlement with the greatest range.
 	 *
 	 * @param settlement         the settlement to check.
@@ -115,10 +143,10 @@ public abstract class RoverMission extends AbstractVehicleMission {
 	 * @return vehicle or null if none available.
 	 * @throws Exception if error finding vehicles.
 	 */
-	public static Vehicle getVehicleWithGreatestRange(MissionType missionType, Settlement settlement, boolean allowMaintReserved) {
-		Vehicle result = null;
+	public static Rover getVehicleWithGreatestRange(Settlement settlement, boolean allowMaintReserved) {
+		Rover result = null;
 
-		for(Vehicle vehicle : settlement.getAllAssociatedVehicles()) {
+		for (Vehicle vehicle : settlement.getAllAssociatedVehicles()) {
 
 			boolean usable = !vehicle.isReservedForMission();
 
@@ -128,15 +156,13 @@ public abstract class RoverMission extends AbstractVehicleMission {
 
 			usable = usable && (vehicle.getStoredMass() <= 0D);
 
-			usable = usable && (vehicle instanceof Rover);
-
-			if (usable) {
+			if (usable && (vehicle instanceof Rover rover)) {
 				if (result == null)
 					// so far, this is the first vehicle being picked
-					result = vehicle;
-				else if (vehicle.getRange(missionType) > result.getRange(missionType))
+					result = rover;
+				else if (vehicle.getRange() > result.getRange())
 					// This vehicle has a better range than the previously selected vehicle
-					result = vehicle;
+					result = rover;
 			}
 		}
 
@@ -475,7 +501,6 @@ public abstract class RoverMission extends AbstractVehicleMission {
 
 		// Make sure the rover chasis is not overlapping a building structure in the settlement map
         if (!isRoverInAGarage) {
-//        	rover.findNewParkingLoc();
 
         	// Outside so preload all EVASuits before the Unloading starts
         	int suitsNeeded = rover.getCrew().size();
@@ -544,9 +569,7 @@ public abstract class RoverMission extends AbstractVehicleMission {
 		else {
 			// Complete embark once everyone is out of the Vehicle
 			// Leave the vehicle.
-			leaveVehicle();
-			// Reset the vehicle reservation
-			v.correctVehicleReservation();
+			releaseVehicle(rover);
 			// End the phase.
 			setPhaseEnded(true);
 		}
@@ -746,10 +769,8 @@ public abstract class RoverMission extends AbstractVehicleMission {
 				logger.info(p, "Unable to do emergency transfer to " + s + ".");
 		}
 
-		// Gets the settlement id
-		int id = s.getIdentifier();
 		// Store the person into a medical building
-		BuildingManager.addToMedicalBuilding(p, id);
+		BuildingManager.addToMedicalBuilding(p, s);
 
 		// Register the historical event
 		HistoricalEvent rescueEvent = new MissionHistoricalEvent(EventType.MISSION_RESCUE_PERSON,
@@ -757,9 +778,7 @@ public abstract class RoverMission extends AbstractVehicleMission {
 				p.getPhysicalCondition().getHealthSituation(),
 				p.getTaskDescription(),
 				p.getName(),
-				p.getLocationTag().getImmediateLocation(),
-				p.getAssociatedSettlement().getName(),
-				p.getCoordinates().getCoordinateString()
+				p
 				);
 		eventManager.registerNewEvent(rescueEvent);
 	}
@@ -852,7 +871,7 @@ public abstract class RoverMission extends AbstractVehicleMission {
 	 */
 	@Override
 	public Map<Integer, Number> getResourcesNeededForTrip(boolean useBuffer, double distance) {
-		// Note: currently, it uses methane as fuel. May switch to methanol in near future
+
 		Map<Integer, Number> result = super.getResourcesNeededForTrip(useBuffer, distance);
 
 		// Determine estimate time for trip.
@@ -860,7 +879,8 @@ public abstract class RoverMission extends AbstractVehicleMission {
 		double timeSols = time / 1000D;
 
 		int people = getMembers().size();
-		addLifeSupportResources(result, people, timeSols, useBuffer);
+		
+		result = addLifeSupportResources(result, people, timeSols, useBuffer);
 
 		// Add resources to load EVA suit of each person
 		// Determine life support supplies needed for trip.
@@ -880,26 +900,29 @@ public abstract class RoverMission extends AbstractVehicleMission {
 	 * @param timeSols
 	 * @param useBuffer
 	 */
-	protected static void addLifeSupportResources(Map<Integer, Number> result,
+	protected Map<Integer, Number> addLifeSupportResources(Map<Integer, Number> result,
 												  int crewNum, double timeSols,
 												  boolean useBuffer) {
 
+		double lifeSupportRangeErrorMargin = Vehicle.getLifeSupportRangeErrorMargin();
 		// Determine life support supplies needed for trip.
 		double oxygenAmount = PhysicalCondition.getOxygenConsumptionRate() * timeSols * crewNum ;
 		if (useBuffer)
-			oxygenAmount *= Vehicle.getLifeSupportRangeErrorMargin() * OXYGEN_MARGIN;
+			oxygenAmount *= lifeSupportRangeErrorMargin * OXYGEN_MARGIN;
 		result.merge(OXYGEN_ID, oxygenAmount, (a,b) -> (a.doubleValue() + b.doubleValue()));
 
 		double waterAmount = PhysicalCondition.getWaterConsumptionRate() * timeSols * crewNum ;
 		if (useBuffer)
-			waterAmount *= Vehicle.getLifeSupportRangeErrorMargin() * WATER_MARGIN; 
+			waterAmount *= lifeSupportRangeErrorMargin * WATER_MARGIN; 
 			// water is generated by fuel cells. no need of margins 
 		result.merge(WATER_ID, waterAmount, (a,b) -> (a.doubleValue() + b.doubleValue()));
 
 		double foodAmount = PhysicalCondition.getFoodConsumptionRate() * timeSols * crewNum ;
 		if (useBuffer)
-			foodAmount *= Vehicle.getLifeSupportRangeErrorMargin() * FOOD_MARGIN;
+			foodAmount *= lifeSupportRangeErrorMargin * FOOD_MARGIN;
 		result.merge(FOOD_ID, foodAmount, (a,b) -> (a.doubleValue() + b.doubleValue()));
+		
+		return result;
 	}
 
 	/**
@@ -981,13 +1004,14 @@ public abstract class RoverMission extends AbstractVehicleMission {
 		if (useBuffer) {
 			timeLimit /= Vehicle.getLifeSupportRangeErrorMargin();
 		}
-
+		
 		return timeLimit;
 	}
 
 	/**
-	 * Find members for a mission, for RoverMissions all members must be at the same
+	 * Finds members for a mission, for RoverMissions all members must be at the same
 	 * settlement.
+	 * 
 	 * @param startingMember
 	 * @return
 	 */

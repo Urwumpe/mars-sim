@@ -10,7 +10,6 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
@@ -26,7 +25,6 @@ import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.JTextPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
@@ -44,9 +42,9 @@ import org.mars_sim.msp.core.structure.construction.ConstructionStage;
 import org.mars_sim.msp.core.structure.construction.ConstructionStageInfo;
 import org.mars_sim.msp.core.structure.construction.ConstructionUtil;
 import org.mars_sim.msp.core.structure.construction.ConstructionVehicleType;
+import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.vehicle.VehicleType;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
 
 /**
  * A wizard panel for selecting the mission's
@@ -62,7 +60,7 @@ class ConstructionProjectPanel extends WizardPanel {
     private final static String NAME = "Construction Project";
 
     // Data members
-    private JTextPane errorMessageTextPane;
+    private JLabel errorMessageTextPane;
     private DefaultListModel<String> siteListModel;
     private JList<String> siteList;
     private DefaultListModel<ConstructionStageInfo> projectListModel;
@@ -87,8 +85,7 @@ class ConstructionProjectPanel extends WizardPanel {
         setBorder(new MarsPanelBorder());
 
         // Create the select construction project label.
-        JLabel titleLabel = new JLabel("Select a construction project",
-                JLabel.CENTER);
+        JLabel titleLabel = createTitleLabel("Select a construction project");
         add(titleLabel, BorderLayout.NORTH);
 
         // Create the center panel.
@@ -209,7 +206,6 @@ class ConstructionProjectPanel extends WizardPanel {
  
         // Create the materials table.
         materialsTable = new JTable(materialsTableModel);
-		TableStyle.setTableStyle(materialsTable);
 		materialsTable.setAutoCreateRowSorter(true);
         materialsTable.setRowSelectionAllowed(false);
         materialsTable.setDefaultRenderer(Object.class,
@@ -228,12 +224,10 @@ class ConstructionProjectPanel extends WizardPanel {
                 MaterialsTableModel tableModel = (MaterialsTableModel) table
                         .getModel();
                 if (tableModel.isFailureCell(row, column))
-                    setBackground(Color.RED);
+                    result.setBackground(Color.RED);
                 else if (tableModel.isWarningCell(row, column)) {
-                    setBackground(Color.YELLOW);
+                    result.setBackground(Color.YELLOW);
                 }
-                else if (!isSelected)
-                    setBackground(Color.WHITE);
 
                 return result;
             }
@@ -241,11 +235,7 @@ class ConstructionProjectPanel extends WizardPanel {
         materialsTableScrollPane.setViewportView(materialsTable);
         
         // Create the error message text pane.
-        errorMessageTextPane = new JTextPane();
-        errorMessageTextPane.setForeground(Color.RED);
-        errorMessageTextPane.setFont(errorMessageTextPane.getFont().deriveFont(
-                Font.BOLD));
-        errorMessageTextPane.setAlignmentX(Component.CENTER_ALIGNMENT);
+        errorMessageTextPane = createErrorLabel();
         add(errorMessageTextPane, BorderLayout.SOUTH);
     }
     
@@ -467,7 +457,7 @@ class ConstructionProjectPanel extends WizardPanel {
             		if (cMWizard.getMissionBean().getMixedMembers().isEmpty()) {
             			// Add checking if members of an on-going site were departed
             			loadSite(selectedSite, selectedSiteIndex);
-            			cMWizard.getMissionWindow().update();
+            			cMWizard.getMissionWindow().update((ClockPulse) null);
             		}
             	else {            	
 	                errorMessageTextPane.setText("Cannot start mission on a site already undergoing construction.");             
@@ -625,7 +615,7 @@ class ConstructionProjectPanel extends WizardPanel {
             result = false;
 
         // Check for LUV attachment parts.
-        Map<Integer, Integer> attachmentParts = new HashMap<Integer, Integer>();
+        Map<Integer, Integer> attachmentParts = new HashMap<>();
         Iterator<ConstructionVehicleType> k = stageInfo.getVehicles()
                 .iterator();
         while (k.hasNext()) {
@@ -667,7 +657,7 @@ class ConstructionProjectPanel extends WizardPanel {
             // Use AbstractTableModel constructor.
             super();
 
-            materialsList = new ArrayList<ConstructionMaterial>();
+            materialsList = new ArrayList<>();
         }
 
         public int getColumnCount() {
@@ -738,6 +728,11 @@ class ConstructionProjectPanel extends WizardPanel {
                             site = manager.getConstructionSites()
                                     .get(existingSiteIndex);
                         }
+                        else {
+                            logger.severe(settlement, 
+                                    "No site selected for Construction Project");
+                            return;
+                        }   
                         ConstructionStage stage = site.getCurrentConstructionStage();
                         
                         // Add resources.
@@ -765,7 +760,7 @@ class ConstructionProjectPanel extends WizardPanel {
                         }
 
                         // Add vehicle attachment parts.
-                        Map<Integer, Integer> attachmentParts = new HashMap<Integer, Integer>();
+                        Map<Integer, Integer> attachmentParts = new HashMap<>();
                         Iterator<ConstructionVehicleType> k = info.getVehicles()
                                 .iterator();
                         while (k.hasNext()) {
@@ -827,7 +822,7 @@ class ConstructionProjectPanel extends WizardPanel {
                         }
 
                         // Add vehicle attachment parts.
-                        Map<Integer, Integer> attachmentParts = new HashMap<Integer, Integer>();
+                        Map<Integer, Integer> attachmentParts = new HashMap<>();
                         Iterator<ConstructionVehicleType> k = info.getVehicles()
                                 .iterator();
                         while (k.hasNext()) {

@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * JStatusBar.java
- * @date 2022-06-30
+ * @date 2023-05-14
  * Modified by Manny Kung
  */
 
@@ -14,6 +14,7 @@ import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 
+import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -21,11 +22,13 @@ import javax.swing.JPanel;
 @SuppressWarnings("serial")
 public class JStatusBar extends TexturedPanel {
 		   
-	private static final Color almond = new Color(239,222,205,128);
+        private static final Color almond = new Color(239,222,205,128);
 
-	private int barHeight = 30;
-	private int leftPadding;
-	private int rightPadding;
+        private static final int MARGIN = 1;
+
+        private int barHeight = 30;
+        private int leftPadding;
+        private int rightPadding;
 	
     protected JPanel leftPanel;
     protected JPanel rightPanel;
@@ -50,35 +53,42 @@ public class JStatusBar extends TexturedPanel {
 		setBackground(almond);
 		
         setLayout(new BorderLayout());
-        setPreferredSize(new Dimension(getWidth(), barHeight));
+        setPreferredSize(new Dimension(getWidth(), barHeight + (2 * (MARGIN + 2))));
     
         leftPanel = new JPanel(new FlowLayout(
-                FlowLayout.LEADING, 3, 0));
+                FlowLayout.CENTER, 3, 1));
+        leftPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
         add(leftPanel, BorderLayout.WEST);
         
         centerPanel = new JPanel(new FlowLayout(
-                FlowLayout.CENTER, 3, 0));
+                FlowLayout.CENTER, 3, 1));
+        centerPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
         add(centerPanel, BorderLayout.CENTER);
         
         rightPanel = new JPanel(new FlowLayout(
-                FlowLayout.TRAILING, 3, 0));
+                FlowLayout.CENTER, 3, 1));
+        rightPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
         add(rightPanel, BorderLayout.EAST);
     }
     
     public void addLeftComponent(JComponent component, boolean separator) {
     	JPanel panel = new JPanel(new FlowLayout(
-                FlowLayout.LEADING, 0, leftPadding));
-        if (separator) 
+                FlowLayout.LEFT, 0, leftPadding));
+        if (separator) {
+            addBorder(panel);
         	panel.add(new SeparatorPanel(Color.GRAY, Color.WHITE));
+        }
         panel.add(component);
         leftPanel.add(panel);
     }
     
     public void addCenterComponent(JComponent component, boolean separator) {
     	JPanel panel = new JPanel(new FlowLayout(
-                FlowLayout.LEADING, 0, leftPadding));
-        if (separator) 
+                FlowLayout.CENTER, 0, leftPadding));
+        if (separator) {
+            addBorder(panel);
         	panel.add(new SeparatorPanel(Color.GRAY, Color.WHITE));
+        }
         panel.add(component);
         centerPanel.add(panel);
     }
@@ -86,19 +96,26 @@ public class JStatusBar extends TexturedPanel {
     
     public void addRightComponent(JComponent component, boolean separator) {
         JPanel panel = new JPanel(new FlowLayout(
-                FlowLayout.LEADING, 0, rightPadding));
-        if (separator) 
+                FlowLayout.RIGHT, 0, rightPadding));
+        if (separator) {
+            addBorder(panel);
         	panel.add(new SeparatorPanel(Color.GRAY, Color.WHITE));
+        }
         panel.add(component);
         rightPanel.add(panel);
     }
     
+    private void addBorder(JPanel panel) {
+        panel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createEtchedBorder(),
+                                                        BorderFactory.createEmptyBorder(MARGIN, MARGIN, MARGIN, MARGIN)));
+    }
+
     public void addRightCorner() {
         JPanel panel = new JPanel(new FlowLayout(
                 FlowLayout.TRAILING, 0, 0));
         JLabel label = new JLabel(new AngledLinesWindowsCornerIcon());
         panel.setAlignmentX(1F);
-        panel.setAlignmentY(1F);
+        panel.setAlignmentY(0);
         label.setHorizontalAlignment(JLabel.RIGHT);
         label.setVerticalAlignment(JLabel.BOTTOM);
         panel.add(label);

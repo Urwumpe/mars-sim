@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * DigLocalIceMeta.java
- * @date 2022-06-24
+ * @date 2023-06-08
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.meta;
@@ -21,6 +21,8 @@ import org.mars_sim.msp.core.structure.Settlement;
  */
 public class DigLocalIceMeta extends DigLocalMeta {
 
+	// can add back private static SimLogger logger = SimLogger.getLogger(DigLocalIceMeta.class.getName());
+	
 	private static final int THRESHOLD_AMOUNT = 50;
 	
     /** Task name */
@@ -39,8 +41,13 @@ public class DigLocalIceMeta extends DigLocalMeta {
 
     @Override
     public double getProbability(Person person) {
+    	if (!CollectionUtils.isSettlement(person.getCoordinates())) {
+    		return 0;
+    	}
+    	
     	Settlement settlement = CollectionUtils.findSettlement(person.getCoordinates());
-    	if ((settlement == null) || (settlement.getIceCollectionRate() <= 0D)) {
+    	double rate = settlement.getIceCollectionRate();
+    	if (rate <= 0D) {
     		return 0D;
     	}
     	
@@ -49,7 +56,12 @@ public class DigLocalIceMeta extends DigLocalMeta {
         	return 0;
         }
     	
-    	return getProbability(ResourceUtil.iceID, settlement, 
-    			person, settlement.getIceProbabilityValue());
+    	double result = getProbability(ResourceUtil.iceID, settlement, 
+    			person, rate * settlement.getIceProbabilityValue());
+    	
+//    	logger.info(settlement, 20_000, "rate: " + Math.round(settlement.getIceCollectionRate() * 100.0)/100.0  
+//    			+ "  Final ice: " + Math.round(result* 100.0)/100.0);
+        
+        return result;
     }
 }

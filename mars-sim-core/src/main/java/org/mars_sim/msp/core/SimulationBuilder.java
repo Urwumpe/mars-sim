@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * SimulationBuilder.java
- * @date 2022-11-02
+ * @date 2023-03-31
  * @author Barry Evans
  */
 package org.mars_sim.msp.core;
@@ -12,6 +12,8 @@ import java.lang.Runtime.Version;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.commons.cli.CommandLine;
@@ -34,7 +36,6 @@ import org.mars_sim.msp.core.tool.RandomUtil;
  * he various options.
  */
 public class SimulationBuilder {
-	private static final String LOAD_ARG = "load";
 	private static final String NEW_ARG = "new";
 	private static final String TIMERATIO_ARG = "timeratio";
 	private static final String TEMPLATE_ARG = "template";
@@ -125,19 +126,21 @@ public class SimulationBuilder {
 		}
 	}
 	
+	/**
+	 * Reload a previous simulation
+	 * @param filename
+	 */
 	public void setSimFile(String filename) {
 		if (filename == null) {
-			this.simFile = new File(SimulationFiles.getSaveDir(),
-						Simulation.SAVE_FILE + Simulation.SAVE_FILE_EXTENSION);
+			throw new IllegalArgumentException("No simultion file specified");
+		}
+
+		if (Paths.get(filename).isAbsolute()) {
+			this.simFile = new File(filename);
 		}
 		else {
-			if (Paths.get(filename).isAbsolute()) {
-				this.simFile = new File(filename);
-			}
-			else {
-				this.simFile = new File(SimulationFiles.getSaveDir(),
-										filename);
-			}
+			this.simFile = new File(SimulationFiles.getSaveDir(),
+									filename);
 		}
 	}
 
@@ -174,8 +177,6 @@ public class SimulationBuilder {
 		
 		options.add(Option.builder(NEW_ARG)
 						.desc("Create a new simulation if one is not present").build());
-		options.add(Option.builder(LOAD_ARG).argName("path to simulation file").hasArg().optionalArg(true)
-						.desc("Load the a previously saved sim, default is used if none specifed").build());
 		options.add(Option.builder(SCENARIO_ARG).argName("scenario name").hasArg().optionalArg(false)
 				.desc("New simulation from a scenario").build());
 		options.add(Option.builder(TEMPLATE_ARG).argName("template name").hasArg().optionalArg(false)
@@ -214,9 +215,6 @@ public class SimulationBuilder {
 		}
 		if (line.hasOption(SCENARIO_ARG)) {
 			setScenarioName(line.getOptionValue(SCENARIO_ARG));
-		}
-		if (line.hasOption(LOAD_ARG)) {
-			setSimFile(line.getOptionValue(LOAD_ARG));
 		}
 		if (line.hasOption(LATITUDE_ARG)) {
 			setLatitude(line.getOptionValue(LATITUDE_ARG));
@@ -268,7 +266,6 @@ public class SimulationBuilder {
 	 * @return The new simulation started
 	 */
 	public Simulation start() {
-		printJavaVersion();
 		
 		// Load xml files but not until arguments parsed since it may change 
 		// the data directory
@@ -283,13 +280,14 @@ public class SimulationBuilder {
 			
 		boolean loaded = false;
 		if (simFile != null) {
-			loaded  = loadSimulation();
+			loaded = loadSimulation();
 		}
 		
 		InitialSettlement spec = null;
 		if (template != null) {
 			spec = loadSettlementTemplate(simConfig);
 		}
+		
 		if (!loaded) {
 			// Create a new simulation
 			sim.createNewSimulation(userTimeRatio); 
@@ -318,12 +316,26 @@ public class SimulationBuilder {
 			}
 		}
 
-		sim.startClock(false);
-		
 		if (!loaded) {
 			// initialize getTransportManager	
 			sim.getTransportManager().init();
 		}
+
+		while (true) {
+	        try {
+				TimeUnit.MILLISECONDS.sleep(1000);
+				if (!sim.isUpdating()) {
+					logger.config("Starting the Master Clock...");		
+					sim.startClock(false);
+					break;
+				}
+	        } catch (InterruptedException e) {
+				logger.log(Level.WARNING, "Trouble starting Main Window. ", e); 
+				// Restore interrupted state...
+			    Thread.currentThread().interrupt();
+	        }
+		}
+
 		
 		return sim;
 	}
@@ -356,11 +368,19 @@ public class SimulationBuilder {
 			logger.config("Loading from " + simFile.getAbsolutePath());
 
 			Simulation sim = Simulation.instance();
+					
+//			sim.createNewSimulation(userTimeRatio);
 			
-			// Create class instances
-			sim.createNewSimulation(userTimeRatio);
+//			sim.loadSim();
 			
+			// Question : Why does it have to create some of the class instances in recreateSomeInstances(), 
+			// only later be rewritten in loadSimulation() ?
+			sim.recreateSomeInstances(userTimeRatio);
+			// Note: if skipping createNewSimulation(), it would not be deserialized correctly
 			sim.loadSimulation(simFile);		
+			
+			// Re-initialize instances
+			sim.reinitializeInstances();
 			
 			result  = true;			
 			// initialize ResupplyUtil.
@@ -403,8 +423,8 @@ public class SimulationBuilder {
 			settlementName = settlementNames.get(rand);
 		}
 		
-		logger.info("Starting a single Settlement sim using template "+ template
-				+ " with settlement name = " + settlementName);
+		logger.info("Starting a single settlement sim using template '" + template
+				+ "' with settlement name '" + settlementName + "'.");
 		return new InitialSettlement(settlementName, authority.getName(), template, 
 									 settlementTemplate.getDefaultPopulation(),
 									 settlementTemplate.getDefaultNumOfRobots(),

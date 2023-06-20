@@ -9,7 +9,6 @@ package org.mars_sim.msp.ui.swing.tool.settlement;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
-import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -24,6 +23,9 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+
+import javax.swing.JPanel;
 
 import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Msg;
@@ -33,19 +35,30 @@ import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.structure.building.Building;
 import org.mars_sim.msp.core.structure.construction.ConstructionSite;
-import org.mars_sim.msp.core.time.ClockListener;
 import org.mars_sim.msp.core.time.ClockPulse;
 import org.mars_sim.msp.core.tool.MoreMath;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-
-import com.alee.laf.panel.WebPanel;
+import org.mars_sim.msp.ui.swing.UIConfig;
 
 /**
  * A panel for displaying the settlement map.
  */
 @SuppressWarnings("serial")
-public class SettlementMapPanel extends WebPanel implements ClockListener {
+public class SettlementMapPanel extends JPanel {
+
+	// Proeprty name s for UI Config
+	private static final String BUILDING_LBL_PROP = "BUILDING_LABELS";
+	private static final String CONSTRUCTION_LBL_PROP = "CONSTRUCTION_LABELS";
+	private static final String PERSON_LBL_PROP = "PERSON_LABELS";
+	private static final String VEHICLE_LBL_PROP = "VEHICLE_LABELS";
+	private static final String ROBOT_LBL_PROP = "ROBOT_LABELS";
+	private static final String SETTLEMENT_PROP = "SETTLEMENT";
+	private static final String DAYLIGHT_PROP = "DAYLIGHT_LAYER";
+	private static final String X_PROP = "XPOS";
+	private static final String Y_PROP = "YPOS";
+	private static final String SCALE_PROP = "SCALE";
+	private static final String ROTATION_PROP = "ROTATION";
 
 	// Static members.
 	private static final double WIDTH = 6D;
@@ -73,7 +86,7 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 
 	private MainDesktopPane desktop;
 
-	private Building building;
+	//private Building building;
 	private SettlementWindow settlementWindow;
 	private Settlement settlement;
 	private PopUpUnitMenu menu;
@@ -91,7 +104,8 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 	/**
 	 * Constructor 1 A panel for displaying a settlement map.
 	 */
-	public SettlementMapPanel(MainDesktopPane desktop, final SettlementWindow settlementWindow) {
+	public SettlementMapPanel(MainDesktopPane desktop, final SettlementWindow settlementWindow,
+							Properties userSettings) {
 		super();
 		this.settlementWindow = settlementWindow;
 		this.desktop = desktop;
@@ -102,7 +116,21 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 		
 		if (!settlements.isEmpty()) {
 			Collections.sort(settlements);
-			settlement = settlements.get(0);
+
+			// Search for matching settlement
+			String userChoice = ((userSettings != null) && userSettings.containsKey(SETTLEMENT_PROP) ?
+											userSettings.getProperty(SETTLEMENT_PROP) : null);
+			if (userChoice != null) {
+				for(Settlement s : settlements) {
+					if (s.getName().equals(userChoice)) {
+						settlement = s;
+					}
+				}
+			}
+										
+			if (settlement == null) {
+				settlement = settlements.get(0);
+			}
 		}
 		
 		setLayout(new BorderLayout());
@@ -110,22 +138,24 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 		setDoubleBuffered(true);
 
 		// Initialize data members.
-		xPos = 0D;
-		yPos = 0D;
-		rotation = 0D;
-		scale = DEFAULT_SCALE;
-		showBuildingLabels = false;
-		showConstructionLabels = false;
-		showPersonLabels = false;
-		showVehicleLabels = false;
-		showRobotLabels = false;
-		showDaylightLayer = false; // turn off by default
+		xPos = UIConfig.extractDouble(userSettings, X_PROP, 0D);
+		yPos = UIConfig.extractDouble(userSettings, Y_PROP, 0D);
+		rotation = UIConfig.extractDouble(userSettings, ROTATION_PROP, 0D);
+		scale = UIConfig.extractDouble(userSettings, SCALE_PROP, DEFAULT_SCALE);
+		showBuildingLabels = UIConfig.extractBoolean(userSettings, BUILDING_LBL_PROP, false);
+		showConstructionLabels = UIConfig.extractBoolean(userSettings, CONSTRUCTION_LBL_PROP, false);
+		showPersonLabels = UIConfig.extractBoolean(userSettings, PERSON_LBL_PROP, false);
+		showVehicleLabels = UIConfig.extractBoolean(userSettings, VEHICLE_LBL_PROP, false);
+		showRobotLabels = UIConfig.extractBoolean(userSettings, ROBOT_LBL_PROP, false);
+		showDaylightLayer = UIConfig.extractBoolean(userSettings, DAYLIGHT_PROP, false); 
+
+
 		selectedBuilding = new HashMap<>();
 		selectedPerson = new HashMap<>();
 		selectedRobot = new HashMap<>();
 	}
 
-	public void createUI() {
+	void createUI() {
 
 		initLayers(desktop);
 
@@ -134,8 +164,6 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 		setBackground(new Color(0,0,0,128));
 
 		setForeground(Color.ORANGE);
-
-		desktop.getSimulation().getMasterClock().addClockListener(this, 1000L);
 
 		detectMouseMovement();
 		setFocusable(true);
@@ -146,7 +174,6 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 		repaint();
 	}
 
-	// Add initLayers()
 	public void initLayers(MainDesktopPane desktop) {
 
 		// Set up the dayNightMapLayer layers
@@ -167,35 +194,10 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 
 		settlementTransparentPanel = new SettlementTransparentPanel(desktop, this);
 		settlementTransparentPanel.createAndShowGUI();
+		settlementTransparentPanel.getSettlementListBox().setSelectedItem(settlement);
 
 		repaint();
 	}
-
-	/**
-	 * Constructor 2 A panel for initializing the display of a building svg image
-	 * by BuildingPanel
-	 */
-	public SettlementMapPanel(Settlement settlement, Building building) {
-		super();
-
-		// Initialize data members.
-		xPos = 0D;
-		yPos = 0D;
-		rotation = 0D;
-		scale = DEFAULT_SCALE;
-		this.settlement = settlement;
-		this.building = building;
-
-		mapLayers = new ArrayList<>(1);
-		mapLayers.add(new StructureMapLayer(this));
-
-		// Set preferred size.
-		setPreferredSize(new Dimension(100, 100));
-
-		// Set foreground and background colors.
-		setOpaque(true);
-	}
-
 
 	public void detectMouseMovement() {
 
@@ -276,7 +278,7 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 	}
 
 	/**
-	 * Checks if the player selected an unit
+	 * Checks if the player selected an unit.
 	 *
 	 * @param evt
 	 */
@@ -328,7 +330,7 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 
 		Point.Double clickPosition = convertToSettlementLocation(xPixel, yPixel);
 
-		Iterator<Building> j = settlement.getBuildingManager().getBuildings().iterator();
+		Iterator<Building> j = settlement.getBuildingManager().getBuildingSet().iterator();
 		while (j.hasNext()) {
 			Building building = j.next();
 
@@ -570,7 +572,7 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 		Point.Double clickPosition = convertToSettlementLocation(xPixel, yPixel);
 		Building selectedBuilding = null;
 
-		Iterator<Building> j = settlement.getBuildingManager().getBuildings().iterator();
+		Iterator<Building> j = settlement.getBuildingManager().getBuildingSet().iterator();
 		while (j.hasNext()) {
 			Building building = j.next();
 
@@ -1054,8 +1056,7 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 	public void paintComponent(Graphics g) {
 		super.paintComponent(g);
 
-		if (building != null
-				|| (desktop != null && settlementWindow.isShowing() && desktop.isToolWindowOpen(SettlementWindow.NAME))) {
+		if (desktop != null && settlementWindow.isShowing() && desktop.isToolWindowOpen(SettlementWindow.NAME)) {
 			Graphics2D g2d = (Graphics2D) g;
 
 			g2d.setFont(sansSerif);
@@ -1070,7 +1071,7 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 			Iterator<SettlementMapLayer> i = mapLayers.iterator();
 			while (i.hasNext()) {
 				// Add building parameter
-				i.next().displayLayer(g2d, settlement, building, xPos, yPos, getWidth(), getHeight(), rotation, scale);
+				i.next().displayLayer(g2d, settlement, null, xPos, yPos, getWidth(), getHeight(), rotation, scale);
 			}
 		}
 	}
@@ -1078,32 +1079,42 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 	public SettlementTransparentPanel getSettlementTransparentPanel() {
 		return settlementTransparentPanel;
 	}
-
-	@Override
-	public void clockPulse(ClockPulse pulse) {
-		if (isShowing() && desktop.isToolWindowOpen(SettlementWindow.NAME)) {
-			repaint();
-		}
+	
+    void update(ClockPulse pulse) {
+		settlementTransparentPanel.update(pulse);
+		repaint();
 	}
 
-	@Override
-	public void pauseChange(boolean isPaused, boolean showPane) {
-		// placeholder
+	/**
+	 * Get the user display settings
+	 */
+	Properties getUIProps() {
+		Properties props = new Properties();
+		props.setProperty(SETTLEMENT_PROP, settlement.getName());
+
+		props.setProperty(BUILDING_LBL_PROP, Boolean.toString(showBuildingLabels));
+		props.setProperty(CONSTRUCTION_LBL_PROP, Boolean.toString(showConstructionLabels));
+		props.setProperty(PERSON_LBL_PROP, Boolean.toString(showPersonLabels));
+		props.setProperty(VEHICLE_LBL_PROP, Boolean.toString(showVehicleLabels));
+		props.setProperty(ROBOT_LBL_PROP, Boolean.toString(showRobotLabels));
+		props.setProperty(DAYLIGHT_PROP, Boolean.toString(showDaylightLayer));
+		props.setProperty(X_PROP, Double.toString(xPos));
+		props.setProperty(Y_PROP, Double.toString(yPos));
+		props.setProperty(ROTATION_PROP, Double.toString(rotation));
+		props.setProperty(SCALE_PROP, Double.toString(scale));
+
+		return props;
 	}
 
 	/**
 	 * Cleans up the map panel for disposal.
 	 */
 	public void destroy() {
-		// Remove clock listener.
-		desktop.getSimulation().getMasterClock().removeClockListener(this);
-
 		settlementTransparentPanel.destroy();
 		
 		menu = null;
 		settlement = null;
 		selectedPerson = null;
-		building = null;
 		settlementWindow = null;
 
 		// Destroy all map layers.
@@ -1114,7 +1125,7 @@ public class SettlementMapPanel extends WebPanel implements ClockListener {
 
 		mapLayers = null;
 		selectedRobot = null;
-		building = null;
 		settlementTransparentPanel = null;
 	}
+
 }

@@ -10,11 +10,11 @@ package org.mars_sim.msp.core.malfunction;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Logger;
 
 import org.mars_sim.msp.core.SimulationConfig;
 import org.mars_sim.msp.core.Unit;
@@ -22,9 +22,11 @@ import org.mars_sim.msp.core.UnitType;
 import org.mars_sim.msp.core.equipment.EVASuit;
 import org.mars_sim.msp.core.equipment.Equipment;
 import org.mars_sim.msp.core.equipment.EquipmentOwner;
+import org.mars_sim.msp.core.logging.SimLogger;
 import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.resource.MaintenanceScope;
 import org.mars_sim.msp.core.resource.Part;
+import org.mars_sim.msp.core.resource.PartConfig;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.tool.RandomUtil;
@@ -41,14 +43,17 @@ public final class MalfunctionFactory implements Serializable {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 
-	private static final Logger logger = Logger.getLogger(MalfunctionFactory.class.getName());
-
+	/** default logger. */
+	private static SimLogger logger = SimLogger.getLogger(MalfunctionFactory.class.getName());
+	
 	public static final String METEORITE_IMPACT_DAMAGE = "Meteorite Impact Damage";
 
 	// Data members
 	private int newIncidentNum = 0;
 
-	public static MalfunctionConfig mc = SimulationConfig.instance().getMalfunctionConfiguration();
+	public static SimulationConfig simulationConfig = SimulationConfig.instance();
+	public static MalfunctionConfig mc = simulationConfig.getMalfunctionConfiguration();
+	public static PartConfig partConfig = simulationConfig.getPartConfiguration();
 
 	/**
 	 * Constructs a MalfunctionFactory object.
@@ -68,7 +73,7 @@ public final class MalfunctionFactory implements Serializable {
 	public MalfunctionMeta pickAMalfunction(Collection<String> scopes) {
 		MalfunctionMeta choosenMalfunction = null;
 
-		List<MalfunctionMeta> malfunctions = mc.getMalfunctionList();
+		List<MalfunctionMeta> malfunctions = new ArrayList<>(mc.getMalfunctionList());
 		double totalProbability = 0D;
 		// Total probability is fixed
 		for (MalfunctionMeta m : malfunctions) {
@@ -78,20 +83,24 @@ public final class MalfunctionFactory implements Serializable {
 		}
 
 		double r = RandomUtil.getRandomDouble(totalProbability);
+		// Shuffle the malfunction list
+		Collections.shuffle(malfunctions);
 		for (MalfunctionMeta m : malfunctions) {
 			double probability = m.getProbability();
-			// will only pick one malfunction at a time (if mal == null, quit)
+			
 			if (m.isMatched(scopes) && (choosenMalfunction == null)) {
 				if (r < probability) {
+					// will only pick one malfunction at a time 
 					choosenMalfunction = m;
+					break;
 				} else
 					r -= probability;
 			}
 		}
 
-		// Safety check if probability failed to pick malfuncton
+		// Safety check if probability failed to pick malfunction
 		if (choosenMalfunction == null) {
-			logger.warning("Failed to pick Malfunction by probability " + totalProbability);
+			logger.warning("Failed to pick a malfunction by probability " + totalProbability + ".");
 			choosenMalfunction = malfunctions.get(0);
 		}
 
@@ -147,7 +156,7 @@ public final class MalfunctionFactory implements Serializable {
 	 */
 	private static Collection<Malfunctionable> getBuildingMalfunctionables(Settlement settlement) {
 		// Should get a collection of buildings only
-		return new ArrayList<>(settlement.getBuildingManager().getBuildings());
+		return new ArrayList<>(settlement.getBuildingManager().getBuildingSet());
 	}
 
 	/**
@@ -244,7 +253,7 @@ public final class MalfunctionFactory implements Serializable {
 
 				for (RepairPart p : m.getParts()) {
 					double partProbability = p.getProbability() / 100D;
-					double averageNumber = RandomUtil.getRandomRegressionIntegerAverageValue(p.getNumber());
+					double averageNumber = RandomUtil.getIntegerAverageValue(p.getNumber());
 					double totalNumber = averageNumber * partProbability * malfunctionProbability;
 
 					int id = p.getPartID();
@@ -268,10 +277,10 @@ public final class MalfunctionFactory implements Serializable {
 	 */
 	static Map<Integer, Double> getMaintenancePartProbabilities(Set<String> scope) {
 		Map<Integer, Double> maintenancePartProbabilities = new HashMap<>();
-		for (MaintenanceScope maintenance : SimulationConfig.instance().getPartConfiguration().getMaintenance(scope)) {
+		for (MaintenanceScope maintenance : partConfig.getMaintenance(scope)) {
 			double prob = maintenance.getProbability() / 100D;
 			int partNumber = maintenance.getMaxNumber();
-			double averageNumber = RandomUtil.getRandomRegressionIntegerAverageValue(partNumber);
+			double averageNumber = RandomUtil.getIntegerAverageValue(partNumber);
 			double totalNumber = averageNumber * prob;
 
 			Integer id = maintenance.getPart().getID();

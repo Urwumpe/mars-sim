@@ -11,7 +11,6 @@ import org.mars_sim.msp.core.person.ai.NaturalAttributeType;
 import org.mars_sim.msp.core.person.ai.SkillType;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.core.structure.Settlement;
-import org.mars_sim.msp.core.structure.building.function.FunctionType;
 
 /** 
  * The Medicbot class represents a job for an medical treatment expert.
@@ -21,7 +20,6 @@ public class Medicbot extends RobotJob {
 	/** default serial id. */
 	private static final long serialVersionUID = 1L;
 	private static final double POP_PER_BOT = 15;
-	private static final double SICKBAY_PER_BOT = 4;
 
 	/** Constructor. */
 	public Medicbot() {

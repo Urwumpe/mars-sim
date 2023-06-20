@@ -1,12 +1,13 @@
 /*
  * Mars Simulation Project
  * MetaTaskUtil.java
- * @date 2022-08-01
+ * @date 2023-06-16
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task.util;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -22,6 +23,7 @@ import org.mars_sim.msp.core.person.ai.task.meta.ConsolidateContainersMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.ConstructBuildingMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.ConversationMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.CookMealMeta;
+import org.mars_sim.msp.core.person.ai.task.meta.DelegateWorkMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.DigLocalIceMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.DigLocalRegolithMeta;
 import org.mars_sim.msp.core.person.ai.task.meta.EatDrinkMeta;
@@ -81,13 +83,17 @@ import org.mars_sim.msp.core.robot.ai.task.ChargeMeta;
  */
 public class MetaTaskUtil {
 
+	private static final String EVA = "EVA";
+	private static final String INSIDE = "Inside";
+	private static final String GARAGE = "Garage";
+	
 	private static List<FactoryMetaTask> dutyHourTasks = null;
 	private static List<FactoryMetaTask> nonDutyHourTasks = null;
 
 	private static List<FactoryMetaTask> personMetaTasks;
 	private static List<FactoryMetaTask> robotMetaTasks = null;
 
-	private static Map<String,MetaTask> nameToMetaTask;
+	private static Map<String,MetaTask> idToMetaTask;
 	private static List<SettlementMetaTask> settlementTasks;
 
 	/**
@@ -101,7 +107,7 @@ public class MetaTaskUtil {
 	 */
 	public static synchronized void initializeMetaTasks() {
 
-		if (nameToMetaTask != null) {
+		if (idToMetaTask != null) {
 			// Created by another thread during the wait
 			return;
 		}
@@ -113,55 +119,67 @@ public class MetaTaskUtil {
 		allMetaTasks.add(new ChargeMeta());
 		allMetaTasks.add(new CompileScientificStudyResultsMeta());
 		allMetaTasks.add(new ConnectWithEarthMeta());
+		
 		allMetaTasks.add(new ConsolidateContainersMeta());
 		allMetaTasks.add(new ConstructBuildingMeta());
 		allMetaTasks.add(new CookMealMeta());
+		allMetaTasks.add(new DelegateWorkMeta());		
 		allMetaTasks.add(new DigLocalIceMeta());
+		
 		allMetaTasks.add(new DigLocalRegolithMeta());
 		allMetaTasks.add(new EatDrinkMeta());
 		allMetaTasks.add(new ExamineBodyMeta());
 		allMetaTasks.add(new ConversationMeta());
 		allMetaTasks.add(new InviteStudyCollaboratorMeta());
+		
 		allMetaTasks.add(new ListenToMusicMeta());
 		allMetaTasks.add(new LoadVehicleMeta());
 		allMetaTasks.add(new MaintainVehicleMeta());
 		allMetaTasks.add(new MaintainBuildingMeta());
 		allMetaTasks.add(new ManufactureConstructionMaterialsMeta());
+		
 		allMetaTasks.add(new ManufactureGoodMeta());
 		allMetaTasks.add(new MeetTogetherMeta());
 		allMetaTasks.add(new ObserveAstronomicalObjectsMeta());
 		allMetaTasks.add(new OptimizeSystemMeta());
 		allMetaTasks.add(new PeerReviewStudyPaperMeta());
+		
 		allMetaTasks.add(new PerformLaboratoryExperimentMeta());
 		allMetaTasks.add(new PerformLaboratoryResearchMeta());
 		allMetaTasks.add(new PerformMathematicalModelingMeta());
 		allMetaTasks.add(new PlanMissionMeta());
 		allMetaTasks.add(new PlayHoloGameMeta());
+		
 		allMetaTasks.add(new PrepareDessertMeta());
 		allMetaTasks.add(new PrescribeMedicationMeta());
 		allMetaTasks.add(new ProduceFoodMeta());
 		allMetaTasks.add(new ProposeScientificStudyMeta());
 		allMetaTasks.add(new ReadMeta());
+		
 		allMetaTasks.add(new RecordActivityMeta());
 		allMetaTasks.add(new RelaxMeta());
 		allMetaTasks.add(new RepairMalfunctionMeta());
 		allMetaTasks.add(new ReportMissionControlMeta());
 		allMetaTasks.add(new RequestMedicalTreatmentMeta());
+		
 		allMetaTasks.add(new RestingMedicalRecoveryMeta());
 		allMetaTasks.add(new RespondToStudyInvitationMeta());
 		allMetaTasks.add(new ReturnLightUtilityVehicleMeta());
 		allMetaTasks.add(new ReviewJobReassignmentMeta());
 		allMetaTasks.add(new ReviewMissionPlanMeta());
+		
 		allMetaTasks.add(new SalvageBuildingMeta());
 		allMetaTasks.add(new SalvageGoodMeta());
 		allMetaTasks.add(new SelfTreatHealthProblemMeta());
 		allMetaTasks.add(new SleepMeta()); 
 		allMetaTasks.add(new StudyFieldSamplesMeta());
+		
 		allMetaTasks.add(new TeachMeta());
 		allMetaTasks.add(new TendFishTankMeta());
 		allMetaTasks.add(new TendGreenhouseMeta());
 		allMetaTasks.add(new ToggleFuelPowerSourceMeta());
 		allMetaTasks.add(new ToggleResourceProcessMeta());
+		
 		allMetaTasks.add(new TreatMedicalPatientMeta());
 		allMetaTasks.add(new UnloadVehicleMeta());
 		allMetaTasks.add(new WorkoutMeta());
@@ -169,9 +187,9 @@ public class MetaTaskUtil {
 		allMetaTasks.add(new YogaMeta());
 		
 		// Build the name lookup for later
-		nameToMetaTask = new HashMap<>();
+		idToMetaTask = new HashMap<>();
 		for(MetaTask t : allMetaTasks) {
-			nameToMetaTask.put(t.getClass().getSimpleName().toLowerCase(), t);
+			idToMetaTask.put(t.getID(), t);
 		}
 
 		// Pick put settlement tasks
@@ -208,6 +226,15 @@ public class MetaTaskUtil {
 		tasks.addAll(metaPerScope.get(TaskScope.ANY_HOUR));
 		tasks.addAll(metaPerScope.get(TaskScope.NONWORK_HOUR));
 		nonDutyHourTasks = Collections.unmodifiableList(tasks);
+	}
+
+	/**
+	 * Gets all the known MetaTasks.
+	 * 
+	 * @return 
+	 */
+	public static Collection<MetaTask> getAllMetaTasks() {
+		return idToMetaTask.values(); 
 	}
 
 	/**
@@ -248,24 +275,27 @@ public class MetaTaskUtil {
     }
 
 	/**
-	 * Converts a task name in String to Metatask
+	 * Converts a task name in String to Metatask.
 	 * 
 	 * @return meta tasks.
 	 */
 	public static MetaTask getMetaTask(String name) {
-		return nameToMetaTask.get(name.toLowerCase());
+		return idToMetaTask.get(name.toUpperCase());
 	}
 
 	/**
-	 * Get a MetaTask instance that is assooicated wth a Task class.
-	 * This method logic ia fragile and needs a better solution.
+	 * Gets a MetaTask instance that is associated with a Task class.
+	 * Note: this method logic is fragile and needs a better solution.
+	 * 
+	 * @param task
+	 * @return
 	 */
 	public static MetaTask getMetaTypeFromTask(Task task) {
 		String s = task.getClass().getSimpleName();
-		String ss = s.replace("EVA", "")
-				.replace("Inside", "")
-				.replace("Garage", "");
-		String metaTaskName = ss.trim() + "Meta";
+		String ss = s.replace(EVA, "")
+				.replace(INSIDE, "")
+				.replace(GARAGE, "");
+		String metaTaskName = ss.trim();
 	
 		return getMetaTask(metaTaskName);
 	}
@@ -275,7 +305,7 @@ public class MetaTaskUtil {
 	}
 
 	/**
-	 * Load any references that MetaTasks need
+	 * Loads any references that MetaTasks need.
 	 */
     static void initialiseInstances(Simulation sim) {
 		MetaTask.initialiseInstances(sim);

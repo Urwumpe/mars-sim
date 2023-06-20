@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * TerrainElevation.java
- * @date 2022-07-29
+ * @date 2023-05-09
  * @author Scott Davis
  */
 
@@ -9,20 +9,23 @@ package org.mars_sim.msp.core.environment;
 
 import java.awt.Color;
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
-import org.mars_sim.mapdata.MapData;
 import org.mars_sim.mapdata.MapDataUtil;
+import org.mars_sim.msp.core.CollectionUtils;
 import org.mars_sim.msp.core.Coordinates;
 import org.mars_sim.msp.core.Direction;
+import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.tool.RandomUtil;
 
 // Note: the newly surveyed ice deposit spans latitudes from 39 to 49 deg
 // within the Utopia Planitia plains, as estimated by SHARAD, an subsurface
 // sounding radar ice that penetrate below the surface. SHARAD was mounted
 // on the Mars Reconnaissance Orbiter.
-//
+
 // See https://www.jpl.nasa.gov/news/news.php?feature=6680
 
 /**
@@ -34,37 +37,20 @@ public class TerrainElevation implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
+//	Will add back SimLogger logger = SimLogger.getLogger(TerrainElevation.class.getName())
+	
+	private static final double STEP_KM = 2;
+	
 	private static final double DEG_TO_RAD = Math.PI/180;
 
-	private static final double OLYMPUS_MONS_CALDERA_PHI = 1.267990;
-	private static final double OLYMPUS_MONS_CALDERA_THETA = 3.949854;
-
-	private static final double ASCRAEUS_MONS_PHI = 1.363102D;
-	private static final double ASCRAEUS_MONS_THETA = 4.459316D;
-
-	private static final double ARSIA_MONS_PHI = 1.411494;
-	private static final double ARSIA_MONS_THETA = 4.158439;
-//
-	private static final double ELYSIUM_MONS_PHI = 1.138866;
-	private static final double ELYSIUM_MONS_THETA = 2.555808;
-//
-	private static final double PAVONIS_MONS_PHI = 1.569704;
-	private static final double PAVONIS_MONS_THETA = 4.305273;
-
-	private static final double HECATES_THOLUS_PHI = 1.015563;
-	private static final double HECATES_THOLUS_THETA = 2.615812;
-
-	private static final double ALBOR_THOLUS_PHI = 1.245184;
-	private static final double ALBOR_THOLUS_THETA = 2.615812;
-
 	private static final double RATE = 1;
-
-	private static MapData mapdata;
 
 	private static MapDataUtil mapDataUtil = MapDataUtil.instance();
 
 	private static Set<CollectionSite> sites;
 
+	private transient Map<Coordinates, double[]> terrainCacheMap = new HashMap<>();
+	
 	/**
 	 * Constructor.
 	 */
@@ -73,7 +59,7 @@ public class TerrainElevation implements Serializable {
 	}
 
 	/**
-	 * Returns terrain steepness angle from location by sampling 11.1 km in given
+	 * Returns terrain steepness angle (in radians) from location by sampling a step distance in given
 	 * direction.
 	 *
 	 * @param currentLocation  the coordinates of the current location
@@ -81,15 +67,11 @@ public class TerrainElevation implements Serializable {
 	 * @return terrain steepness angle (in radians)
 	 */
 	public static double determineTerrainSteepness(Coordinates currentLocation, Direction currentDirection) {
-		double newY = -1.5D * currentDirection.getCosDirection();
-		double newX = 1.5D * currentDirection.getSinDirection();
-		Coordinates sampleLocation = currentLocation.convertRectToSpherical(newX, newY);
-		double elevationChange = getMOLAElevation(sampleLocation) - getMOLAElevation(currentLocation);
-		return Math.atan(elevationChange / 11.1D);
+		return determineTerrainSteepness(currentLocation, getMOLAElevation(currentLocation), currentDirection);
 	}
 
 	/**
-	 * Determines the terrain steepness angle from location by sampling 11.1 km in given
+	 * Determines the terrain steepness angle (in radians) from location by sampling a step distance in given
 	 * direction and elevation.
 	 *
 	 * @param currentLocation
@@ -102,11 +84,13 @@ public class TerrainElevation implements Serializable {
 		double newX = 1.5 * currentDirection.getSinDirection();
 		Coordinates sampleLocation = currentLocation.convertRectToSpherical(newX, newY);
 		double elevationChange = getMOLAElevation(sampleLocation) - elevation;
-		return Math.atan(elevationChange / 11.1D);
+		double steepness = Math.atan(elevationChange / STEP_KM);
+//		logger.config("elevation: " + elevation + "  1.  steepness: " + Math.round(steepness * 100.0)/100.0);
+		return steepness;
 	}
 
 	/**
-	 * Determines the terrain steepness angle from location by sampling a random coordinate set and 11.1 km in given
+	 * Determines the terrain steepness angle (in radians) from location by sampling a random coordinate set and a step distance in given
 	 * direction and elevation.
 	 *
 	 * @param currentLocation
@@ -119,42 +103,44 @@ public class TerrainElevation implements Serializable {
 		double newX = RandomUtil.getRandomDouble(1.5) * currentDirection.getSinDirection();
 		Coordinates sampleLocation = currentLocation.convertRectToSpherical(newX, newY);
 		double elevationChange = getMOLAElevation(sampleLocation) - elevation;
-		return Math.atan(elevationChange / 11.1D);
+		return Math.atan(elevationChange / STEP_KM);
 	}
 
 	/**
 	 * Computes the terrain profile of a site at a coordinate
 	 * direction and elevation.
 	 *
-	 * @param {@link CollectionSite} site
 	 * @param {@link Coordinates} currentLocation
 	 * @return an array of two doubles, namely elevation and steepness
 	 */
-	public static double[] computeTerrainProfile(CollectionSite site, Coordinates currentLocation) {
-		double steepness = 0;
-		double elevation = getMOLAElevation(currentLocation);
-		for (int i=0 ; i <= 360 ; i++) {
-			double rad = i * DEG_TO_RAD;
-			steepness += Math.abs(determineTerrainSteepness(currentLocation, elevation, new Direction(rad)));
+	public double[] computeTerrainProfile(Coordinates currentLocation) {
+		
+		if (!terrainCacheMap.containsKey(currentLocation)) {
+			double steepness = 0;
+			double elevation = getMOLAElevation(currentLocation);
+			for (int i=0 ; i <= 360 ; i++) {
+				double rad = i * DEG_TO_RAD;
+				steepness += Math.abs(determineTerrainSteepness(currentLocation, elevation, new Direction(rad)));
+			}
+		
+			double[] terrain = {elevation, steepness};
+			
+			terrainCacheMap.put(currentLocation, terrain);
+			
+			return terrain;
 		}
-//		// Create a new site
-//		site.setElevation(elevation);
-//		site.setSteepness(steepness);
-//
-//		// Save this site
-//		surfaceFeatures.setSites(currentLocation, site);
-
-		return new double[] {elevation, steepness};
+		
+		return terrainCacheMap.get(currentLocation);
 	}
 
 	/**
 	 * Gets the terrain profile of a location.
 	 *
-	 * @param {@link Coordinates}
+	 * @param {@link Coordinates} currentLocation
 	 * @return an array of two doubles, namely elevation and steepness
 	 */
-	public static double[] getTerrainProfile(Coordinates currentLocation) {
-		return computeTerrainProfile(null, currentLocation);
+	public double[] getTerrainProfile(Coordinates currentLocation) {
+		return computeTerrainProfile(currentLocation);
 	}
 
 
@@ -165,7 +151,7 @@ public class TerrainElevation implements Serializable {
 	 * @param currentLocation
 	 * @return regolith collection rate
 	 */
-	public static void computeRegolithCollectionRate(CollectionSite site, Coordinates currentLocation) {
+	public void computeRegolithCollectionRate(CollectionSite site, Coordinates currentLocation) {
 
 		// Get the elevation and terrain gradient factor
 		double[] terrainProfile = getTerrainProfile(currentLocation);
@@ -213,7 +199,7 @@ public class TerrainElevation implements Serializable {
 	 * @param currentLocation
 	 * @return ice collection rate
 	 */
-	public static void computeIceCollectionRate(CollectionSite site, Coordinates currentLocation) {
+	public void computeIceCollectionRate(CollectionSite site, Coordinates currentLocation) {
 
 		// Get the elevation and terrain gradient factor
 		double[] terrainProfile = getTerrainProfile(currentLocation);
@@ -227,8 +213,8 @@ public class TerrainElevation implements Serializable {
 
 		double rate = RATE;
 
-		// Note: Add seasonal variation for north and south hemisphere
-		// Note: The collection rate may be increased by relevant scientific studies
+		// Note 1: Add seasonal variation for north and south hemisphere
+		// Note 2: The collection rate may be increased by relevant scientific studies
 
 		if (latitude < 60 && latitude > -60) {
 			// The steeper the slope, the harder it is to retrieve the ice deposit
@@ -260,7 +246,7 @@ public class TerrainElevation implements Serializable {
 	 * @param loc
 	 * @return the collection rate
 	 */
-	public static double obtainIceCollectionRate(Coordinates loc) {
+	public double obtainIceCollectionRate(Coordinates loc) {
 		CollectionSite site = getCollectionSite(loc);
 		if (site.getIceCollectionRate() == -1)
 			computeIceCollectionRate(site, loc);
@@ -273,23 +259,11 @@ public class TerrainElevation implements Serializable {
 	 * @param loc
 	 * @return the collection rate
 	 */
-	public static double obtainRegolithCollectionRate(Coordinates loc) {
+	public double obtainRegolithCollectionRate(Coordinates loc) {
 		CollectionSite site = getCollectionSite(loc);
 		if (site.getRegolithCollectionRate() == -1)
 			computeRegolithCollectionRate(site, loc);
 		return site.getRegolithCollectionRate();
-	}
-
-	public static int[] getRGB(Coordinates location) {
-		// Find hue and saturation color components at location.
-		if (mapdata == null)
-			mapdata = mapDataUtil.getTopoMapData();
-		Color color = mapdata.getRGBColor(location.getPhi(), location.getTheta());
-		int red = color.getRed();
-		int green = color.getGreen();
-		int blue = color.getBlue();
-
-		return new int[] {red, green, blue};
 	}
 
 	public static float[] getHSB(int[] rgb) {
@@ -314,7 +288,13 @@ public class TerrainElevation implements Serializable {
 	 * @return the elevation at the location (in km)
 	 */
 	public static double getMOLAElevation(Coordinates location) {
-		return getMOLAElevation(location.getPhi(), location.getTheta());
+		// Check if this location is a settlement
+		Settlement s = CollectionUtils.findSettlement(location);
+		if (s != null) {
+			return s.getElevation();
+		}
+		else
+			return getMOLAElevation(location.getPhi(), location.getTheta());
 	}
 
 	/**
@@ -325,168 +305,10 @@ public class TerrainElevation implements Serializable {
 	 * @return the elevation at the location (in km)
 	 */
 	public static double getMOLAElevation(double phi, double theta) {
-		return mapDataUtil.getElevationInt(phi, theta)/1000.0;
-	}
-	/**
-	 * Returns the patched elevation in km at the given location.
-	 *
-	 * @param location the location in question
-	 * @return the elevation at the location (in km)
-	 */
-	public static double getPatchedElevation(Coordinates location) {
-		// Patch elevation problems at certain locations.
-		return patchElevation(getRawElevation(location), location);
+		return mapDataUtil.getElevation(phi, theta)/1000.0;
 	}
 
-	/**
-	 * Returns the raw elevation in km at the given location.
-	 *
-	 * @param location the location in question
-	 * @return the elevation at the location (in km)
-	 */
-	public static double getRawElevation(Coordinates location) {
-		// Find hue and saturation color components at location.
-		int rgb[] = getRGB(location);
-//		int red = rgb[0];
-		int green = rgb[1];
-		int blue = rgb[2];
-
-		float[] hsb = getHSB(rgb);
-		float hue = hsb[0];
-		float saturation = hsb[1];
-		float brightness = hsb[2];
-
-		// Determine elevation in meters.
-		// NOTE: This code (calculate terrain elevation) needs updating.
-		double elevation = 0;
-
-		// The minimum and maximum topography observations for the entire data set are -8068 and 21134 meters.
-
-//		Note 1: Color Legends at https://astropedia.astrogeology.usgs.gov/download/Mars/GlobalSurveyor/MOLA/ancillary/colorhillshade_mola_lut.gif
-//		Note 2: Lookup Table at https://user-images.githubusercontent.com/1168584/65486713-0c855b80-de5a-11e9-9777-1ed3943c433b.gif
-
-//		if (red == 255 && green == 255 & blue == 255) {
-//			// Note: at Color.white, it's still not the highest point but very close.
-//			return 19;
-//		}
-
-		// Determine elevation in kilometers.
-
-		// Between 19 km to 22+ km
-		if (saturation >= 0 && saturation <= 0.4326
-				&& brightness >= .9921 && brightness <= 1
-				&& green >= 249
-				&& blue >= 253)
-			elevation = saturation * .1422 + 1.0204;
-
-		// Between -9 km to 0 km
-		else if ((hue < 1) && (hue >= 0.1752))
-			elevation = -13.6219 * hue + 2.3866;
-
-		// Between 0 km to 19 km
-		else if ((saturation <= .8504) && (saturation >= 0))
-			elevation = saturation * -22.3424 + 19;
-
-
-		return elevation;
-	}
-
-	/**
-	 * Patches elevation errors around mountain tops.
-	 *
-	 * @param elevation the original elevation for the location.
-	 * @param location  the coordinates
-	 * @return the patched elevation for the location
-	 */
-	private static double patchElevation(double elevation, Coordinates location) {
-		// Patch errors at Olympus Mons
-		// Patch the smallest cauldera at the center
-		if (Math.abs(location.getTheta() - OLYMPUS_MONS_CALDERA_THETA) < .0176
-			 && Math.abs(location.getPhi() - OLYMPUS_MONS_CALDERA_PHI) < .0174) {
-				return (elevation + 19) / 2.0;
-		}
-
-		// Patch errors at Olympus Mons caldera.
-		// Patch the larger white cauldera
-		if (Math.abs(location.getTheta() - OLYMPUS_MONS_CALDERA_THETA) < .0796
-			&& Math.abs(location.getPhi() - OLYMPUS_MONS_CALDERA_PHI) < .0796) {
-			if (elevation > 19 && elevation < 21.2870)
-				return (elevation + 21.287D) / 2.0;
-			else if (elevation >= 21.2870)
-				return elevation;
-			
-			return (elevation + 19) / 2.0;
-		}
-
-		// Patch errors at Olympus Mons caldera.
-		// Patch the red base cauldera
-		if (Math.abs(location.getTheta() - OLYMPUS_MONS_CALDERA_THETA) < .1731
-			&& Math.abs(location.getPhi() - OLYMPUS_MONS_CALDERA_PHI) < .1731) {
-			if (elevation < 19 && elevation > 3)
-				return elevation;
-			else if (elevation >= 19)
-				return elevation;
-			
-			return (elevation + 3) / 2.0;
-		}
-
-		// Patch errors at Ascraeus Mons.
-		if (Math.abs(location.getTheta() - ASCRAEUS_MONS_THETA) < .04D
-			&& Math.abs(location.getPhi() - ASCRAEUS_MONS_PHI) < .04D) {
-			if (elevation < 3.4D)
-				return (elevation + 18.219) / 2.0;
-		}
-
-		else if (Math.abs(location.getTheta() - ARSIA_MONS_THETA) < .04D
-			&& Math.abs(location.getPhi() - ARSIA_MONS_PHI) < .04D) {
-				if (elevation < 3D)
-					return (elevation + 17.781) / 2.0;
-		}
-
-		else if (Math.abs(location.getTheta() - ELYSIUM_MONS_THETA) < .04D
-			&& Math.abs(location.getPhi() - ELYSIUM_MONS_PHI) < .04D) {
-				if (elevation < 3D)
-					return (elevation + 14.127) / 2.0;
-		}
-
-		if (Math.abs(location.getTheta() - PAVONIS_MONS_THETA) < .04D
-			&& Math.abs(location.getPhi() - PAVONIS_MONS_PHI) < .04D) {
-				if (elevation < 3D)
-					return (elevation + 14.057) / 2.0;
-		}
-
-		if (Math.abs(location.getTheta() - HECATES_THOLUS_THETA) < .04D
-			&& Math.abs(location.getPhi() - HECATES_THOLUS_PHI) < .04D) {
-//				if (elevation < 2.5D)
-					return (elevation + 4.853) / 2.0;
-		}
-
-		// Patch errors at Ascraeus Mons.
-		if (Math.abs(location.getTheta() - ALBOR_THOLUS_THETA) < .04D
-			&& Math.abs(location.getPhi() - ALBOR_THOLUS_PHI) < .04D) {
-//				if (elevation < 2D)
-					return (elevation + 3.925) / 2.0;
-		}
-
-//		// Patch errors at the north pole.
-//		else if (Math.abs(location.getTheta() - NORTH_POLE_THETA) < .2D) {
-//			if (Math.abs(location.getPhi() - NORTH_POLE_PHI) < .04D) {
-////				if (elevation < 2D)
-//					return 1.015;
-//			}
-//		}
-//
-//		// Patch errors at the south pole.
-//		else if (Math.abs(location.getTheta() - SOUTH_POLE_THETA) < .04D) {
-//			if (Math.abs(location.getPhi() - SOUTH_POLE_PHI) < .04D) {
-////				if (elevation < 2D)
-//					return .783;
-//			}
-//		}
-
-		return elevation;
-	}
-
+	
 	public Set<CollectionSite> getCollectionSites() {
 		return sites;
 	}

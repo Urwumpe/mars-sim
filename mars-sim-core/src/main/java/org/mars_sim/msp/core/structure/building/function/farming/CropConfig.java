@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * CropConfig.java
- * @date 2022-06-20
+ * @date 2023-05-06
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.structure.building.function.farming;
@@ -166,7 +166,7 @@ public class CropConfig {
 			CropSpec spec = new CropSpec(cropID++, name, growingTime * 1000D,
 									cat, lifeCycle, edibleBiomass,
 									edibleWaterContent, inedibleBiomass,
-									dailyPAR, phases, seedName, seedPlant );
+									dailyPAR, phases, seedName, seedPlant);
 
 			newList.add(spec);
 
@@ -244,6 +244,18 @@ public class CropConfig {
 				phases.add(new Phase(PhaseType.TILLERING, 1D, 39D));
 				phases.add(new Phase(PhaseType.GRAND_GROWTH, 1D, 40D));
 				phases.add(new Phase(PhaseType.MATURATION, 1D, 10D));
+				phases.add(new Phase(PhaseType.HARVESTING, 0.5, 5D));
+				phases.add(new Phase(PhaseType.FINISHED, 0.5, 0));
+				break;
+				
+			case HERBS:
+				phases.add(new Phase(PhaseType.INCUBATION, INCUBATION_PERIOD, 0D));
+				phases.add(new Phase(PhaseType.PLANTING, 0.5D, 1D));
+				phases.add(new Phase(PhaseType.GERMINATION, 1D, 9D));
+				phases.add(new Phase(PhaseType.FOLIAGE, 1D, 50D));
+				phases.add(new Phase(PhaseType.FLOWERING, 1D, 20D));
+				phases.add(new Phase(PhaseType.SEED_FILL, 1D, 5D));
+				phases.add(new Phase(PhaseType.POD_MATURING, 1D, 10D));				
 				phases.add(new Phase(PhaseType.HARVESTING, 0.5, 5D));
 				phases.add(new Phase(PhaseType.FINISHED, 0.5, 0));
 				break;

@@ -8,21 +8,16 @@ package org.mars_sim.msp.ui.swing.unit_window.structure;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
-import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
-import java.text.DecimalFormat;
 import java.util.Iterator;
 import java.util.List;
 
-import javax.swing.BorderFactory;
 import javax.swing.BoundedRangeModel;
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
-import javax.swing.border.TitledBorder;
 
 import org.mars_sim.msp.core.resource.ItemResourceUtil;
 import org.mars_sim.msp.core.resource.ResourceUtil;
@@ -33,7 +28,7 @@ import org.mars_sim.msp.core.structure.construction.ConstructionStageInfo;
 import org.mars_sim.msp.core.structure.construction.ConstructionVehicleType;
 import org.mars_sim.msp.core.tool.Conversion;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.unit_window.UnitWindow;
+import org.mars_sim.msp.ui.swing.StyleManager;
 
 /**
  * A panel displaying a list of construction sites at a settlement.
@@ -61,14 +56,10 @@ public class ConstructionSitesPanel extends JPanel {
         
         setLayout(new BorderLayout());
 
-        TitledBorder dessertBorder = BorderFactory.createTitledBorder(null, "Construction Sites",
-				javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION,
-				new Font("Serif", Font.BOLD, 14), java.awt.Color.darkGray);
-        setBorder(dessertBorder);
+        setBorder(StyleManager.createLabelBorder("Construction Sites"));
         		
         // Create scroll panel for sites list pane.
         sitesScrollPane = new JScrollPane();
-        sitesScrollPane.setPreferredSize(new Dimension(UnitWindow.WIDTH - 168, 250));
         sitesScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         add(sitesScrollPane, BorderLayout.CENTER);  
         
@@ -276,10 +267,9 @@ public class ConstructionSitesPanel extends JPanel {
                 result.append("Stage Type: ").append(info.getType()).append("<br>");
                 if (stage.isSalvaging()) result.append("Work Type: salvage<br>");
                 else result.append("Work Type: Construction<br>");
-                DecimalFormat formatter = new DecimalFormat("0.0");
-                String requiredWorkTime = formatter.format(stage.getRequiredWorkTime() / 1000D);
+                String requiredWorkTime = StyleManager.DECIMAL_PLACES1.format(stage.getRequiredWorkTime() / 1000D);
                 result.append("Work Time Required: ").append(requiredWorkTime).append(" Sols<br>");
-                String completedWorkTime = formatter.format(stage.getCompletedWorkTime() / 1000D);
+                String completedWorkTime = StyleManager.DECIMAL_PLACES1.format(stage.getCompletedWorkTime() / 1000D);
                 result.append("Work Time Completed: ").append(completedWorkTime).append(" Sols<br>");
                 result.append("Architect Construction Skill Required: ").append(info.getArchitectConstructionSkill()).append("<br>");
                 

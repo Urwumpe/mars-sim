@@ -12,27 +12,23 @@ import java.awt.FlowLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
-import javax.swing.SpringLayout;
 import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 
 import org.mars_sim.msp.core.Msg;
+import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitEvent;
 import org.mars_sim.msp.core.UnitEventType;
 import org.mars_sim.msp.core.UnitListener;
@@ -47,15 +43,12 @@ import org.mars_sim.msp.core.vehicle.Rover;
 import org.mars_sim.msp.core.vehicle.Vehicle;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.SpringUtilities;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
+import org.mars_sim.msp.ui.swing.tool.monitor.MonitorWindow;
 import org.mars_sim.msp.ui.swing.tool.monitor.PersonTableModel;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
-
-import com.alee.laf.button.WebButton;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
+import org.mars_sim.msp.ui.swing.utils.UnitModel;
+import org.mars_sim.msp.ui.swing.utils.UnitTableLauncher;
 
 /**
  * The TabPanelCrew is a tab panel for a vehicle's crew information.
@@ -66,13 +59,12 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
 	/** default logger. */
 	private static SimLogger logger = SimLogger.getLogger(TabPanelCrew.class.getName());
 
-	private static final String SAILOR_ICON = Msg.getString("icon.sailor"); //$NON-NLS-1$
+	private static final String CREW_ICON = "people"; //$NON-NLS-1$
 
-	
 	private MemberTableModel memberTableModel;
 	private JTable memberTable;
 
-	private JTextField crewNumTF;
+	private JLabel crewNumTF;
 
 	private int crewNumCache;
 	private int crewCapacityCache;
@@ -92,7 +84,7 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
 		// Use the TabPanel constructor
 		super(
 			null,
-			ImageLoader.getNewIcon(SAILOR_ICON),
+			ImageLoader.getIconByName(CREW_ICON),
 			Msg.getString("TabPanelCrew.tooltip"), //$NON-NLS-1$
 			vehicle, desktop
 		);
@@ -107,38 +99,35 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
         northPanel.setLayout(new BoxLayout(northPanel, BoxLayout.Y_AXIS));
         
 		// Create crew count panel
-		WebPanel crewCountPanel = new WebPanel(new SpringLayout());
+		AttributePanel crewCountPanel = new AttributePanel(2);
 		northPanel.add(crewCountPanel, BorderLayout.CENTER);
 
 		// Create crew num header label
 		crewNumCache = crewable.getCrewNum();
-		crewNumTF = addTextField(crewCountPanel, Msg.getString("TabPanelCrew.crewNum"), crewNumCache,
+		crewNumTF = crewCountPanel.addTextField(Msg.getString("TabPanelCrew.crewNum"),
+								Integer.toString(crewNumCache),
 								 Msg.getString("TabPanelCrew.crew.tooltip"));
 
 		// Create crew cap header label
 		crewCapacityCache = crewable.getCrewCapacity();
-		addTextField(crewCountPanel, Msg.getString("TabPanelCrew.crewCapacity"), crewCapacityCache,
-					 Msg.getString("TabPanelCrew.crewCapacity.tooltip"));
+		crewCountPanel.addTextField(Msg.getString("TabPanelCrew.crewCapacity"),
+								Integer.toString(crewCapacityCache),
+					 			Msg.getString("TabPanelCrew.crewCapacity.tooltip"));
 
-		// Prepare SpringLayout.
-		SpringUtilities.makeCompactGrid(crewCountPanel,
-				2, 2, // rows, cols
-				120, 2, // initX, initY
-				XPAD_DEFAULT, YPAD_DEFAULT); // xPad, yPad
 
 		// Create crew monitor button
-		WebButton monitorButton = new WebButton(ImageLoader.getIcon(Msg.getString("img.monitor"))); //$NON-NLS-1$
+		JButton monitorButton = new JButton(ImageLoader.getIconByName(MonitorWindow.ICON)); 
 		monitorButton.setMargin(new Insets(1, 1, 1, 1));
 		monitorButton.addActionListener(this);
 		monitorButton.setToolTipText(Msg.getString("TabPanelCrew.tooltip.monitor")); //$NON-NLS-1$
 
-		WebPanel crewButtonPanel = new WebPanel(new FlowLayout(FlowLayout.CENTER));
+		JPanel crewButtonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		crewButtonPanel.add(monitorButton);
 		northPanel.add(crewButtonPanel, BorderLayout.SOUTH);
        	content.add(northPanel, BorderLayout.NORTH);
 
 		// Create scroll panel for member list.
-		WebScrollPane memberScrollPane = new WebScrollPane();
+		JScrollPane memberScrollPane = new JScrollPane();
 		memberScrollPane.setPreferredSize(new Dimension(300, 300));
 		content.add(memberScrollPane, BorderLayout.CENTER);
 
@@ -148,11 +137,11 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
 			memberTableModel.setMission(mission);
 
 		// Create member table.
-		memberTable = new ZebraJTable(memberTableModel);
-		TableStyle.setTableStyle(memberTable);
+		memberTable = new JTable(memberTableModel);
 		memberTable.getColumnModel().getColumn(0).setPreferredWidth(110);
 		memberTable.getColumnModel().getColumn(1).setPreferredWidth(140);
 		memberTable.setRowSelectionAllowed(true);
+		memberTable.setAutoCreateRowSorter(true);
 		memberTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		
 		DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
@@ -161,28 +150,7 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
 		memberScrollPane.setViewportView(memberTable);
 
 		// Call it a click to display details button when user double clicks the table
-		memberTable.addMouseListener(new MouseListener() {
-			public void mouseReleased(MouseEvent e) {
-			}
-
-			public void mousePressed(MouseEvent e) {
-			}
-
-			public void mouseExited(MouseEvent e) {
-			}
-
-			public void mouseEntered(MouseEvent e) {
-			}
-
-			public void mouseClicked(MouseEvent e) {
-				if (e.getClickCount() == 2 && !e.isConsumed()) {
-			        int index = memberTable.getSelectedRow();
-	    			Person selectedPerson = (Person) memberTableModel.getMemberAtIndex(index);
-	    			if (selectedPerson != null)
-	    				getDesktop().openUnitWindow(selectedPerson, false);
-		        }
-			}
-		});
+		memberTable.addMouseListener(new UnitTableLauncher(getDesktop()));
 
 		update();
 	}
@@ -238,7 +206,7 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
 	/**
 	 * Table model for mission members.
 	 */
-	private class MemberTableModel extends AbstractTableModel implements UnitListener {
+	private class MemberTableModel extends AbstractTableModel implements UnitListener, UnitModel {
 
 		// Private members.
 		private Mission mission;
@@ -294,8 +262,7 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
 		 */
 		public Object getValueAt(int row, int column) {
 			if (row < members.size()) {
-				Object array[] = members.toArray();
-				Worker member = (Worker) array[row];
+				Worker member = members.get(row);
 				if (column == 0)
 					return member.getName();
 				else if (column == 1)
@@ -327,7 +294,6 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
 			return false;
 		}
 
-
 		/**
 		 * Sets the mission for this table model.
 		 *
@@ -346,29 +312,14 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
 		public void unitUpdate(UnitEvent event) {
 			UnitEventType type = event.getType();
 			Worker member = (Worker) event.getSource();
-			int index = getIndex(members, member);
+			int index = members.indexOf(member);
 			if (type == UnitEventType.NAME_EVENT) {
-				SwingUtilities.invokeLater(new MemberTableUpdater(index, 0));
+				fireTableCellUpdated(index, 0);
 			} else if ((type == UnitEventType.TASK_DESCRIPTION_EVENT) || (type == UnitEventType.TASK_EVENT)
 					|| (type == UnitEventType.TASK_ENDED_EVENT) || (type == UnitEventType.TASK_SUBTASK_EVENT)
 					|| (type == UnitEventType.TASK_NAME_EVENT)) {
-				SwingUtilities.invokeLater(new MemberTableUpdater(index, 1));
+				fireTableCellUpdated(index, 1);
 			}
-		}
-
-		private int getIndex(Collection<?> col, Object obj) {
-			int result = -1;
-			Object array[] = col.toArray();
-			int size = array.length;
-
-			for (int i = 0; i < size; i++) {
-				if (array[i].equals(obj)) {
-					result = i;
-					break;
-				}
-			}
-
-			return result;
 		}
 
 		/**
@@ -376,14 +327,7 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
 		 */
 		void updateMembers() {
 			if (mission != null) {
-//				clearMembers();
 				List<Worker> newList = new ArrayList<>(mission.getMembers());
-				Collections.sort(newList, new Comparator<>() {
-					@Override
-					public int compare(Worker o1, Worker o2) {
-						return o1.getName().compareToIgnoreCase(o2.getName());
-					}
-				});
 
 				if (!members.equals(newList)) {
 					List<Integer> rows = new ArrayList<>();
@@ -407,13 +351,13 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
 
 					for (int i : rows) {
 						// Update this row
-						SwingUtilities.invokeLater(new MemberTableUpdater(i));
+						fireTableRowsUpdated(i, i);
 					}
 				}
 			} else {
 				if (members.size() > 0) {
 					clearMembers();
-					SwingUtilities.invokeLater(new MemberTableUpdater());
+					fireTableDataChanged();
 				}
 			}
 		}
@@ -432,54 +376,9 @@ public class TabPanelCrew extends TabPanel implements ActionListener {
 			}
 		}
 
-		/**
-		 * Gets the mission member at a given index.
-		 *
-		 * @param index the index.
-		 * @return the mission member.
-		 */
-		Worker getMemberAtIndex(int index) {
-			if ((index >= 0) && (index < members.size())) {
-				return (Worker) members.toArray()[index];
-			} else {
-				return null;
-			}
-		}
-
-		/**
-		 * Inner class for updating member table.
-		 */
-		private class MemberTableUpdater implements Runnable {
-
-			private int row;
-			private int column;
-			private boolean entireData;
-
-			private MemberTableUpdater(int row, int column) {
-				this.row = row;
-				this.column = column;
-				entireData = false;
-			}
-
-			private MemberTableUpdater(int row) {
-				this.row = row;
-				this.column = -1;
-				entireData = false;
-			}
-
-			private MemberTableUpdater() {
-				entireData = true;
-			}
-
-			public void run() {
-				if (entireData) {
-					fireTableDataChanged();
-				} else if (column == -1) {
-					fireTableRowsUpdated(row, row);
-				} else {
-					fireTableCellUpdated(row, column);
-				}
-			}
+		@Override
+		public Unit getAssociatedUnit(int row) {
+			return (Unit) members.get(row);
 		}
 	}
 }

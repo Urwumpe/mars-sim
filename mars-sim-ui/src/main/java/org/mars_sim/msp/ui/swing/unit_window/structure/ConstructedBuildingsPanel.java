@@ -9,7 +9,6 @@ package org.mars_sim.msp.ui.swing.unit_window.structure;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
 
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -19,8 +18,7 @@ import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.structure.construction.ConstructedBuildingLogEntry;
 import org.mars_sim.msp.core.structure.construction.ConstructionManager;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
+import org.mars_sim.msp.ui.swing.StyleManager;
 
 @SuppressWarnings("serial")
 public class ConstructedBuildingsPanel
@@ -39,18 +37,16 @@ extends JPanel {
 		super();
 
 		setLayout(new BorderLayout(0, 0));
-//		setBorder(new MarsPanelBorder());
 
 		JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 		add(titlePanel, BorderLayout.NORTH);
 
 		JLabel titleLabel = new JLabel("Constructed Buildings");
-		titleLabel.setFont(new Font("Serif", Font.BOLD, 16));
+		StyleManager.applySubHeading(titleLabel);
 		titlePanel.add(titleLabel);
 
 		// Create scroll panel for the outer table panel.
 		JScrollPane scrollPanel = new JScrollPane();
-		scrollPanel.setPreferredSize(new Dimension(200, 75));
 		scrollPanel.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 		add(scrollPanel, BorderLayout.CENTER);
 
@@ -58,7 +54,7 @@ extends JPanel {
 		constructedTableModel = new ConstructedBuildingTableModel(manager);
 
 		// Prepare constructed table.
-		constructedTable = new ZebraJTable(constructedTableModel);
+		constructedTable = new JTable(constructedTableModel);
 		scrollPanel.setViewportView(constructedTable);
 		constructedTable.setRowSelectionAllowed(true);
 		constructedTable.getColumnModel().getColumn(0).setPreferredWidth(105);
@@ -67,16 +63,12 @@ extends JPanel {
 		constructedTable.setPreferredScrollableViewportSize(new Dimension(225, -1));
 		constructedTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
 		constructedTable.setAutoCreateRowSorter(true);
-	
-		TableStyle.setTableStyle(constructedTable);
-
 	}
 
 	/**
 	 * Update the information on this panel.
 	 */
 	public void update() {
-		TableStyle.setTableStyle(constructedTable);
 		constructedTableModel.update();
 	}
 

@@ -1,7 +1,7 @@
 /*
  * Mars Simulation Project
  * StudyFieldSamples.java
- * @date 2022-07-17
+ * @date 2023-04-15
  * @author Scott Davis
  */
 package org.mars_sim.msp.core.person.ai.task;
@@ -10,11 +10,13 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 
 import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.UnitType;
+import org.mars_sim.msp.core.data.UnitSet;
 import org.mars_sim.msp.core.environment.ExploredLocation;
 import org.mars_sim.msp.core.equipment.ResourceHolder;
 import org.mars_sim.msp.core.logging.SimLogger;
@@ -98,15 +100,15 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy {
 				if (lab != null) {
 					addPersonToLab();
 				} else {
-					logger.log(person, Level.WARNING, 0, "lab could not be determined.");
+					logger.log(person, Level.WARNING, 0, "No lab was available.");
 					endTask();
 				}
 			} else {
-				logger.log(person, Level.WARNING, 0, "science could not be determined");
+				logger.log(person, Level.WARNING, 0, "The science subject could not be determined.");
 				endTask();
 			}
 		} else {
-			logger.log(person, Level.WARNING, 0, "study could not be determined");
+			logger.log(person, Level.WARNING, 0, "The scientific study could not be determined.");
 			endTask();
 		}
 
@@ -168,7 +170,7 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy {
 	private ScientificStudy determineStudy() {
 		ScientificStudy result = null;
 
-		List<ScientificStudy> possibleStudies = new ArrayList<ScientificStudy>();
+		List<ScientificStudy> possibleStudies = new ArrayList<>();
 
 		// Create list of possible sciences for studying field samples.
 		List<ScienceType> fieldSciences = getFieldSciences();
@@ -239,7 +241,7 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy {
 		Lab result = null;
 
 		BuildingManager manager = person.getSettlement().getBuildingManager();
-		List<Building> labBuildings = manager.getBuildings(FunctionType.RESEARCH);
+		Set<Building> labBuildings = manager.getBuildingSet(FunctionType.RESEARCH);
 		labBuildings = getSettlementLabsWithSpecialty(science, labBuildings);
 		labBuildings = BuildingManager.getNonMalfunctioningBuildings(labBuildings);
 		labBuildings = getSettlementLabsWithAvailableSpace(labBuildings);
@@ -260,8 +262,8 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy {
 	 * @param buildingList list of buildings with research function.
 	 * @return research buildings with available lab space.
 	 */
-	private static List<Building> getSettlementLabsWithAvailableSpace(List<Building> buildingList) {
-		List<Building> result = new ArrayList<Building>();
+	private static Set<Building> getSettlementLabsWithAvailableSpace(Set<Building> buildingList) {
+		Set<Building> result = new UnitSet<>();
 
 		Iterator<Building> i = buildingList.iterator();
 		while (i.hasNext()) {
@@ -283,8 +285,8 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy {
 	 * @param buildingList list of buildings with research function.
 	 * @return research buildings with science specialty.
 	 */
-	private static List<Building> getSettlementLabsWithSpecialty(ScienceType science, List<Building> buildingList) {
-		List<Building> result = new ArrayList<Building>();
+	private static Set<Building> getSettlementLabsWithSpecialty(ScienceType science, Set<Building> buildingList) {
+		Set<Building> result = new UnitSet<>();
 
 		Iterator<Building> i = buildingList.iterator();
 		while (i.hasNext()) {
@@ -435,7 +437,7 @@ public class StudyFieldSamples extends Task implements ResearchScientificStudy {
 		// Take field samples from inventory.
 		if (!isDone()) {
 			Unit container = person.getContainerUnit();
-			if (container.getUnitType() != UnitType.PLANET) {
+			if (container.getUnitType() != UnitType.MARS) {
 				double mostStored = 0D;
 	            int bestID = 0;
 	            if (container instanceof ResourceHolder) {

@@ -7,13 +7,12 @@
 package org.mars_sim.msp.ui.swing.unit_window.structure.building;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.GridLayout;
 
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.JTextField;
 import javax.swing.table.AbstractTableModel;
 
 import org.mars_sim.msp.core.Msg;
@@ -21,10 +20,8 @@ import org.mars_sim.msp.core.person.health.HealthProblem;
 import org.mars_sim.msp.core.structure.building.function.MedicalCare;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
+import org.mars_sim.msp.ui.swing.utils.AttributePanel;
 
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
 
 /**
  * The MedicalCareBuildingPanel class is a building function panel representing
@@ -34,13 +31,13 @@ import com.alee.laf.scroll.WebScrollPane;
 public class BuildingPanelMedicalCare
 extends BuildingFunctionPanel {
 
-	private static final String MEDICAL_ICON = Msg.getString("icon.medical"); //$NON-NLS-1$
+	private static final String MEDICAL_ICON = "medical";
 
 	// Data members
 	/** The medical care. */
 	private MedicalCare medical;
 	/** Label of number of physicians. */
-	private JTextField physicianLabel;
+	private JLabel physicianLabel;
 	/** Table of medical info. */
 	private MedicalTableModel medicalTableModel;
 
@@ -58,7 +55,7 @@ extends BuildingFunctionPanel {
 		// Use BuildingFunctionPanel constructor
 		super(
 			Msg.getString("BuildingPanelMedicalCare.title"), 
-			ImageLoader.getNewIcon(MEDICAL_ICON),
+			ImageLoader.getIconByName(MEDICAL_ICON),
 			medical.getBuilding(), 
 			desktop
 		);
@@ -74,35 +71,30 @@ extends BuildingFunctionPanel {
 	protected void buildUI(JPanel center) {
 
 		// Create label panel
-		WebPanel labelPanel = new WebPanel(new GridLayout(2, 2, 5, 1));
+		AttributePanel labelPanel = new AttributePanel(2);
 		center.add(labelPanel, BorderLayout.NORTH);
-		labelPanel.setOpaque(false);
-		labelPanel.setBackground(new Color(0,0,0,128));
 		
 		// Create sick bed label
-		addTextField(labelPanel, Msg.getString("BuildingPanelMedicalCare.numberOfsickBeds"),
-					 medical.getSickBedNum(), 5, null);
+		labelPanel.addTextField(Msg.getString("BuildingPanelMedicalCare.numberOfsickBeds"),
+					 				Integer.toString(medical.getSickBedNum()), null);
 
 		// Create physician label
 		physicianCache = medical.getPhysicianNum();
-		physicianLabel = addTextField(labelPanel, Msg.getString("BuildingPanelMedicalCare.numberOfPhysicians"),
-									  physicianCache, 5, null);
+		physicianLabel = labelPanel.addTextField(Msg.getString("BuildingPanelMedicalCare.numberOfPhysicians"),
+									  Integer.toString(physicianCache), null);
 
 		// Create scroll panel for medical table
-		WebScrollPane scrollPanel = new WebScrollPane();
+		JScrollPane scrollPanel = new JScrollPane();
 		scrollPanel.setPreferredSize(new Dimension(160, 80));
 		center.add(scrollPanel, BorderLayout.CENTER);
 	    scrollPanel.getViewport().setOpaque(false);
-	    scrollPanel.getViewport().setBackground(new Color(0, 0, 0, 0));
 	    scrollPanel.setOpaque(false);
-	    scrollPanel.setBackground(new Color(0, 0, 0, 0));
-        //scrollPanel.setBorder( BorderFactory.createLineBorder(Color.orange) );
 
 		// Prepare medical table model
 		medicalTableModel = new MedicalTableModel(medical);
 
 		// Prepare medical table
-		JTable medicalTable = new ZebraJTable(medicalTableModel);
+		JTable medicalTable = new JTable(medicalTableModel);
 		medicalTable.setCellSelectionEnabled(false);
 		scrollPanel.setViewportView(medicalTable);
 	}

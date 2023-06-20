@@ -25,7 +25,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.table.AbstractTableModel;
 
-import org.mars_sim.msp.core.Msg;
 import org.mars_sim.msp.core.Unit;
 import org.mars_sim.msp.core.manufacture.Salvagable;
 import org.mars_sim.msp.core.manufacture.SalvageInfo;
@@ -41,7 +40,7 @@ import org.mars_sim.msp.ui.swing.NumberCellRenderer;
 @SuppressWarnings("serial")
 public class SalvageTabPanel extends TabPanel {
 
-	private static final String WARN_ICON = Msg.getString("icon.warn"); //$NON-NLS-1$
+	private static final String WARN_ICON = "warn";
 	
     private String finishTimeString;
     private JLabel finishTimeLabel;
@@ -54,7 +53,7 @@ public class SalvageTabPanel extends TabPanel {
      */
     public SalvageTabPanel(Unit unit, MainDesktopPane desktop) { 
         // Use the TabPanel constructor
-        super(null, ImageLoader.getNewIcon(WARN_ICON), "Salvage Info", unit, desktop);
+        super(null, ImageLoader.getIconByName(WARN_ICON), "Salvage Info", unit, desktop);
 	}
 
     @Override
@@ -105,7 +104,7 @@ public class SalvageTabPanel extends TabPanel {
         settlementButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent event) {
                 SalvageInfo info = ((Salvagable) getUnit()).getSalvageInfo();
-                getDesktop().openUnitWindow(info.getSettlement(), false);
+                getDesktop().showDetails(info.getSettlement());
             }
         });
         settlementPanel.add(settlementButton);

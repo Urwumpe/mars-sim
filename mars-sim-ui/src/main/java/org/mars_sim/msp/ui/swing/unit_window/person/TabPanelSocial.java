@@ -14,6 +14,7 @@ import java.awt.event.MouseEvent;
 import java.util.Collection;
 
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.event.ListSelectionEvent;
@@ -27,11 +28,7 @@ import org.mars_sim.msp.core.person.ai.social.RelationshipUtil;
 import org.mars_sim.msp.core.tool.Conversion;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
-
-import com.alee.laf.scroll.WebScrollPane;
 
 /**
  * A tab panel displaying a person's social relationships.
@@ -41,7 +38,7 @@ public class TabPanelSocial
 extends TabPanel
 implements ListSelectionListener {
 
-	private static final String SOCIAL_ICON = Msg.getString("icon.social"); //$NON-NLS-1$
+	private static final String SOCIAL_ICON = "social";
 	
 	/** The Person instance. */
 	private Person person = null;
@@ -60,7 +57,7 @@ implements ListSelectionListener {
 		// Use the TabPanel constructor
 		super(
 			null,
-			ImageLoader.getNewIcon(SOCIAL_ICON),
+			ImageLoader.getIconByName(SOCIAL_ICON),
 			Msg.getString("TabPanelSocial.title"), //$NON-NLS-1$
 			person, desktop
 		);
@@ -71,7 +68,7 @@ implements ListSelectionListener {
 	protected void buildUI(JPanel content) {
 
 		// Create relationship scroll panel
-		WebScrollPane relationshipScrollPanel = new WebScrollPane();
+		JScrollPane relationshipScrollPanel = new JScrollPane();
 //		relationshipScrollPanel.setBorder(new MarsPanelBorder());
 		content.add(relationshipScrollPanel, BorderLayout.CENTER);
 
@@ -79,11 +76,11 @@ implements ListSelectionListener {
 		relationshipTableModel = new RelationshipTableModel(person);
 
 		// Create relationship table
-		relationshipTable = new ZebraJTable(relationshipTableModel);
+		relationshipTable = new JTable(relationshipTableModel);
 		relationshipTable.setPreferredScrollableViewportSize(new Dimension(225, 100));
 		relationshipTable.getColumnModel().getColumn(0).setPreferredWidth(100);
-		relationshipTable.getColumnModel().getColumn(1).setPreferredWidth(120);
-		relationshipTable.getColumnModel().getColumn(2).setPreferredWidth(25);
+		relationshipTable.getColumnModel().getColumn(1).setPreferredWidth(100);
+		relationshipTable.getColumnModel().getColumn(2).setPreferredWidth(100);
 		relationshipTable.getColumnModel().getColumn(3).setPreferredWidth(70);
 		relationshipTable.setRowSelectionAllowed(true);
 		
@@ -101,7 +98,7 @@ implements ListSelectionListener {
 		        if (me.getClickCount() == 2) {
 		            if (row > 0 && col > 0) {
 		    			Person selectedPerson = (Person) relationshipTable.getValueAt(row, 1);  			
-		    			if (selectedPerson != null) getDesktop().openUnitWindow(selectedPerson, false);
+		    			if (selectedPerson != null) getDesktop().showDetails(selectedPerson);
 		    	    }
 		        }
 		    }
@@ -119,8 +116,6 @@ implements ListSelectionListener {
 		
 		// Added sorting
 		relationshipTable.setAutoCreateRowSorter(true); // in conflict with valueChanged(), throw exception if clicking on a person
-
-		TableStyle.setTableStyle(relationshipTable);
 	}
 
 	/**
@@ -168,7 +163,7 @@ implements ListSelectionListener {
 			Class<?> dataType = super.getColumnClass(columnIndex);
 			if (columnIndex == 0) dataType = Object.class;
 			else if (columnIndex == 1) dataType = Object.class;
-			else if (columnIndex == 2) dataType = Double.class;
+			else if (columnIndex == 2) dataType = Object.class;
 			else if (columnIndex == 3) dataType = Object.class;
 			return dataType;
 		}
@@ -188,14 +183,17 @@ implements ListSelectionListener {
 			else if (column == 1) 
 				return p;
 			else if (column == 2) {
-				double opinion = RelationshipUtil.getOpinionOfPerson(person, p);
-				return Math.round(opinion*10.0)/10.0;
+				double[] opinions = RelationshipUtil.getOpinionsOfPerson(person, p);
+				return "  T " + (int)Math.round(opinions[0])
+						+ ",  C " + (int)Math.round(opinions[1])
+						+ ",  R " + (int)Math.round(opinions[2]) + "  ";
 			}
 			else if (column == 3) {
 				double opinion = RelationshipUtil.getOpinionOfPerson(person, p);
-				return " " + getRelationshipString(opinion);
+				return " " + getRelationshipString(opinion);	
 			}
-			else return null;
+
+			return null;
 		}
 
 		public void update() {

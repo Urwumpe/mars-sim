@@ -9,9 +9,9 @@ package org.mars_sim.msp.core.person.ai.task.util;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
@@ -307,8 +307,9 @@ public abstract class Task implements Serializable, Comparable<Task> {
 	}
 
 	/**
-	 * End a task because an internal condition is wrong.
-	 * @param reason Reson for the end.
+	 * Ends a task because an internal condition is wrong.
+	 * 
+	 * @param reason Reason for the end.
 	 */
 	protected void clearTask(String reason) {
 		logger.warning(worker, "Early end of " + name + ": " + reason);
@@ -786,6 +787,13 @@ public abstract class Task implements Serializable, Comparable<Task> {
 		return modifier;
 	}
 
+	/**
+	 * Gets the crowding probability modifier.
+	 * 
+	 * @param robot
+	 * @param newBuilding
+	 * @return
+	 */
 	protected static double getCrowdingProbabilityModifier(Robot robot, Building newBuilding) {
 		double modifier = 1D;
 
@@ -851,6 +859,7 @@ public abstract class Task implements Serializable, Comparable<Task> {
 
 	/**
 	 * Who is working on this Task.
+	 * 
 	 * @return
 	 */
 	public Worker getWorker() {
@@ -1177,7 +1186,6 @@ public abstract class Task implements Serializable, Comparable<Task> {
 		}
 	}
 
-
 	
 	/**
 	 * Walks to a random interior location in a building.
@@ -1192,7 +1200,6 @@ public abstract class Task implements Serializable, Comparable<Task> {
 		// Create subtask for walking to destination.
 		createWalkingSubtask(building, adjustedInteriorPos, allowFail);
 	}
-
 
 	
 	/**
@@ -1345,14 +1352,11 @@ public abstract class Task implements Serializable, Comparable<Task> {
 			Settlement s = person.getSettlement();
 			if (s != null) {
 				
-				List<Building> buildingList = s.getBuildingManager()
+				Set<Building> buildingList = s.getBuildingManager()
 						.getBuildingsWithoutFunctionType(FunctionType.EVA);
 				
 				buildingList = buildingList.stream().filter(b -> !b.hasFunction(FunctionType.ASTRONOMICAL_OBSERVATION))
-						.collect(Collectors.toList());
-				
-				// Randomize its order
-				Collections.shuffle(buildingList);	
+						.collect(Collectors.toSet());	
 
 				if (buildingList.size() > 0) {
 					for (Building b : buildingList) {
@@ -1415,7 +1419,7 @@ public abstract class Task implements Serializable, Comparable<Task> {
 
 					Building building = buildingList.get(buildingIndex);
 
-					if (robot.getSettlement().getBuildingConnectors(building).size() > 0) {
+					if (robot.getSettlement().getAdjacentBuildings(building).size() > 0) {
 						logger.log(robot, Level.FINER, 5000, "Walking toward " + building.getNickName());
 						walkToActivitySpotInBuilding(building, fct, allowFail);
 					}
@@ -1454,7 +1458,7 @@ public abstract class Task implements Serializable, Comparable<Task> {
 
 					Building building = buildingList.get(buildingIndex);
 
-					if (robot.getSettlement().getBuildingConnectors(building).size() > 0) {
+					if (robot.getSettlement().getAdjacentBuildings(building).size() > 0) {
 						logger.log(robot, Level.FINER, 5000, "Walking toward " + building.getNickName());
 						canWalk = walkToActivitySpotInBuilding(building, fct, allowFail);
 						if(canWalk)

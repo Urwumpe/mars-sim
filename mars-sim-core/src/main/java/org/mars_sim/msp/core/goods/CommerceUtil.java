@@ -23,7 +23,6 @@ import org.mars_sim.msp.core.person.PhysicalCondition;
 import org.mars_sim.msp.core.person.ai.mission.Mission;
 import org.mars_sim.msp.core.person.ai.mission.MissionManager;
 import org.mars_sim.msp.core.person.ai.mission.MissionType;
-import org.mars_sim.msp.core.person.ai.mission.MissionUtil;
 import org.mars_sim.msp.core.person.ai.mission.Trade;
 import org.mars_sim.msp.core.resource.AmountResource;
 import org.mars_sim.msp.core.resource.ResourceUtil;
@@ -50,9 +49,6 @@ public final class CommerceUtil {
 	 * must pay off credit to under limit to continue buying.
 	 */
 	private static final double SELL_CREDIT_LIMIT = 10_000_000D;
-
-	/** The factor for estimating the adjusted fuel economy. */
-	private static final double FE_FACTOR = 3.0;
 
 	private static MissionManager missionManager;
 	private static UnitManager unitManager;
@@ -101,7 +97,7 @@ public final class CommerceUtil {
 	 */
 	public static Deal getPotentialDeal(Settlement startingSettlement, MissionType commerceType, Settlement tradingSettlement,
 										Vehicle delivery) {
-		double possibleRange = delivery.getRange(commerceType) * .8D;
+		double possibleRange = delivery.getRange() * .8D;
 
 		if (!startingSettlement.equals(tradingSettlement) && tradingSettlement.isMissionEnable(commerceType)) {
 
@@ -448,9 +444,12 @@ public final class CommerceUtil {
 		Map<Good, Integer> neededResources = new HashMap<>(4);
 
 		// Get required fuel.
-		Good fuelGood = GoodsUtil.getGood(delivery.getFuelType());
-		neededResources.put(fuelGood, (int) MissionUtil.getFuelNeededForTrip(delivery, distance, 
-				delivery.getConservativeFuelEconomy(), false));
+		int fuelTypeID = delivery.getFuelTypeID();
+		Good fuelGood = null;
+		if (fuelTypeID != -1) {
+			fuelGood = GoodsUtil.getGood(fuelTypeID);
+			neededResources.put(fuelGood, (int) delivery.getFuelNeededForTrip(distance, false));
+		}
 
 		if (delivery instanceof Crewable) {
 			// Needs a crew

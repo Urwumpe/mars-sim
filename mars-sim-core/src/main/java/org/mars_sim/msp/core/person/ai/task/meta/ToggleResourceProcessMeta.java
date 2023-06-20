@@ -141,6 +141,7 @@ public class ToggleResourceProcessMeta extends MetaTask implements SettlementMet
 
 		double hydrogenVP = goodsManager.getGoodValuePoint(ResourceUtil.hydrogenID);
 		double methaneVP = goodsManager.getGoodValuePoint(ResourceUtil.methaneID);
+		double methanolVP = goodsManager.getGoodValuePoint(ResourceUtil.methanolID);
 		double waterVP = goodsManager.getGoodValuePoint(ResourceUtil.waterID);
 		double oxygenVP = goodsManager.getGoodValuePoint(ResourceUtil.oxygenID);
 
@@ -199,6 +200,8 @@ public class ToggleResourceProcessMeta extends MetaTask implements SettlementMet
 				// This is bad and the logic is very fragile being based on the Process Name !!
 				String name = process.getProcessName().toLowerCase();
 
+				boolean sel = name.equalsIgnoreCase(ResourceProcessing.SELECTIVE);
+				boolean olefin = name.equalsIgnoreCase(ResourceProcessing.OLEFIN);
 				boolean sab = name.equalsIgnoreCase(ResourceProcessing.SABATIER);
 				boolean reg = name.contains(ResourceProcessing.REGOLITH);
 				boolean ice = name.equalsIgnoreCase(ResourceProcessing.ICE);
@@ -207,11 +210,11 @@ public class ToggleResourceProcessMeta extends MetaTask implements SettlementMet
 				boolean ogs = name.equalsIgnoreCase(ResourceProcessing.OGS);
 
 				if (reg) {
-					score *= goodsManager.getAmountDemandValue(ResourceUtil.regolithID) * (1 + regStored);
+					score *= goodsManager.getDemandValueWithID(ResourceUtil.regolithID) * (1 + regStored);
 				}
 
 				else if (ice) {
-					score *= goodsManager.getAmountDemandValue(ResourceUtil.iceID) * (1 + iceStored);
+					score *= goodsManager.getDemandValueWithID(ResourceUtil.iceID) * (1 + iceStored);
 				}
 
 				else if (ppa) {
@@ -226,6 +229,15 @@ public class ToggleResourceProcessMeta extends MetaTask implements SettlementMet
 					score *= waterVP * methaneVP / hydrogenVP;
 				}
 
+				else if (sel) {
+					score *= methanolVP / methaneVP / oxygenVP;
+				}
+				
+				else if (olefin) {
+					score *= goodsManager.getDemandValueWithID(ResourceUtil.ethyleneID) 
+							* goodsManager.getDemandValueWithID(ResourceUtil.prophyleneID) / methanolVP;
+				}
+				
 				else if (ogs) {
 					score *= hydrogenVP * oxygenVP / waterVP;
 				}

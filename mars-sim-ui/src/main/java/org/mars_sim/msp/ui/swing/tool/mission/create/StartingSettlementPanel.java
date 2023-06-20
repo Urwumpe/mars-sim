@@ -1,17 +1,15 @@
 /*
  * Mars Simulation Project
  * StartingSettlementPanel.java
- * @date 2021-10-21
+ * @date 2023-04-16
  * @author Scott Davis
  */
 
 package org.mars_sim.msp.ui.swing.tool.mission.create;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.Collection;
@@ -19,6 +17,9 @@ import java.util.Iterator;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
@@ -34,12 +35,6 @@ import org.mars_sim.msp.core.resource.ResourceUtil;
 import org.mars_sim.msp.core.structure.Settlement;
 import org.mars_sim.msp.core.vehicle.VehicleType;
 import org.mars_sim.msp.ui.swing.MarsPanelBorder;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
-
-import com.alee.laf.label.WebLabel;
-import com.alee.laf.panel.WebPanel;
-import com.alee.laf.scroll.WebScrollPane;
 
 /**
  * A wizard panel for selecting the mission's starting settlement.
@@ -53,7 +48,7 @@ class StartingSettlementPanel extends WizardPanel {
 	// Data members.
 	private SettlementTableModel settlementTableModel;
 	private JTable settlementTable;
-	private WebLabel errorMessageLabel;
+	private JLabel errorMessageLabel;
 
 	/**
 	 * Constructor.
@@ -70,29 +65,25 @@ class StartingSettlementPanel extends WizardPanel {
 		setBorder(new MarsPanelBorder());
 
 		// Create the select settlement label.
-		WebLabel selectSettlementLabel = new WebLabel("Select a starting settlement.", WebLabel.CENTER);
-		selectSettlementLabel.setFont(selectSettlementLabel.getFont().deriveFont(Font.BOLD));
-		selectSettlementLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		JLabel selectSettlementLabel = createTitleLabel("Select a starting settlement.");
 		add(selectSettlementLabel);
 
 		// Create the settlement panel.
-		WebPanel settlementPane = new WebPanel(new BorderLayout(0, 0));
+		JPanel settlementPane = new JPanel(new BorderLayout(0, 0));
 		settlementPane.setMaximumSize(new Dimension(Short.MAX_VALUE, 100));
 		settlementPane.setAlignmentX(Component.CENTER_ALIGNMENT);
 		add(settlementPane);
 
 		// Create scroll panel for settlement list.
-		WebScrollPane settlementScrollPane = new WebScrollPane();
+		JScrollPane settlementScrollPane = new JScrollPane();
 		settlementPane.add(settlementScrollPane, BorderLayout.CENTER);
 
 		// Create the settlement table model.
 		settlementTableModel = new SettlementTableModel();
 
 		// Create the settlement table.
-		settlementTable = new ZebraJTable(settlementTableModel);
-		TableStyle.setTableStyle(settlementTable);
+		settlementTable = new JTable(settlementTableModel);
 		// Added sorting
-//		settlementTable.setAutoCreateRowSorter(true);
 		settlementTable.setDefaultRenderer(Object.class, new UnitTableCellRenderer(settlementTableModel));
 		settlementTable.setRowSelectionAllowed(true);
 		settlementTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -133,10 +124,7 @@ class StartingSettlementPanel extends WizardPanel {
 		settlementScrollPane.setViewportView(settlementTable);
 
 		// Create the error message label.
-		errorMessageLabel = new WebLabel(" ", WebLabel.CENTER);
-		errorMessageLabel.setForeground(Color.RED);
-		errorMessageLabel.setFont(errorMessageLabel.getFont().deriveFont(Font.BOLD));
-		errorMessageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		errorMessageLabel = createErrorLabel();
 		add(errorMessageLabel);
 
 		// Add a vertical glue.
@@ -153,7 +141,8 @@ class StartingSettlementPanel extends WizardPanel {
 
 	/**
 	 * Commits changes from this wizard panel.
-	 * @retun true if changes can be committed.
+	 * 
+	 * @return true if changes can be committed.
 	 */
 	boolean commitChanges() {
 		int selectedIndex = settlementTable.getSelectedRow();
@@ -207,8 +196,8 @@ class StartingSettlementPanel extends WizardPanel {
 			columns.add("Oxygen");
 			columns.add("Water");
 			columns.add("Food");
-//			columns.add("Dessert");
 			columns.add("Methane");
+			columns.add("Methanol");
 			columns.add("EVA Suits");
 		}
 
@@ -243,30 +232,33 @@ class StartingSettlementPanel extends WizardPanel {
 					else if (column == 6) {
 						result = (int) settlement.getAmountResourceStored(ResourceUtil.methaneID);
 					}
-					else if (column == 7)
+					else if (column == 7) {
+						result = (int) settlement.getAmountResourceStored(ResourceUtil.methanolID);
+					}
+					else if (column == 8)
 						result = settlement.findNumContainersOfType(EquipmentType.EVA_SUIT);
 
 					MissionType type = getWizard().getMissionData().getMissionType();
 					if (MissionType.EXPLORATION == type) {
-						if (column == 8)
+						if (column == 9)
 							result = settlement.findNumContainersOfType(EquipmentType.SPECIMEN_BOX);
 					}
 					else if (MissionType.COLLECT_ICE == type ||
 							MissionType.COLLECT_REGOLITH == type) {
-						if (column == 8)
+						if (column == 9)
 							result = settlement.findNumContainersOfType(EquipmentType.BAG);
 					}
 					else if (MissionType.MINING == type) {
-						if (column == 8) {
+						if (column == 9) {
 							result = settlement.findNumContainersOfType(EquipmentType.BAG);
 						}
-						else if (column == 9) {
+						else if (column == 10) {
 							result = settlement.findNumVehiclesOfType(VehicleType.LUV);
 						}
-						else if (column == 10) {
+						else if (column == 11) {
 							result = settlement.getItemResourceStored(ItemResourceUtil.pneumaticDrillID);
 						}
-						else if (column == 11) {
+						else if (column == 12) {
 							result = settlement.getItemResourceStored(ItemResourceUtil.backhoeID);
 						}
 					}
@@ -378,35 +370,38 @@ class StartingSettlementPanel extends WizardPanel {
 					if (settlement.getAmountResourceStored(ResourceUtil.methaneID) < 100D) result = true;
 				}
 				else if (column == 7) {
+					if (settlement.getAmountResourceStored(ResourceUtil.methanolID) < 100D) result = true;
+				}
+				else if (column == 8) {
 					if (settlement.findNumContainersOfType(EquipmentType.EVA_SUIT) == 0) result = true;
 				}
 
 				MissionType type = getWizard().getMissionData().getMissionType();
 				if (MissionType.EXPLORATION == type) {
-					if (column == 8) {
+					if (column == 9) {
 						if (settlement.findNumContainersOfType(EquipmentType.SPECIMEN_BOX) < 
 								Exploration.REQUIRED_SPECIMEN_CONTAINERS) result = true;
 					}
 				}
 				else if (MissionType.COLLECT_ICE == type ||
 						MissionType.COLLECT_REGOLITH == type) {
-					if (column == 8) {
+					if (column == 9) {
 						if (settlement.findNumContainersOfType(EquipmentType.BAG) <
 								CollectIce.REQUIRED_BARRELS) result = true;
 					}
 				}
 				else if (MissionType.MINING == type ) {
-					if (column == 8) {
+					if (column == 9) {
 						if (settlement.findNumContainersOfType(EquipmentType.BAG) <
 								CollectIce.REQUIRED_BARRELS) result = true;
 					}
-					if (column == 9) {
+					if (column == 10) {
 						if (settlement.findNumVehiclesOfType(VehicleType.LUV) == 0) result = true;
 					}
-					else if (column == 10) {
+					else if (column == 11) {
 						if (settlement.getItemResourceStored(ItemResourceUtil.pneumaticDrillID) == 0) result = true;
 					}
-					else if (column == 11) {
+					else if (column == 12) {
 						if (settlement.getItemResourceStored(ItemResourceUtil.backhoeID) == 0) result = true;
 					}
 				}

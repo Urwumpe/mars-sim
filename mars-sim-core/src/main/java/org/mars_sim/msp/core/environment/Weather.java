@@ -36,6 +36,12 @@ public class Weather implements Serializable, Temporal {
 	private static final SimLogger logger = SimLogger.getLogger(Weather.class.getName());
 
 	// Static data
+	public static final int WINDSPEED_REFRESH = 3;
+	/** The maximum initial windspeed of a new location. */
+	private static final double MAX_INITIAL_WINDSPEED = 20;
+	/** The maximum initial windspeed of a new location. */
+	private static final double AVERAGE_WINDSPEED = 15;
+	
 	/** The effect of sunlight on the surface temperatures on Mars. */
 	private static final double LIGHT_EFFECT = 1.2;
 	/** Extreme cold surface temperatures on Mars at deg Kelvin [or at -153.17 C] */
@@ -96,6 +102,8 @@ public class Weather implements Serializable, Temporal {
 	private static Simulation sim;
 	private static OrbitInfo orbitInfo;
 	private static MarsClock marsClock;
+	private static SurfaceFeatures surfaceFeatures;
+	private static TerrainElevation terrainElevation;
 
 	public Weather() {
 		weatherDataMap = new HashMap<>();
@@ -150,62 +158,130 @@ public class Weather implements Serializable, Temporal {
 	 * @return wind speed in m/s.
 	 */
 	public double computeWindSpeed(Coordinates location) {
-		double newSpeed = -1;
-
+		double newSpeed = 0;
+		
 		if (windSpeedCacheMap == null)
 			windSpeedCacheMap = new HashMap<>();
 
-		// On sol 214 in this list of Viking wind speeds, 25.9 m/sec (93.24 km/hr) was
-		// recorded.
+		// On sol 214 in this list of Viking wind speeds, 
+		// 25.9 m/sec (93.24 km/hr) was recorded.
 
 		// Viking spacecraft from the surface, "during a global dust storm the diurnal
-		// temperature range narrowed
-		// sharply,...the wind speeds picked up considerably—indeed, within only an hour
-		// of the storm's arrival they
-		// had increased to 17 m/s (61 km/h), with gusts up to 26 m/s (94 km/h)
+		// temperature range narrowed sharply,
+		// ...the wind speeds picked up considerably—indeed, within only an hour
+		// of the storm's arrival they  had increased to 17 m/s (61 km/h), 
+		// with gusts up to 26 m/s (94 km/h)
 		// https://en.wikipedia.org/wiki/Climate_of_Mars
 
-		double rand = RandomUtil.getRandomDouble(.75);
-
+		if (surfaceFeatures == null) 
+			surfaceFeatures = sim.getSurfaceFeatures();
+			
+		double optical = 1;
+		
+		if (surfaceFeatures != null) 
+			optical = surfaceFeatures.getOpticalDepth(location);
+		
 		if (windSpeedCacheMap.containsKey(location)) {
+			// Load the previous wind speed
 			double currentSpeed = windSpeedCacheMap.get(location);
 			
-			// check for the passing of each day
+			// Check for the passing of each day only
 			if (isNewSol) {
 				Settlement focus = CollectionUtils.findSettlement(location);
 				DustStorm ds = (focus != null ? focus.getDustStorm() : null);
 				if (ds != null) {
+					double stormSpeed = 0;
+					
 					double dustSpeed = ds.getSpeed();
 					switch (ds.getType()) {
 						case DUST_DEVIL:
 							// arbitrary speed determination
-							newSpeed = .8 * currentSpeed + .2 * dustSpeed;
+							stormSpeed = .8 * currentSpeed + .2 * dustSpeed;
 							break;
 	
 						case LOCAL:
 							// arbitrary speed determination
-							newSpeed = .985 * currentSpeed + .015 * dustSpeed;
+							stormSpeed = .985 * currentSpeed + .015 * dustSpeed;
 							break;
 						
 						case REGIONAL:
 							// arbitrary speed determination
-							newSpeed = .99 * currentSpeed + .01 * dustSpeed;
+							stormSpeed = .99 * currentSpeed + .01 * dustSpeed;
 							break;
 	
 						case PLANET_ENCIRCLING:
 							// arbitrary speed determination
-							newSpeed = .995 * currentSpeed + .005 * dustSpeed;
+							stormSpeed = .995 * currentSpeed + .005 * dustSpeed;
 							break;
+							
+						default :
+							stormSpeed = .99 * currentSpeed;
 					}
+					
+					// Assume the max surface wind speed of up to 800 m/s
+					if (stormSpeed > 800) {
+						stormSpeed = 800;
+					}
+					
+					newSpeed = stormSpeed;
 				}
 			}
-			if (newSpeed < 0) {
-				newSpeed = currentSpeed*(1 - .02 * rand) 
-						+ 1.15 * rand - RandomUtil.getRandomDouble(.01);				
+			
+			else { // not a new sol, no need to check for dust storm
+				
+				int msol = sim.getMasterClock().getMarsClock().getMillisolInt();
+				
+				// the value of optical depth doesn't need to be refreshed too often
+				if (msol % WINDSPEED_REFRESH == 0) {
+					
+					double rand = RandomUtil.getRandomDouble(-0.02, 0.02);
+	
+					if (terrainElevation == null) 
+						terrainElevation = sim.getSurfaceFeatures().getTerrainElevation();
+					
+					double[] terrain = terrainElevation.getTerrainProfile(location);
+					
+					double boundary = Math.round(AVERAGE_WINDSPEED * optical 
+									* Math.log(1.1 + Math.abs((1 + terrain[0]) * (5 - terrain[1])))* 1000.0)/1000.0;
+					
+					// Swing the wind speed back to AVERAGE_WINDSPEED
+					if (currentSpeed > boundary) {
+						newSpeed = currentSpeed * (1 + rand) - (currentSpeed - boundary) * Math.abs(rand) / 20;
+					}
+					else if (currentSpeed > boundary / 2) {
+						newSpeed = currentSpeed * (1 + rand) - (currentSpeed - boundary / 2) * Math.abs(rand) / 20;
+					}
+					else {
+						newSpeed = currentSpeed * (1 + rand) + (boundary / 2 - currentSpeed) * Math.abs(rand) / 40;
+					}
+								
+					newSpeed = Math.round(newSpeed *1000.0)/1000.0;
+					
+					if (newSpeed < 0) {
+						newSpeed = 0;
+					}
+					
+					// Assume the max surface wind speed of up to 100 m/s
+					if (newSpeed > 100) {
+						newSpeed = 100;
+					}
+					
+//					logger.info("newSpeed: " + newSpeed + "  terrain[0]: " + terrain[0] + "  terrain[1]: " + terrain[1] 
+//							+ "  optical: " + optical + "  boundary: " + boundary );
+				}
+				
+				else {
+					// Make no change to the previous wind speed
+					newSpeed = currentSpeed;
+				}
 			}
 		}
+		
 		else {
-			newSpeed = rand;
+			// If wind cache doesn't exist at this location 
+			newSpeed = RandomUtil.getRandomDouble(MAX_INITIAL_WINDSPEED) ;
+			
+			newSpeed = Math.round(newSpeed * 1000.0)/1000.0;
 		}
 
 		// Despite secondhand estimates of higher velocities, official observed gust
@@ -214,12 +290,12 @@ public class Weather implements Serializable, Temporal {
 		// At higher altitudes, the movement of dust was measured at 250-300 mph
 		// (400-480 km/hr).
 
-//		if (new_speed > 50) // assume the max surface wind speed of up to 50 m/s
-//			new_speed = 50;
-		newSpeed = Math.round(newSpeed *100.0)/100.0;
+		// Note : 1 mile per hour (mph) = 0.44704 meter per sec (m/s)
 		
 		windSpeedCacheMap.put(location, newSpeed);
-				
+		
+//		logger.info("newSpeed: " + newSpeed);
+		
 		return newSpeed;
 	}
 
@@ -445,7 +521,7 @@ public class Weather implements Serializable, Temporal {
 			// for
 			// over five Mars Years (MY), at the “Tleilax” site.
 
-			double lS = orbitInfo.getL_s();
+			double lS = orbitInfo.getSunAreoLongitude();
 
 			// split into 6 zones for linear curve fitting for each martian year
 			// See chart at https://www.hou.usra.edu/meetings/marspolar2016/pdf/6012.pdf
@@ -675,10 +751,11 @@ public class Weather implements Serializable, Temporal {
 
 			// Note : The Mars dust storm season begins just after perihelion at around Ls =
 			// 260°.
-			double lS = Math.round(orbitInfo.getL_s() * 10.0) / 10.0;
-			int lSint = (int) lS;
-
-			if (lSint == 230) {
+			
+			double aLs = (int) (Math.round(orbitInfo.getSunAreoLongitude()));
+			int aLon = (int) (aLs);
+					
+			if (aLon == 230) {
 				// reset the counter once a year
 				checkStorm = 0;
 			}
@@ -690,22 +767,22 @@ public class Weather implements Serializable, Temporal {
 			// By doing curve-fitting a cosine curve
 			// (5% - .05%)/2 = 2.475
 
-			double probability = -2.475 * Math.cos(lS * Math.PI / 180D - DX) + (2.475 + .05);
+			double probability = -2.475 * Math.cos(aLs * Math.PI / 180D - DX) + (2.475 + .05);
 			// probability is 5% at max
 			double size = dustStorms.size();
 			// Artificially limit the # of dust storm to 10
-			if (lSint > 240 && lSint < 271 && size <= 10 && checkStorm < 200) {
+			if (aLon > 240 && aLon < 271 && size <= 10 && checkStorm < 200) {
 				// When L_s = 250 (use 255 instead), Mars is at perihelion--when the sun is
 				// closed to Mars.
 
 				// All of the observed storms have begun within 50-60 degrees of Ls of
 				// perihelion (Ls ~ 250);
-				createDustDevils(probability, lS);
+				createDustDevils(probability, aLs);
 			}
 
 			else if (dustStorms.size() <= 20 && checkStorm < 200) {
 
-				createDustDevils(probability, lS);
+				createDustDevils(probability, aLs);
 			}
 
 			checkOnDustStorms();
@@ -905,6 +982,17 @@ public class Weather implements Serializable, Temporal {
 		marsClock = c;
 		orbitInfo = oi;
 	}
+	
+//	/**
+//	 * Reinitializes instances after deserialization.
+//	 * 
+//	 * @param in
+//	 * @throws IOException
+//	 * @throws ClassNotFoundException
+//	 */
+//	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+//		in.defaultReadObject();
+//	}
 	
 	/**
 	 * Prepares object for garbage collection.

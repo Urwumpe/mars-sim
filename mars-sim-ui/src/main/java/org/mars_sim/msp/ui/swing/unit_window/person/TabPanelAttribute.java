@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.table.AbstractTableModel;
@@ -24,11 +25,7 @@ import org.mars_sim.msp.core.person.ai.task.util.Worker;
 import org.mars_sim.msp.core.robot.Robot;
 import org.mars_sim.msp.ui.swing.ImageLoader;
 import org.mars_sim.msp.ui.swing.MainDesktopPane;
-import org.mars_sim.msp.ui.swing.tool.TableStyle;
-import org.mars_sim.msp.ui.swing.tool.ZebraJTable;
 import org.mars_sim.msp.ui.swing.unit_window.TabPanel;
-
-import com.alee.laf.scroll.WebScrollPane;
 
 /**
  * The TabPanelAttribute is a tab panel for the natural attributes of a person.
@@ -37,7 +34,7 @@ import com.alee.laf.scroll.WebScrollPane;
 public class TabPanelAttribute
 extends TabPanel {
 	
-	private static final String ATTRIBUTE_ICON = Msg.getString("icon.attribute"); //$NON-NLS-1$
+	private static final String ATTRIBUTE_ICON = "attribute"; //$NON-NLS-1$
 	
 	private AttributeTableModel attributeTableModel;
 	
@@ -52,7 +49,7 @@ extends TabPanel {
 		// Use the TabPanel constructor
 		super(
 			Msg.getString("TabPanelAttribute.title"), //$NON-NLS-1$
-			ImageLoader.getNewIcon(ATTRIBUTE_ICON),	
+			ImageLoader.getIconByName(ATTRIBUTE_ICON),	
 			Msg.getString("TabPanelAttribute.title"), //$NON-NLS-1$
 			person,	desktop
 		);
@@ -67,7 +64,7 @@ extends TabPanel {
 		// Use the TabPanel constructor
 		super(
 			Msg.getString("TabPanelAttribute.title"), //$NON-NLS-1$
-			ImageLoader.getNewIcon(ATTRIBUTE_ICON),	
+			ImageLoader.getIconByName(ATTRIBUTE_ICON),	
 			Msg.getString("TabPanelAttribute.tooltip"), //$NON-NLS-1$
 			robot, desktop
 		);
@@ -77,14 +74,14 @@ extends TabPanel {
 	protected void buildUI(JPanel content) {
 
 		// Create attribute scroll panel
-		WebScrollPane attributeScrollPanel = new WebScrollPane();
+		JScrollPane attributeScrollPanel = new JScrollPane();
 		content.add(attributeScrollPanel);
 
 		// Create attribute table model
 		attributeTableModel = new AttributeTableModel((Worker) getUnit());
 		
 		// Create attribute table
-		attributeTable = new ZebraJTable(attributeTableModel); //new JTable(attributeTableModel);//
+		attributeTable = new JTable(attributeTableModel); //new JTable(attributeTableModel);//
 		attributeTable.setPreferredScrollableViewportSize(new Dimension(225, 100));
 		attributeTable.getColumnModel().getColumn(0).setPreferredWidth(100);
 		attributeTable.getColumnModel().getColumn(1).setPreferredWidth(70);
@@ -101,7 +98,6 @@ extends TabPanel {
 		attributeTable.getColumnModel().getColumn(0).setCellRenderer(renderer);
 		attributeTable.getColumnModel().getColumn(1).setCellRenderer(renderer);
 
-        TableStyle.setTableStyle(attributeTable);
         update();
 	}
 
@@ -110,7 +106,6 @@ extends TabPanel {
 	 */
 	@Override
 	public void update() {
-		TableStyle.setTableStyle(attributeTable);
 		attributeTableModel.update();
 	}
 
