@@ -1,23 +1,24 @@
-<?xml version="1.0"?>
-<project xsi:schemaLocation="https://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd"
-	xmlns="https://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+	xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
-		<groupId>com.github.mars-sim</groupId>
+		<groupId>com.mars-sim</groupId>
 		<artifactId>mars-sim</artifactId>
-		<version>pre-3.6.0</version>
+		<version>pre-3.9.0</version>
 	</parent>
 	<artifactId>mars-sim-headless</artifactId>
 	<name>mars-sim-headless</name>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>	
-		<starterClass>org.mars_sim.headless.MarsProjectHeadlessStarter</starterClass>	
-		<mainClass>org.mars_sim.headless.MarsProjectHeadless</mainClass>			
+		<starterClass>com.mars_sim.headless.MarsProjectHeadlessStarter</starterClass>	
+		<mainClass>com.mars_sim.headless.MarsProjectHeadless</mainClass>
+		<target.name>mars-sim-console-${project.version}</target.name>
 	</properties>
 	<dependencies>
 		<dependency>
-			<groupId>com.github.mars-sim</groupId>
+			<groupId>com.mars-sim</groupId>
 			<artifactId>mars-sim-console</artifactId>
 			<version>${project.version}</version>
 		</dependency>
@@ -38,54 +39,12 @@
 		</dependency>	
 	</dependencies>	
 	<build>
-		<defaultGoal>clean package install</defaultGoal>
 		<plugins>
-			<!-- https://mvnrepository.com/artifact/org.codehaus.mojo/exec-maven-plugin : 65KB -->
-			<!-- https://www.mojohaus.org/exec-maven-plugin/ -->
-			<!-- https://github.com/mojohaus/mojo-parent -->
+			<!-- Package into an executable JAR file -->
 			<plugin>
-		        <groupId>org.codehaus.mojo</groupId>
-		        <artifactId>exec-maven-plugin</artifactId>
-		        <version>3.1.0</version>
-		        <executions>
-		            <execution>
-		                <goals>
-		                    <goal>java</goal>
-		                </goals>
-		            </execution>
-		        </executions>
-		        <configuration>
-		            <executable>java</executable>
-		            <!--mainClass>org.mars_sim.headless.MarsProjectHeadless</mainClass-->
-		            <arguments>
-               			<argument>-Djava.util.logging.config.file=logging.properties -cp .;*;jars\*</argument>
-               			<argument>-classpath</argument>
-            			<classpath/>
-            			<argument>org.mars_sim.headless.MarsProjectHeadless</argument>           			
-               			<argument>-Xms256m -Xmx1536m -new</argument>
-              		</arguments>
-		        </configuration>
-		    </plugin>		
-			<plugin>
-				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-jar-plugin  : 27 KB -->
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<version>3.3.0</version>
-				<configuration>
-					<archive>
-						<manifest>
-							<addClasspath>true</addClasspath>
-							<mainClass>${mainClass}</mainClass>
-						</manifest>
-					</archive>
-				</configuration>
-			</plugin>
-			<plugin>
-				<!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-assembly-plugin/3.1.0 
-					 https://maven.apache.org/plugins/maven-assembly-plugin/ : 235 KB -->
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-assembly-plugin</artifactId>
-				<version>3.6.0</version>
+				<version>3.7.1</version>
 				<configuration>
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
@@ -98,6 +57,9 @@
 						    <Multi-Release>true</Multi-Release>
 						</manifestEntries>
 					</archive>
+					<!-- Control the final name of the generated file -->
+					<finalName>${target.name}</finalName>
+					<appendAssemblyId>false</appendAssemblyId>
 				</configuration>
 				<executions>
 					<execution>
@@ -106,82 +68,6 @@
 						<goals>
 							<goal>single</goal> <!-- goals == mojos -->
 						</goals>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<!-- https://github.com/tcurdt/jdeb -->
-				<!-- https://mvnrepository.com/artifact/org.vafer/jdeb : 1.8 MB -->
-				<groupId>org.vafer</groupId>
-				<artifactId>jdeb</artifactId>
-				<version>1.10</version>
-				<executions>
-					<execution>
-						<phase>package</phase>
-						<goals>
-							<goal>jdeb</goal>
-						</goals>
-						<configuration>
-							<dataSet>
-								<data>
-									<src>${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar</src>
-									<type>file</type>
-									<mapper>
-										<type>perm</type>
-										<prefix>/usr/share/mars-sim-headless</prefix>
-									</mapper>
-								</data>
-								<data>
-									<src>${project.basedir}/src/deb/mars-sim</src>
-									<type>file</type>
-									<mapper>
-										<type>perm</type>
-										<prefix>/usr/bin</prefix>
-										<filemode>755</filemode>
-									</mapper>
-								</data>
-								<data>
-									<src>${project.basedir}/src/deb/copyright/copyright</src>
-									<type>file</type>
-									<mapper>
-										<type>perm</type>
-										<prefix>/usr/share/doc/mars-sim-headless</prefix>
-									</mapper>
-								</data>
-								<data>
-									<src>${project.basedir}/src/deb/changelog</src>
-									<type>file</type>
-									<mapper>
-										<type>perm</type>
-										<prefix>/usr/share/doc/mars-sim-headless</prefix>
-									</mapper>
-								</data>
-								<data>
-									<src>${project.basedir}/src/deb/icon.png</src>
-									<type>file</type>
-									<mapper>
-										<type>perm</type>
-										<prefix>/usr/share/doc/mars-sim-headless</prefix>
-									</mapper>
-								</data>
-								<data>
-									<src>${project.basedir}/src/deb/mars-sim.desktop</src>
-									<type>file</type>
-									<mapper>
-										<type>perm</type>
-										<prefix>/usr/share/applications</prefix>
-									</mapper>
-								</data>
-								<data>
-									<src>${project.basedir}/src/deb/man/mars-sim.1</src>
-									<type>file</type>
-									<mapper>
-										<type>perm</type>
-										<prefix>/usr/share/man/man1</prefix>
-									</mapper>
-								</data>
-							</dataSet>
-						</configuration>
 					</execution>
 				</executions>
 			</plugin>

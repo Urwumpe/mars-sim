@@ -1,29 +1,30 @@
 <?xml version = "1.0" encoding = "UTF-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="settlement.xsd"
-        name="Alpha Base" 
+        name="Alpha Base" shift-pattern="Long 3 Shift" 
         default-population="24" number-of-robots="14" sponsor="MS"
-        description="Large Alpha Base">
+        description="Large Base" objective="CROP_FARM">
     <building id="0" type="Lander Hab" xloc="0.0" yloc="0.0"
         facing="0.0">
         <connection-list>
-            <connection id="1" xloc="0.0" yloc="4.5" />
-            <connection id="5" xloc="-4.5" yloc="0.0" />
-            <connection id="27" xloc="4.5" yloc="0.0" />
+            <connection id="1" hatch-facing="north" />
+            <connection id="5" hatch-facing="east" />
+            <connection id="27" hatch-facing="west" />
+            <connection id="30" hatch-facing="south" />
         </connection-list>
     </building>
     <building id="1" type="Hallway" length="4.0" xloc="0.0"
         yloc="6.5" facing="0.0">
         <connection-list>
-            <connection id="0" xloc="0.0" yloc="-2.0" />
-            <connection id="2" xloc="0.0" yloc="2.0" />
+            <connection id="0" hatch-facing="south" />
+            <connection id="2" hatch-facing="north" />
         </connection-list>
     </building>
     <building id="2" type="Lander Hab" xloc="0.0" yloc="13.0"
         facing="0.0">
         <connection-list>
-            <connection id="1" xloc="0.0" yloc="-4.5" />
-            <connection id="3" xloc="0.0" yloc="4.5" />
-            <connection id="7" xloc="-4.5" yloc="0.0" />
+            <connection id="1" hatch-facing="south" />
+            <connection id="3" hatch-facing="north" />
+            <connection id="7" hatch-facing="east" />
         </connection-list>
     </building>
     <building id="3" type="Hallway" length="4.0" xloc="0.0"
@@ -39,7 +40,6 @@
             <connection id="3" xloc="0.0" yloc="-4.5" />
             <connection id="11" xloc="0.0" yloc="4.5" />
             <connection id="9" xloc="-4.5" yloc="0.0" />
-            <connection id="30" xloc="4.5" yloc="0.0" />
         </connection-list>
     </building>
     <building id="5" type="Hallway" length="3.0" xloc="-6.0"
@@ -52,7 +52,7 @@
     <building id="6" type="Inflatable Greenhouse" xloc="-12.0"
         yloc="0.0" facing="270.0">
         <connection-list>
-            <connection id="5" xloc="0.0" yloc="4.5" />
+            <connection id="5" hatch-facing="west" />
         </connection-list>
     </building>
     <building id="7" type="Hallway" length="3.0" xloc="-6.0"
@@ -62,7 +62,7 @@
             <connection id="8" xloc="0.0" yloc="-1.5" />
         </connection-list>
     </building>
-    <building id="8" type="Inflatable Greenhouse" xloc="-12.0"
+    <building id="8" type="Algae Pond" xloc="-12.0"
         yloc="13.0" facing="270.0">
         <connection-list>
             <connection id="7" xloc="0.0" yloc="4.5" />
@@ -75,7 +75,7 @@
             <connection id="10" xloc="0.0" yloc="-1.5" />
         </connection-list>
     </building>
-    <building id="10" type="Inflatable Greenhouse" xloc="-12.0"
+    <building id="10" type="Fish Farm" xloc="-12.0"
         yloc="26.0" facing="270.0">
         <connection-list>
             <connection id="9" xloc="0.0" yloc="4.5" />
@@ -88,11 +88,11 @@
             <connection id="12" xloc="0.0" yloc="2.0" />
         </connection-list>
     </building>
-    <building id="12" type="Command and Control" xloc="0.0"
-        yloc="38" facing="270.0">
+    <building id="12" type="Laboratory" xloc="0.0"
+        yloc="38" facing="90.0">
         <connection-list>
-            <connection id="11" xloc="3.5" yloc="0.0" />
-            <connection id="13" xloc="0.0" yloc="-4.5" />
+            <connection id="11" hatch-facing="south" />
+            <connection id="13" hatch-facing="east" />
         </connection-list>
     </building>
     <building id="13" type="Hallway" length="2.0" xloc="-5.5"
@@ -145,11 +145,11 @@
             <connection id="20" xloc="0.0" yloc="-1.0" />
         </connection-list>
     </building>
-    <building id="20" type="Laboratory" xloc="-44.0" yloc="38"
-        facing="270.0">
+    <building id="20" type="Server Farm" xloc="-44.0" yloc="38"
+        facing="0.0">
         <connection-list>
-            <connection id="19" xloc="0.0" yloc="4.5" />
-            <connection id="21" xloc="0.0" yloc="-4.5" />
+            <connection id="19" hatch-facing="west" />
+            <connection id="21" hatch-facing="east" />
         </connection-list>
     </building>
     <building id="21" type="Hallway" length="2.0" xloc="-49.5"
@@ -197,187 +197,63 @@
     <building id="27" type="EVA Airlock" xloc="7.5" yloc="0.0"
         facing="0.0">
         <connection-list>
-            <connection id="0" xloc="-3.0" yloc="0.0" />
+            <connection id="0" hatch-facing="east" />
         </connection-list>
     </building>
 
     <building id="28" zone="1" type="Astronomy Observatory" xloc="-55.0"
         yloc="-20.0" facing="180.0">
         <connection-list>
-            <connection id="29" xloc="-3.5" yloc="0.0" />
+            <connection id="29" hatch-facing="west" />
         </connection-list>
     </building>
 
     <!-- EVA Airlock is attached to the Astronomy Observatory -->
-    <building id="29" type="EVA Airlock" xloc="-48.5"
+    <building id="29" zone="1" type="EVA Airlock" xloc="-48.5"
         yloc="-20.0" facing="0.0">
         <connection-list>
-            <connection id="28" xloc="-3.0" yloc="0.0" />
+            <connection id="28" hatch-facing="east" />
         </connection-list>
     </building>
 
     <!-- EVA Airlock is attached to the 3rd lander hab -->
-    <building id="30" type="EVA Airlock" xloc="7.5" yloc="26.0"
-        facing="0.0">
+    <building id="30" type="EVA Airlock" xloc="0.0" yloc="-7.5"
+        facing="270.0">
         <connection-list>
-            <connection id="4" xloc="-3.0" yloc="0.0" />
+            <connection id="0" hatch-facing="north" />
         </connection-list>
     </building>
-
-
-
-    <building type="MD4 Nuclear Reactor" xloc="510.0"
-        yloc="-500" facing="0.0" />
-    <building type="MD4 Nuclear Reactor" xloc="510.0"
-        yloc="-520" facing="0.0" />
-
-
-    <building type="MD1 Nuclear Reactor" xloc="500.0"
-        yloc="-500" facing="0.0" />
-    <building type="MD1 Nuclear Reactor" xloc="500.0"
-        yloc="-510" facing="0.0" />
-        
-        
-    <building type="Kilopower Reactor" xloc="490.0"
-        yloc="-500" facing="0.0" />
-    <building type="Kilopower Reactor" xloc="490.0"
-        yloc="-505" facing="0.0" />
-        
-       
-    <building type="Medium Battery Array" xloc="-24.0" yloc="-40.0"
-        facing="0.0" />
-    <building type="Wind Turbine" xloc="-24.0" yloc="-60.0"
-        facing="0.0" />
-    <building type="Wind Turbine" xloc="-24.0" yloc="-80.0"
-        facing="0.0" />
-    <building type="Wind Turbine" xloc="-24.0" yloc="-100.0"
-        facing="0.0" />
-                
-                
-    <building type="Medium Battery Array" xloc="40.0"
-        yloc="-50.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-60.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-70.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-80.0" facing="0.0" />
-                        
-        
-    <!-- Earth Return Vehicle Type A building has a Sabatier reactor for converting
-        hydrogen and carbon dioxide into methane, water and oxygen. -->
-    <building type="ERV-A" xloc="80.0" yloc="-15.0"
-        facing="0.0" />
-    <building type="ERV-A" xloc="120.0" yloc="-15.0"
-        facing="0.0" />
-    <building type="ERV-A" xloc="160.0" yloc="-15.0"
-        facing="0.0" />
-    <building type="ERV-A" xloc="200.0" yloc="-15.0"
-        facing="0.0" />
-        
-    <!-- Earth Return Vehicle Type B building has regolith-related processing
-            capabilities. -->
-    <building type="ERV-B" xloc="80.0" yloc="25.0"
-        facing="0.0" />
-    <building type="ERV-B" xloc="120.0" yloc="25.0"
-        facing="0.0" />
-    <building type="ERV-B" xloc="160.0" yloc="25.0"
-        facing="0.0" />
-    <building type="ERV-B" xloc="200.0" yloc="25.0"
-        facing="0.0" />
-        
-    <!-- Earth Return Vehicle Type C building has industrial chemical processing
-            capabilities for synthesizing chemicals. -->
-    <building type="ERV-C" xloc="80.0" yloc="65.0"
-        facing="0.0" />
-    <building type="ERV-C" xloc="120.0" yloc="65.0"
-        facing="0.0" />
-    <building type="ERV-C" xloc="160.0" yloc="65.0"
-        facing="0.0" />
-    <building type="ERV-C" xloc="200.0" yloc="65.0"
-        facing="0.0" />
-        
-    <building type="Atmospheric Processor" xloc="20"
-        yloc="-60.0" facing="90.0" />
-    <building type="Atmospheric Processor" xloc="20"
-        yloc="-70.0" facing="90.0" />
-    <building type="Atmospheric Processor" xloc="20"
-        yloc="-80.0" facing="90.0" />
-        
-        
-    <building type="Large Sabatier Processor" xloc="0.0"
-        yloc="-60.0" facing="90.0" />                                        
-    <building type="Large Sabatier Processor" xloc="0.0"
-        yloc="-70.0" facing="90.0" />
-    <building type="Large Sabatier Processor" xloc="0.0"
-        yloc="-80.0" facing="90.0" />
-
-
-    <building type="Medium Battery Array" xloc="40.0"
-        yloc="-60.0" facing="0.0" /> 
-        
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-70.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-80.0" facing="0.0" />
-        
-        
-    <building type="Medium Battery Array" xloc="40.0"
-        yloc="-90.0" facing="0.0" /> 
-                
-    <building type="Solar Thermal Collector" xloc="40.0"
-        yloc="-100.0" facing="0.0" />
-    <building type="Solar Thermal Collector" xloc="40.0"
-        yloc="-110.0" facing="0.0" />
-        
-       
-        
-    <building type="Regolith Storage Bin" xloc="35.0" yloc="0.0"
-        facing="90.0" />
-    <building type="Sand Storage Bin" xloc="35.0" yloc="5.0"
-        facing="90.0" />
-    <building type="Concrete Storage Bin" xloc="35.0"
-        yloc="10.0" facing="90.0" />
-    <building type="Cement Storage Bin" xloc="35.0" yloc="15.0"
-        facing="90.0" />
-    <building type="Mortar Storage Bin" xloc="35.0" yloc="20.0"
-        facing="90.0" />
-    <building type="Lime Storage Bin" xloc="35.0" yloc="25.0"
-        facing="90.0" />
-    <building type="Ice Storage Bin" xloc="35.0" yloc="-5.0"
-        facing="90.0" />
-    <building type="Carbon Storage Bin" xloc="35.0" yloc="-10.0"
-        facing="90.0" />
-
-    <building type="Regolith Storage Bin" xloc="55.0" yloc="0.0"
-        facing="90.0" />
-    <building type="Sand Storage Bin" xloc="55.0" yloc="5.0"
-        facing="90.0" />
-    <building type="Concrete Storage Bin" xloc="55.0"
-        yloc="10.0" facing="90.0" />
-    <building type="Cement Storage Bin" xloc="55.0" yloc="15.0"
-        facing="90.0" />
-    <building type="Mortar Storage Bin" xloc="55.0" yloc="20.0"
-        facing="90.0" />
-    <building type="Lime Storage Bin" xloc="55.0" yloc="25.0"
-        facing="90.0" />
-    <building type="Ice Storage Bin" xloc="55.0" yloc="-5.0"
-        facing="90.0" />
-    <building type="Carbon Storage Bin" xloc="55.0" yloc="-10.0"
-        facing="90.0" />
-
-    <vehicle type="Long Range Explorer" number="3" />
+   
+ 
+	<!-- Building Packages -->
+    <building-package name="Storage Set 1"/>
+    <building-package name="Storage Set 2"/>
+   	<building-package name="ERV Set 1"/>
+   	<building-package name="ERV Set 2"/>
+   	<building-package name="ERV Set 3"/>   	  	
+   	<building-package name="Air Set 1 - 1x4"/>
+    <building-package name="Sabatier Set 1 - 1x4"/>
+	<building-package name="Syngas Set 1 - 1x1"/>
+	<building-package name="Solar Thermal Set 1 - 1x9"/>
+	<building-package name="Wind Set 1 - 1x3"/>
+	<building-package name="Kilo Set 1 - 1x2"/>
+	<building-package name="MD1 Set 1 - 1x2"/>
+	<building-package name="MD4 Set 1 - 1x2"/>
+  
+    <vehicle type="Explorer Rover" number="2" />
+    <vehicle type="Long Range Explorer" number="1" />
     <vehicle type="Transport Rover" number="2" />
     <vehicle type="Cargo Rover" number="2" />
     <vehicle type="Light Utility Vehicle" number="3" />
-    <vehicle type="Delivery Drone" number="3" />
- 
+    <vehicle type="Delivery Drone" number="2" />
+    <vehicle type="Cargo Drone" number="2" />
+    
     <!-- Robots -->
     <robot name="Huey" type="GardenBot" model="Advanced"/>
     <robot name="Dewey" type="GardenBot" model="Advanced"/>
     <robot name="Louie" type="GardenBot"/>
 
-    <equipment type="EVA Suit" number="48" />
+    <equipment type="EVA Suit" number="36" />
 
     <!-- Containers-->
 	<equipment type="barrel" number="120" />
@@ -390,16 +266,17 @@
 
 	<!-- Life Support Resources -->
 	<resource type="food" amount="4320" />
-	<resource type="water" amount="21600" />
-	<resource type="oxygen" amount="8640" />
+	<resource type="water" amount="7200" />
+	<resource type="oxygen" amount="5760" />
 
     <part-package name="package 4" number="1" />
-    
+      
     <resupply>
-       	<resupply-mission name="Bi-Monthly Delivery" manifest-name="Standard Resupply 1"
-            first-arrival-time="0.1"
-            frequency-sols="62" /> 
-        <resupply-mission name="Scale up Delivery" manifest-name="Resupply for Phase 3"
-            first-arrival-time="300"/> 
+       	<resupply-mission name="Bi-Monthly Delivery" manifest-name="Standard Resupply 1">
+            <schedule firstSol="1" eventTime="400" frequency="62" /> 
+        </resupply-mission>
+        <resupply-mission name="Scale up Delivery" manifest-name="Resupply for Phase 3">
+            <schedule firstSol="300" eventTime="400"/>
+        </resupply-mission> 
     </resupply>     
 </template>

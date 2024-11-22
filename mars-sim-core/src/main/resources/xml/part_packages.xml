@@ -21,7 +21,7 @@
 		<!-- type: the type of part (see parts.xml) -->
 		<!-- number: the number of parts. -->
 		<part type="petri dish" number="100"/>
-		<part type="garment" number="6"/>
+		<part type="garment" number="8"/>
 		<part type="fiberglass" number="3"/>
 		<part type="fiberglass cloth" number="10"/>
 		<part type="logic board" number="25"/>
@@ -38,7 +38,7 @@
 		<part type="flexible hose" number="10"/>
 
 		<!-- 2015-05-18 Added the following new parts -->
-		<part type="laser sintering 3d printer" number="4"/>
+		<part type="SLS 3D Printer" number="4"/>
 		<part type="heat pump" number="2"/>
 		<part type="carbon dioxide laser" number="5"/>
 		<part type="helium neon laser" number="5"/>
@@ -104,14 +104,14 @@
 		<part type="fuel pump" number="2" />
 		<part type="oxygen pump" number="2" />
 		<part type="rover windshield" number="2" />
-		<part type="rover window" number="4" />
+		<part type="window" number="4" />
 		<part type="winch" number="2" />
-		<part type="motor small" number="2" />
-		<part type="motor large" number="4" />
-		<part type="stepper motor small" number="4"/>
+		<part type="Stepper Motor" number="8"/>
+		<part type="Motor 5 kW" number="6" />
+		<part type="Motor 10 kW" number="4" />
+		<part type="Motor 30 kW" number="2" />
 		<part type="propeller" number="4"/>
 		<part type="vehicle chassis panel" number="4" />
-		<part type="rover generator" number="2" />
 		<part type="rover control panel" number="2" />
 		<part type="fuel tank" number="20" />
 		<part type="gas tank" number="20" />
@@ -139,7 +139,7 @@
 	<part-package name="package 2" >
 
 		<part type="petri dish" number="200"/>
-		<part type="garment" number="12"/>
+		<part type="garment" number="16"/>
 		<part type="fiberglass" number="6"/>
 		<part type="fiberglass cloth" number="20"/>
 		<part type="logic board" number="50"/>
@@ -155,7 +155,7 @@
 		<part type="air duct" number="20"/>
 		<part type="flexible hose" number="20"/>
 		<!-- 2015-05-18 Added the following new parts -->
-		<part type="laser sintering 3d printer" number="6"/>
+		<part type="SLS 3D Printer" number="6"/>
 		<part type="heat pump" number="5"/>
 		<part type="carbon dioxide laser" number="10"/>
 		<part type="helium neon laser" number="10"/>
@@ -221,14 +221,14 @@
 		<part type="fuel pump" number="2" />
 		<part type="oxygen pump" number="2" />
 		<part type="rover windshield" number="2" />
-		<part type="rover window" number="4" />
+		<part type="window" number="4" />
 		<part type="winch" number="2" />
-		<part type="motor small" number="2" />
-		<part type="motor large" number="4" />
-		<part type="stepper motor small" number="4"/>
+		<part type="Stepper Motor" number="10"/>
+		<part type="Motor 5 kW" number="8" />
+		<part type="Motor 10 kW" number="5" />
+		<part type="Motor 30 kW" number="3" />
 		<part type="propeller" number="4"/>		
 		<part type="vehicle chassis panel" number="4" />
-		<part type="rover generator" number="2" />
 		<part type="rover control panel" number="2" />
 		<part type="fuel tank" number="20" />
 		<part type="gas tank" number="20" />
@@ -274,7 +274,7 @@
 		<part type="air duct" number="30"/>
 		<part type="flexible hose" number="30"/>
 		<!-- 2015-05-18 Added the following new parts -->
-		<part type="laser sintering 3d printer" number="8"/>
+		<part type="SLS 3D Printer" number="8"/>
 		<part type="heat pump" number="10"/>
 		<part type="carbon dioxide laser" number="20"/>
 		<part type="helium neon laser" number="20"/>
@@ -340,14 +340,14 @@
 		<part type="fuel pump" number="6" />
 		<part type="oxygen pump" number="4" />
 		<part type="rover windshield" number="4" />
-		<part type="rover window" number="8" />
+		<part type="window" number="8" />
 		<part type="winch" number="4" />
-		<part type="motor small" number="3" />
-		<part type="motor large" number="6" />
-		<part type="stepper motor small" number="6"/>
+		<part type="Stepper Motor" number="14"/>
+		<part type="Motor 5 kW" number="10" />
+		<part type="Motor 10 kW" number="6" />
+		<part type="Motor 30 kW" number="4" />
 		<part type="propeller" number="6"/>			
 		<part type="vehicle chassis panel" number="8" />
-		<part type="rover generator" number="4" />
 		<part type="rover control panel" number="4" />
 		<part type="fuel tank" number="40" />
 		<part type="gas tank" number="40" />
@@ -393,7 +393,7 @@
 		<part type="air duct" number="40"/>
 		<part type="flexible hose" number="40"/>
 		<!-- 2015-05-18 Added the following new parts -->
-		<part type="laser sintering 3d printer" number="16"/>
+		<part type="SLS 3D Printer" number="16"/>
 		<part type="heat pump" number="20"/>
 		<part type="carbon dioxide laser" number="30"/>
 		<part type="helium neon laser" number="30"/>
@@ -459,14 +459,14 @@
 		<part type="fuel pump" number="10" />
 		<part type="oxygen pump" number="8" />
 		<part type="rover windshield" number="8" />
-		<part type="rover window" number="12" />
+		<part type="window" number="12" />
 		<part type="winch" number="8" />
-		<part type="motor small" number="6" />
-		<part type="motor large" number="12" />
-		<part type="stepper motor small" number="12"/>
+		<part type="Stepper Motor" number="16"/>
+		<part type="Motor 5 kW" number="12" />
+		<part type="Motor 10 kW" number="8" />
+		<part type="Motor 30 kW" number="6" />
 		<part type="propeller" number="12"/>			
 		<part type="vehicle chassis panel" number="14" />
-		<part type="rover generator" number="8" />
 		<part type="rover control panel" number="8" />
 		<part type="fuel tank" number="80" />
 		<part type="gas tank" number="80" />

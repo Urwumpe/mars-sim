@@ -1,7 +1,8 @@
 <?xml version = "1.0" encoding = "UTF-8" standalone = "yes" ?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="settlement.xsd"
-    name="Phase 3-CN" default-population="12" description="Phase 3 base for CNSA"
-    number-of-robots="7" sponsor="CNSA">
+    name="Phase 3-CN" shift-pattern="Long 3 Shift" 
+    default-population="16" description="Phase 3 base for CNSA"
+    number-of-robots="8" sponsor="CNSA">
     
     <building id="0" type="Lander Hab" xloc="0.0" yloc="0.0"
         facing="0.0">
@@ -11,6 +12,8 @@
             <connection id="21" xloc="4.5" yloc="0.0" />
         </connection-list>
     </building>
+    
+    <!-- H1. Between the first and the second row -->
     <building id="1" type="Hallway" length="4.0" xloc="0.0"
         yloc="6.5" facing="0.0">
         <connection-list>
@@ -18,6 +21,7 @@
             <connection id="2" xloc="0.0" yloc="2.0" />
         </connection-list>
     </building>
+    
     <building id="2" type="Research Hab" xloc="0.0" yloc="13.0"
         facing="0.0">
         <connection-list>
@@ -26,6 +30,8 @@
             <connection id="9" xloc="-4.5" yloc="0.0" />
         </connection-list>
     </building>
+    
+    <!-- H2. Between the second and the third row -->
     <building id="3" type="Hallway" length="4.0" xloc="0.0"
         yloc="19.5" facing="0.0">
         <connection-list>
@@ -41,7 +47,7 @@
         </connection-list>
     </building>
 
-    <!-- The first row -->
+    <!-- H3. At the first row -->
     <building id="5" type="Hallway" length="3.0" xloc="-6.0"
         yloc="0.0" facing="270.0">
         <connection-list>
@@ -57,6 +63,7 @@
         </connection-list>
     </building>
 
+    <!-- H4. At the first row -->
     <building id="7" type="Hallway" length="3.0" xloc="-18.0"
         yloc="0.0" facing="270.0">
         <connection-list>
@@ -73,7 +80,7 @@
         </connection-list>
     </building>
 
-    <!-- The second row -->
+    <!-- H5. At the second row -->
     <building id="9" type="Hallway" length="3.0" xloc="-6.0"
         yloc="13.0" facing="270.0">
         <connection-list>
@@ -89,6 +96,7 @@
         </connection-list>
     </building>
 
+    <!-- H6. At the second row -->
     <building id="11" type="Hallway" length="3.0" xloc="-18.0"
         yloc="13.0" facing="270.0">
         <connection-list>
@@ -105,7 +113,7 @@
         </connection-list>
     </building>
 
-    <!-- The third row -->
+    <!-- H7. The third row -->
     <building id="13" type="Hallway" length="3.0" xloc="-6.0"
         yloc="26.0" facing="270.0">
         <connection-list>
@@ -121,6 +129,7 @@
         </connection-list>
     </building>
 
+    <!-- H8. The third row -->
     <building id="15" type="Hallway" length="3.0" xloc="-18.0"
         yloc="26.0" facing="270.0">
         <connection-list>
@@ -128,7 +137,7 @@
             <connection id="16" xloc="0.0" yloc="-1.5" />
         </connection-list>
     </building>
-    <building id="16" type="Inflatable Greenhouse" xloc="-24.0"
+    <building id="16" type="Algae Pond" xloc="-24.0"
         yloc="26.0" facing="270.0">
         <connection-list>
             <connection id="15" xloc="0.0" yloc="4.5" />
@@ -136,8 +145,7 @@
         </connection-list>
     </building>
 
-    <!-- This hallway connects the inflatable greenhouse on the first row
-        to that of second row -->
+    <!-- H9. Between the first and the second row -->
     <building id="17" type="Hallway" length="7.0" xloc="-24.0"
         yloc="6.5" facing="0.0">
         <connection-list>
@@ -146,8 +154,7 @@
         </connection-list>
     </building>
 
-    <!-- This hallway connects the inflatable greenhouse on the second row
-        to that of the third row -->
+    <!-- H10. Between the second and the third row -->
     <building id="18" type="Hallway" length="7.0" xloc="-24.0"
         yloc="19.5" facing="0.0">
         <connection-list>
@@ -156,8 +163,7 @@
         </connection-list>
     </building>
 
-    <!-- This hallway connects the inflatable greenhouse in the first row
-        to the garage -->
+    <!-- H11. Between the zero and the first row -->
     <building id="19" type="Hallway" length="4.0" xloc="-24.0"
         yloc="-5.0" facing="0.0">
         <connection-list>
@@ -181,149 +187,19 @@
         </connection-list>
     </building>
 
-	<building type="TOPAZ-2A Reactor" xloc="500.0"
-        yloc="-500" facing="0.0" />
-    <building type="TOPAZ-2A Reactor" xloc="500.0"
-        yloc="-510" facing="0.0" />
-     <building type="TOPAZ-2A Reactor" xloc="500.0"
-        yloc="-515" facing="0.0" />       
-        
-    <building type="TOPAZ-3 Reactor" xloc="510.0"
-        yloc="-500" facing="0.0" /> 
-     <building type="TOPAZ-3 Reactor" xloc="510.0"
-        yloc="-510" facing="0.0" /> 
-        
 
-    <building type="Methane Power Generator" xloc="40.0"
-        yloc="-40.0" facing="0.0" />
-    <building type="Methane Power Generator" xloc="60.0"
-        yloc="-40.0" facing="0.0" />
-    <building type="Methane Power Generator" xloc="80.0"
-        yloc="-40.0" facing="0.0" />      
-             
-    <building type="Medium Battery Array" xloc="40.0"
-        yloc="-50.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-60.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-70.0" facing="0.0" />
-     <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-80.0" facing="0.0" />
-               
-    <building type="Medium Battery Array" xloc="40.0"
-        yloc="-90.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-100.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-110.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-120.0" facing="0.0" />
-
-    <building type="Medium Battery Array" xloc="40.0"
-        yloc="-130.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-140.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-150.0" facing="0.0" />
-     <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-160.0" facing="0.0" />
-               
-    <building type="Medium Battery Array" xloc="40.0"
-        yloc="-170.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-180.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-190.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-200.0" facing="0.0" />
-
-
-   <building type="Medium Battery Array" xloc="60.0"
-        yloc="-50.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-60.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-70.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-80.0" facing="0.0" />
-        
-     <building type="Medium Battery Array" xloc="60.0"
-        yloc="-90.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-100.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-110.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-120.0" facing="0.0" />
-        
-        
-   <building type="Medium Battery Array" xloc="60.0"
-        yloc="-130.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-140.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-150.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-160.0" facing="0.0" />
-        
-     <building type="Medium Battery Array" xloc="60.0"
-        yloc="-170.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-180.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-190.0" facing="0.0" />
-    <building type="Wind Turbine" xloc="60.0"
-        yloc="-200.0" facing="0.0" />
-
-
-    <building type="ERV-A" xloc="80.0" yloc="-15.0"
-        facing="0.0" />
-    <building type="ERV-A" xloc="120.0" yloc="-15.0"
-        facing="0.0" />
-    <building type="ERV-A" xloc="160.0" yloc="-15.0"
-        facing="0.0" />
-        
-    <building type="ERV-B" xloc="80.0" yloc="25.0"
-        facing="0.0" />
-    <building type="ERV-B" xloc="120.0" yloc="25.0"
-        facing="0.0" />
-    <building type="ERV-B" xloc="160.0" yloc="25.0"
-        facing="0.0" />
-   
-    <building type="ERV-C" xloc="80.0" yloc="65.0"
-        facing="0.0" />
-    <building type="ERV-C" xloc="120.0" yloc="65.0"
-        facing="0.0" />
-    <building type="ERV-C" xloc="160.0" yloc="65.0"
-        facing="0.0" />
-
-
-    <building type="Atmospheric Processor" xloc="20"
-        yloc="-50.0" facing="90.0" />
-    <building type="Atmospheric Processor" xloc="20"
-        yloc="-60.0" facing="90.0" />
-        
-    <building type="Large Sabatier Processor" xloc="0.0"
-        yloc="-50.0" facing="90.0" />
-    <building type="Large Sabatier Processor" xloc="0.0"
-        yloc="-60.0" facing="90.0" />
-
-    <building type="Regolith Storage Bin" xloc="35.0" yloc="0.0"
-        facing="90.0" />
-    <building type="Sand Storage Bin" xloc="35.0" yloc="5.0"
-        facing="90.0" />
-    <building type="Concrete Storage Bin" xloc="35.0"
-        yloc="10.0" facing="90.0" />
-    <building type="Cement Storage Bin" xloc="35.0" yloc="15.0"
-        facing="90.0" />
-    <building type="Mortar Storage Bin" xloc="35.0" yloc="20.0"
-        facing="90.0" />
-    <building type="Lime Storage Bin" xloc="35.0" yloc="25.0"
-        facing="90.0" />
-    <building type="Ice Storage Bin" xloc="35.0" yloc="-5.0"
-        facing="90.0" />
-    <building type="Carbon Storage Bin" xloc="35.0" yloc="-10.0"
-        facing="90.0" />
+    <!-- Building Packages -->
+    <building-package name="Storage Set 1"/>   
+   	<building-package name="ERV Set 1"/>
+   	<building-package name="ERV Set 2"/>
+    <building-package name="Air Set 1 - 1x2"/>
+    <building-package name="Sabatier Set 1 - 1x4"/>
+	<building-package name="Syngas Set 1 - 1x2"/>
+	<building-package name="Solar Set 1 - 1x9"/>
+   	<building-package name="Wind Set 1 - 1x9"/>	
+   	<building-package name="TOPAZ-2A Set 1 - 1x3"/>
+	<building-package name="TOPAZ-3 Set 1 - 1x2"/>		   	
+	
 
     <vehicle type="Explorer Rover" number="2" />
     <vehicle type="Transport Rover" number="1" />
@@ -344,16 +220,17 @@
  	
 	<!-- Life Support Resources -->
 	<resource type="food" amount="2160" />
-	<resource type="water" amount="10800" />
+	<resource type="water" amount="6000" />
 	<resource type="oxygen" amount="4320" />
 	
     <part-package name="package 3" number="1" />
-    
+
     <resupply>
-       	<resupply-mission name="BiMonthly Delivery" manifest-name="Standard Resupply 1"
-            first-arrival-time="0.7"
-            frequency-sols="60" /> 
-        <resupply-mission name="Annual Delivery" manifest-name="Resupply for Phase 3"
-            first-arrival-time="668" /> 
+       	<resupply-mission name="BiMonthly Delivery" manifest-name="Standard Resupply 1">
+            <schedule eventTime="700" frequency="60" />
+        </resupply-mission>
+        <resupply-mission name="Annual Delivery" manifest-name="Resupply for Phase 3">
+            <schedule firstSol="668" />
+        </resupply-mission>
     </resupply>
 </template>

@@ -6,6 +6,7 @@
 	<!ATTLIST building category CDATA #IMPLIED>
 	<!ATTLIST building width CDATA #REQUIRED>
 	<!ATTLIST building length CDATA #REQUIRED>
+	<!ATTLIST building north-south-alignment (width|length) #REQUIRED>
 	<!ATTLIST building construction CDATA #IMPLIED>
 	<!ATTLIST building base-level CDATA #REQUIRED>
 	<!ATTLIST building wear-lifetime CDATA #REQUIRED>
@@ -17,25 +18,27 @@
 	<!ATTLIST power-required base-power CDATA #REQUIRED>
 	<!ATTLIST power-required base-power-down-power CDATA #REQUIRED>
 
-	<!ELEMENT functions (administration?, astronomical-observation?, building-connection?,
+	<!ELEMENT functions (administration?, algae-farming?, astronomical-observation?, connection?,
 	communication?, computation?, cooking?, dining?, earth-return?, EVA?, exercise?, food-production?, farming?, fishery?,
-	vehicle-maintenance?, life-support?, living-accommodations?, management?, manufacture?,
+	vehicle-maintenance?, life-support?, living-accommodation?, management?, manufacture?,
 	medical-care?, power-generation?, power-storage?, preparing-dessert?, recreation?, research?,
 	resource-processing?, robotic-station?, storage?, thermal-generation?, thermal-storage?, waste-processing? )>
 
 	<!ELEMENT administration (activity?)>
 	<!ATTLIST administration capacity CDATA #REQUIRED>
 	<!ATTLIST administration population-support CDATA #REQUIRED>
+	<!ELEMENT algae-farming (activity?)>
+	<!ATTLIST algae-farming area CDATA #REQUIRED>
+	<!ATTLIST algae-farming depth CDATA #REQUIRED>
 	<!ELEMENT astronomical-observation (activity?)>
 	<!ATTLIST astronomical-observation tech-level CDATA #REQUIRED>
 	<!ATTLIST astronomical-observation capacity CDATA #REQUIRED>
 	<!ATTLIST astronomical-observation power-required CDATA #REQUIRED>
-	<!ELEMENT building-connection EMPTY>
+	<!ELEMENT connection EMPTY>
 	<!ELEMENT communication (activity?)>
 	<!ELEMENT computation (activity?)>
 	<!ATTLIST computation computing-unit CDATA #REQUIRED>
 	<!ATTLIST computation power-demand CDATA #REQUIRED>
-	<!ATTLIST computation cooling-demand CDATA #REQUIRED>
 	<!ELEMENT cooking (activity?)>
 	<!ATTLIST cooking capacity CDATA #REQUIRED>
 	<!ELEMENT dining (activity?)>
@@ -73,21 +76,21 @@
 	<!ELEMENT flyerParking (flyer-location+)>
 	<!ELEMENT flyer-location EMPTY>
 	<!ATTLIST flyer-location xloc CDATA #REQUIRED>
-	<!ATTLIST flyer-location yloc CDATA #REQUIRED>
-	
+	<!ATTLIST flyer-location yloc CDATA #REQUIRED>	
 	<!ELEMENT life-support EMPTY>
 	<!ATTLIST life-support capacity CDATA #REQUIRED>
 	<!ATTLIST life-support power-required CDATA #REQUIRED>
-	<!ELEMENT living-accommodations (activity?)>
-	<!ATTLIST living-accommodations capacity CDATA #REQUIRED>
-	<!ATTLIST management capacity CDATA #REQUIRED>
+	<!ELEMENT living-accommodation (activity)>
+	<!ATTLIST living-accommodation capacity CDATA #REQUIRED>
+	<!ATTLIST living-accommodation guesthouse CDATA #IMPLIED>
 	<!ELEMENT management (activity?)>
+	<!ATTLIST management capacity CDATA #REQUIRED>
+	<!ELEMENT manufacture (activity?)>
 	<!ATTLIST manufacture tech-level CDATA #REQUIRED>
 	<!ATTLIST manufacture concurrent-processes CDATA #REQUIRED>
-	<!ELEMENT manufacture (activity?)>
 	<!ELEMENT medical-care (activity?, bed?)>
 	<!ATTLIST medical-care tech-level CDATA #REQUIRED>
-	<!ATTLIST medical-care capacity CDATA #REQUIRED>
+	<!ATTLIST medical-care bed CDATA #REQUIRED>
 	<!ELEMENT power-generation (power-source+)>
 	<!ELEMENT power-source EMPTY>
 	<!ATTLIST power-source type CDATA #REQUIRED>
@@ -97,7 +100,7 @@
 	<!ATTLIST power-source thermal-conversion CDATA #IMPLIED>
 	<!ATTLIST power-source percent-loading CDATA #IMPLIED>
 	<!ATTLIST power-source fuel-type CDATA #IMPLIED>
-	<!ATTLIST power-source consumption-rate CDATA #IMPLIED>
+
 	<!ELEMENT power-storage EMPTY>
 	<!ATTLIST power-storage capacity CDATA #REQUIRED>
 	<!ATTLIST power-storage discharge-rate CDATA #REQUIRED>
@@ -118,7 +121,7 @@
 	<!ATTLIST heat-source toggle (true|false) #IMPLIED>
 	<!ATTLIST heat-source capacity CDATA #REQUIRED>
 	<!ATTLIST heat-source fuel-type CDATA #IMPLIED>
-	<!ATTLIST heat-source consumption-rate CDATA #IMPLIED>
+
 	<!ELEMENT thermal-storage EMPTY>
 	<!ATTLIST thermal-storage capacity CDATA #REQUIRED>
 	<!ELEMENT waste-processing (process-engine+, activity?)>
@@ -143,6 +146,7 @@
 	<!ELEMENT activity-spot EMPTY>
 	<!ATTLIST activity-spot xloc CDATA #REQUIRED>
 	<!ATTLIST activity-spot yloc CDATA #REQUIRED>
+	<!ATTLIST activity-spot name CDATA #IMPLIED>
 	<!ELEMENT bed (bed-location+)>
 	<!ELEMENT bed-location EMPTY>
 	<!ATTLIST bed-location xloc CDATA #REQUIRED>
@@ -164,19 +168,17 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 <!-- List of buildings that can be used in a settlement template (see settlements.xml) -->
 <building-list>
 	<!-- type: the type of the building. -->
-	<!-- width: the width of the building in meters. -->
-	<!-- length: the length of the building in meters. -->
+	<!-- width: the width (east-west span) of the building  in meters. -->
+	<!-- length: the length (north-south span) of the building in meters. -->
 	<!-- base-level: 0 for above-ground building, -1 for in-ground building. -->
 	<!-- wear-lifetime: in millisols (old default : 3340 Sols or 5 orbits). -->
 	<!-- maintenance-time: in millisols (old default : 50 millisols). -->
 	<!-- room-temperature: in deg Celsius (old default : 22.5D). -->
 	<!-- base-mass: in kg (old default : 3000). -->
-	<building type="Lander Hab" width="9.0" length="9.0" base-level="0"
-		wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="3000">
-		<description> The Lander Hab is the initial habitat for a crew of four.
-	 		It serves as a jack-of-all-trades building that houses many basic but critical functions
-	 		to jump start a settlement. It's commonly used as a central hub providing four connection points
-	 		when developing a colony.
+	<building type="Lander Hab" width="9.0" length="9.0" north-south-alignment="length" base-level="1"
+		wear-lifetime="3340000" maintenance-time="250" room-temperature="22.5" base-mass="3000">
+		<description> The Lander Hab is a jack-of-all-trades building that houses many basic but critical functions
+		to jump start a settlement. It's commonly used as a main hub.
 		</description>
 		<!-- The power requirements of the building. -->
 		<!-- base-power: The baseline power (kW) required by this building in 'full power' mode. -->
@@ -197,15 +199,17 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<!-- The building has communication capabilities. -->
 			<communication>
 				<activity>
-					<activity-spot xloc="3.43" yloc="-1.41" />
-					<activity-spot xloc="2.12" yloc="-1.41" />
+					<!-- The left and right seats of the west table -->
+					<activity-spot xloc="3.43" yloc="-1.36" />
+					<activity-spot xloc="2.12" yloc="-1.36" />
 				</activity>
 			</communication>
 
-			<!-- The building has computation capabilities. -->
-			<!-- power-demand [kW/CU] : the power load in kW for each running CU -->
-			<!-- cooling-demand [kW/CU] : the power load in kW needed for cooling each running CU -->
-			<computation computing-unit="10.0" power-demand="0.2" cooling-demand=".05">
+			<!-- The building has a computation capability. -->
+			<!-- computing-unit [CU] : the unit of computation available for this node. -->
+			<!-- power-demand [kW/CU] : the power required in kW for running each CU.
+			     Note that cooling demand was calculated separately based on this figure.  -->
+			<computation computing-unit="10.0" power-demand="1.0">
 				<activity>
 					<activity-spot xloc="0" yloc="0" />
 				</activity>
@@ -224,23 +228,24 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<activity>
 					<activity-spot xloc="1.02" yloc="-0.73" />
 					<activity-spot xloc="1.02" yloc="-2.02" />
-					<activity-spot xloc="1.7" yloc="-1.41" />
-					<activity-spot xloc="0.37" yloc="-1.41" />
+					<!-- The left and right seats of the East table -->
+					<activity-spot xloc="1.75" yloc="-1.36" />
+					<activity-spot xloc="0.4" yloc="-1.36" />
 				</activity>
 			</dining>
 
 			<!-- The building has exercise facilities. -->
 			<exercise capacity="2">
 				<activity>
-					<activity-spot xloc="2.1" yloc="2.2" />
-					<activity-spot xloc="2.8" yloc="1.5" />
+					<activity-spot xloc="2.4" yloc="2.25" name="Running Machine"/>
+					<activity-spot xloc="2.8" yloc="1.5" name="Bike"/>
 				</activity>
 			</exercise>
 
 			<food-production tech-level="2" concurrent-processes="3">
 				<activity>
-					<activity-spot xloc="1.12" yloc="-3.28" />
-					<activity-spot xloc="0.36" yloc="-3.28" />
+					<activity-spot xloc="1.15" yloc="-3.28" />
+					<activity-spot xloc="0.4" yloc="-3.28" />
 					<activity-spot xloc="0.76" yloc="-3.79" />
 				</activity>
 			</food-production>
@@ -252,14 +257,14 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 
 			<!-- The building provides sleeping quarters for people. -->
 			<!-- beds: the number of sleeping quarters provided. -->
-			<living-accommodations capacity="4">
+			<living-accommodation capacity="4">
 				<activity>
-					<activity-spot xloc="1.5" yloc="3.16" />
-					<activity-spot xloc="-0.39" yloc="3.46" />
-					<activity-spot xloc="-3.14" yloc="0.83" />
-					<activity-spot xloc="-3.04" yloc="-1.04" />
+					<activity-spot xloc="1.55" yloc="3.28" />
+					<activity-spot xloc="-0.4" yloc="3.6" />
+					<activity-spot xloc="-3.3" yloc="0.9" />
+					<activity-spot xloc="-3.17" yloc="-1.08" />
 				</activity>
-			</living-accommodations>
+			</living-accommodation>
 
 			<!-- The building provides command and control for the population. -->
 			<!-- capacity: the number of population managed. -->
@@ -283,9 +288,9 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<!-- The building has a medical infirmary. -->
 			<!-- tech-level: the treatment level capability of the infirmary. (see tech_level.txt) -->
 			<!-- beds: the number of patients the infirmary can support. -->
-			<medical-care tech-level="4" capacity="1">
+			<medical-care tech-level="4" bed="1">
 				<activity>
-					<activity-spot xloc="-1.25" yloc="-1.69" />
+					<activity-spot xloc="-2" yloc="2" />
 				</activity>
 				<bed>
 					<bed-location xloc="-1.97" yloc="1.83" />
@@ -299,13 +304,13 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<!-- toggle: is it on by default. -->
 				<!-- power: the maximum power (kW) produced by the power source. -->
 				<!-- fuel-type: the type of fuel to be used. -->
-				<!-- consumption-rate: the rate of fuel used [kg/millisol] -->
 				<power-source type="Solar Power Source" power="5.0" />
-				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				<power-source type="Fuel Power Source" toggle="false" power="10.0"
+					fuel-type="methane"/>
 			</power-generation>
 
-			<!-- power storage capacity in the energy unit of kW hr. -->
+			<!-- capacity: the battery energy storage capacity in the unit of kWh. -->
+			<!-- discharge rate: The max C-rating of the battery in the unit of C. -->
 			<power-storage capacity="40" discharge-rate="1.25"/>
 
 			<!-- The building has facilities for preparing dessert. -->
@@ -329,8 +334,6 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<research tech-level="3" capacity="3">
 				<!-- Sciences that can be researched at the laboratory. -->
 				<research-specialty name="AREOLOGY" />
-				<research-specialty name="BIOLOGY" />
-				<research-specialty name="CHEMISTRY" />
 				<research-specialty name="COMPUTING" />
 				<research-specialty name="ENGINEERING" />
 				<research-specialty name="MATHEMATICS" />
@@ -350,17 +353,20 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<!-- power-down-level: the efficiency of the resource processes
 								   when building is in 'power down' mode. -->
 
+			<!-- "Lander Hab" -->
 			<resource-processing power-down-level="0.0">
-				<process-engine name="Sabatier RWGS Reactor" number-modules="4"/>
-				<process-engine name="Selective Partial Oxidation of Methane to Methanol" number-modules="4"/>				
-				<process-engine name="Carbon Formation Reactor" number-modules="2"/>	
-				<process-engine name="Plasma Pyrolysis Assembly (PPA) Reactor" number-modules="4"/>		
-				<process-engine name="Oxygen Generation System" number-modules="2"/>
-				<process-engine name="Low Temperature Plasma CO2 Decomposition" number-modules="4"/>
-				<process-engine name="Carbon Dioxide Pump"/>
-				<process-engine name="Syngas Plant"/>
-				<process-engine name="Melt Ice" number-modules="3" />
-				<process-engine name="Filter Brine Water" number-modules="3" />
+				<process-engine name="Sabatier RWGS Reactor" number-modules="16"/>
+				<process-engine name="Selective Partial Oxidation (SPO) of Methane to Methanol" number-modules="4"/>				
+				<process-engine name="Continuous Bosch Reactor (C-Bosch)" number-modules="4"/>	
+				<process-engine name="Plasma Pyrolysis Assembly (PPA) Reactor" number-modules="4"/>	
+				<process-engine name="Produce Oxygen and Acetylene with Chloride and Carbides" number-modules="12"/>	
+				<process-engine name="Oxygen Generation System (OGS)" number-modules="48"/>
+				<process-engine name="Low Temperature Plasma CO2 Decomposition" number-modules="8"/>
+				
+				<process-engine name="Atmospheric processing" number-modules="4"/>
+				<process-engine name="Methanol Synthesis" number-modules="4"/>
+				<process-engine name="Melt Ice" number-modules="20" />
+				<process-engine name="Filter Brine Water" number-modules="20" />
 			
 				<!-- Activity spot for toggling resource process on and off. -->
 				<activity>
@@ -369,12 +375,10 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 
 			</resource-processing>
 
-			<robotic-station capacity="4">
+			<robotic-station capacity="2">
 				<activity>
-					<activity-spot xloc="0.4" yloc="0.0" />
-					<activity-spot xloc="-0.55" yloc="0.0" />
-					<activity-spot xloc="-0.08" yloc="0.5" />
-					<activity-spot xloc="-0.08" yloc="1.1" />
+					<activity-spot xloc="0.2" yloc="0.2" />
+					<activity-spot xloc="-0.2" yloc="-0.2" />
 				</activity>
 			</robotic-station>
 
@@ -397,7 +401,7 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<resource-storage resource="food" capacity="5000.0" />
 				<resource-storage resource="water" capacity="10000.0" />
 				<resource-storage resource="oxygen" capacity="500.0" />
-				<resource-storage resource="carbon dioxide" capacity="500.0" />
+				<resource-storage resource="carbon dioxide" capacity="1000.0" />
 				<resource-storage resource="carbon monoxide" capacity="500.0" />
 				<resource-storage resource="argon" capacity="500.0" />
 				<resource-storage resource="nitrogen" capacity="500.0" />
@@ -484,9 +488,9 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<!-- type: the type of heat source. -->
 				<!-- capacity: the maximum  power capacity kW produced by the heat source. -->
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0"/>
 				<heat-source type="Electric Heating" capacity="20.0" />
+				<heat-source type="Fuel Heating" toggle="true"
+					fuel-type="methane" capacity="20.0"/>
 			</thermal-generation>
 
 			<waste-processing power-down-level="0.0">
@@ -510,114 +514,254 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 	</building>
 <!-- end of Lander Hab-->
 
-	<building type="EVA Airlock" width="6.0" length="4.0" base-level="-1"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="1500"
-			category="EVA_AIRLOCK">
+
+	<building type="EVA Airlock" width="6.0" length="4.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="200" room-temperature="20" base-mass="1500"
+			category="EVA">
 		<description> The EVA Airlock is a node to be attached to building for giving direct access
-			in performing EVA operations.
-		</description>
-		<power-required base-power="0.5" base-power-down-power="0.05" />
+		in performing EVA operations.</description>
+		<power-required base-power="1.0" base-power-down-power="0.1" />
 		<functions>
 			<!-- This building has an airlock and changing room for EVA operations. -->
-			<!--         capacity : the number of people who can use the airlock at once. -->
-			<!--       xloc, yloc : the relative X/Y location inside the airlock. -->
-			<!--    interior-position : the inner or inteior door position of the airlock. -->
-			<!--    exterior-position : the outer or exterior door position of the airlock. -->
+			<!--          capacity : the number of people who can use the airlock at once. -->
+			<!--        xloc, yloc : the relative X/Y location inside the airlock. -->
+			<!--   center-position : the center position of the airlock. -->
+			<!-- interior-position : the inner or inteior door position of the airlock. -->
+			<!-- exterior-position : the outer or exterior door position of the airlock. -->
 			<EVA capacity="4">
-				<center-position xloc="1.0" yloc="0.0"/>
-				<interior-position xloc="-1.3" yloc="0.0"/>
-				<exterior-position xloc="3.2" yloc="0.0"/>
+				<center-position xloc="0.0" yloc="0.0"/>
+				<interior-position xloc="-2.25" yloc="0.0"/>
+				<exterior-position xloc="3.0" yloc="0.0"/>
 				<activity>
-					<activity-spot xloc="1.55" yloc="1.35" />
-					<activity-spot xloc="1.55" yloc="-1.0" />
-					<activity-spot xloc="0.0" yloc="1.0" />
-					<activity-spot xloc="0.0" yloc="-1.35" />
+					<activity-spot xloc="1.0" yloc="1.25" />
+					<activity-spot xloc="1.0" yloc="-1.25" />
+					<activity-spot xloc="-1.0" yloc="1.25" />
+					<activity-spot xloc="-1.0" yloc="-1.25" />
 				</activity>
 			</EVA>
-			<life-support capacity="6" power-required="0.3" />
-			<living-accommodations capacity="2">
-				<activity>
-					<activity-spot xloc="-2.6" yloc="1.35" />
-					<activity-spot xloc="-2.6" yloc="-1.35" />
-				</activity>
-			</living-accommodations>
+
+			<life-support capacity="8" power-required="0.4" />
+
 			<power-generation>
-				<power-source type="Solar Power Source" power="2.5" />
+				<power-source type="Solar Power Source" power="3.0" />
 			</power-generation>
+
 			<power-storage capacity="20" discharge-rate="1.25"/>
-			<robotic-station capacity="1" >
-				<activity>
-					<activity-spot xloc="-1.3" yloc="0.7" />
-				</activity>
-			</robotic-station>
+
 			<thermal-generation>
-				<heat-source type="Solar Heating" capacity="2.0" />
-				<heat-source type="Electric Heating" capacity="10.0" />
+				<heat-source type="Solar Heating" capacity="3.0" />
+				<heat-source type="Electric Heating" capacity="20.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0"/>
+					fuel-type="methane"	capacity="20.0"/>
 			</thermal-generation>
 
 		</functions>
 	</building>
-<!-- end of Storage Shed -->
+<!-- end of EVA Airlock -->
 
-	<building type="Inflatable Greenhouse" width="6.0" length="9.0" construction="INFLATABLE" base-level="0"
-		wear-lifetime="3340000" maintenance-time="50" room-temperature="24.0" base-mass="3000">
-		<description> The Inflatable Greenhouse is essentially a flexible air bladder
-		made with interwoven layers of Polyurethane, Kevlar, polyester, Saran and Tedlar materials to retain an atmosphere adequate
-		for growing a limited number of crops as the food source for the settlers. It is UV-resistant, bullet-resistant and
-		has an aluminized Mylar reflector curtain. It also houses one workbench with instruments for botany research.
-		</description>
-
-		<power-required base-power="2.0" base-power-down-power=".2"/>
+	<building type="Central Hub A" width="20.0" length="20.0" north-south-alignment="length" construction="INFLATABLE" base-level="0"
+		wear-lifetime="3340000" maintenance-time="300" room-temperature="20.0" base-mass="10000">
+		<description> The Central Hub serves to a nexus for connecting other building modules. It has a flexible air dome and is 
+		designed to be a place of gathering and relaxation.</description>
+		<power-required base-power="5.0" base-power-down-power="1.0"/>
 
 		<functions>
-			<!-- The building is capable of growing plant crops. -->
-			<!-- crops: the number of different crops grown in the building. -->
-			<!-- power-growing-crop: the power (kW) required per kg harvest biomass per crop for basic life support (not including light-generating power. -->
-			<!-- power-sustaining-crop: the minimum power (kW) required per kg harvest biomass per crop just to keep it alive. -->
-			<!-- growing-area: the max growing area (square meters) for all crops. -->
-			<farming crops="10" power-growing-crop=".10" power-sustaining-crop=".05" growing-area="200.0" >
+			<cooking capacity="4">
 				<activity>
-					<activity-spot xloc="1.5" yloc="2.25" />
-					<activity-spot xloc="-1.5" yloc="2.25" />
-					<activity-spot xloc="-1.5" yloc="1.25" />
-					<activity-spot xloc="1.5" yloc="-2.25" />
-					<activity-spot xloc="1.5" yloc="2.25" />
-					<activity-spot xloc="-1.5" yloc="-3.5" />
+					<activity-spot xloc="-7.7" yloc="-2.8" />
+					<activity-spot xloc="-8.5" yloc="-2.8" />
+					
+					<activity-spot xloc="-2.9" yloc="-8.0" />
+					<activity-spot xloc="-3.7" yloc="-8.0" />
+				</activity>
+			</cooking>
+
+			<dining capacity="28">
+				<activity>
+					<activity-spot xloc="-1.0" yloc="-3.85" />
+					<activity-spot xloc="-1.0" yloc="-5.85" />
+					
+					<activity-spot xloc="-1.7" yloc="-3.15" />
+					<activity-spot xloc="-1.7" yloc="-4.5" />
+					<activity-spot xloc="-1.7" yloc="-5.1" />
+					<activity-spot xloc="-1.7" yloc="-6.5" />
+					
+					<activity-spot xloc="-2.4" yloc="-3.85" />
+					<activity-spot xloc="-2.4" yloc="-5.85" />
+					
+					<activity-spot xloc="-3.0" yloc="-1.8" />
+					<activity-spot xloc="-3.0" yloc="-3.85" />
+					<activity-spot xloc="-3.0" yloc="-5.85" />
+
+					<activity-spot xloc="-3.7" yloc="-1.13" />
+					<activity-spot xloc="-3.7" yloc="-2.52" />
+					
+					<activity-spot xloc="-3.7" yloc="-3.15" />
+					<activity-spot xloc="-3.7" yloc="-4.5" />
+					<activity-spot xloc="-3.7" yloc="-5.1" />
+					<activity-spot xloc="-3.7" yloc="-6.5" />
+
+					<activity-spot xloc="-4.4" yloc="-1.8" />
+					<activity-spot xloc="-4.4" yloc="-3.85" />
+					<activity-spot xloc="-4.4" yloc="-5.85" />
+					
+					<activity-spot xloc="-5.0" yloc="-1.8" />
+					<activity-spot xloc="-5.0" yloc="-3.85" />
+					
+					<activity-spot xloc="-5.7" yloc="-1.13" />
+					<activity-spot xloc="-5.7" yloc="-2.52" />	
+					<activity-spot xloc="-5.7" yloc="-3.15" />
+					<activity-spot xloc="-5.7" yloc="-4.5" />
+									
+					<activity-spot xloc="-6.4" yloc="-1.8" />
+					<activity-spot xloc="-6.4" yloc="-3.85" />
+			
+				</activity>
+			</dining>
+						
+			<exercise capacity="7">
+				<activity>
+					<activity-spot xloc="7.6" yloc="-2.6" />
+					<activity-spot xloc="6.95" yloc="-3.76" />
+					
+					<activity-spot xloc="6.1" yloc="-4.9" />
+					<activity-spot xloc="5.55" yloc="-6.0" />
+
+					<activity-spot xloc="4.55" yloc="-6.8" />
+					<activity-spot xloc="3.55" yloc="-7.4" />
+
+					<activity-spot xloc="2.45" yloc="-7.9" />
+					
+				</activity>
+			</exercise>
+
+			<food-production tech-level="4" concurrent-processes="4">
+				<activity>
+					<activity-spot xloc="-7.7" yloc="-1.95" />
+					<activity-spot xloc="-8.5" yloc="-1.95" />
+					
+					<activity-spot xloc="-2.9" yloc="-7.2" />
+					<activity-spot xloc="-3.7" yloc="-7.2" />
+				</activity>
+			</food-production>
+						
+			<farming crops="15" power-growing-crop=".10" power-sustaining-crop=".05" growing-area="300.0" >
+				<activity>
+					<activity-spot xloc="5.3" yloc="6.6" />
+					<activity-spot xloc="5.3" yloc="5.2" />
+					<activity-spot xloc="5.3" yloc="4.0" />
+					<activity-spot xloc="5.3" yloc="3.3" />
+					<activity-spot xloc="5.3" yloc="2.6" />
+					<activity-spot xloc="5.3" yloc="1.6" />
+					
+					<activity-spot xloc="-2.54" yloc="7.83" />
+					<activity-spot xloc="-2.54" yloc="7.4" />
+					<activity-spot xloc="-2.54" yloc="6.07" />
+					<activity-spot xloc="-2.54" yloc="4.27" />									
+										
+					<activity-spot xloc="-4.11" yloc="2.6" />
+					<activity-spot xloc="-5.82" yloc="2.6" />
+					<activity-spot xloc="-5.82" yloc="2.6" />
+					<activity-spot xloc="-8.28" yloc="2.6" />
+					
+					<activity-spot xloc="-6.9" yloc="3.1" />
+					<activity-spot xloc="-7.5" yloc="2.1" />					
 				</activity>
 			</farming>
 
-			<life-support capacity="6" power-required="0.3" />
-
-			<power-storage capacity="40"  discharge-rate="1.25"/>
-
-			<research tech-level="3" capacity="2">
-				<research-specialty name="BOTANY" />
-				<research-specialty name="BIOLOGY" />
+			<fishery capacity="5000">
 				<activity>
-					<activity-spot xloc="-1.0" yloc="1.3" />
-					<activity-spot xloc="-2.0" yloc="1.3" />
+					<activity-spot xloc="3.8" yloc="5.25" />
+					<activity-spot xloc="1.25" yloc="5.25" />
+					
+					<activity-spot xloc="3.8" yloc="2.7" />
+					<activity-spot xloc="1.25" yloc="2.7" />															
+				</activity>
+			</fishery>
+
+			<life-support capacity="42" power-required="2.1" />
+			
+			<power-generation>
+				<power-source type="Solar Power Source" power="20.0" />
+				<power-source type="Fuel Power Source" toggle="false" power="30.0"
+				    fuel-type="methane"	/>
+			</power-generation>
+			
+			<power-storage capacity="40"  discharge-rate="1.25"/>
+	
+			<preparing-dessert capacity="2">
+				<activity>
+					<activity-spot xloc="-1.9"  yloc="-8.15" />
+					<activity-spot xloc="-6.7"  yloc="-2.9" />
+				</activity>
+			</preparing-dessert>
+			
+			<!-- The building has recreation facilities (movies, games, music, etc.). -->
+			<recreation capacity="10">
+				<activity>
+					<activity-spot xloc="5.6" yloc="-2.6" />
+					<activity-spot xloc="2.9" yloc="-2.6" />
+
+					<activity-spot xloc="4.6" yloc="-1.9" />
+					<activity-spot xloc="3.7" yloc="-1.9" />
+					
+					<activity-spot xloc="4.6" yloc="-3.35" />
+					<activity-spot xloc="3.7" yloc="-3.35" />
+					
+					<activity-spot xloc="2.9" yloc="-4.55" />
+					<activity-spot xloc="2.9" yloc="-5.85" />	
+					
+					<activity-spot xloc="3.7" yloc="-5.2" />
+					<activity-spot xloc="2.1" yloc="-5.2" />																				
+				</activity>
+			</recreation>
+			
+			<research tech-level="2" capacity="2">
+				<research-specialty name="BIOLOGY" />
+				<research-specialty name="BOTANY" />
+				<research-specialty name="CHEMISTRY" />
+				<activity>
+					<activity-spot xloc="-4.5" yloc="5.73" />
+					<activity-spot xloc="-5.1" yloc="5.73" />	
+					<activity-spot xloc="-5.7" yloc="5.73" />
+
+					<activity-spot xloc="-5.6" yloc="4.25" />
+					<activity-spot xloc="-6.2" yloc="4.25" />
+					<activity-spot xloc="-6.8" yloc="4.25" />			
 				</activity>
 			</research>
 
-			<resource-processing power-down-level="0.0">
-				<process-engine name="Carbon Dioxide Pump"/>
+			<!-- "Central Hub A" -->
+			<resource-processing power-down-level="0.0">			
+				<process-engine name="Sabatier RWGS Reactor" number-modules="48"/>
+				<process-engine name="Selective Partial Oxidation (SPO) of Methane to Methanol" number-modules="12"/>				
+				<process-engine name="Continuous Bosch Reactor (C-Bosch)" number-modules="12"/>	
+				<process-engine name="Plasma Pyrolysis Assembly (PPA) Reactor" number-modules="12"/>	
+				<process-engine name="Produce Oxygen and Acetylene with Chloride and Carbides" number-modules="36"/>	
+				<process-engine name="Oxygen Generation System (OGS)" number-modules="72"/>
+				<process-engine name="Low Temperature Plasma CO2 Decomposition" number-modules="48"/>
+				
+				<process-engine name="Atmospheric processing" number-modules="12"/>
+				<process-engine name="Methanol Synthesis" number-modules="12"/>
+				<process-engine name="Melt Ice" number-modules="40" />
+				<process-engine name="Filter Brine Water" number-modules="40" />
+						
 				<activity>
-					<activity-spot xloc="-1.47" yloc="3.68" />
+					<activity-spot xloc="7.27" yloc="4.54" />
+					<activity-spot xloc="6.94" yloc="5.11" />
 				</activity>
 			</resource-processing>
 
 			<robotic-station capacity="2">
 				<activity>
-					<activity-spot xloc="2.2" yloc="4.1" />
-					<activity-spot xloc="-2.2" yloc="4.1" />
+					<activity-spot xloc="-4.8" yloc="7.5" />
+					<activity-spot xloc="-5.3" yloc="7.2" />									
 				</activity>
 			</robotic-station>
 
 			<storage capacity="20000">
 				<!-- gases -->
-				<resource-storage resource="carbon dioxide" capacity="2500.0" />
+				<resource-storage resource="carbon dioxide" capacity="1000.0" />
 				<resource-storage resource="oxygen" capacity="5000.0" />				
 				<resource-storage resource="nitrogen" capacity="2500.0" />
 				<resource-storage resource="ammonia" capacity="500.0" />
@@ -637,14 +781,137 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<resource-storage resource="crop waste" capacity="500.0" />
 
 				<!-- Supplies -->
-				<resource-initial resource="carbon dioxide" amount="500.0" />
+				<resource-initial resource="carbon dioxide" amount="100.0" />
+
+			</storage>
+
+			<thermal-generation>
+				<heat-source type="Solar Heating" capacity="20.0" />
+				<heat-source type="Electric Heating" capacity="40.0" />
+				<heat-source type="Fuel Heating" toggle="true"
+					fuel-type="methane"	capacity="20.0" />
+			</thermal-generation>
+			
+		</functions>
+	</building>
+<!-- end for Central Hub Type A -->
+
+	<!-- Note: a flexible air bladder
+		made with interwoven layers of Polyurethane, Kevlar, polyester, Saran and Tedlar materials -->
+		
+	<building type="Inflatable Greenhouse" width="6.0" length="9.0" north-south-alignment="length" 
+		construction="INFLATABLE" base-level="0"
+		wear-lifetime="3340000" maintenance-time="150" room-temperature="24.0" base-mass="3000">
+		<description> The Inflatable Greenhouse is a flexible air bladder
+		made with interwoven layers of Polyurethane and polyester materials to retain an atmosphere adequate
+		for growing crops as the food source for the settlers. It is UV-resistant, bullet-resistant and
+		has an aluminized Mylar reflector curtain. It houses one workbench with instruments for botany research.
+		</description>
+
+		<power-required base-power="2.0" base-power-down-power=".2"/>
+
+		<functions>
+			<!-- The building is capable of growing plant crops. -->
+			<!-- crops: the number of different crops grown in the building. -->
+			<!-- power-growing-crop: the power (kW) required per kg harvest biomass per crop for basic life support (not including light-generating power. -->
+			<!-- power-sustaining-crop: the minimum power (kW) required per kg harvest biomass per crop just to keep it alive. -->
+			<!-- growing-area: the max growing area (square meters) for all crops. -->
+			<farming crops="10" power-growing-crop=".10" power-sustaining-crop=".05" growing-area="200.0" >
+				<activity>
+					<activity-spot xloc="1.5" yloc="3" />
+					<activity-spot xloc="1.5" yloc="2" />
+					<activity-spot xloc="1.5" yloc="1" />
+					<activity-spot xloc="1.5" yloc="0" />
+					<activity-spot xloc="1.5" yloc="-1" />
+					<activity-spot xloc="1.5" yloc="-2" />
+					<activity-spot xloc="1.5" yloc="-3" />
+					
+					<activity-spot xloc="-1.5" yloc="3" />
+					<activity-spot xloc="-1.5" yloc="2" />
+					<activity-spot xloc="-1.5" yloc="1" />
+					<activity-spot xloc="-1.5" yloc="0" />
+					<activity-spot xloc="-1.5" yloc="-1" />
+					<activity-spot xloc="-1.5" yloc="-2" />
+					<activity-spot xloc="-1.5" yloc="-3" />
+				</activity>
+			</farming>
+
+			<life-support capacity="8" power-required="0.4" />
+
+			<power-generation>
+				<power-source type="Fuel Power Source" toggle="false" power="10.0"
+				    fuel-type="methane"	/>
+			</power-generation>
+			
+			<power-storage capacity="40"  discharge-rate="1.25"/>
+
+			<recreation capacity="7">
+				<activity>
+					<activity-spot xloc="0" yloc="3" />
+					<activity-spot xloc="0" yloc="2" />
+					<activity-spot xloc="0" yloc="1" />
+					<activity-spot xloc="0" yloc="0" />
+					<activity-spot xloc="0" yloc="-1" />
+					<activity-spot xloc="0" yloc="-2" />
+					<activity-spot xloc="0" yloc="-3" />
+				</activity>
+			</recreation>
+			
+			<research tech-level="2" capacity="2">
+				<research-specialty name="BIOLOGY" />
+				<research-specialty name="BOTANY" />
+				<research-specialty name="CHEMISTRY" />
+				<activity>
+					<activity-spot xloc="-1.0" yloc="1.3" />
+					<activity-spot xloc="-2.0" yloc="1.3" />
+				</activity>
+			</research>
+
+			<resource-processing power-down-level="0.0">
+				<process-engine name="Atmospheric processing" number-modules="8"/>
+				<activity>
+					<activity-spot xloc="-1.47" yloc="3.68" />
+				</activity>
+			</resource-processing>
+
+			<robotic-station capacity="2">
+				<activity>
+					<activity-spot xloc="2.2" yloc="3.8" />
+					<activity-spot xloc="-2.2" yloc="3.8" />
+				</activity>
+			</robotic-station>
+
+			<storage capacity="20000">
+				<!-- gases -->
+				<resource-storage resource="carbon dioxide" capacity="3000.0" />
+				<resource-storage resource="oxygen" capacity="5000.0" />				
+				<resource-storage resource="nitrogen" capacity="2500.0" />
+				<resource-storage resource="ammonia" capacity="500.0" />
+
+				<!-- soil related -->
+				<!-- crop food -->
+				<resource-storage resource="fertilizer" capacity="500.0" />
+				<resource-storage resource="nitrate" capacity="500.0" />
+				<resource-storage resource="nitrite" capacity="500.0" />
+				
+				<resource-storage resource="grey water" capacity="500.0" />
+				<resource-storage resource="water" capacity="2500.0" />					
+
+				<!-- soil related -->
+				<resource-storage resource="soil" capacity="500.0" />
+				<resource-storage resource="compost" capacity="500.0" />
+				<resource-storage resource="crop waste" capacity="500.0" />
+
+				<!-- Supplies -->
+				<resource-initial resource="carbon dioxide" amount="100.0" />
 
 			</storage>
 
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="10.0" />
+				<heat-source type="Electric Heating" capacity="30.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
+					fuel-type="methane"	capacity="30.0" />
 				<!-- Note : every mole of methane (16 g) releases 810 KJ of energy if burning with 2 moles of oxygen (64 g)
 				 CH4(g) + 2O2(g) -> CO2(g) + 2 H2O(g), deltaH = -890 kJ
 
@@ -655,82 +922,120 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				 Assume thermal efficiency at 100%,
 				 1 kW_t for 1.5960 g/millisol or kg/sol
 				 -->
-				<heat-source type="Electric Heating" capacity="30.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end for inflatable greenhouse -->
 
-	<building type="Large Greenhouse" width="12.0" length="18.0" construction="SEMI_SOLID" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="24.0" base-mass="10000">
+	<building type="Large Greenhouse" width="12.0" length="18.0" north-south-alignment="length" 
+		construction="SEMI_ENGINEERED" base-level="0"
+		wear-lifetime="3340000" maintenance-time="250" room-temperature="22.0" base-mass="10000">
 		<description>
-			The Large Greenhouse is made of stronger structural and cladding material such as coextruded laminate of polyamide and polyolefin interwoven around
-			an aluminum frame to give rise to a scaffolded retention bladder. It is furnished with a botany research lab with instruments. It has a spacious interior
-			for high volume crop cultivation and has a high resource storage capability.
+			The Large Greenhouse is made of stronger structural and cladding material such as coextruded
+			laminate of polyamide and polyolefin interwoven around an aluminum frame to give rise
+			 to a scaffolded retention bladder. It is furnished with a lab with instruments. 
+			 It has a spacious interior	for high volume crop cultivation and has a high resource 
+			 storage capability.
 		</description>
 		<power-required base-power="4.0" base-power-down-power="0.4" />
 
 		<functions>
 			<farming crops="40" power-growing-crop=".10" power-sustaining-crop=".05" growing-area="800.0">
 				<activity>
-					<activity-spot xloc="1.6" yloc="4.9" />
-					<activity-spot xloc="1.6" yloc="2.45" />
-					<activity-spot xloc="1.6" yloc="0.0" />
-					<activity-spot xloc="1.6" yloc="-2.45" />
-					<activity-spot xloc="1.6" yloc="-4.9" />
-					<activity-spot xloc="-1.6" yloc="4.9" />
-					<activity-spot xloc="-1.6" yloc="2.45" />
-					<activity-spot xloc="-1.6" yloc="0.0" />
-					<activity-spot xloc="-1.6" yloc="-2.45" />
-					<activity-spot xloc="-1.6" yloc="-4.9" />
+					<activity-spot xloc="1.6" yloc="1" />
+					<activity-spot xloc="1.6" yloc="-1" />
+					<activity-spot xloc="1.6" yloc="-3" />
+					<activity-spot xloc="1.6" yloc="-5" />
+					<activity-spot xloc="1.6" yloc="-7" />
+					
+					<activity-spot xloc="-1.6" yloc="1" />
+					<activity-spot xloc="-1.6" yloc="-1" />
+					<activity-spot xloc="-1.6" yloc="-3" />
+					<activity-spot xloc="-1.6" yloc="-5" />
+					<activity-spot xloc="-1.6" yloc="-7" />
 				</activity>
 			</farming>
 
-			<fishery capacity="1000">
+			<fishery capacity="5000">
 				<activity>
-					<activity-spot xloc="1.6" yloc="4.9" />
-					<activity-spot xloc="1.6" yloc="0.0" />
-					<activity-spot xloc="1.6" yloc="-4.9" />
-					<activity-spot xloc="-1.6" yloc="4.9" />
-					<activity-spot xloc="-1.6" yloc="0.0" />
-					<activity-spot xloc="-1.6" yloc="-4.9" />
+					<activity-spot xloc="1.6" yloc="5" />
+					<activity-spot xloc="-1.6" yloc="3" />
+					<activity-spot xloc="1.6" yloc="3" />
+					<activity-spot xloc="-1.6" yloc="5" />					
 				</activity>
 			</fishery>
 
-			<life-support capacity="16" power-required=".8" />
+			<life-support capacity="24" power-required="1.2" />
 
+			<power-generation>
+				<power-source type="Fuel Power Source" toggle="false" power="20.0"
+				    fuel-type="methane"	/>
+			</power-generation>
+			
 			<power-storage capacity="80" discharge-rate="1.25" />
 
-			<research tech-level="4" capacity="4">
-				<research-specialty name="BOTANY" />
+			<recreation capacity="26">
+				<activity>
+					<activity-spot xloc="1.6" yloc="1" />
+					<activity-spot xloc="1.6" yloc="-1" />
+					<activity-spot xloc="1.6" yloc="-3" />
+					<activity-spot xloc="1.6" yloc="-5" />
+					<activity-spot xloc="1.6" yloc="-7" />
+					
+					<activity-spot xloc="-1.6" yloc="1" />
+					<activity-spot xloc="-1.6" yloc="-1" />
+					<activity-spot xloc="-1.6" yloc="-3" />
+					<activity-spot xloc="-1.6" yloc="-5" />
+					<activity-spot xloc="-1.6" yloc="-7" />
+					
+					<activity-spot xloc="5.2" yloc="7" />
+					<activity-spot xloc="5.2" yloc="5" />
+					<activity-spot xloc="5.2" yloc="3" />
+					<activity-spot xloc="5.2" yloc="1" />
+					<activity-spot xloc="5.2" yloc="-1" />
+					<activity-spot xloc="5.2" yloc="-3" />
+					<activity-spot xloc="5.2" yloc="-5" />
+					<activity-spot xloc="5.2" yloc="-7" />
+									
+					<activity-spot xloc="-5.2" yloc="7" />
+					<activity-spot xloc="-5.2" yloc="5" />
+					<activity-spot xloc="-5.2" yloc="3" />
+					<activity-spot xloc="-5.2" yloc="1" />
+					<activity-spot xloc="-5.2" yloc="-1" />
+					<activity-spot xloc="-5.2" yloc="-3" />
+					<activity-spot xloc="-5.2" yloc="-5" />
+					<activity-spot xloc="-5.2" yloc="-7" />
+				
+				</activity>
+			</recreation>
+			
+			<research tech-level="3" capacity="4">
 				<research-specialty name="BIOLOGY" />
+				<research-specialty name="BOTANY" />
+				<research-specialty name="CHEMISTRY" />
 				<activity>
 					<activity-spot xloc=".9" yloc="7.8" />
 					<activity-spot xloc="4.25" yloc="-7.7" />
 				</activity>
 			</research>
 			<resource-processing power-down-level="0.0">
-				<process-engine name="Carbon Dioxide Pump" number-modules="3"/>
+				<process-engine name="Atmospheric processing" number-modules="8"/>
 				<activity>
 					<activity-spot xloc="-4.5" yloc="8.25" />
 				</activity>
 			</resource-processing>
 
-			<robotic-station capacity="6">
+			<robotic-station capacity="2">
 				<activity>
-					<activity-spot xloc="1.6" yloc="0.0" />
-					<activity-spot xloc="-1.6" yloc="0.0" />
-					<activity-spot xloc="1.6" yloc="-2.45" />
-					<activity-spot xloc="1.6" yloc="-4.9" />
-					<activity-spot xloc="-1.6" yloc="4.9" />
-					<activity-spot xloc="-1.6" yloc="2.45" />
+					<activity-spot xloc="5.5" yloc="8.5" />
+					<activity-spot xloc="-5.5" yloc="8.5" />
 				</activity>
 			</robotic-station>
 
 			<storage capacity="50000">
 
 				<!-- gases -->
-				<resource-storage resource="carbon dioxide" capacity="5000.0" />
+				<resource-storage resource="carbon dioxide" capacity="6000.0" />
 				<resource-storage resource="oxygen" capacity="10000.0" />					
 				<resource-storage resource="nitrogen" capacity="5000.0" />
 				<resource-storage resource="ammonia" capacity="1000.0" />
@@ -749,84 +1054,167 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<resource-storage resource="crop waste" capacity="1000.0" />
 
 				<!-- Supplies -->
-				<resource-initial resource="carbon dioxide" amount="1000.0" />
+				<resource-initial resource="carbon dioxide" amount="200.0" />
 
 			</storage>
 
 			<thermal-generation>
-				<heat-source type="Solar Heating" capacity="10.0" />
+				<heat-source type="Solar Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="40.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="47.9385" capacity="30.0" />
-				<heat-source type="Electric Heating" capacity="50.0" />
+					fuel-type="methane"	capacity="40.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end for large greenhouse -->
 
-	<building type="Fish Farm" width="6.0" length="9.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="24.0" base-mass="3000">
+	<building type="Fish Farm" width="6.0" length="9.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="20.0" base-mass="3000">
 		<description>
 			The Fish Farm is made of stronger structural and cladding material such as coextruded laminate of polyamide and polyolefin interwoven around
 			an aluminum frame to give rise to a scaffolded retention bladder. It is furnished with a biology research lab with instruments.
 		</description>
-		<power-required base-power="4.0" base-power-down-power="0.4" />
+		<power-required base-power="2.0" base-power-down-power="0.2" />
 
 		<functions>
 			<fishery capacity="10000">
 				<activity>
-					<activity-spot xloc="0" yloc="2" />
-					<activity-spot xloc="0" yloc="1" />
-					<activity-spot xloc="0" yloc="-1" />
-					<activity-spot xloc="0" yloc="-2" />
+					<activity-spot xloc="-2.65" yloc="-2.5" />
+					<activity-spot xloc="-2.65" yloc="-1.5" />
+					<activity-spot xloc="-2.65" yloc="-0.5" />
+					<activity-spot xloc="2.65" yloc="-0.5" />
+					<activity-spot xloc="2.65" yloc="-1.5" />
+					<activity-spot xloc="2.65" yloc="-2.5" />
 				</activity>
 			</fishery>
 
-			<life-support capacity="4" power-required=".8" />
+			<life-support capacity="8" power-required="0.4" />
 
+			<power-generation>
+				<power-source type="Fuel Power Source" toggle="false" power="10.0"
+				    fuel-type="methane"	/>
+			</power-generation>
+			
 			<power-storage capacity="80"  discharge-rate="1.25"/>
 
+			<recreation capacity="5">
+				<activity>
+					<activity-spot xloc="0" yloc="1" />
+					<activity-spot xloc="0" yloc="0" />
+					<activity-spot xloc="0" yloc="-1" />
+					<activity-spot xloc="0" yloc="-2" />
+					<activity-spot xloc="0" yloc="-3" />		
+				</activity>
+			</recreation>
+			
 			<research tech-level="2" capacity="4">
 				<research-specialty name="BIOLOGY" />
 				<activity>
-					<activity-spot xloc=".9" yloc="2" />
-					<activity-spot xloc="2.3" yloc="-2" />
+					<activity-spot xloc="-1.7" yloc="3.6" />
+					<activity-spot xloc="1.7" yloc="3.6" />
 				</activity>
 			</research>
-			<resource-processing power-down-level="0.0">
-				<process-engine name="Carbon Dioxide Pump" number-modules="3"/>
-				<activity>
-					<activity-spot xloc="-2.5" yloc="4" />
-				</activity>
-			</resource-processing>
 
-			<robotic-station capacity="3">
+			<robotic-station capacity="1">
 				<activity>
-					<activity-spot xloc="1.6" yloc="0.0" />
-					<activity-spot xloc="-1.6" yloc="0.0" />
-					<activity-spot xloc="1.6" yloc="-2.45" />
-					<activity-spot xloc="-1.6" yloc="2.45" />
+					<activity-spot xloc="-2.2" yloc="3.8" />
 				</activity>
 			</robotic-station>
 
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="10.0" />
+				<heat-source type="Electric Heating" capacity="40.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="47.9385" capacity="30.0" />
-				<heat-source type="Electric Heating" capacity="50.0" />
+					fuel-type="methane"	capacity="30.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end for fish farm -->
 
-	<building type="ERV-A" width="10.0" length="10.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="3000">
-		<description> The Earth Return Vehicle Type A (ERV-A) is a vehicle base sent ahead
-		    of the arrival of the human crew. It provides equipment package for producing 
-		    and handling viable life-support and mission-capable resources. It is NOT 
-		    fully flight capable and would require retrofitting to become flight-ready.
+	<building type="Algae Pond" width="6.0" length="9.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="24.0" base-mass="3000">
+		<description>
+			This building grows spirulina in ponds. It is furnished with a biology research lab 
+			with instruments.
+		</description>
+		<power-required base-power="2.0" base-power-down-power="0.2" />
+
+		<functions>
+			<!-- 
+			Note: 1000 L = 1 m^3, 10000 L = 10 m^3; 
 			
-				Mars Direct Mission Plan :
-					(1). ERV -
+			At 40% space utilization within the building
+			
+			Area: 6 m * 9 m * 40% = 21.6 SM; 
+			Vol: 21.6 SM * 0.25 m = 10.8 CM
+			
+			Assume 4 stackable ponds. total area: 86.4 SM
+			
+			The pH levels must range between 8 and 11. The water levels should be 
+			maintained in a controlled manner. 
+			
+			Higher water levels in the tank can lead to difficulty in photosynthesis 
+			and algae development. Average water level should be kept 25 centimeter.  
+			
+			area in square meters (SM)
+			depth in meters (M)
+			-->
+			<algae-farming area="86.4" depth="0.25">
+				<activity>
+					<activity-spot xloc="-1.8" yloc="3.4" />
+					<activity-spot xloc="1.8" yloc="-3.4" />
+					<activity-spot xloc="-1.8" yloc="-3.4" />
+					<activity-spot xloc="1.8" yloc="3.4" />
+					<activity-spot xloc="0" yloc="-3.4" />
+					<activity-spot xloc="0" yloc="3.4" />
+				</activity>
+			</algae-farming>
+
+			<life-support capacity="8" power-required=".8" />
+
+			<power-generation>
+				<power-source type="Fuel Power Source" toggle="false" power="10.0"
+				    fuel-type="methane"	/>
+			</power-generation>
+			
+			<power-storage capacity="80" discharge-rate="1.25"/>
+
+			<recreation capacity="4">
+				<activity>
+					<activity-spot xloc="1.0" yloc="-1.9" />
+					<activity-spot xloc="1.0" yloc="1.9" />
+					<activity-spot xloc="-1.0" yloc="-1.9" />
+					<activity-spot xloc="-1.0" yloc="-1.9" />	
+				</activity>
+			</recreation>
+			
+			<research tech-level="2" capacity="4">
+				<research-specialty name="BIOLOGY" />
+				<activity>
+					<activity-spot xloc="1.5" yloc="3.5" />
+					<activity-spot xloc="-1.5" yloc="3.5" />
+				</activity>
+			</research>
+
+			<robotic-station capacity="1">
+				<activity>
+					<activity-spot xloc="-2.2" yloc="3.8" />					
+				</activity>
+			</robotic-station>
+
+			<thermal-generation>
+				<heat-source type="Solar Heating" capacity="10.0" />
+				<heat-source type="Electric Heating" capacity="40.0" />
+				<heat-source type="Fuel Heating" toggle="true"
+					fuel-type="methane"	capacity="30.0" />
+			</thermal-generation>
+		</functions>
+	</building>
+<!-- end for algae pond -->
+
+	<!-- 
+		Mars Direct Mission Plan :
+				  (1). ERV -
 				 	(a). Payload imported from Earth -
 					 	 Consumables : 3400 kg
 					 	 Hydrogen feedstock : 6300 kg
@@ -835,11 +1223,17 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 						 Oxygen : 16080 kg
 						 Methane : 8400 kg
 
-					(2). Hab -
+				  (2). Hab -
 					(a). Payload imported from Earth -
 					 	 Consumables : 7000 kg
-				 			
-		</description>
+	-->
+	<building type="ERV-A" width="10.0" length="10.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="100" room-temperature="0" base-mass="3000">
+		<description> The Earth Return Vehicle Type A (ERV-A) is a vehicle base sent ahead
+		    of the arrival of the human crew. It provides equipment package for resource
+		    processing that provide essential life-support functions. It is NOT fully flight 
+		    capable and would require retrofitting to become flight-ready.
+		    </description>
 		<power-required base-power="0.5" base-power-down-power="0.05"/>
 
 		<functions>
@@ -848,15 +1242,16 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<power-source type="Solar Power Source" power="5.0" />
 			</power-generation>
 			<power-storage capacity="20" discharge-rate="1.25"/>
+			
+			 <!-- "ERV-A" -->
 			<resource-processing power-down-level="0.0">
-				<process-engine name="Sabatier RWGS Reactor" number-modules="4"/>
-				<process-engine name="Selective Partial Oxidation of Methane to Methanol" number-modules="4"/>
-				<process-engine name="Carbon Formation Reactor" number-modules="2"/>
-				<process-engine name="Plasma Pyrolysis Assembly (PPA) Reactor" number-modules="6"/>
-				<process-engine name="Oxygen Generation System" number-modules="2"/>			
-				<process-engine name="Low Temperature Plasma CO2 Decomposition" number-modules="6"/>
-				<process-engine name="Melt Ice" number-modules="4"/>	
-				<process-engine name="Filter Brine Water" number-modules="4"/>						
+				<process-engine name="Sabatier RWGS Reactor" number-modules="32"/>
+				<process-engine name="Selective Partial Oxidation (SPO) of Methane to Methanol" number-modules="8"/>
+				<process-engine name="Continuous Bosch Reactor (C-Bosch)" number-modules="12"/>
+				<process-engine name="Plasma Pyrolysis Assembly (PPA) Reactor" number-modules="12"/>
+				<process-engine name="Produce Oxygen and Acetylene with Chloride and Carbides" number-modules="24"/>
+				<process-engine name="Oxygen Generation System (OGS)" number-modules="72"/>			
+				<process-engine name="Low Temperature Plasma CO2 Decomposition" number-modules="48"/>					
 			</resource-processing>
 
 			<storage capacity="300000">
@@ -865,35 +1260,31 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<resource-storage resource="methanol" capacity="10000.0" />
 				<resource-storage resource="oxygen" capacity="10000.0" />
 				
-				<resource-storage resource="acetylene" capacity="5000.0" />
+				<resource-storage resource="acetylene" capacity="2000.0" />
 				<resource-storage resource="carbon monoxide" capacity="2500.0" />
-								
-				<resource-storage resource="water" capacity="10000.0" />
-				<resource-storage resource="ice" capacity="5000.0" />
-				<resource-storage resource="grey water" capacity="2000.0" />				
+				<resource-storage resource="carbon dioxide" capacity="500.0" />
+			
 				<resource-storage resource="rock salt" capacity="500.0" />
 				
 				<!-- Payload imported from Earth
 				resource-initial resource="hydrogen" amount="6300.0" /-->
 
 				<!-- Extracted on Mars -->
-				<resource-initial resource="carbon dioxide" amount="1000.0" />
+				<resource-initial resource="carbon dioxide" amount="100.0" />
 
 				<!-- Produced on Mars -->
-				<resource-initial resource="oxygen" amount="16080.0" />
-				<resource-initial resource="methane" amount="8400.0" />
-				<resource-initial resource="methanol" amount="8400.0" />
-				<resource-initial resource="hydrogen" amount="6300.0" />
-				<resource-initial resource="water" amount="18900.0" />
-
-
+				<resource-initial resource="oxygen" amount="8040.0" />
+				<resource-initial resource="methane" amount="4200.0" />
+				<resource-initial resource="methanol" amount="4200.0" />
+				<resource-initial resource="hydrogen" amount="3150.0" />
+				<resource-initial resource="water" amount="9450.0" />
 			</storage>
 		</functions>
 	</building>
 <!-- end of ERV-A -->
 
-	<building type="ERV-B" width="10.0" length="10.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="3000">
+	<building type="ERV-B" width="10.0" length="10.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="100" room-temperature="0" base-mass="3000">
 		<description> The Earth Return Vehicle Type B (ERV-B) It furnishes many regolith-
 		related processing equipment package that extract ores and minerals. It may be 
 		reconfigured into a flight-ready space vehicle with habitation space. 
@@ -908,37 +1299,40 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<power-storage capacity="20" discharge-rate="1.25"/>
 			<resource-processing power-down-level="0.0">
 				<!-- 5 processes for breaking down regolith -->		
-				<process-engine name="convert regolith to ores with sand" number-modules="10"/>
-				<process-engine name="extract nitrogen compounds from regolith" number-modules="10"/>
-				<process-engine name="process regolith-B rich in poly-hydrated sulfate" number-modules="3"/> 
-				<process-engine name="process regolith-C rich in phyllo-silicate" number-modules="3"/>
-				<process-engine name="process regolith-D rich in basaltic" number-modules="3"/>
+				<process-engine name="Convert Regolith to Ores with Sand" number-modules="40"/>
+				<process-engine name="Extract Nitrogen Compounds from Regolith" number-modules="15"/>
+				<process-engine name="Process Regolith-B rich in Poly-Hydrated Sulfate" number-modules="15"/> 
+				<process-engine name="Process Regolith-C rich in Phyllo-Silicate" number-modules="15"/>
+				<process-engine name="Process Regolith-D rich in Basaltic" number-modules="15"/>
 				
 				<!-- 10 processes for breaking down minerals -->
-				<process-engine name="do chalcopyrite smelting" number-modules="3"/>
+				<process-engine name="Do Chalcopyrite Smelting" number-modules="5"/>
 				<!-- https://geologyscience.com/minerals/goethite/ -->
-				<process-engine name="do goethite smelting" number-modules="3"/>				
+				<process-engine name="Do Goethite Smelting" number-modules="5"/>				
 				<!-- https://geologyscience.com/minerals/hematite/ -->
-				<process-engine name="do hematite smelting" number-modules="3"/>
-				<process-engine name="do kamacite smelting" number-modules="3"/> 
-				<process-engine name="do magnesite smelting" number-modules="3"/>								
-				<process-engine name="do magnetite smelting" number-modules="3"/>
-				<process-engine name="do malachite smelting" number-modules="3"/>				
-				<process-engine name="do olivine smelting" number-modules="3"/>				
-				<process-engine name="do taenite smelting" number-modules="3"/>
-				<process-engine name="do sylvite smelting" number-modules="3"/>
+				<process-engine name="Do Hematite Smelting" number-modules="5"/>
+				<process-engine name="Do Kamacite Smelting" number-modules="5"/> 
+				<process-engine name="Do Magnesite Smelting" number-modules="5"/>								
+				<process-engine name="Do Magnetite Smelting" number-modules="5"/>
+				<process-engine name="Do Malachite Smelting" number-modules="5"/>				
+				<process-engine name="Do Olivine Smelting" number-modules="5"/>				
+				<process-engine name="Do Taenite Smelting" number-modules="5"/>
+				<process-engine name="Do Sylvite Smelting" number-modules="5"/>
 								
 				<!-- 9 processes for extracting ore deposits -->
-				<process-engine name="extract minerals from basaltic deposits" number-modules="3"/>
-				<process-engine name="extract minerals from smectite deposits" number-modules="3"/>
-				<process-engine name="extract minerals from allophane deposits" number-modules="3"/>
-				<process-engine name="extract minerals from akaganeite deposits" number-modules="3"/> 
-				<process-engine name="extract minerals from bassanite deposits" number-modules="3"/> 
-				<process-engine name="extract minerals from sand" number-modules="5"/>
-				<process-engine name="reduce gypsum to calcium carbonate with carbon" number-modules="3"/>
-				<process-engine name="reduce gypsum to calcium carbonate with carbon monoxide" number-modules="3"/>
-				<process-engine name="reduce gypsum to calcium carbonate with hydrogen" number-modules="3"/>
-				<process-engine name="Make gypsum plaster via calcination" number-modules="3"/>							
+				<process-engine name="Extract Minerals from Sand" number-modules="40"/>
+				
+				<process-engine name="Extract Minerals from Basaltic deposits" number-modules="5"/>
+				<process-engine name="Extract Minerals from Smectite deposits" number-modules="5"/>
+				<process-engine name="Extract Minerals from Allophane deposits" number-modules="5"/>
+				<process-engine name="Extract Minerals from Akaganeite deposits" number-modules="5"/> 
+				<process-engine name="Extract Minerals from Bassanite deposits" number-modules="5"/> 
+
+				<process-engine name="Reduce Gypsum to Calcium Carbonate with Carbon" number-modules="5"/>
+				<process-engine name="Reduce Gypsum to Calcium Carbonate with Carbon Monoxide" number-modules="5"/>
+				<process-engine name="Reduce Gypsum to Calcium Carbonate with Hydrogen" number-modules="5"/>
+				
+				<process-engine name="Make Gypsum Plaster via Calcination" number-modules="5"/>							
 			</resource-processing>
 
 			<storage capacity="300000">
@@ -963,7 +1357,14 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<resource-storage resource="olivine" capacity="1000.0" />
 				<resource-storage resource="taenite" capacity="5000.0" />
 				<resource-storage resource="sylvite" capacity="1000.0" />					
-												
+
+				<resource-storage resource="iron powder" capacity="1000.0" />									
+				<resource-storage resource="iron oxide" capacity="1000.0" />
+				<resource-storage resource="sodium oxide" capacity="500.0" />									
+				<resource-storage resource="aluminum oxide" capacity="1000.0" />
+				<resource-storage resource="silica" capacity="500.0" />									
+				<resource-storage resource="silicon" capacity="1000.0" />
+																
 				<resource-storage resource="regolith" capacity="7500.0" />
 				<resource-storage resource="sand" capacity="5000.0" />
 				<resource-storage resource="brine water" capacity="5000.0" />				
@@ -973,8 +1374,8 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 	</building>
 <!-- end of ERV-B -->
 
-	<building type="ERV-C" width="10.0" length="10.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="3000">
+	<building type="ERV-C" width="10.0" length="10.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="100" room-temperature="0" base-mass="3000">
 		<description> The Earth Return Vehicle Type C (ERV-C) possesses many chemical-related processing
 		equipment packages that synthesize industrial chemicals. It may be reconfigured into a flight-ready space
 		vehicle with habitation space. 
@@ -989,41 +1390,43 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<power-storage capacity="20" discharge-rate="1.25"/>
 			<resource-processing power-down-level="0.0">
 					
-				<!-- 3 chemical processes -->
-				<process-engine name="make quartz from silica" number-modules="2"/>
-				<process-engine name="make soda from sodium oxide" number-modules="3"/>
-				<process-engine name="bake calcium carbonate to lime"/> 	
+				<!-- 3 silicon/chemical processes -->
+				<process-engine name="Make Quartz from Silica" number-modules="2"/>
+				<process-engine name="Make Soda from Sodium Oxide" number-modules="3"/>
+				<process-engine name="Bake Calcium Carbonate to Lime"/> 	
 					
 				<!-- 4 types of cement/concrete -->			
-				<process-engine name="make cement" number-modules="5"/>
-				<process-engine name="mix concrete 1" number-modules="5"/>
-				<process-engine name="mix concrete 2" number-modules="5"/>				
-				<process-engine name="mix sulfur concrete" number-modules="5"/>
-				<process-engine name="mix limecrete 1" number-modules="5"/>
-				<process-engine name="mix limecrete 2" number-modules="5"/>				
-				<process-engine name="make magnesium-based concrete 1" number-modules="2"/>
-				<process-engine name="make magnesium-based concrete 2" number-modules="2"/>
+				<process-engine name="Make Cement" number-modules="5"/>
+				<process-engine name="Mix Concrete 1" number-modules="5"/>
+				<process-engine name="Mix Concrete 2" number-modules="5"/>				
+				<process-engine name="Mix Sulfur Concrete" number-modules="5"/>
+				<process-engine name="Mix Limecrete 1" number-modules="5"/>
+				<process-engine name="Mix Limecrete 2" number-modules="5"/>				
+				<process-engine name="Make Magnesium-based Concrete 1" number-modules="2"/>
+				<process-engine name="Make Magnesium-based Concrete 2" number-modules="2"/>
 								
-				<!-- 6 industrial ingredients -->	
+				<!-- 6 industrial chemical ingredients -->	
 				<process-engine name="Produce Ethylene" number-modules="2"/>
 				<process-engine name="Produce Polyethylene from Ethylene" number-modules="50"/>
 				<process-engine name="Produce Styrene from Ethylene" number-modules="5"/>
 				<process-engine name="Produce Polystyrene from Styrene" number-modules="10"/>
 				<process-engine name="Produce Polypropylene from Prophylene" number-modules="10"/>
-				<process-engine name="Methanol-to-olefin (MTO) process" number-modules="10"/>
+				<process-engine name="Methanol-to-Olefin (MTO) process" number-modules="10"/>
 									
 			</resource-processing>
 
 			<storage capacity="300000">
 
 				<resource-storage resource="glass" capacity="3000.0" />
-				<resource-storage resource="silica" capacity="3000.0" />
-				<resource-storage resource="aluminum oxide" capacity="3000.0" />
-				<resource-storage resource="aluminum" capacity="3000.0" />
-				<resource-storage resource="calcium carbonate" capacity="2500.0" />
-					 			
-				<resource-storage resource="concrete" capacity="7500.0" />
+				<resource-storage resource="silica" capacity="2000.0" />
+				<resource-storage resource="silicon" capacity="1000.0" />
 				
+				<resource-storage resource="magnesium" capacity="1000.0" />
+				
+				<resource-storage resource="calcium carbonate" capacity="1000.0" />
+				<resource-storage resource="sodium carbonate" capacity="1000.0" />	
+							
+				<resource-storage resource="concrete" capacity="7500.0" />
 				<resource-storage resource="cement" capacity="7500.0" />
 				<resource-storage resource="sulfur" capacity="2500.0" />
 				<resource-storage resource="lime" capacity="3000.0" />		
@@ -1032,20 +1435,90 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<resource-storage resource="polyethylene" capacity="1000.0" />	
 				<resource-storage resource="polystyrene" capacity="1000.0" />	
 				<resource-storage resource="styrene" capacity="1000.0" />	
-				
+
+				<resource-initial resource="sodium carbonate" amount="10.0" />
+				<resource-initial resource="calcium carbonate" amount="10.0" />				
 			</storage>
 		</functions>
 	</building>
 <!-- end of ERV-C -->
 
-	<building type="TOPAZ-2A Reactor" width="4.0" length="6.0" base-level="0"
-		wear-lifetime="3340000" maintenance-time="50" room-temperature= "0" base-mass="4000">
-		<description>The TOPAZ-2A Reactor is a minor improvement of the TOPAZ-II reactor system, 
-		 which was developed by Soviet Union. In 1987, TOPAZ-II was the first successfully demonstrated
-		 for use by Cosmos 1818 and Cosmos 1867 satellites in space. It is based on thermionic energy 
-		 conversion with highly enriched uranium oxide pellet as fuel. It was colled by liquid-metal 
-		 consisting of sodium and potassium. It has 37 single-cell TFEs, with a much improved 10.5% 
-		 thermal-to-electrical conversion efficiency and 83.3% load capacity to provide ~10 kWe.</description>
+	<building type="ERV-I" width="10.0" length="10.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="100" room-temperature="0" base-mass="3000">
+		<description> The Earth Return Vehicle Type I (ERV-I) is a vehicle base sent ahead
+		    of the arrival of the human crew. It provides equipment package for resource
+		    processing that provide ice and water related life-support functions. It is NOT fully flight 
+		    capable and would require retrofitting to become flight-ready.
+			
+				Mars Direct Mission Plan :
+				  (1). ERV -
+				 	(a). Payload imported from Earth -
+					 	 Consumables : 3400 kg
+					 	 Hydrogen feedstock : 6300 kg
+					(b). Produced on Mars :
+						 water : 18900 kg
+						 Oxygen : 16080 kg
+						 Methane : 8400 kg
+
+				  (2). Hab -
+					(a). Payload imported from Earth -
+					 	 Consumables : 7000 kg
+				 			
+		</description>
+		<power-required base-power="0.5" base-power-down-power="0.05"/>
+
+		<functions>
+			<earth-return capacity="4" />
+			<power-generation>
+				<power-source type="Solar Power Source" power="5.0" />
+			</power-generation>
+			<power-storage capacity="20" discharge-rate="1.25"/>
+			<resource-processing power-down-level="0.0">
+				<process-engine name="Melt Ice" number-modules="60"/>	
+				<process-engine name="Filter Brine Water" number-modules="60"/>						
+			</resource-processing>
+			
+			<storage capacity="300000">
+				<resource-storage resource="hydrogen" capacity="10000.0" />
+				<resource-storage resource="oxygen" capacity="10000.0" />
+	
+				<resource-storage resource="brine water" capacity="10000.0" />					
+				<resource-storage resource="water" capacity="10000.0" />
+				<resource-storage resource="ice" capacity="5000.0" />
+				<resource-storage resource="grey water" capacity="2000.0" />				
+				<resource-storage resource="rock salt" capacity="500.0" />
+				
+				<!-- Payload imported from Earth
+				resource-initial resource="hydrogen" amount="6300.0" /-->
+
+				<!-- Extracted on Mars -->
+				<resource-initial resource="carbon dioxide" amount="100.0" />
+
+				<!-- Produced on Mars -->
+				<resource-initial resource="oxygen" amount="8000.0" />
+				<resource-initial resource="hydrogen" amount="3000.0" />
+				<resource-initial resource="water" amount="9500.0" />
+			</storage>
+
+			<waste-processing power-down-level="0.0">
+				<process-engine name="Grey Water Processor"/>
+				<process-engine name="Black Water Processor"/>
+			</waste-processing>	
+			
+		</functions>
+	</building>
+<!-- end of ERV-I -->
+
+
+	<building type="TOPAZ-2A Reactor" width="4.0" length="6.0" north-south-alignment="length" base-level="0"
+		wear-lifetime="3340000" maintenance-time="200" room-temperature="0" base-mass="4000">
+		<description>The TOPAZ-2A Reactor is a minor improvement of the TOPAZ-II reactor 
+			system, which was developed by Soviet Union in 1987 for use by Cosmos 1818 
+			and Cosmos 1867 satellites in space. Based on thermionic energy conversion 
+			with highly enriched uranium oxide pellet as fuel, it was cooled by 
+			liquid-metal consisting of sodium and potassium. It has 37 single-cell TFEs, 
+			with a much improved 10.5% thermal-to-electrical conversion efficiency and 
+			83.3% load capacity to provide 10.03 kWe.</description>
 		<power-required base-power="1" base-power-down-power="0.1" />
 		<functions>
 			<power-generation>
@@ -1056,10 +1529,11 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		</functions>
 	</building>
 	
-	<building type="TOPAZ-3 Reactor" width="4.0" length="6.0" base-level="0"
-		wear-lifetime="3340000" maintenance-time="50" room-temperature= "0" base-mass="4000">
-		<description>The TOPAZ-3 Reactor doubles the number of TFEs cells to 74 and has higher 
-		 thermal output of 4.7kW per cell. At ~10.37% conversion efficiency, it provides ~30 kWe.</description>
+	<building type="TOPAZ-3 Reactor" width="4.0" length="6.0" north-south-alignment="length" base-level="0"
+		wear-lifetime="3340000" maintenance-time="300" room-temperature="0" base-mass="4000">
+		<description>The TOPAZ-3 Reactor doubles the number of TFEs cells to 74 and has 
+			higher thermal output of 4.7kW per cell. At ~10.37% conversion efficiency, 
+			it provides ~30 kWe.</description>
 		<power-required base-power="1" base-power-down-power="0.1" />
 		<functions>
 			<power-generation>
@@ -1070,8 +1544,8 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		</functions>
 	</building>
 		
-	<building type="Kilopower Reactor" width="2.0" length="2.0" base-level="0"
-		wear-lifetime="3340000" maintenance-time="50" room-temperature= "0" base-mass="1500">
+	<building type="Kilopower Reactor" width="2.0" length="2.0" north-south-alignment="length" base-level="0"
+		wear-lifetime="3340000" maintenance-time="150" room-temperature="0" base-mass="1500">
 		<description>The Kilopower Reactor provides ~20 kWe. It contains two 10 kWe modules, 
 		each with a reactor core using depleted uranium as fuel source. 
 		It uses stirling converters for generating power via mechanical movement of pistons 
@@ -1094,9 +1568,9 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		</functions>
 	</building>
 	
-	<building type="MD1 Nuclear Reactor" width="4.0" length="6.0" base-level="0"
-		wear-lifetime="3340000" maintenance-time="50" room-temperature= "0" base-mass="4000">
-		<description>The MD1 Nuclear Reactor is the first compact fission power plant commissioned 
+	<building type="MD1 Nuclear Reactor" width="4.0" length="6.0" north-south-alignment="length" base-level="0"
+		wear-lifetime="3340000" maintenance-time="200" room-temperature="0" base-mass="4000">
+		<description>The MD1 Nuclear Reactor at 40kW is the first compact fission power plant commissioned 
 		    for use off-world. At 83.3% load capacity, it provides a consistent power supply of ~40 kWe.</description>
 		<power-required base-power="0.25" base-power-down-power="0.025" />
 		<functions>
@@ -1108,8 +1582,8 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		</functions>
 	</building>
 
-	<building type="MD4 Nuclear Reactor" width="10.0" length="15.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature= "0" base-mass="8000">
+	<building type="MD4 Nuclear Reactor" width="10.0" length="15.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="500" room-temperature="0" base-mass="8000">
 		<description>
 			The MD4 Nuclear Reactor is a robust, flight-ready nuclear fission power plant. 
 			At 83.3% load capacity, it provides a consistent power supply of ~100 kWe.
@@ -1128,8 +1602,8 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		</functions>
 	</building>
 
-	<building type="Atmospheric Processor" width="8.0" length="11.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="1000">
+	<building type="Atmospheric Processor" width="8.0" length="11.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="0" base-mass="1000">
 		<description> The Atmospheric Processor is an resource-processing
 		building providing black/water recycling, air processing and waste
 		recycling functions for the settlement.
@@ -1143,16 +1617,17 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<power-source type="Solar Power Source" power="5.0" />
 			</power-generation>
 			
-			<power-storage capacity="20"  discharge-rate="1.25"/>
+			<power-storage capacity="20" discharge-rate="1.25"/>
 			
+			<!-- "Atmospheric Processor" -->
 			<resource-processing power-down-level="0.0">
-				<process-engine name="Sabatier RWGS Reactor" number-modules="8"/>
-				<process-engine name="Selective Partial Oxidation of Methane to Methanol" number-modules="4"/>				
-				<process-engine name="Carbon Formation Reactor" number-modules="2"/>
-				<process-engine name="Plasma Pyrolysis Assembly (PPA) Reactor" number-modules="8"/>
-				<process-engine name="Oxygen Generation System" number-modules="6"/>
-				<process-engine name="Low Temperature Plasma CO2 Decomposition" number-modules="8"/>
-			</resource-processing>
+				<process-engine name="Atmospheric processing" number-modules="16"/>
+				<process-engine name="Selective Partial Oxidation (SPO) of Methane to Methanol" number-modules="3"/>				
+				<process-engine name="Continuous Bosch Reactor (C-Bosch)" number-modules="8"/>
+				<process-engine name="Produce Oxygen and Acetylene with Chloride and Carbides" number-modules="24"/>				
+				<process-engine name="Oxygen Generation System (OGS)" number-modules="64"/>
+				<process-engine name="Low Temperature Plasma CO2 Decomposition" number-modules="36"/>
+			</resource-processing> 
 
 			<storage capacity="100000">
 				<resource-storage resource="hydrogen" capacity="20000.0" />
@@ -1170,7 +1645,7 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			</storage>
 			
 			<waste-processing power-down-level="0.0">
-				<process-engine name="Grey Water Processor"  number-modules="3"/>
+				<process-engine name="Grey Water Processor" number-modules="3"/>
 				<process-engine name="Black Water Processor" number-modules="3"/>
 				<process-engine name= "Solid Waste Management" number-modules="3"/>
 				<process-engine name= "Food Waste Management" number-modules="4"/>
@@ -1184,8 +1659,37 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 	</building>
 <!-- end of Atmospheric Processor -->
 
-	<building type="Residential Quarters" width="7.0" length="9.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="2000">
+	<building type="Syngas Plant" width="5.0" length="5.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="0" base-mass="1000">
+		<description> The synthesis gas plant is defined as a gas with H2 and CO as the main 
+			components of fuel. Syngas plants produces chemicals and fuel such as methanol and 
+			ammonia, etc. 
+		</description>
+		<power-required base-power=".1" base-power-down-power=".01"/>
+
+		<functions>
+			<power-generation>
+				<power-source type="Solar Power Source" power="5.0" />
+			</power-generation>
+			
+			<power-storage capacity="20"  discharge-rate="1.25"/>
+			
+			<resource-processing power-down-level="0.0">
+				<process-engine name="Methanol Synthesis" number-modules="4"/>
+			</resource-processing>
+
+			<storage capacity="100000">
+				<resource-storage resource="hydrogen" capacity="20000.0" />
+				<resource-storage resource="methanol" capacity="15000.0" />
+				<resource-storage resource="water" capacity="10000.0" />
+			</storage>
+				
+		</functions>
+	</building>
+<!-- end of Syngas Plant -->
+
+	<building type="Residential Quarters" width="7.0" length="9.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="22.5" base-mass="2000">
 		<description> The Residential Quarters is the first full living accommodation building
 			that is configured to house as many as twelve beds. It also provides storage space
 			for critical rate resources. It is furnished with a solar panel rooftop.
@@ -1194,15 +1698,15 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 
 		<functions>
 			<life-support capacity="16" power-required="0.8" />
-			<living-accommodations capacity="12">
+			<living-accommodation capacity="11" guesthouse="true">
 				<activity>
 					<activity-spot xloc="2.2" yloc="3.2" />
 					<activity-spot xloc="2.2" yloc="1.8" />
 					<activity-spot xloc="2.2" yloc=".4" />
 					<activity-spot xloc="2.2" yloc="-.6" />
-					<activity-spot xloc="2.2" yloc="-2.0" />
+					<activity-spot xloc="2.2" yloc="-2.0" />			
 					<activity-spot xloc="2.2" yloc="-3.4" />
-
+					
 					<activity-spot xloc="-2.2" yloc="3.2" />
 					<activity-spot xloc="-2.2" yloc="1.8" />
 					<activity-spot xloc="-2.2" yloc=".4" />
@@ -1210,18 +1714,15 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 					<activity-spot xloc="-2.2" yloc="-2.0" />
 					<activity-spot xloc="-2.2" yloc="-3.4" />
 				</activity>
-			</living-accommodations>
+			</living-accommodation>
 			<power-generation>
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="20"  discharge-rate="1.25"/>
-			<robotic-station capacity="4">
+			<robotic-station capacity="1">
 				<activity>
 					<activity-spot xloc="0.0" yloc="-0.5" />
-					<activity-spot xloc="0.0" yloc="-1.5" />
-					<activity-spot xloc="0.0" yloc="0.5" />
-					<activity-spot xloc="0.0" yloc="1.5" />
 				</activity>
 			</robotic-station>
 
@@ -1251,16 +1752,16 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="25.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
+					fuel-type="methane"	capacity="20.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Residential Quarters -->
 
-	<building type="Lounge" width="7.0" length="9.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="2000">
+	<building type="Lounge" width="7.0" length="9.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="22.5" base-mass="2000">
 		<description> The Lounge is a rest and relaxation living space furnished
 			with dining tables and chairs for serving almost three dozens of people at a time.
 			It has a well furnished kitchen supporting a lot of food processing activities and
@@ -1354,7 +1855,7 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 
 			<power-storage capacity="20"  discharge-rate="1.25"/>
@@ -1365,7 +1866,7 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				</activity>
 			</preparing-dessert>
 
-			<recreation capacity="25">
+			<recreation capacity="20">
 				<activity>
 					<activity-spot xloc="1.6" yloc="1.0" />
 					<activity-spot xloc="1.0" yloc="1.05" />
@@ -1393,11 +1894,9 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				</activity>
 			</recreation>
 
-			<robotic-station capacity="4">
+			<robotic-station capacity="2">
 				<activity>
 					<activity-spot xloc="-3.0" yloc="-3.4" />
-					<activity-spot xloc="3.0" yloc="-3.4" />
-					<activity-spot xloc="-2.5" yloc="-4.05" />
 					<activity-spot xloc="2.5" yloc="-4.05" />
 				</activity>
 			</robotic-station>
@@ -1482,17 +1981,17 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="25.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
+					fuel-type="methane"	capacity="20.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Lounge -->
 
 
-	<building type="Infirmary" width="7.0" length="9.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="2000">
+	<building type="Infirmary" width="7.0" length="9.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="22.5" base-mass="2000">
 		<description>
 			The Infirmary is the first medical facility equipped to provide more adequate
 			medical care for settlers. It houses one workbench with equipment for medical research.
@@ -1501,22 +2000,25 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 
 		<functions>
 			<life-support capacity="12" power-required="0.6" />
-			<medical-care tech-level="5" capacity="8">
+			<medical-care tech-level="5" bed="8">
 				<activity>
 					<activity-spot xloc="1.8" yloc="2.4" />
-					<activity-spot xloc="2.0" yloc="-.15" />
-					<activity-spot xloc="2.0" yloc="-1.65" />
-					<activity-spot xloc="2.0" yloc="-3.15" />
-					<activity-spot xloc="-2.0" yloc="1.35" />
-					<activity-spot xloc="-2.0" yloc="-.15" />
-					<activity-spot xloc="-2.0" yloc="-1.65" />
-					<activity-spot xloc="-2.0" yloc="-3.15" />
 				</activity>
+				<bed>
+					<bed-location xloc="2.0" yloc="1.35" />					
+					<bed-location xloc="2.0" yloc="-.15" />
+					<bed-location xloc="2.0" yloc="-1.65" />
+					<bed-location xloc="2.0" yloc="-3.15" />
+					<bed-location xloc="-2.0" yloc="1.35" />
+					<bed-location xloc="-2.0" yloc="-.15" />
+					<bed-location xloc="-2.0" yloc="-1.65" />
+					<bed-location xloc="-2.0" yloc="-3.15" />
+				</bed>				
 			</medical-care>
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="20"  discharge-rate="1.25"/>
 			<research tech-level="2" capacity="2">
@@ -1527,27 +2029,24 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 					<activity-spot xloc="-1.72" yloc="3.2" />
 				</activity>
 			</research>
-			<robotic-station capacity="4">
+			<robotic-station capacity="1">
 				<activity>
 					<activity-spot xloc="0.5" yloc="-0.5" />
-					<activity-spot xloc="-0.5" yloc="-0.5" />
-					<activity-spot xloc="-0.5" yloc="0.5" />
-					<activity-spot xloc="0.5" yloc="0.5" />
 				</activity>
 			</robotic-station>
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="25.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
+					fuel-type="methane"	capacity="20.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Infirmiry-->
 
 
-	<building type="Command and Control" width="7.0" length="9.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="4000">
+	<building type="Command and Control" width="7.0" length="9.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="22.5" base-mass="4000">
 		<description>
 			The Command and Control is a communication facility with networking
 			capability for high speed communications and colony-width connectivity.
@@ -1580,7 +2079,14 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 					<activity-spot xloc="1.75" yloc="-1.6" />
 				</activity>
 			</communication>
-
+			<computation computing-unit="5.0" power-demand="1.0">
+				<activity>
+					<activity-spot xloc="-2.9" yloc="2.33" />
+					<activity-spot xloc="2.9" yloc="2.33" />
+					<activity-spot xloc="-2.9" yloc="-2.33" />
+					<activity-spot xloc="2.9" yloc="-2.33" />
+				</activity>
+			</computation>
 			<life-support capacity="24" power-required="0.6" />
 			<management capacity="12">
 				<activity>
@@ -1603,30 +2109,118 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="40"  discharge-rate="1.25"/>
 			<robotic-station capacity="4">
 				<activity>
-					<activity-spot xloc="0.0" yloc="-2.8" />
-					<activity-spot xloc="0.0" yloc="-2.6" />
-					<activity-spot xloc="0.0" yloc="2.8" />
-					<activity-spot xloc="0.0" yloc="2.6" />
+					<activity-spot xloc="-2.1" yloc="3.0" />
+					<activity-spot xloc="-2.1" yloc="-3.0" />
+					
+					<activity-spot xloc="2.1" yloc="3.0" />
+					<activity-spot xloc="2.1" yloc="-3.0" />
 				</activity>
 			</robotic-station>
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="25.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
+					fuel-type="methane"	capacity="20.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Command and Control -->
 
+	<building type="Server Farm" width="9.0" length="7.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="18" base-mass="4000"
+			category="LABORATORY">
+		<description>
+			The Server Farm is a computer facility providing mainframe resources and networking
+			nodes for colony-width computing needs.
+		</description>
+		<power-required base-power="5.0" base-power-down-power="0.5" />
 
-	<building type="Laboratory" width="7.0" length="9.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="4000">
+		<functions>
+			<administration capacity="4" population-support="4">
+				<activity>
+					<activity-spot xloc="1.10" yloc="2.15" />
+					<activity-spot xloc="0.36" yloc="2.15" />
+					<activity-spot xloc="-0.36" yloc="2.15" />
+					<activity-spot xloc="-1.12" yloc="2.15" />
+				</activity>
+			</administration>
+			<communication>
+				<activity>
+					<activity-spot xloc="1.10" yloc="0.8" />
+					<activity-spot xloc="0.36" yloc="0.8" />
+					<activity-spot xloc="-0.36" yloc="0.8" />
+					<activity-spot xloc="-1.12" yloc="0.8" />
+				</activity>
+			</communication>
+			<computation computing-unit="30.0" power-demand="0.75">
+				<activity>
+					<activity-spot xloc="0.65" yloc="-2.2" />
+					<activity-spot xloc="0.65" yloc="-1.5" />
+					<activity-spot xloc="0.65" yloc="-0.8" />
+					
+					<activity-spot xloc="-0.25" yloc="-2.2" />
+					<activity-spot xloc="-0.25" yloc="-1.5" />
+					<activity-spot xloc="-0.25" yloc="-0.8" />
+					
+					<activity-spot xloc="-1.2" yloc="-2.2" />
+					<activity-spot xloc="-1.2" yloc="-1.5" />
+					<activity-spot xloc="-1.2" yloc="-0.8" />	
+					
+					<activity-spot xloc="-2.15" yloc="-2.2" />
+					<activity-spot xloc="-2.15" yloc="-1.5" />
+					<activity-spot xloc="-2.15" yloc="-0.8" />																			
+				</activity>
+			</computation>
+			<life-support capacity="24" power-required="0.6" />
+			<management capacity="12">
+				<activity>
+					<activity-spot xloc="3.1" yloc="2.7" />
+					<activity-spot xloc="3.1" yloc="1.95" />
+					<activity-spot xloc="2.75" yloc="1.5" />
+									
+					<activity-spot xloc="3.1" yloc="-2.7" />
+					<activity-spot xloc="3.1" yloc="-1.95" />				
+					<activity-spot xloc="2.75" yloc="-1.5" />					
+
+					<activity-spot xloc="-3.1" yloc="2.7" />
+					<activity-spot xloc="-3.1" yloc="1.95" />
+					<activity-spot xloc="-2.75" yloc="1.5" />
+
+					<activity-spot xloc="-3.1" yloc="-2.7" />
+					<activity-spot xloc="-3.1" yloc="-1.95" />				
+					<activity-spot xloc="-2.75" yloc="-1.5" />	
+				</activity>
+			</management>
+			<power-generation>
+				<power-source type="Solar Power Source" power="5.0" />
+				<power-source type="Fuel Power Source" toggle="false" power="5.0"
+				    fuel-type="methane"	/>
+			</power-generation>
+			<power-storage capacity="40"  discharge-rate="1.25"/>
+			<robotic-station capacity="2">
+				<activity>
+					<activity-spot xloc="-1.95" yloc="3.0" />
+					<activity-spot xloc="-2.13" yloc="-3.0" />
+				</activity>
+			</robotic-station>
+			<thermal-generation>
+				<heat-source type="Solar Heating" capacity="5.0" />
+				<heat-source type="Electric Heating" capacity="25.0" />
+				<heat-source type="Fuel Heating" toggle="true"
+					fuel-type="methane"	capacity="20.0" />
+			</thermal-generation>
+		</functions>
+	</building>
+<!-- end of Server Farm -->
+
+
+	<building type="Laboratory" width="7.0" length="9.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="200" room-temperature="22.5" base-mass="4000">
 		<description> The Laboratory is a modest facility furnished with workbench,
 		instruments, COMPUTINGs and tablets and peer collaboration communication
 		suites of equipment that enables making scientific inquiries on the frontier of Mars.
@@ -1634,20 +2228,27 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		<power-required base-power="2.0" base-power-down-power="0.2" />
 
 		<functions>
+			<computation computing-unit="5.0" power-demand="1.0">
+				<activity>
+					<activity-spot xloc="0" yloc="0" />
+				</activity>
+			</computation>			
 			<life-support capacity="16" power-required="0.8" />
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="20"  discharge-rate="1.25"/>
 			<research tech-level="3" capacity="16">
 				<research-specialty name="AREOLOGY" />
-				<research-specialty name="CHEMISTRY" />
 				<research-specialty name="COMPUTING" />
+				<research-specialty name="ENGINEERING" />
 				<research-specialty name="MATHEMATICS" />
+				<research-specialty name="MEDICINE" />
 				<research-specialty name="METEOROLOGY" />
 				<research-specialty name="PHYSICS" />
+				<research-specialty name="PSYCHOLOGY" />
 				<activity>
 					<activity-spot xloc="1.55" yloc="2.87" />
 					<activity-spot xloc="1.55" yloc="1.38" />
@@ -1670,66 +2271,66 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 					<activity-spot xloc="-1.61" yloc="-2.19" />
 				</activity>
 			</research>
-			<robotic-station capacity="4">
+			<robotic-station capacity="1">
 				<activity>
 					<activity-spot xloc="2.9" yloc="3.7" />
-					<activity-spot xloc="2.9" yloc="-3.7" />
-					<activity-spot xloc="-2.9" yloc="-3.7" />
-					<activity-spot xloc="-2.9" yloc="3.7" />
 				</activity>
 			</robotic-station>
 			<storage capacity="5000" />
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="25.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
+					fuel-type="methane"	capacity="20.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Laboratory -->
 
-	<building type="Garage" width="12.0" length="16.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="5000">
+	<building type="Garage" width="12.0" length="16.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="200" room-temperature="18" base-mass="5000">
 		<description> The Garage is an enclosed maintenance facility for
 			building, repairing and modifying Martian rovers and vehicles
 		</description>
 		<power-required base-power="2.0" base-power-down-power="0.2" />
 
 		<functions>
-			<!--  EVA airlock-capacity="8" xloc="0.0" yloc="7.5" interior-xloc="0.0" interior-yloc="7.0"
-			exterior-xloc="0.0" exterior-yloc="9.0" /-->
 			<vehicle-maintenance>
 				<parking>
 		        	<parking-location xloc="2.60" yloc="2.0" />
 		        	<parking-location xloc="-2.60" yloc="2.0" />
 		        </parking>
 				<flyerParking>
-		        	<flyer-location xloc="2.60" yloc="-3.3" />
-		        	<flyer-location xloc="-2.60" yloc="-3.3" />
+		        	<flyer-location xloc="2.35" yloc="-5.4" />
+		        	<flyer-location xloc="-2.35" yloc="-5.4" />
 		        </flyerParking>		        
 		        <activity>
-					<activity-spot xloc="1.75" yloc="-3.5" />
-					<activity-spot xloc="0.0" yloc="-3.5" />
-					<activity-spot xloc="-1.75" yloc="-3.5" />
-					<activity-spot xloc="0.0" yloc="-2.0" />
-					<activity-spot xloc=".75" yloc="1.0" />
-					<activity-spot xloc="-.75" yloc="1.0" />
+					<activity-spot xloc="3.25" yloc="-3" />		        
+					<activity-spot xloc="1.5" yloc="-3" />
+					<activity-spot xloc="-1.5" yloc="-3" />
+					<activity-spot xloc="-3.25" yloc="-3" />
+								
+					<activity-spot xloc="0.6" yloc="-1" />
+					<activity-spot xloc="-0.6" yloc="-1" />
+					<activity-spot xloc="0.6" yloc="1" />
+					<activity-spot xloc="-0.6" yloc="1" />
+					<activity-spot xloc="0.6" yloc="3" />
+					<activity-spot xloc="-0.6" yloc="3" />
+					<activity-spot xloc="0.6" yloc="5" />
+					<activity-spot xloc="-0.6" yloc="5" />					
 				</activity>
 			</vehicle-maintenance>
 			<life-support capacity="8" power-required="0.4" />
 			<power-generation>
 				<power-source type="Solar Power Source" power="7.5" />
 				<power-source type="Fuel Power Source" toggle="false" power="7.5"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="60" discharge-rate="1.25"/>
-			<robotic-station capacity="4">
+			<robotic-station capacity="2">
 				<activity>
-					<activity-spot xloc="-5.8" yloc="2.0" />
-					<activity-spot xloc="-5.8" yloc="2.5" />
-					<activity-spot xloc="-5.8" yloc="3.0" />
-					<activity-spot xloc="5.8" yloc="3.5" />
+					<activity-spot xloc="0.6" yloc="-5.5" />
+					<activity-spot xloc="-0.6" yloc="-5.5" />
 				</activity>
 			</robotic-station>
 			<storage capacity="20000">
@@ -1737,17 +2338,17 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<resource-storage resource="methanol" capacity="5000.0" />				
 			</storage>
 			<thermal-generation>
-				<heat-source type="Solar Heating" capacity="10.0" />
+				<heat-source type="Solar Heating" capacity="20.0" />
+				<heat-source type="Electric Heating" capacity="35.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
-				<heat-source type="Electric Heating" capacity="30.0" />
+					fuel-type="methane"	capacity="30.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end for garage-->
 
-	<building type="Workshop" width="7.0" length="9.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5"  base-mass="4000">
+	<building type="Workshop" width="7.0" length="9.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="200" room-temperature="22.5"  base-mass="4000">
 		<description> The Workshop is practically a machine shop furnished with
 			3-D printers and additive manufacturing machines for processing resources,
 			synthesizing parts and items for use.
@@ -1755,35 +2356,35 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		<power-required base-power="3.0" base-power-down-power="0.3" />
 
 		<functions>
+			<computation computing-unit="4.0" power-demand="1.0">
+				<activity>
+					<activity-spot xloc="-2.3" yloc="2.5" />
+				</activity>
+			</computation>			
 			<life-support capacity="8" power-required="0.4" />
 			<manufacture tech-level="4" concurrent-processes="4">
 				<activity>
-					<activity-spot xloc=".6" yloc="2.9" />
-					<activity-spot xloc="-2.0" yloc="-.7" />
-					<activity-spot xloc="-.6" yloc="-2.9" />
+					<activity-spot xloc=".6" yloc="3.2" />
+					<activity-spot xloc="-2.45" yloc="-1.7" />
+					<activity-spot xloc="-.6" yloc="-3.05" />
 					<activity-spot xloc="1.7" yloc="0.0" />
-					<activity-spot xloc="-.5" yloc="1.1" />
-					<activity-spot xloc=".7" yloc="-1.3" />
-					<activity-spot xloc=".7" yloc=".4" />
+					<activity-spot xloc="-.5" yloc="1.41" />
+					<activity-spot xloc="-.2" yloc="-0.9" />
+					<activity-spot xloc=".65" yloc=".4" />
 				</activity>
 			</manufacture>
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="40"  discharge-rate="1.25"/>
-			<robotic-station capacity="8">
+			<robotic-station capacity="4">
 				<activity>
-					<activity-spot xloc="2" yloc="-3.0" />
-					<activity-spot xloc="-2" yloc="3.0" />
-					<activity-spot xloc="-1.8" yloc="-3.2" />
-					<activity-spot xloc="2" yloc="-3.0" />
-
-					<activity-spot xloc="-2" yloc="-3.0" />
-					<activity-spot xloc="-2.2" yloc="-2.8" />
-					<activity-spot xloc="2.2" yloc="-2.8" />
-					<activity-spot xloc="-2.2" yloc="2.8" />
+					<activity-spot xloc="1.7" yloc="-4" />
+					<activity-spot xloc="1.7" yloc="4" />
+					<activity-spot xloc="-1.7" yloc="-4" />
+					<activity-spot xloc="-1.7" yloc="4" />
 				</activity>
 			</robotic-station>
 
@@ -1806,41 +2407,45 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			</storage>
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="25.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
+					fuel-type="methane"	capacity="20.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Workshop -->
 
 
-	<building type="Methane Power Generator" width="5.0" length="5.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature= "0" base-mass="500">
-		<description>The Methane Power generator utilized methane gas for the
-			generation of electricity. It makes use of the freely available carbon dioxide
-			in the Martian atmosphere and creates non-polluting by-products.
+	<building type="Methane Power Generator" width="5.0" length="5.0" north-south-alignment="length" 
+			base-level="0"
+			wear-lifetime="3340000" maintenance-time="500" room-temperature= "0" base-mass="500">
+		<description>This 30 kW Methane Power generator uses methane gas for generating
+			electricity.
+			
 			Note : every mole of methane (16 g) releases 810 KJ of energy if burning 
 			       with 2 moles of oxygen (64 g) :
 			CH4(g) + 2O2(g) -> CO2(g) + 2 H2O(g), deltaH = -890 kJ
+			
 			Thus, 890kW requires 16 g/s. 
+			
 			Assume electric efficiency at 100%,
 			1 kW_e requires 1.5960 g/millisol or 1.596 kg/sol
+			
 		</description>
-		<power-required base-power="0.5" base-power-down-power="0.05" />
+		<power-required base-power="0.1" base-power-down-power="0.01" />
 
 		<functions>
 			<power-generation>
-				<power-source type="Fuel Power Source" toggle="true" power="60.0"
-				fuel-type="methane"	consumption-rate="95.877" />
+				<power-source type="Fuel Power Source" toggle="true" power="30.0"
+					fuel-type="methane" />
 			</power-generation>
 			<power-storage capacity="40" discharge-rate="1.25"/>
 		</functions>
 	</building>
 
 
-	<building type="Wind Turbine" width="5.0" length="5.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="200">
+	<building type="Wind Turbine" width="5.0" length="5.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="400" room-temperature="0" base-mass="200">
 		<description> This Vertical Axis Wind Turbine (VAWT) is constructed with strong, 
 		lightweight material suited for Mars low gravity and low density wind load. 
 		Each VAWT provides up to a total of 18 kW of power at the wind speed of ~14 m/s
@@ -1857,8 +2462,8 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		</functions>
 	</building>
 
-	<building type="Solar Photovoltaic Array" width="5.0" length="10.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="100">
+	<building type="Solar Photovoltaic Array" width="5.0" length="10.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="300" room-temperature="0" base-mass="100">
 		<description>  The Solar Photovoltaic Array is an array of steerable photovoltaic panels
 		that generates electricity from Martian sunlight. It is an essential part of
 		a modular distributed renewable energy generation system for the power grid.
@@ -1874,8 +2479,8 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 	</building>
 
 	<!-- Array of solar thermal mirrors with steam power generator. -->
-	<building type="Solar Thermal Collector" width="5.0" length="10.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="100">
+	<building type="Solar Thermal Collector" width="5.0" length="10.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="350" room-temperature="0" base-mass="100">
 		<description>  The Solar Thermal Array is an array of steerable parabolic
 			reflectors that concentrates sunlight for heating up molten materials
 			that move mechanical turbines generating power.
@@ -1891,8 +2496,8 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 	</building>
 
 	<!-- A small areothermal electrical generator. -->
-	<building type="Small Areothermal Well" width="5.0" length="10.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="400">
+	<building type="Small Areothermal Well" width="5.0" length="10.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="0" base-mass="400">
 		<description>  The Small Areothermal Well is an geothermal energy production system
 			that captures the trapped underground heat for the power grid.
 		</description>
@@ -1906,8 +2511,8 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		</functions>
 	</building>
 
-	<building type="Large Areothermal Well" width="10.0" length="15.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature= "0" base-mass="15">
+	<building type="Large Areothermal Well" width="10.0" length="15.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="200" room-temperature="0" base-mass="15">
 		<description>  The Large Areothermal Well is an geothermal energy production system
 			that features more advance geothermal flow path for ground loop design for
 			capturing heat and creating electricity.
@@ -1922,21 +2527,21 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		</functions>
 	</building>
 
-	<building type="Concrete Storage Bin" width="2.0" length="3.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature= "0" base-mass="1000">
+	<building type="Concrete Storage" width="2.0" length="3.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="1000">
 		<description>  The Concrete Storage Bin is a small brick bin for
 			storing dry concrete material for light construction project.
 		</description>
 		<power-required base-power="0.0" base-power-down-power="0.0" />
 
 		<functions>
-			<storage capacity="10000">
-				<resource-storage resource="Concrete" capacity="10000.0" />
+			<storage capacity="20000">
+				<resource-storage resource="Concrete" capacity="20000.0" />
 			</storage>
 		</functions>
 	</building>
 
-	<building type="Cement Storage Bin" width="2.0" length="3.0" base-level="0"
+	<building type="Cement Storage" width="2.0" length="3.0" north-south-alignment="length" base-level="0"
 			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="1000">
 		<description>  The Cement Storage Bin is a small brick bin for
 			storing dry cement for light construction project.
@@ -1944,27 +2549,68 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		<power-required base-power="0.0" base-power-down-power="0.0" />
 
 		<functions>
-			<storage capacity="10000">
+			<storage capacity="20000">
 				<resource-storage resource="Cement" capacity="10000.0" />
 			</storage>
 		</functions>
 	</building>
 
-	<building type="Mortar Storage Bin" width="2.0" length="3.0" base-level="0"
+	<building type="Chemical Storage" width="2.0" length="3.0" north-south-alignment="length" base-level="0"
 			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="1000">
-		<description>  The Mortar Storage Bin is a small brick bin for
-			storing dry mortar for light contruction project.
+		<description>  The Chemical Storage Bin is a small brick bin for storing chemical compounds.
 		</description>
 		<power-required base-power="0.0" base-power-down-power="0.0" />
 
 		<functions>
-			<storage capacity="10000">
-				<resource-storage resource="Mortar" capacity="10000.0" />
+			<storage capacity="20000">
+				<resource-storage resource="Polycarbonate resin" capacity="1000.0" />
+				<resource-storage resource="Polyurethane" capacity="1000.0" />
+				<resource-storage resource="Bisphenol-a" capacity="1000.0" />
+				<resource-storage resource="Polyester fiber" capacity="1000.0" />
+				<resource-storage resource="Polyester resin" capacity="1000.0" />
+				<resource-storage resource="Ethylene glycol" capacity="1000.0" />
+				<resource-storage resource="Ethylene" capacity="3000.0" />
+				<resource-storage resource="Polypropylene" capacity="3000.0" />
+				<resource-storage resource="Polystyrene" capacity="3000.0" />
+				<resource-storage resource="Prophylene" capacity="3000.0" />
+				<resource-storage resource="Styrene" capacity="2000.0" />
 			</storage>
 		</functions>
 	</building>
 
-	<building type="Lime Storage Bin" width="2.0" length="3.0" base-level="0"
+	<building type="Fuel Storage" width="2.0" length="3.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="50" room-temperature="-40" base-mass="2000">
+		<description> The Fuel Storage is a small brick bin with tanks within for storing fuels.
+		</description>
+		<power-required base-power="0.0" base-power-down-power="0.0" />
+
+		<functions>
+			<storage capacity="30000">
+				<resource-storage resource="methanol" capacity="15000.0" />
+				<resource-storage resource="methane" capacity="15000.0" />
+			</storage>
+		</functions>
+	</building>
+		
+	<building type="Ice Storage" width="2.0" length="3.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="50" room-temperature="-40" base-mass="1000">
+		<description> The Ice Storage Bin is a small brick bin for handling and
+			storing extracted ice and water for future use.
+		</description>
+		<power-required base-power="0.0" base-power-down-power="0.0" />
+
+		<functions>
+			<storage capacity="20000">
+				<resource-storage resource="ice" capacity="6000.0" />
+				<resource-storage resource="water" capacity="10000.0" />
+				<resource-storage resource="brine water" capacity="2300.0" />
+				<resource-storage resource="grey water" capacity="1500.0" />
+				<resource-storage resource="black water" capacity="200.0" />
+			</storage>
+		</functions>
+	</building>
+	
+	<building type="Lime Storage" width="2.0" length="3.0" north-south-alignment="length" base-level="0"
 			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="1000">
 		<description>  The Lime Storage Bin is a small brick bin for
 			storing lime for light contruction project.
@@ -1972,76 +2618,117 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		<power-required base-power="0.0" base-power-down-power="0.0" />
 
 		<functions>
-			<storage capacity="10000">
-				<resource-storage resource="Lime" capacity="10000.0" />
+			<storage capacity="20000">
+				<resource-storage resource="Lime" capacity="8000.0" />
+				<resource-storage resource="Carbon" capacity="2000.0" />
+				<resource-storage resource="calcium carbonate" capacity="10000.0" />				
 			</storage>
 		</functions>
 	</building>
 
-	<building type="Carbon Storage Bin" width="2.0" length="3.0" base-level="0"
+	<building type="Metal Storage" width="2.0" length="3.0" north-south-alignment="length" base-level="0"
 			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="1000">
-		<description> The Carbon Storage Bin is a small brick bin for
+		<description> The Metal Storage Bin is a small brick bin for
+			storing metallic elements for industrial uses.
+		</description>
+		<power-required base-power="0.0" base-power-down-power="0.0" />
+
+		<functions>
+			<storage capacity="30000">
+				<resource-storage resource="potassium" capacity="5000.0" />
+				<resource-storage resource="iron powder" capacity="5000.0" />
+				<resource-storage resource="copper" capacity="5000.0" />	
+				<resource-storage resource="magnesium" capacity="5000.0" />
+				<resource-storage resource="nickel" capacity="5000.0" />
+				<resource-storage resource="aluminum" capacity="5000.0" />												
+			</storage>
+		</functions>
+	</building>
+	
+	<building type="Ore Storage" width="2.0" length="3.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="1000">
+		<description> The Ore Storage Bin is a small brick bin for
 			storing carbon for light contruction project.
 		</description>
 		<power-required base-power="0.0" base-power-down-power="0.0" />
 
 		<functions>
-			<storage capacity="10000">
-				<resource-storage resource="Carbon" capacity="10000.0" />
+			<storage capacity="20000">
+				<resource-storage resource="basaltic" capacity="5000.0" />
+				<resource-storage resource="gypsum" capacity="11000.0" />	
+				<resource-storage resource="smectite" capacity="1000.0" />
+				<resource-storage resource="allophane" capacity="1000.0" />	
+				<resource-storage resource="akaganeite" capacity="1000.0" />
+				<resource-storage resource="bassanite" capacity="1000.0" />								
 			</storage>
 		</functions>
 	</building>
 
-	<building type="Regolith Storage Bin" width="2.0" length="3.0" base-level="0"
+	<building type="Regolith Storage" width="2.0" length="3.0" north-south-alignment="length" base-level="0"
 			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="1000">
-		<description> The Regolith Storage Bin is a small brick bin for
+		<description> The Regolith Storage is a small brick bin for
 			storing Martian regolith for light contruction project.
 		</description>
 		<power-required base-power="0.0" base-power-down-power="0.0" />
 
 		<functions>
-			<storage capacity="10000">
-				<resource-storage resource="regolith" capacity="10000.0" />
+			<storage capacity="20000">
+				<resource-storage resource="regolith" capacity="15000.0" />
+				<resource-storage resource="regolith-B" capacity="5000.0" />
+				<resource-storage resource="regolith-C" capacity="5000.0" />
+				<resource-storage resource="regolith-D" capacity="5000.0" />	
 			</storage>
 		</functions>
 	</building>
 
-	<building type="Sand Storage Bin" width="2.0" length="3.0" base-level="0"
+	<building type="Sand Storage" width="2.0" length="3.0" north-south-alignment="length" base-level="0"
 			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="1000">
 		<description> The Sand Storage Bin is a small brick bin for
-			storing Martian sand for light contruction project.
+			storing sand, silicon, glass and silica for industrial uses.
 		</description>
 		<power-required base-power="0.0" base-power-down-power="0.0" />
 
 		<functions>
-			<storage capacity="10000">
+			<storage capacity="20000">
 				<resource-storage resource="sand" capacity="10000.0" />
+				<resource-storage resource="silicon" capacity="3000.0" />
+				<resource-storage resource="glass" capacity="2000.0" />
+				<resource-storage resource="silica" capacity="5000.0" />	
 			</storage>
 		</functions>
 	</building>
 
-	<building type="Ice Storage Bin" width="2.0" length="3.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="-40" base-mass="1000">
-		<description> The Ice Storage Bin is a small brick bin for handling and
-			storing extracted ice for future use.
+	<building type="Gas Storage" width="2.0" length="3.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="50" room-temperature="-40" base-mass="2000">
+		<description> The Gas Storage is a small brick bin with tanks within for storing gases.
 		</description>
 		<power-required base-power="0.0" base-power-down-power="0.0" />
 
 		<functions>
-			<storage capacity="10000">
-				<resource-storage resource="ice" capacity="10000.0" />
+			<storage capacity="20000">
+				<resource-storage resource="Oxygen" capacity="6000.0" />
+				<resource-storage resource="Hydrogen" capacity="6000.0" />
+				<resource-storage resource="Nitrogen" capacity="3000.0" />			
+				<resource-storage resource="Argon" capacity="3000.0" />
+				<resource-storage resource="Carbon Dioxide" capacity="1000.0" />
+				<resource-storage resource="Carbon Monoxide" capacity="1000.0" />
 			</storage>
 		</functions>
 	</building>
 
-	<building type="Manufacturing Shed" width="5.0" length="5.0" base-level="-1"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="2500">
+	<building type="Manufacturing Shed" width="5.0" length="5.0" north-south-alignment="length" base-level="-1"
+			wear-lifetime="3340000" maintenance-time="200" room-temperature="22.5" base-mass="2500">
 		<description> The Manufacturing Shed is a small brick manufacturing
 			building for forming, cutting, coating and glazing bricks for construction projects.
 		</description>
 		<power-required base-power="2.0" base-power-down-power="0.2" />
 
 		<functions>
+			<computation computing-unit="2.0" power-demand="1.0">
+				<activity>
+					<activity-spot xloc="0" yloc="0" />
+				</activity>
+			</computation>			
 			<life-support capacity="4" power-required="0.2" />
 			<manufacture tech-level="3" concurrent-processes="2">
 				<activity>
@@ -2073,14 +2760,14 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<heat-source type="Solar Heating" capacity="5.0" />
 				<heat-source type="Electric Heating" capacity="15.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
+					fuel-type="methane"	capacity="20.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Manufacturing Shed -->
 
-	<building type="Large Sabatier Processor" width="5.0" length="5.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="1500">
+	<building type="Large Sabatier Processor" width="5.0" length="5.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="250" room-temperature="0" base-mass="1500">
 		<description> This building houses a number of high capacity sabatier
 			methanation modules for processing hydrogen and carbon dioxide at
 			elevated temperatures and pressures in the presence of a
@@ -2090,7 +2777,7 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 
 		<functions>
 			<resource-processing power-down-level="0.0">
-				<process-engine name="Sabatier RWGS Reactor" number-modules="12"/>
+				<process-engine name="Sabatier RWGS Reactor" number-modules="64"/>
 			</resource-processing>
 			<storage capacity="30000">
 				<resource-storage resource="carbon dioxide" capacity="5000" />
@@ -2100,11 +2787,11 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			</storage>
 		</functions>
 	</building>
-<!-- Small Sabatier Processor -->
+<!-- Large Sabatier Processor -->
 
 	<!-- An Array of Electrical Batteries -->
-	<building type="Medium Battery Array" width="5.0" length="10.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="0" base-mass="500">
+	<building type="Medium Battery Array" width="5.0" length="10.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="250" room-temperature="0" base-mass="500">
 		<description> The Medium Battery Array showcase an advanced battery system that
 			stored excess power during non-peak hours and released power during peak power
 			usage.
@@ -2117,35 +2804,55 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		</functions>
 	</building>
 
-	<building type="Astronomy Observatory" width="7.0" length="7.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="3000">
+	<building type="Astronomy Observatory" width="7.0" length="7.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="250" room-temperature="22.5" base-mass="3000">
 		<description> The Astronomy Observatory is a small self-contained observatory building
 			furnished with an optical telescope, research workbenches and laboratory equipment.
 		</description>
 		<power-required base-power="2.0" base-power-down-power="0.2" />
 
 		<functions>
-			<astronomical-observation tech-level="2" capacity="1" power-required="4.0">
+			<astronomical-observation tech-level="4" capacity="8" power-required="4.0">
 				<activity>
-					<activity-spot xloc="0.0" yloc="0.0" />
+					<!-- Near the center core -->
+					<!-- Left side -->
+					<activity-spot xloc="0.5" yloc="0.7" />
+					<activity-spot xloc="0.8" yloc="0.4" />
+					<activity-spot xloc="0.8" yloc="-0.4" />
+					<activity-spot xloc="0.5" yloc="-0.7" />
+					<!-- Right side -->
+					<activity-spot xloc="-0.5" yloc="0.7" />
+					<activity-spot xloc="-0.8" yloc="0.4" />
+					<activity-spot xloc="-0.8" yloc="-0.4" />
+					<activity-spot xloc="-0.5" yloc="-0.7" />														
 				</activity>
 			</astronomical-observation>
+			
+			<computation computing-unit="2.0" power-demand="1.0">
+				<activity>
+					<!-- Left side -->
+					<activity-spot xloc="-2.0" yloc="1.6" />
+					<activity-spot xloc="-2.0" yloc="-1.6" />				
+					<activity-spot xloc="-2.15" yloc="1.35" />
+					<activity-spot xloc="-2.15" yloc="-1.35" />
+					
+					<!-- Right side -->
+					<activity-spot xloc="2.0" yloc="1.6" />
+					<activity-spot xloc="2.0" yloc="-1.6" />
+					<activity-spot xloc="2.15" yloc="1.35" />
+					<activity-spot xloc="2.15" yloc="-1.35" />
+				</activity>
+			</computation>
 
 			<!-- The building has facilities for eating meals. -->
 			<dining capacity="2">
 				<activity>
-					<activity-spot xloc="0.7" yloc="-2" />
-					<activity-spot xloc="-0.7" yloc="-2" />
+					<activity-spot xloc="0.5" yloc="1.85" />
+					<activity-spot xloc="-0.5" yloc="1.85" />
 				</activity>
 			</dining>
+			
 			<life-support capacity="8" power-required="0.4" />
-
-			<living-accommodations capacity="2">
-				<activity>
-					<activity-spot xloc="2" yloc="-2" />
-					<activity-spot xloc="-2" yloc="-2" />
-				</activity>
-			</living-accommodations>
 
 			<power-storage capacity="40"  discharge-rate="1.25"/>
 			<research tech-level="4" capacity="3">
@@ -2153,16 +2860,16 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<research-specialty name="COMPUTING" />
 				<research-specialty name="PHYSICS" />
 				<activity>
-					<activity-spot xloc="1.45" yloc="1.35" />
-					<activity-spot xloc="-1.45" yloc="1.4" />
-					<activity-spot xloc="1.45" yloc="-1.35" />
-					<activity-spot xloc="-1.35" yloc="-1.4" />
+					<activity-spot xloc="1.45" yloc="1.45" />
+					<activity-spot xloc="-1.45" yloc="1.45" />
+					<activity-spot xloc="1.45" yloc="-1.45" />
+					<activity-spot xloc="-1.45" yloc="-1.45" />
 				</activity>
 			</research>
  			<robotic-station capacity="2">
  				<activity>
-					<activity-spot xloc="2.6" yloc="2.5" />
-					<activity-spot xloc="2.6" yloc="-2.5" />
+					<activity-spot xloc="-1.6" yloc="0" />
+					<activity-spot xloc="1.6" yloc="0" />
 				</activity>
 			</robotic-station>
 			<storage capacity="10000">
@@ -2172,14 +2879,14 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<heat-source type="Solar Heating" capacity="5.0" />
 				<heat-source type="Electric Heating" capacity="15.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
+					fuel-type="methane"	capacity="20.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 	<!-- end of Astronomy Observatory-->
 
 	<!-- A lander hab refitted for storage. -->
-	<building type="Storage Hab" width="9.0" length="9.0" base-level="0"
+	<building type="Storage Hab" width="9.0" length="9.0" north-south-alignment="length" base-level="1"
 			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="2000">
 		<description> The Storage Hab is a Lander Hab refitted storage
 			building with ample storage space. It has built-in PV panels
@@ -2188,14 +2895,11 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		<power-required base-power="1.0" base-power-down-power="0.1" />
 
 		<functions>
-			<!-- EVA airlock-capacity="4" xloc="4.0" yloc="0.0" interior-xloc="3.5" interior-yloc="0.0"
-			exterior-xloc="5.5" exterior-yloc="0.0"/ -->
-
 			<life-support capacity="12" power-required="0.6" />
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="20"  discharge-rate="1.25"/>
 			<robotic-station capacity="2">
@@ -2214,16 +2918,16 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			</storage>
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="20.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0"/>
+					fuel-type="methane"	capacity="20.0"/>
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Storage Hab-->
 
-	<building type="Research Hab" width="9.0" length="9.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="3000">
+	<building type="Research Hab" width="9.0" length="9.0" north-south-alignment="length" base-level="1"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="22.5" base-mass="3000">
 		<description> The Research Hab is a Lander Hab refitted laboratory
 			building for scientific research. It can be custom-tailored with COMPUTING
 			systems for	up to four research subjects and has built-in solar panels.
@@ -2231,18 +2935,21 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		<power-required base-power="2.0" base-power-down-power="0.2" />
 
 		<functions>
+			<computation computing-unit="10.0" power-demand="1.0">
+				<activity>
+					<activity-spot xloc="0" yloc="0" />
+				</activity>
+			</computation>
 			<life-support capacity="12" power-required="0.6" />
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="20"  discharge-rate="1.25"/>
 			<research tech-level="4" capacity="8">
 				<research-specialty name="AREOLOGY" />
 				<research-specialty name="ASTRONOMY" />
-				<research-specialty name="BIOLOGY" />
-				<research-specialty name="CHEMISTRY" />
 				<research-specialty name="COMPUTING" />
 				<research-specialty name="MATHEMATICS" />
 				<research-specialty name="MEDICINE" />
@@ -2270,16 +2977,17 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<storage capacity="5000"/>
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="20.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0"/>
+					fuel-type="methane"	capacity="20.0"/>
 			</thermal-generation>
 	</functions>
 	</building>
-<!-- end of Storage Hab-->
+<!-- end of Research Hab-->
 
-	<building type="Residential Hab" width="9.0" length="9.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="2000">
+	<building type="Residential Hab" width="9.0" length="9.0" north-south-alignment="length" base-level="1"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="22.5" base-mass="2000"
+			category="LIVING">
 		<description> The Residential Hab is a Lander Hab refitted residential
 			quarters for living accommodation of up to 8 persons. It uses solar
 			panels as backup power source.
@@ -2287,22 +2995,20 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		<power-required base-power="2.0" base-power-down-power="0.2" />
 
 		<functions>
-			<!--EVA airlock-capacity="4" xloc="4.0" yloc="0.0" interior-xloc="3.5" interior-yloc="0.0"
-			exterior-xloc="5.5" exterior-yloc="0.0" /!-->
 			<life-support capacity="12" power-required="0.6" />
-			<living-accommodations capacity="5">
+			<living-accommodation capacity="5">
 				<activity>
-					<activity-spot xloc="1.13" yloc="2.67" />
-					<activity-spot xloc="2.89" yloc="0.31" />
-					<activity-spot xloc="2.67" yloc="-0.92" />
-					<activity-spot xloc="-0.18" yloc="-2.97" />
-					<activity-spot xloc="-2.82" yloc="-1.14" />
-				</activity>
-			</living-accommodations>
+					<activity-spot xloc="1.33" yloc="3.11" />
+					<activity-spot xloc="3.27" yloc="0.27" />
+					<activity-spot xloc="3.09" yloc="-1.07" />
+					<activity-spot xloc="-0.2" yloc="-3.44" />
+					<activity-spot xloc="-3.13" yloc="-1.33" />
+				</activity>			
+			</living-accommodation>
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="20"  discharge-rate="1.25"/>
 			<robotic-station capacity="2">
@@ -2314,17 +3020,17 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<storage capacity="5000"/>
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="20.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0"/>
+					fuel-type="methane"	capacity="20.0"/>
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Residential Hab-->
 
 	<!-- A lander hab refitted as a medical facility. -->
-	<building type="Medical Hab" width="9.0" length="9.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="2500">
+	<building type="Medical Hab" width="9.0" length="9.0" north-south-alignment="length" base-level="1"
+			wear-lifetime="3340000" maintenance-time="100" room-temperature="22.5" base-mass="2500">
 		<description> The Medical Hab is a Lander Hab refitted medical facility
 		 for providing medical basic care. It also has medical research workbench and
 		 uses solar	panels as backup power source.
@@ -2332,27 +3038,28 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		<power-required base-power="2.0" base-power-down-power="0.2" />
 
 		<functions>
-			<!--EVA airlock-capacity="4" xloc="4.0" yloc="0.0" interior-xloc="3.5" interior-yloc="0.0"
-			exterior-xloc="5.5" exterior-yloc="0.0" /!-->
 			<exercise capacity="4">
 				<activity>
-					<activity-spot xloc="-3.0" yloc="1.5" />
-					<activity-spot xloc="-3.3" yloc="0.0" />
-					<activity-spot xloc="-3.0" yloc="-1.2" />
-					<activity-spot xloc="-2.3" yloc="-1.7" />
+					<activity-spot xloc="-3.23" yloc="1.92" />
+					<activity-spot xloc="-3.43" yloc="0.97" />
+					<activity-spot xloc="-3.27" yloc="-0.02" />
+					<activity-spot xloc="-3.0" yloc="-1.35" />
 				</activity>
 			</exercise>
 			<life-support capacity="12" power-required="0.6" />
-			<medical-care tech-level="4" capacity="4">
+			<medical-care tech-level="4" bed="2">
 				<activity>
-					<activity-spot xloc="3.04" yloc="-1.3" />
-					<activity-spot xloc="1.75" yloc="2.33" />
+					<activity-spot xloc="2.0" yloc="0" />
 				</activity>
+				<bed>
+					<bed-location xloc="3.55" yloc="-.42" />
+					<bed-location xloc="2.26" yloc="2.61" />
+				</bed>
 			</medical-care>
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="20" discharge-rate="1.25" />
 			<research tech-level="3" capacity="8">
@@ -2361,36 +3068,35 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<research-specialty name="MEDICINE" />
 				<research-specialty name="PSYCHOLOGY" />
 				<activity>
-					<activity-spot xloc=".77" yloc="-2.52" />
-					<activity-spot xloc="-2.09" yloc="2.06" />
-					<activity-spot xloc="1.4" yloc="-2.7" />
-					<activity-spot xloc=".8" yloc="-3.0" />
+					<activity-spot xloc="0" yloc="2.62" />
+					<activity-spot xloc="-0.35" yloc="3.75" />
+					<activity-spot xloc="-0.96" yloc="2.85" />
+					<activity-spot xloc="-1.91" yloc="3.15" />
 
-					<activity-spot xloc="-0.8" yloc="-2.5" />
-					<activity-spot xloc="0.7" yloc="2.8" />
-					<activity-spot xloc="-1.4" yloc="2.85" />
-					<activity-spot xloc="-.5" yloc="-3.0" />
+					<activity-spot xloc="1.5" yloc="-2.76" />
+					<activity-spot xloc="0.56" yloc="-3.12" />
+					<activity-spot xloc="-0.44" yloc="-3.16" />
+					<activity-spot xloc="-.69" yloc="-2.4" />
 				</activity>
 			</research>
-			<robotic-station capacity="2">
+			<robotic-station capacity="1">
 				<activity>
-					<activity-spot xloc="-0.5" yloc="0.5" />
-					<activity-spot xloc="0.5" yloc="-0.5" />
+					<activity-spot xloc="0.47" yloc="-0.43" />
 				</activity>
 			</robotic-station>
 			<storage capacity="5000"/>
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="20.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0"/>
+					fuel-type="methane"	capacity="20.0"/>
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Medical Hab-->
 
-	<building type="Machinery Hab" width="9.0" length="9.0" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="3000">
+	<building type="Machinery Hab" width="9.0" length="9.0" north-south-alignment="length" base-level="1"
+			wear-lifetime="3340000" maintenance-time="250" room-temperature="22.5" base-mass="3000">
 		<description> The Machinery Hab is a Lander Hab refitted manufacturing workshop
 		 	for making items and synthesizing resource. It provides storage space for
 		 	housing commonly used resources.
@@ -2398,10 +3104,14 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		<power-required base-power="3.0" base-power-down-power=".3" />
 
 		<functions>
-			<!--EVA airlock-capacity="4" xloc="4.0" yloc="0.0" interior-xloc="3.5" interior-yloc="0.0"
-			exterior-xloc="5.5" exterior-yloc="0.0" /!-->
-			<life-support capacity="12" power-required="0.6" />
-			<manufacture tech-level="5" concurrent-processes="8">
+			<computation computing-unit="4.0" power-demand="1.0">
+				<activity>
+					<activity-spot xloc="3" yloc="3" />
+				</activity>
+			</computation>			
+
+			<life-support capacity="6" power-required="3" />
+			<manufacture tech-level="4" concurrent-processes="8">
 				<activity>
 					<activity-spot xloc="2.16" yloc="1.45" />
 					<activity-spot xloc="0.8" yloc="3.0" />
@@ -2417,7 +3127,7 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="40"  discharge-rate="1.25"/>
 			<robotic-station capacity="2">
@@ -2445,17 +3155,18 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			</storage>
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Electric Heating" capacity="20.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0"/>
+					fuel-type="methane"	capacity="20.0"/>
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Machinery Hab -->
 
 	<!-- A hallway's length is variable and determined in templates or during construction. -->
-	<building type="Hallway" width="2.0" length="-1.0" construction="SEMI_SOLID" base-level="0"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="200">
+	<building type="Hallway" width="2.0" length="-1.0" north-south-alignment="length" base-level="0"
+			wear-lifetime="3340000" maintenance-time="20" room-temperature="20.0" base-mass="200"
+			category="CONNECTION">
 		<description> The Hallway is a pressurized access tube connecting
 			two inhabitable buildings. It allows only one person to access it
 			at a time.
@@ -2463,29 +3174,34 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		<power-required base-power="0.1" base-power-down-power="0.0" />
 
 		<functions>
-			<building-connection />
+			<connection />
 			<life-support capacity="3" power-required="0.15" />
+
 			<power-generation>
 				<power-source type="Solar Power Source" power="1.0" />
 			</power-generation>
+			
 			<power-storage capacity="20" discharge-rate="1.25" />
+			
 			<robotic-station capacity="1">
 				<activity>
-					<activity-spot xloc="0.5" yloc="0.0" />
+					<activity-spot xloc="0.0" yloc="0.0" />
 				</activity>
 			</robotic-station>
+						
 			<thermal-generation>
-				<heat-source type="Solar Heating" capacity="1.0" />
-				<heat-source type="Electric Heating" capacity="2.0" />
+				<heat-source type="Solar Heating" capacity="2.0" />
+				<heat-source type="Electric Heating" capacity="5.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 
-<!-- The buildings below are underground and are used primarily for
-     Trading and Mining settlements -->
+<!-- The buildings below are constructed with in-situ materials, primarly 
+	underground and are used primarily for trading and mining settlements -->
 
-	<building type="Outpost Hub" width="10.0" length="10.0" base-level="-1"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="3000">
+	<building type="Outpost Hub" width="10.0" length="10.0" north-south-alignment="length" 
+			construction="CONCRETE" base-level="-1"
+			wear-lifetime="3340000" maintenance-time="250" room-temperature="22.5" base-mass="3000">
 		<description> The Outpost Hub is a vaulted brick building that acts
 			as the main hub of a trading or mining outpost. Like its cousin
 			Lander Hab, it hosts a suite of functions to its inhabitants.
@@ -2505,7 +3221,7 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 					<activity-spot xloc="3.2" yloc="-3.6" />
 				</activity>
 			</communication>
-			<computation computing-unit="10.0" power-demand="0.1" cooling-demand=".05">
+			<computation computing-unit="10.0" power-demand="1.0">
 				<activity>
 					<activity-spot xloc="0" yloc="0" />
 				</activity>
@@ -2552,7 +3268,7 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				</activity>
 			</manufacture>
 
-			<medical-care tech-level="2" capacity="1">
+			<medical-care tech-level="2" bed="1">
 				<activity>
 					<activity-spot xloc="3.7" yloc="4.2" />
 				</activity>
@@ -2561,7 +3277,7 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 
 			<power-storage capacity="40"  discharge-rate="1.25"/>
@@ -2572,7 +3288,7 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				</activity>
 			</preparing-dessert>
 			
-			<recreation capacity="4">
+			<recreation capacity="10">
 				<activity>
 					<activity-spot xloc="-2.15" yloc="1.35" />
 					<activity-spot xloc="-1.9" yloc=".5" />
@@ -2590,8 +3306,6 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<!-- Sciences that can be researched at the laboratory. -->
 				<research-specialty name="AREOLOGY" />
 				<research-specialty name="ASTRONOMY" />
-				<research-specialty name="BIOLOGY" />
-				<research-specialty name="CHEMISTRY" />
 				<research-specialty name="COMPUTING" />
 				<research-specialty name="ENGINEERING" />
 				<research-specialty name="MATHEMATICS" />
@@ -2607,17 +3321,20 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				</activity>
 			</research>
 
+			<!-- "Outpost Hub" -->
 			<resource-processing power-down-level="0.0">
-				<process-engine name="Sabatier RWGS Reactor" number-modules="4" />
-				<process-engine name="Selective Partial Oxidation of Methane to Methanol" number-modules="4"/>				
-				<process-engine name="Carbon Formation Reactor" number-modules="2" />
+				<process-engine name="Sabatier RWGS Reactor" number-modules="16"/>
+				<process-engine name="Selective Partial Oxidation (SPO) of Methane to Methanol" number-modules="4"/>				
+				<process-engine name="Continuous Bosch Reactor (C-Bosch)" number-modules="4"/>
 				<process-engine name="Plasma Pyrolysis Assembly (PPA) Reactor" number-modules="4"/>
-				<process-engine name="Oxygen Generation System" number-modules="2" />
-				<process-engine name="Low Temperature Plasma CO2 Decomposition" number-modules="4"/>
-				<process-engine name="Carbon Dioxide Pump"/>
-				<process-engine name="Syngas Plant"/>
-				<process-engine name="Melt Ice" number-modules="3" />
-				<process-engine name="Filter Brine Water" number-modules="3" />
+				<process-engine name="Produce Oxygen and Acetylene with Chloride and Carbides" number-modules="12"/>
+				<process-engine name="Oxygen Generation System (OGS)" number-modules="48"/>
+				<process-engine name="Low Temperature Plasma CO2 Decomposition" number-modules="8"/>
+				
+				<process-engine name="Atmospheric processing" number-modules="4"/>
+				<process-engine name="Methanol Synthesis" number-modules="4"/>
+				<process-engine name="Melt Ice" number-modules="20" />
+				<process-engine name="Filter Brine Water" number-modules="20" />
 								
 				<activity>
 					<activity-spot xloc="-2.6" yloc="-2.13" />
@@ -2705,9 +3422,9 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
 				<heat-source type="Electric Heating" capacity="20.0" />
+				<heat-source type="Fuel Heating" toggle="true"
+					fuel-type="methane"	capacity="20.0" />
 			</thermal-generation>
 
 			<waste-processing power-down-level="0.0">
@@ -2724,8 +3441,10 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 	</building>
 <!-- end of Outpost Hub  -->
 
-	<building type="Bunkhouse" width="5.0" length="5.0" base-level="-1"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="1500">
+	<building type="Bunkhouse" width="5.0" length="5.0" north-south-alignment="length" 
+			construction="CONCRETE" base-level="-1"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="22.5" base-mass="1500"
+			category="LIVING">
 		<description> The Bunkhouse is a spartan living quarters with
 			two beds. It is a retractable housing custom-tailored for
 			temporary mining outpost operation.
@@ -2734,16 +3453,16 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 
 		<functions>
 			<life-support capacity="4" power-required="0.2" />
-			<living-accommodations capacity="2">
+			<living-accommodation capacity="2" guesthouse="true">
 				<activity>
 					<activity-spot xloc="1.35" yloc="-1.35" />
 					<activity-spot xloc="-1.35" yloc="-1.35" />
 				</activity>
-			</living-accommodations>
+			</living-accommodation>
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="20"  discharge-rate="1.25"/>
 			<robotic-station capacity="2">
@@ -2755,15 +3474,16 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<storage capacity="5000"/>
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
-				<heat-source type="Electric Heating" capacity="20.0" />
+				<heat-source type="Electric Heating" capacity="15.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0" />
+					fuel-type="methane"	capacity="20.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Bunkhouse -->
 
-	<building type="Storage Shed" width="5.0" length="5.0" base-level="-1"
+	<building type="Storage Shed" width="5.0" length="5.0" north-south-alignment="length" 
+			construction="CONCRETE" base-level="-1"
 			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="1500">
 		<description> The Storage Shed is a small brick building for
 			storing resources for the settlement.
@@ -2793,8 +3513,9 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 	</building>
 <!-- end of Storage Shed -->
 
-	<building type="Loading Dock Garage" width="15.0" length="18.0" base-level="-1"
-			wear-lifetime="3340000" maintenance-time="75" room-temperature="22.5" base-mass="10000">
+	<building type="Loading Dock Garage" width="15.0" length="18.0" 
+			construction="CONCRETE" north-south-alignment="length" base-level="-1" wear-lifetime="3340000" 
+			maintenance-time="300" room-temperature="18" base-mass="10000">
 		<description> The Loading Dock Garage is an enclosed maintenance facility
 			featuring a brick loading dock for easy access. It hosts equipment for
 			building, repairing and modifying rovers and vehicles.
@@ -2802,42 +3523,40 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 		<power-required base-power="3.0" base-power-down-power="0.3" />
 
 		<functions>
-			<!-- <EVA capacity="8">
-				<center-position xloc="0.0" yloc="1.0"/>
-				<interior-position xloc="0.0" yloc=".5"/>
-				<exterior-position xloc="0.0" yloc="10.0"/>
-			</EVA> -->
 			<vehicle-maintenance>
 				<parking>
-                	<parking-location xloc="4.5" yloc="-3.2" />
-                	<parking-location xloc="-4.5" yloc="-3.2" />
+                	<parking-location xloc="4.5" yloc="-1" />
+                	<parking-location xloc="-4.5" yloc="-1" />
                 </parking>
 				<flyerParking>
-		        	<flyer-location xloc="4.5" yloc="4.0" />
-		        	<flyer-location xloc="-4.5" yloc="4.0" />
+		        	<flyer-location xloc="4.5" yloc="-6.25" />
+		        	<flyer-location xloc="-4.5" yloc="-6.25" />
 		        </flyerParking>	                
                 <activity>
-					<activity-spot xloc="-.5" yloc="-2.25" />
-					<activity-spot xloc="2.25" yloc="-3.25" />
-					<activity-spot xloc="0" yloc="-1.25" />
-					<activity-spot xloc="-1.125" yloc="0" />
-					<activity-spot xloc="-2.25" yloc="-4.75" />
-					<activity-spot xloc="1.0" yloc="-6.25" />
+					<activity-spot xloc="1.5" yloc="3" />
+					<activity-spot xloc="1.5" yloc="1" />
+					<activity-spot xloc="1.5" yloc="-1" />
+					<activity-spot xloc="1.5" yloc="-3" />			
+					<activity-spot xloc="3.0" yloc="-4.5" />
+					
+					<activity-spot xloc="-1.5" yloc="3" />
+					<activity-spot xloc="-1.5" yloc="1" />
+					<activity-spot xloc="-1.5" yloc="-1" />
+					<activity-spot xloc="-1.5" yloc="-3" />
+					<activity-spot xloc="-3.0" yloc="-4.5" />
 				</activity>
 			</vehicle-maintenance>
 			<life-support capacity="16" power-required="0.8" />
 			<power-generation>
 				<power-source type="Solar Power Source" power="10" />
 				<power-source type="Fuel Power Source" toggle="false" power="10"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="40" discharge-rate="1.25"/>
-			<robotic-station capacity="4">
+			<robotic-station capacity="2">
 				<activity>
-					<activity-spot xloc="-2.25" yloc="3.75" />
-					<activity-spot xloc="2.25" yloc="-5.25" />
-					<activity-spot xloc="-2.5" yloc="3.5" />
-					<activity-spot xloc="2.5" yloc="-5.5" />
+					<activity-spot xloc="-1" yloc="-7.0" />
+					<activity-spot xloc="1" yloc="-7.0" />
 				</activity>
 			</robotic-station>
 			<storage capacity="30000">
@@ -2845,17 +3564,18 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<resource-storage resource="methanol" capacity="10000.0" />
 			</storage>
 			<thermal-generation>
-				<heat-source type="Solar Heating" capacity="15" />
+				<heat-source type="Solar Heating" capacity="25.0" />
+				<heat-source type="Electric Heating" capacity="45.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="47.9385" capacity="30.0" />
-				<heat-source type="Electric Heating" capacity="60.0" />
+					fuel-type="methane"	capacity="40.0" />
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end for loading dock garage -->
 
-	<building type="Mining Lab" width="5.0" length="5.0" base-level="-1"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="2500">
+	<building type="Mining Lab" width="5.0" length="5.0" north-south-alignment="length" 
+			construction="CONCRETE"  base-level="-1"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="22.5" base-mass="2500">
 		<description> The Mining Lab is a small brick laboratory furnished for
 			mining-related scientific instruments and research workbench.
 		</description>
@@ -2866,7 +3586,7 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<power-generation>
 				<power-source type="Solar Power Source" power="5.0" />
 				<power-source type="Fuel Power Source" toggle="false" power="5.0"
-				fuel-type="methane"	consumption-rate="7.9897" />
+				    fuel-type="methane"	/>
 			</power-generation>
 			<power-storage capacity="20"  discharge-rate="1.25"/>
 			<research tech-level="2" capacity="2">
@@ -2894,14 +3614,17 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="5.0" />
 				<heat-source type="Electric Heating" capacity="15.0" />
+				<heat-source type="Fuel Heating" toggle="true"
+					fuel-type="methane"	capacity="10.0"/>				
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end of Mining Lab -->
 
 
-	<building type="Inground Greenhouse" width="5.0" length="10.0" base-level="-1"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="24.0" base-mass="2500">
+	<building type="Inground Greenhouse" width="5.0" length="10.0" north-south-alignment="length" 
+			construction="CONCRETE" base-level="-1"
+			wear-lifetime="3340000" maintenance-time="150" room-temperature="24.0" base-mass="2500">
 		<description> The Inground Greenhouse is a semi underground structure with a
 			vaulted fiber glass roof which is less susceptible to meteor damage.
 			It grows crops as food for the settlement.
@@ -2919,36 +3642,44 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				</activity>
 			</farming>
 
-			<life-support capacity="5" power-required="0.25" />
+			<life-support capacity="8" power-required="0.4" />
 
 			<power-storage capacity="40"  discharge-rate="1.25"/>
 
+			<recreation capacity="4">
+				<activity>
+					<activity-spot xloc="1" yloc="1" />
+					<activity-spot xloc="-1" yloc="1" />
+					<activity-spot xloc="1" yloc="-1" />
+					<activity-spot xloc="-1" yloc="-1" />
+				</activity>
+			</recreation>
+			
 			<research tech-level="2" capacity="2">
-				<research-specialty name="BOTANY" />
 				<research-specialty name="BIOLOGY" />
+				<research-specialty name="BOTANY" />
+				<research-specialty name="CHEMISTRY" />
 				<activity>
 					<activity-spot xloc="-1" yloc="1.0" />
 					<activity-spot xloc="1" yloc="1.0" />
 				</activity>
 			</research>
 			<resource-processing power-down-level="0.0">
-				<process-engine name="Carbon Dioxide Pump" number-modules="2"/>
+				<process-engine name="Atmospheric processing" number-modules="4"/>
 				<activity>
 					<activity-spot xloc="2.0" yloc="4.5" />
 				</activity>
 			</resource-processing>
 
-			<robotic-station capacity="3">
+			<robotic-station capacity="1">
 				<activity>
-					<activity-spot xloc="0" yloc="-2" />
-					<activity-spot xloc="0" yloc="0" />
-					<activity-spot xloc="0" yloc="2" />
+					<activity-spot xloc="2" yloc="4.5" />
 				</activity>
 			</robotic-station>
 
 			<storage capacity="20000">
 				<!-- gases -->
-				<resource-storage resource="carbon dioxide" capacity="2500.0" />
+				<resource-storage resource="carbon dioxide" capacity="1000.0" />
 				<resource-storage resource="oxygen" capacity="5000.0" />				
 				<resource-storage resource="nitrogen" capacity="2500.0" />
 				<resource-storage resource="ammonia" capacity="500.0" />
@@ -2968,40 +3699,44 @@ http://www.uss-hornet.org/groups/pdf/SEMB_MarsHabitat.pdf
 				<resource-storage resource="crop waste" capacity="500.0" />
 
 				<!-- Supplies -->
-				<resource-initial resource="carbon dioxide" amount="500.0" />
+				<resource-initial resource="carbon dioxide" amount="100.0" />
 
 			</storage>
 
 			<thermal-generation>
 				<heat-source type="Solar Heating" capacity="10.0" />
+				<heat-source type="Electric Heating" capacity="25.0" />
 				<heat-source type="Fuel Heating" toggle="true"
-					fuel-type="methane"	consumption-rate="31.959" capacity="20.0"/>
-				<heat-source type="Electric Heating" capacity="30.0" />
+					fuel-type="methane"	capacity="20.0"/>
 			</thermal-generation>
 		</functions>
 	</building>
 <!-- end for inground greenhouse -->
 
 	<!-- A tunnel's length is variable and determined in templates or during construction. -->
-	<building type="Tunnel" width="3.0" length="-1.0" base-level="-1"
-			wear-lifetime="3340000" maintenance-time="50" room-temperature="22.5" base-mass="200">
+	<building type="Tunnel" width="3.0" length="-1.0" north-south-alignment="length" 
+			construction="CONCRETE" base-level="-1"
+			wear-lifetime="3340000" maintenance-time="20" room-temperature="20.0" base-mass="200"
+			category="CONNECTION">
 		<description> The Tunnel is an underground pressurized access tube connecting
-			two inhabitable buildings. It allows only one person to access it
-			at a time.
+			two inhabitable buildings.
 		</description>
 		<power-required base-power="0.1" base-power-down-power="0.0" />
 
 		<functions>
-			<building-connection />
+			<connection />
+			
 			<life-support capacity="3" power-required="0.15" />
+			
 			<robotic-station capacity="1">
 				<activity>
-					<activity-spot xloc="1.0" yloc="0.0" />
+					<activity-spot xloc="0.0" yloc="0.0" />
 				</activity>
 			</robotic-station>
+						
 			<thermal-generation>
-				<heat-source type="Solar Heating" capacity="1.0" />
-				<heat-source type="Electric Heating" capacity="2.0" />
+				<heat-source type="Solar Heating" capacity="2.0" />
+				<heat-source type="Electric Heating" capacity="5.0" />
 			</thermal-generation>
 		</functions>
 	</building>

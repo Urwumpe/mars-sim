@@ -1,31 +1,32 @@
 name: SonarQube Analysis
 on:
-  # Trigger analysis when pushing in master 
+  # Trigger analysis when pushing in master
   push:
     branches:
       - master
+
 jobs:
   sonarqube:
+    # Dependabot actor does not have access to secrets so skill the analysis
+    if: ${{ github.actor != 'dependabot[bot]' }}
     name: SonarQube Trigger
     runs-on: ubuntu-latest
     steps:
             
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
-    # Setup java 17
+    # Setup java 21
     - name: Setup Java JDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
-        java-version: 17
-
+        java-version: 21
+                  
     - name: SonarCloud Analysis
-      if: ${{ github.repository == 'mars-sim/mars-sim' }}
       env:
         SONAR_ORGANISATION: ${{ secrets.SONAR_ORGANISATION }}
         SONAR_LOGIN: ${{ secrets.SONAR_LOGIN }}
-        SONAR_LABEL: ${{ github.workflow }}/${{ github.run_number }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
       run:
-        mvn --file pom.xml -B -DskipTests -Dsonar.login=$SONAR_LOGIN -Dsonar.organization=$SONAR_ORGANISATION -Dsonar.projectVersion="$SONAR_LABEL" verify sonar:sonar
+        mvn --file pom.xml -B -Pcoverage -Dsonar.token=$SONAR_LOGIN -Dsonar.projectKey=com.mars-sim:mars-sim -Dsonar.organization=$SONAR_ORGANISATION verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar

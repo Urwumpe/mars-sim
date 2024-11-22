@@ -1,5 +1,5 @@
 /build
-/target/
+**/target/
 .classpath
 .project
 /.settings/**
@@ -7,3 +7,5 @@
 .prefs
 /mars-sim.iml
 .vscode
+.DS_Store
+lib/

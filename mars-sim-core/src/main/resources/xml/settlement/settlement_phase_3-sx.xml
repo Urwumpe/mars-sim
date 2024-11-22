@@ -96,7 +96,7 @@
             <connection id="12" xloc="0.0" yloc="-1.5" />
         </connection-list>
     </building>
-    <building id="12" type="Inflatable Greenhouse" xloc="-24.0"
+    <building id="12" type="Fish Farm" xloc="-24.0"
         yloc="13.0" facing="270.0">
         <connection-list>
             <connection id="11" xloc="0.0" yloc="4.5" />
@@ -181,133 +181,17 @@
         </connection-list>
     </building>
 
-    <building type="ERV-A" xloc="80.0" yloc="-15.0"
-        facing="0.0" />
-    <building type="ERV-A" xloc="120.0" yloc="-15.0"
-        facing="0.0" />
-    <building type="ERV-A" xloc="160.0" yloc="-15.0"
-        facing="0.0" />
-        
-    <building type="ERV-B" xloc="80.0" yloc="25.0"
-        facing="0.0" />
-    <building type="ERV-B" xloc="120.0" yloc="25.0"
-        facing="0.0" />
-    <building type="ERV-B" xloc="160.0" yloc="25.0"
-        facing="0.0" />
-   
-    <building type="ERV-C" xloc="80.0" yloc="65.0"
-        facing="0.0" />
-    <building type="ERV-C" xloc="120.0" yloc="65.0"
-        facing="0.0" />
-    <building type="ERV-C" xloc="160.0" yloc="65.0"
-        facing="0.0" />
 
-
-    <building type="Kilopower Reactor" xloc="490.0"
-        yloc="-500" facing="0.0" />
-    <building type="Kilopower Reactor" xloc="490.0"
-        yloc="-505" facing="0.0" />
-     <building type="Kilopower Reactor" xloc="490.0"
-        yloc="-510" facing="0.0" />
-    <building type="Kilopower Reactor" xloc="490.0"
-        yloc="-515" facing="0.0" />
-               
-        
-    <building type="Methane Power Generator" xloc="40.0"
-        yloc="-40.0" facing="0.0" />
-
-    <building type="Medium Battery Array" xloc="40.0"
-        yloc="-50.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-60.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-70.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-80.0" facing="0.0" />
-        
-    <building type="Medium Battery Array" xloc="40.0"
-        yloc="-90.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-100.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-110.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-120.0" facing="0.0" />
-
-    <building type="Medium Battery Array" xloc="40.0"
-        yloc="-130.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-140.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-150.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="40.0"
-        yloc="-160.0" facing="0.0" />
-        
-
-    <building type="Methane Power Generator" xloc="55.0"
-        yloc="-40.0" facing="0.0" />
-
-    <building type="Medium Battery Array" xloc="55.0"
-        yloc="-50.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="55.0"
-        yloc="-60.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="55.0"
-        yloc="-70.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="55.0"
-        yloc="-80.0" facing="0.0" />
-        
-    <building type="Medium Battery Array" xloc="55.0"
-        yloc="-90.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="55.0"
-        yloc="-100.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="55.0"
-        yloc="-110.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="55.0"
-        yloc="-120.0" facing="0.0" />
-
-    <building type="Medium Battery Array" xloc="55.0"
-        yloc="-130.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="55.0"
-        yloc="-140.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="55.0"
-        yloc="-150.0" facing="0.0" />
-    <building type="Solar Photovoltaic Array" xloc="55.0"
-        yloc="-160.0" facing="0.0" />
-
-   
-    <building type="Atmospheric Processor" xloc="-20.0"
-        yloc="-50.0" facing="90.0" />
-    <building type="Atmospheric Processor" xloc="-20.0"
-        yloc="-60.0" facing="90.0" />
-    <building type="Atmospheric Processor" xloc="-20.0"
-        yloc="-70.0" facing="90.0" />
-
-
-    <building type="Large Sabatier Processor" xloc="0.0"
-        yloc="-50.0" facing="90.0" />
-    <building type="Large Sabatier Processor" xloc="0.0"
-        yloc="-60.0" facing="90.0" />        
-    <building type="Large Sabatier Processor" xloc="0.0"
-        yloc="-70.0" facing="90.0" />   
-
-
-    <building type="Regolith Storage Bin" xloc="35.0" yloc="0.0"
-        facing="90.0" />
-    <building type="Sand Storage Bin" xloc="35.0" yloc="5.0"
-        facing="90.0" />
-    <building type="Concrete Storage Bin" xloc="35.0"
-        yloc="10.0" facing="90.0" />
-    <building type="Cement Storage Bin" xloc="35.0" yloc="15.0"
-        facing="90.0" />
-    <building type="Mortar Storage Bin" xloc="35.0" yloc="20.0"
-        facing="90.0" />
-    <building type="Lime Storage Bin" xloc="35.0" yloc="25.0"
-        facing="90.0" />
-    <building type="Ice Storage Bin" xloc="35.0" yloc="-5.0"
-        facing="90.0" />
-    <building type="Carbon Storage Bin" xloc="35.0" yloc="-10.0"
-        facing="90.0" />
-
+    <!-- Building Packages -->
+    <building-package name="Storage Set 1"/>   
+   	<building-package name="ERV Set 1"/>
+   	<building-package name="ERV Set 2"/>
+   	<building-package name="Air Set 1 - 1x3"/>
+    <building-package name="Sabatier Set 1 - 1x4"/> 
+	<building-package name="Solar Set 1 - 1x9"/>
+	<building-package name="Kilo Set 1 - 1x4"/>
+	<building-package name="MD1 Set 1 - 1x1"/>	
+	
     <vehicle type="Explorer Rover" number="3" />
     <vehicle type="Transport Rover" number="2" />
     <vehicle type="Cargo Rover" number="2" />
@@ -327,16 +211,17 @@
  	
 	<!-- Life Support Resources -->
 	<resource type="food" amount="2160" />
-	<resource type="water" amount="10800" />
+	<resource type="water" amount="6000" />
 	<resource type="oxygen" amount="4320" />
 	
     <part-package name="package 3" number="1" />
-    
+ 
     <resupply>
-       	<resupply-mission name="BiMonthly Delivery" manifest-name="Standard Resupply 1"
-            first-arrival-time="4"
-            frequency-sols="60" /> 
-        <resupply-mission name="Annual Delivery" manifest-name="Resupply for Phase 3"
-            first-arrival-time="668" /> 
+       	<resupply-mission name="BiMonthly Delivery" manifest-name="Standard Resupply 1">
+            <schedule firstSol="30" frequency="60" />
+        </resupply-mission>
+        <resupply-mission name="Phase 3 Delivery" manifest-name="Resupply for Phase 3">
+            <schedule firstSol="668" />
+        </resupply-mission> 
     </resupply>
 </template>

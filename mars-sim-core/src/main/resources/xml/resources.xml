@@ -23,10 +23,10 @@
 	<!-- edible - Is the resource edible? -->
 
 	<!-- Life Support Resources -->
-	<resource name="Food" type="derived" phase="solid" life-support="true" edible="true">Represents general freeze dried food.</resource>
-	<resource name="Water" type="compound" phase="liquid" life-support="true">potable water</resource>
+	<resource name="Food" type="derived" phase="solid" life-support="true" edible="true">Represents thermo-stabilized food that can afford long-term storage.</resource>
+	<resource name="Water" type="compound" phase="liquid" life-support="true">Potable water</resource>
 	<resource name="Oxygen" type="element" phase="gas" life-support="true" />
-	<resource name="Carbon Dioxide" type="compound" phase="gas" life-support="true"/>
+	<resource name="Carbon dioxide" type="compound" phase="gas" life-support="true"/>
 
 	<resource name="Ice" type="compound" phase="solid">Extracted from ice-rich underground permafrost</resource>
 
@@ -35,28 +35,50 @@
 
 	<!-- see https://space.stackexchange.com/questions/8449/is-there-a-cost-effective-way-to-obtain-nitrogen-argon-on-mars-for-usage-in-a-hu/8548 -->
 	<!-- Other Gas Resources -->
-	<resource name="Hydrogen" type="element" phase="gas" demand=".15" />
+	<resource name="Hydrogen" type="element" phase="gas" life-support="true" demand=".15" />
 	
-	<resource name="Methane" type="compound" phase="gas" demand=".15" />
-	<resource name="Methanol" type="compound" phase="liquid">Methanol CH3OH can be used as a fuel source, solvent, pesticide, or 
-	 a chemical feedstock for production of a range of important industrial chemicals such as polyester. 
-	 It appears as a colorless fairly volatile liquid with a faintly sweet pungent odor like that of ethyl alcohol. </resource>
+	<resource name="Methane" type="compound" phase="gas" life-support="true" demand=".15" />
+	<resource name="Methanol" type="compound" phase="liquid" life-support="true" >Methanol CH3OH
+	  can be used as a fuel source, solvent, pesticide, or 
+	  a chemical feedstock for production of a range of important industrial
+	  chemicals such as polyester. It appears as a colorless fairly volatile 
+	  liquid with a faintly sweet pungent odor like that of ethyl alcohol. 
+	  </resource>
 	 
-	<resource name="Nitrogen" type="element" phase="gas"> N2 is an odorless gas </resource>
+	<resource name="Nitrogen" type="element" phase="gas">N2 is an odorless gas </resource>
 	<resource name="Argon" type="element" phase="gas"/>
 	
-	<resource name="Carbon Monoxide" type="compound" phase="gas" demand=".05" />
+	<resource name="Carbon monoxide" type="compound" phase="gas" demand=".05" />
 	<resource name="Chlorine" type="element" phase="gas"/>
-	<resource name="Ethylene" type="compound" phase="gas" demand=".1" />
-	<resource name="Acetylene" type="compound" phase="gas" demand=".01" >Acetylene is a colorless gas that has a strong 
-	 garlic-like odor. When combined with oxygen, it becomes very hot and is classified as the hottest fuel gas. 
-	 It is also the only fuel gas that can weld and cut steel, making it the preferred choice for welders.
-	 The welding process that uses acetylene is known as oxy-fuel cutting or gas cutting. Acetylene is 
-	 probably the hottest burning fuel gas available to us. Acetylene releases almost 40% of its heat in 
-	 the inner flame cone. Acetylene is also commonly used for the production of other chemicals used 
-	 in perfumes, vitamins, polymers, solvents and other materials due to its versatility and ease of
-	 reactive control in comparison to other gases. It combines nicely with a variety of elements and
-	 compounds, making it the most important of starting materials for organic synthesis.</resource>
+	<resource name="Ethane" type="compound" phase="gas"> Ethane is a naturally
+		occurring organic chemical compound with chemical formula C2H6. 
+		and has a molecular mass of 30.07 g/mol. At standard temperature 
+		and pressure, ethane is a colorless, odorless gas. It can be used as
+		a fuel for power generation in power plants or used as a feedstock for
+		the production of ethylene.
+	</resource>		
+	<resource name="Ethylene" type="compound" phase="gas" demand=".1" >
+		Ethylene is a colorless, flammable gas with a sweet and musky odor. 
+		It is a hydrocarbon with the chemical formula C2H4, also known as ethene 
+		or polyethylene. Ethylene is widely used in the chemical industry and is 
+		a natural plant hormone that plays a crucial role in plant growth and 
+		development.
+	</resource>
+	<resource name="Acetylene" type="compound" phase="gas" demand=".01" >
+		Acetylene is a colorless gas that has a strong garlic-like odor. When 
+		combined with oxygen, it becomes very hot and is classified as the 
+		hottest fuel gas. 
+	 	It is also the only fuel gas that can weld and cut steel, making it 
+	 	the preferred choice for welders. The welding process that uses 
+	 	acetylene is known as oxy-fuel cutting or gas cutting. 
+	 	Acetylene is probably the hottest burning fuel gas available to us. 
+	 	Acetylene releases almost 40% of its heat in the inner flame cone. 
+	 	Acetylene is also commonly used for the production of other chemicals used 
+	 	in perfumes, vitamins, polymers, solvents and other materials due to its 
+	 	versatility and ease of reactive control in comparison to other gases. 
+	 	It combines nicely with a variety of elements and compounds, making it 
+	 	the most important of starting materials for 
+	 	organic synthesis.</resource>
 	 
 	<resource name="Prophylene" type="chemical" phase="gas" demand=".01">
 		The common name for the organic chemical compound propene. An alkene which is a 
@@ -64,11 +86,6 @@
 		formula C3H6. It's a colorless gas with a faint petroleum-like odor and is 
 		flammable, and is often used as fuel.
 		</resource>
-
-	
-<!-- Elements -->
-	<resource name="Iron powder" type="element" phase="solid" />
-	<resource name="Manganese" type="element" phase="solid" />
 
 <!-- Wastes -->
 	<resource name="Soil" type="waste" phase="solid">Soil is the mixture of minerals, organic matter, gases, liquids, and the myriad of organisms that together support plant life.</resource>
@@ -135,9 +152,12 @@
 	<resource name="White onion" type="crop" phase="solid" edible="true"></resource>
 	<resource name="Yam" type="crop" phase="solid" edible="true"></resource>
 
-<!-- Tissue culture from crop produce (Automatically generated by code) -->
-<!-- see https://en.wiki2.org/wiki/Plant_tissue_culture
-		 http://extension.psu.edu/plants/green-industry/news/2014/tissue-culture-finishing-for-greenhouse-growers-stage-iii-stage-iv -->
+<!-- Tissue culture from crop produce (Automatically generated by code)
+
+	 Reference : 
+     1. https://en.wiki2.org/wiki/Plant_tissue_culture
+ 
+-->
 
 <!-- Seeds from Crop Produce -->
 	<resource name="Mustard seed" type="derived" phase="solid" edible="true">
@@ -170,9 +190,10 @@
 	<resource name="Cranberry juice" type="derived" phase="solid" edible="true">Juice made from Cranberries</resource>
 	<resource name="Cranberry sauce" type="derived" phase="solid" edible="true">Sauce or relish made from Cranberries</resource>
 	<resource name="French fries" type="derived" phase="solid" edible="true">French fries made from potatoes.</resource>
-<!-- Since garlic oil is not a neutral flavour (just like fish oil), it should not be used in place of generic oil -->
-	<resource name="Garlic oil" type="derived" phase="liquid" edible="true">Oil pressed from garlic.</resource>
-	<resource name="Granola bar" type="derived" phase="solid" edible="true">A popular breakfast and snack consisting of puffed grain, rolled oats, nuts, honey, dried fruits</resource>
+
+	<resource name="Granola bar" type="derived" phase="solid" edible="true">A popular snake bar made from puffed quinoa/rice/wheat, honey/sugarcane juice, dried fruits and peanuts</resource>
+	<resource name="Protein bar" type="derived" phase="solid" edible="true">A popular snack bar made from puffed quinoa/rice/wheat, honey/sugarcane juice, dried fruits and peanuts</resource>
+
 	<resource name="Honey" type="derived" phase="liquid" edible="true">Honey extracted from bee hives</resource>
 	<resource name="Ketchup" type="derived" phase="liquid" edible="true">Jam made from tomatoes.</resource>
 	<resource name="Mustard" type="derived" phase="liquid" edible="true">Mustard made from mustard seed</resource>
@@ -203,7 +224,20 @@
 		Oil is extracted from peanuts.</resource>
 	<resource name="Soybean oil" type="oil" phase="liquid" edible="true">
 		Oil derived from soybean.</resource>
+	<resource name="Olive oil" type="oil" phase="liquid" edible="true">
+		Oil pressed from olive.</resource>
+<!-- Since garlic oil is not a neutral flavour (just like fish oil), it should not be used in place of generic oil -->
+	<resource name="Garlic oil" type="derived" phase="liquid" edible="true">Oil pressed from garlic.</resource>
 	
+<!-- Food resources derived from fish -->
+	<resource name="Fish meat" type="animal" phase="solid" edible="true">
+		meat from fish</resource>
+<!-- Since fish oil is not a neutral flavour (just like garlic oil), it should not be used in place of generic oil -->
+	<resource name="Fish oil" type="animal" phase="liquid" edible="true">
+		Oil derived from fish.</resource>
+	<resource name="Fish patty" type="animal" phase="solid" edible="true">
+		patty made of fish meat</resource>
+			
 <!-- Imported food resources-->	
 	<resource name="Olive" type="crop" phase="solid" edible="true"></resource>
 	<resource name="Apple" type="crop" phase="solid" edible="true"></resource>
@@ -221,6 +255,36 @@
 		an edible block.</resource>
 	<resource name="Yeast" type="organism" phase="solid" edible="true">
 		Yeasts are single-celled fungi. It is an essential Baking Ingredient for making bread.</resource>
+	<resource name="Spirulina" type="organism" phase="solid" edible="true">
+		Spirulina is multi-cellular and filamentous cyano-bacteria commonly known as blue-green algae that 
+		grows both in fresh as well as salt water. Similar to plants it produces energy from sunlight 
+		through the photosynthesis process. It grows and thrives in warm water alkaline ponds and rivers. 
+		It is one of the best potential sources of protein. 
+				
+		See https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9143897/
+		"Wide Range Applications of Spirulina: From Earth to Space Missions"
+			 				
+		https://www.techno-preneur.net/technology/project-profiles/food/Spirulina.htm
+		
+		For uniform growth and for uniform harvesting, 30 grams of dry Spirulina is added 
+		for every 10 liters of water. The water level in the pond should be maintained at 20 to 30 cm.
+
+		In general, the pond will be ready for harvest after 5 days after seeding process is done.		
+		Culture is filtered and collected in a container and poured onto the cloth. The culture medium 
+		flows back into the pond, leaving Spirulina on the cloth. 
+		
+		After filtering, the collected Spirulina is thoroughly washed in distilled water to remove any 
+		traces of salts, contaminants, or culture medium residue. Once the cleaning is done, the water 
+		content is further removed by squeezing or pressing and is ready for drying. Freshly harvested 
+		Spirulina will be at its best in its nutritional values. Fresh Spirulina cannot last more than 
+		2 days, hence it needs to be dried to preserve its nutritional values and to last for a longer
+		duration.
+		
+		Each pond constructed is of 10 x 20 feet size. With 20 such ponds, each will generate on an 
+		average about 2 kg wet culture per day. 1 kg wet culture will give 100 grams of dry powder only. 
+		On average, a 20 tank will generate 4-5 kg of dry Spirulina powder on a daily basis. 
+		The production in a month will be around 100 to 130 kg per month. 
+		</resource>
 
 <!-- Chemical resources derived from insect -->
 	<resource name="Beeswax" type="insect" phase="solid" edible="true"> 
@@ -235,15 +299,6 @@
 		in the biomedical literature as an oral hygiene product, emollient,
 		antioxidant or an antimicrobial agent, as a treatment for allergies,
 		in cancer treatment and cancer prevention.	</resource>
-
-<!-- Food resources derived from fish -->
-	<resource name="Fish meat" type="animal" phase="solid" edible="true">
-		meat from fish</resource>
-<!-- Since fish oil is not a neutral flavour (just like garlic oil), it should not be used in place of generic oil -->
-	<resource name="Fish oil" type="animal" phase="liquid" edible="true">
-		Oil derived from fish.</resource>
-	<resource name="Fish patty" type="animal" phase="solid" edible="true">
-		patty made of fish meat</resource>
 
 <!-- Chemical food resources -->
 	<resource name="Baking powder" type="chemical" phase="solid" edible="true">
@@ -285,8 +340,6 @@
 	
 		
 <!-- Chemical for utility -->
-
-
 	<resource name="Terephthalic acid"  type="chemical" phase="solid">
 		Terephthalic acid is an organic compound with formula C6H4(CO2H)2. 
 		This white solid is a commodity chemical, used principally as a precursor 
@@ -352,17 +405,29 @@
 		heat transfer properties and is used in a wide variety of heating and cooling
 		applications such as HVAC systems, plastic mould making, food, and pharmaceutical
 		processes.
-	</resource>	
-	
+	</resource>
+	<resource name="Propylene" type="chemical" phase="gas" demand=".01">
+		Propylene is a colorless, flammable gas with the chemical formula C3H6 
+		at room temperature and pressure, with a faint petroleum-like odor. It is a 
+		product of combustion and a unsaturated organic compound with one double bond. 
+		It is the second simplest member of the alkene class of hydrocarbons.
+		It is widely used in the production of various chemicals, plastics, and fuels.
+		As plastics such as production of resins, fibers, and elastomers (polyolefins).
+		As chemical products such as polypropylene, polyethylene, and polyvinyl chloride (PVC).
+		As fuel for industrial processes and as a component of gasoline and 
+		for production of antifreeze and other industrial chemicals.
+		</resource>	
 	<resource name="Polypropylene" type="chemical" phase="solid" demand=".01">
-		A thermoplastic polymer stiffer than polyethylene. Characterized by a more transparent appearance 
-		and higher tensile strength, polypropylene bags offer a higher heat and chemical resistance than 
-		polyethylene bags, as well as rigid protective edges to prevent scratches. Polypropylene is a soft, 
+		A thermoplastic polymer stiffer than polyethylene. Characterized by a more 
+		transparent appearance and higher tensile strength, polypropylene bags 
+		offer a higher heat and chemical resistance than polyethylene bags, as well 
+		as rigid protective edges to prevent scratches. Polypropylene is a soft, 
 		flexible type of plastic that is considered safer than other plastics.</resource>		
 	<resource name="Polyethylene" type="chemical" phase="solid" demand=".01">
 		Polyethylene pellets or flakes. It has two different types (HDPE vs LDPE). </resource>
 	<resource name="Styrene" type="chemical" phase="liquid" demand=".015">
-		Synthetic styrene, which is chemically identical to naturally occurring styrene, is manufactured as a chemical building block for
+		Synthetic styrene, which is chemically identical to naturally occurring styrene, 
+		is manufactured as a chemical building block for
 		materials used to make packaging, insulation </resource>
 	<resource name="Polystyrene" type="chemical" phase="solid" demand="2.5">
 		When styrene molecules are linked together into a polymer, polystyrene (C8H8)n is created. Polystyrene is an inert plastic that can
@@ -391,6 +456,8 @@
 	<resource name="Regolith" type="regolith" phase="solid"> 
 		Unspecified type of Martian soil.</resource>
 
+
+<!-- 6 types of Ores -->
 	<resource name="Gypsum" type="ore" phase="solid"> 
 		Gypsum is a soft sulfate mineral composed of calcium sulfate dihydrate,
 		with the chemical formula CaSO4·2H2O. It is widely mined and used as a fertilizer. A typical regolith
@@ -398,7 +465,7 @@
 	<resource name="Basaltic" type="ore" phase="solid"> 
 		Basalt is a common extrusive igneous rock formed from the rapid cooling
 		of basaltic lava exposed at or very near the surface of a planet. A typical regolith derived mineral deposit
-		in NASA Water ISRU Study Reference Case D</resource>
+		in NASA Water ISRU Study Type Case D regolith that makes up of 23.5% basaltic. </resource>
 	<resource name="Smectite" type="ore" phase="solid"> 
 		Smectite is the name used for a group of phyllo-silicate mineral species.
 		It's a clay-like regolith derived mineral deposit in NASA Water ISRU Study Reference Case C. </resource>
@@ -419,19 +486,27 @@
 	<resource name="Ammonia" type="compound" phase="solid"> NH3+ is an essential nutrient for plants</resource>
 	<resource name="Calcium carbonate" type="compound" phase="solid" demand=".1" />
 	<resource name="Calcium sulfate" type="compound" phase="solid">
-		Mineral salt occurs naturally in the form of gypsum, and may be used as a sequestrant in food 
-		as well as a buffer and firming agent. Artificial sweetener base, bleaching agent for bread rolls, 
-		flour, tinned tomatoes, soy tofu, dried egg, cheese products, tooth paste. Used in mortar, 
-		cement and plaster of Paris. Derived from limestone. No known adverse effects.
+		CaSO4 has a molecular weight of 136.14 g/mol. Derived from limestone, it 
+		occurs naturally in the form of gypsum, and may be used as a sequestrant 
+		in food as well as a buffer and firming agent. Artificial sweetener base, 
+		bleaching agent for bread rolls, flour, tinned tomatoes, soy tofu, 
+		dried egg, cheese products, tooth paste. Used in mortar, 
+		cement and plaster of Paris. Calcium sulfate has a long history of use 
+		in medicine and dentistry, including bone regeneration as a graft material 
+		and graft binder/extender, and as a barrier in guided tissue regeneration.
 		
 		Crystalline phases of CaSO4 
 		(1). Anhydrite. CaSO4.
-		(2). Dihydrate. CaSO4·2H2O. Called gypsum, as a bleaching agent for crude soya bean vegetable oil
+		(2). Dihydrate. CaSO4·2H2O. Called gypsum, as a bleaching agent for crude
+		     soya bean vegetable oil
 	 	(3). Hemihydrate. CaSO4.1⁄2H2O). bassanite. Also called plaster of Paris.
 	 	
 	 	Calcium sulfate, 516 or E516, a common laboratory and industrial chemical. 
 	 	Also used as a coagulant in products like tofu.
 	 	
+	 	CaSO4 is used as a coating agent for papers and adds thickness and 
+	 	durability, making the paper harder to rip. 
+
 	 	Specifically, it's used in cooking as a 
 		a. Firming agent - Helps maintain firmness of fruits and vegetables or interacts with 
 		   gelling agents to strengthen food structure. 
@@ -441,8 +516,9 @@
 	</resource>
 	<resource name="Gypsum plaster" type="compound" phase="solid"> 
 	   See https://civiconcepts.com/blog/gypsum-plaster
-	   A white cementing building material made by partial or complete dehydration of the mineral gypsum, commonly 
-	   with special retarders or hardeners added.
+	   A white cementing building material made by partial or complete 
+	   dehydration of the mineral gypsum, commonly with special retarders or 
+	   hardeners added.
 	   
 	   Uses of gypsum plaster includes : 
 		(1). Medical : an orthopedic cast for the hand made out of plaster. 
@@ -467,13 +543,17 @@
 
 	<resource name="Nitrate" type="compound" phase="solid"> NO3 is an essential nutrient for plants</resource>
 	<resource name="Nitrite" type="compound" phase="solid"> NO2 is an essential nutrient for plants</resource>
-	<resource name="Potash lye" type="compound" phase="solid" demand="20"> Potassium Hydroxide</resource>
+	<resource name="Potash lye" type="compound" phase="solid" demand="20"> Potassium Hydroxide (KOH). Used for
+		liquid soap production. Also for food processing, such as curing olives and making certain types of noodles.</resource>
 	<resource name="Sand" type="compound" phase="solid"> Soil with iron oxide removed. Used for making glass.</resource>
 	<resource name="Silica" type="compound" phase="solid"> The word Silica came from the Latin silex. 
 	 Also known as silicon dioxide, silica is an oxide of silicon with the chemical formula
 	 SiO2, most commonly found in nature as quartz and in various living
 	 organisms. In many parts of the world, silica is the major constituent
 	 of sand. </resource>
+	 <resource name="Silicone Elastomer" type="compound" phase="solid"> Highly stretchable, soft silicone elastomers 
+		 are of great interest for the fabrication of stretchable, soft devices. </resource>
+	 	
 	<resource name="Sodium oxide" type="compound" phase="solid"> extracted from regolith.</resource>
 			 
 	<resource name="Sodium carbonate" type="compound" phase="solid">Na2CO3, also called washing soda,
@@ -481,7 +561,7 @@
 	</resource>
 
 <!-- Utility items derived from crop harvest -->
-	<resource name="Fiber cloth" type="utility" phase="solid" >Cloth made from Soy Fiber and cane fiber.</resource>
+	<resource name="Fiber cloth" type="utility" phase="solid" >Cloth made from soy fiber and cane fiber.</resource>
 	<resource name="Polyester fiber" type="chemical" phase="solid" demand="0.015">
 		Polyester fiber are strong, heat resistant material for clothing and fabric.
 	</resource>
@@ -503,7 +583,66 @@
 	 thermal radiation of the sun and the bitter cold of space. See 'Efficiency of aluminized mylar 
 	 insulation at cryogenic temperatures' by James B. Heaney </resource>
 		 
-<!-- Mineral concentrations.
+	<resource name="Nylon" type="utility" phase="solid"> Nylon C12H22N2O2, came from DuPont’s work in 
+		their high pressure ammonia laboratory. The innermost layer of the EVA suit is made up of a 
+		Nylon tricot material.</resource>
+	 	
+	<resource name="Kevlar" type="utility" phase="solid"> Kevlar is a trademark for one of DuPont’s 
+		aramid products as both Kevlar and Nomex are examples of chemicals called synthetic aromatic
+		polyamides or aramids for short. The fundamental structure of an aramid is C14H14N2O4.
+		Aramid fibers are short for aromatic polyamide. They are manufactured fibers where the 
+		composition is a type of synthetic polyamide, in which more than 85% of the linkages must 
+		link to two aromatic rings. Kevlar is prone to soaking up water in composite applications 
+		and it’s not ideal in compression, so fiberglass and carbon fiber are used in composites 
+		rather than Kevlar in those situations.</resource>
+		
+	<resource name="Paraffin Composites" type="utility" phase="solid"> Paraffin is a phase change 
+		materials (PCMs) and is a mixture of straight-chain n-alkanes with the general formula 
+		CH3-(CH2)n-CH3. Paraffin is a name that is commonly used to denote a group of saturated 
+		alkane hydrocarbons with the general formula CnH2n+2, where “n” is greater than 20. 
+		They are in both solid and liquid forms.
+		
+		Paraffins typically have high latent heat capacity. If the length of the 
+		chain increases, the melting ranges of waxes also increase. 
+
+		As a PCM that isothermally absorbs heat energy, it changes from solid to liquid. Paraffin 
+		is housed in a special metal matrix xposed to the space environment to radiate heat energy 
+		efficiently into space.
+		
+		See https://www.1-act.com/thermal-solutions/passive/pcm/
+		See https://paraffinwaxco.com/phase-change-materials/
+		See DOI: http://dx.doi.org/10.5772/intechopen.90487
+	</resource>	
+			 		 
+	<resource name="Thermoplastic Elastomer" type="utility" phase="solid">
+		Thermoplastic elastomers (TPE), sometimes referred to as thermoplastic rubbers, are a 
+		class of copolymers or a physical mix of polymers (usually a plastic and a rubber) 
+		that consist of materials with both thermoplastic and elastomeric properties.
+		
+		The benefit of using thermoplastic elastomers is the ability to stretch to moderate 
+		elongations and return to its near original shape creating a longer life and better 
+		physical range than other materials.
+		
+		TPE film is added to the liquid cooling garment to allow for water vapor or 
+		perspiration to travel out, away from the skin. The film is a monoflim membrance with 
+		superior permeability, water-vapor transmittion, and tear strength properties. It would
+		not allow water to penetrate in the opposite direction back to the skin. It is a one-way
+		water-vapor transport wicking material that maintain a comfortable microclimate between 
+		the fabric's surfaces closet to the skin.
+	</resource>	
+		
+	<resource name="Zeolite" type="compound" phase="solid"> Zeolites are naturally occurring 
+		or synthetic microporous powder-like minerals with unique properties, making them valuable 
+		in various industrial applications from refining to chemical production, 
+		and from off-gas purification to odor removal. It reduces harmful emissions.
+		
+		A crystalline material made of silicon, oxygen, and aluminum, Zeolite has have 
+		the general formula Mn+1/n(AlO2)･(SiO2)x･yH2O and 
+		its unique pore structures can selectively adsorb desired or 
+		undesired molecules and make it a perfect basis for catalytically active metals.
+	</resource>
+				 		 
+<!-- 11 types of Mineral concentrations.
 
     Using instruments on the Mars Reconnaissance Orbiter they found the minerals
     smectite, silica, zeolite, serpentine, carbonate, and chorite that are
@@ -515,13 +654,13 @@
 	to the volcanic rock called basalt. The basalt dunes are believed to
 	contain the minerals chromite, magnetite, and ilmenite.
 
-    see https://en.wikipedia.org/wiki/Ore_resources_on_Mars
-    -->
-
-    <!-- Compare with NASA MGS/TES Mineral Maps at http://www.mars.asu.edu/data/
-    May add Plagioclase, Feldspar, High-Ca Pyroxene, Low-Ca Pyroxene, Quartz,
-    Amphibole, Silicates, etc. -->
-
+    May also add Plagioclase, Feldspar, High-Ca Pyroxene, Low-Ca Pyroxene, Quartz,
+    Amphibole, Silicates, etc. 
+       
+	Reference: 
+    1. https://en.wikipedia.org/wiki/Ore_resources_on_Mars
+    2. NASA MGS/TES Mineral Maps at http://www.mars.asu.edu/data/
+-->
 	<resource name="Chalcopyrite" type="mineral" phase="solid">A copper iron sulfide (CuFeS2) mineral that
 	 crystallizes in the tetragonal system.</resource>
 	<resource name="Goethite" type="mineral" phase="solid">An iron bearing oxyhydroxide mineral containing
@@ -556,6 +695,15 @@
 	 elements present in highest concentrations. Olivine gives its name to the group of minerals
 	 with a related structure (the olivine group)—which includes tephroite (Mn2SiO4),
 	 monticellite (CaMgSiO4) and kirschsteinite (CaFeSiO4).</resource>
+	 <resource name="Pyroxene" type="mineral" phase="solid">Pyroxenes have the general formula XY(Si,Al)2O6,
+	 where X represents calcium (Ca), sodium (Na), iron (Fe(II)) or magnesium (Mg) and more rarely zinc, 
+	 manganese or lithium, and Y represents ions of smaller size, such as chromium (Cr), aluminium (Al), 
+	 magnesium (Mg), cobalt (Co), manganese (Mn), scandium (Sc), titanium (Ti), vanadium (V) or even 
+	 iron (Fe(II) or Fe(III)). </resource>
+	<resource name="Sylvite" type="mineral" phase="solid">Or sylvine, is potassium chloride (KCl) in natural
+	 mineral form. It forms crystals in the isometric system very similar to normal rock salt,
+	 halite (NaCl). The two are, in fact, isomorphous. Sylvite is colorless to white with shades
+	 of yellow and red due to inclusions. </resource>
 	<resource name="Taenite" type="mineral" phase="solid">Taenite is a major constituent of iron meteorites.
 	 An alloy of iron and nickel, with nickel proportions of 20% up to 65%. The name is derived
 	 from the Greek meaning band or ribbon. In octahedrites it is found in bands interleaving
@@ -563,13 +711,8 @@
 	 constituent. In octahedrites a fine intermixture with kamacite can occur, which is
 	 called plessite. Taenite is one of four known Fe-Ni meteorite minerals: The others are
 	 kamacite, tetrataenite, and antitaenite.</resource>
-	<resource name="Sylvite" type="mineral" phase="solid">Or sylvine, is potassium chloride (KCl) in natural
-	 mineral form. It forms crystals in the isometric system very similar to normal rock salt,
-	 halite (NaCl). The two are, in fact, isomorphous. Sylvite is colorless to white with shades
-	 of yellow and red due to inclusions. </resource>
 
-
-	<!-- Types of Rocks. See https://geology.com/stories/13/rocks-on-mars/ -->
+<!-- Types of Rocks. See https://geology.com/stories/13/rocks-on-mars/ -->
 	<resource name="Rock samples" type="rock" phase="solid">Rock samples collected from explored sites.</resource>
 	<resource name="Columnar basalt" type="rock"  phase="solid">Basalt is a dark-colored, fine-grained, igneous rock
 	 composed mainly of plagioclase and pyroxene minerals. It most commonly forms as an
@@ -589,9 +732,8 @@
 	<resource name="Cross bedding" type="rock" phase="solid">.</resource>
 	<resource name="Meteorite" type="rock" phase="solid">.</resource>
 	<resource name="Scoria" type="rock" phase="solid">.</resource>
-	<!--resource name="sand dunes" type="rock" phase="solid">.</resource-->
 
-<!-- Mineral Elements
+<!-- Elements
 
     On Earth, vast volcanic landscapes are called "Large Igneous Provinces"
     (LIP's); such places are sources of nickel, copper, titanium, iron,
@@ -606,39 +748,54 @@
 	mined, merely scooped up.These minerals could supply future colonists
 	with chromium, iron, and titanium.
 
-    see https://en.wikipedia.org/wiki/Ore_resources_on_Mars
-
-    -->
+	Reference : 
+    1. https://en.wikipedia.org/wiki/Ore_resources_on_Mars
+-->
 	<resource name="Aluminum" type="element" phase="solid" demand=".15" >An element.</resource>
 	<resource name="Calcium" type="element" phase="solid">An element.</resource>
 	<resource name="Carbon" type="element" phase="solid" demand=".01" >Carbon powder</resource>
 	<resource name="Chromium" type="element" phase="solid">An element.</resource>
 	<resource name="Copper" type="element" phase="solid">An element.</resource>
 	<resource name="Gold" type="element" phase="solid">An element.</resource>
-	<resource name="Iron" type="element" phase="solid" demand=".1">An element.</resource>
+	<resource name="Iron powder" type="element" phase="solid" demand=".1">An element.</resource>
 	<resource name="Lithium" type="element" phase="solid">An element.</resource>
 	<resource name="Magnesium" type="element" phase="solid">An element.</resource>
+	<resource name="Manganese" type="element" phase="solid">An element.</resource>
 	<resource name="Nickel" type="element" phase="solid">An element.</resource>
 	<resource name="Phosphorus" type="element" phase="solid">An element.</resource>
 	<resource name="Platinum" type="element" phase="solid">An element.</resource>
 	<resource name="Potassium" type="element" phase="solid">An element.</resource>
+	<resource name="scandium" type="element" phase="solid">An element.</resource>
 	<resource name="Silicon" type="element" phase="solid" demand=".15" >An element.</resource>
 	<resource name="Silver" type="element" phase="solid">An element.</resource>
 	<resource name="Sulfur" type="element" phase="solid">An element.</resource>
 	<resource name="Tin" type="element" phase="solid">An element.</resource>
 	<resource name="Titanium" type="element" phase="solid">An element.</resource>
+	<resource name="Vanadium" type="element" phase="solid">An element.</resource>
 	<resource name="Zinc" type="element" phase="solid">An element.</resource>
 
 
 <!-- Building Material -->
 	<resource name="Cement" type="construction" phase="solid" >A Building Material.</resource>
 	<resource name="Concrete" type="construction" phase="solid" >A Building Material.</resource>
-	<resource name="Mortar" type="construction" phase="solid" >A Building Material.</resource>
 
 <!-- Drugs and Supplements -->
 	<resource name="Immune booster" type="medical" phase="solid" >A Drug.</resource>
 
-<!-- Bio-organisms -->
+<!-- Bio-organisms 
+
+    Nitrification itself is a two-step aerobic process, each step facilitated by a 
+    different type of bacteria. The oxidation of ammonia (NH3) to nitrite (NO2−) 
+    is most often facilitated by Nitrosomonas spp. ("nitroso" referring to the formation
+    of a nitroso functional group). Nitrite oxidation to nitrate (NO3−), though 
+    traditionally believed to be facilitated by Nitrobacter spp. (nitro referring 
+    the formation of a nitro functional group), is now known to be facilitated in 
+    the environment almost exclusively by Nitrospira spp.
+    
+    Reference : 
+    1. http://en.wiki2.org/wiki/Sewage_treatment
+	2. http://www.the-compost-gardener.com/nitrogen-fixing-bacteria.html
+-->
 	<resource name="Acetic acid bacteria" type="organism" phase="solid">This bacteria has the ability to oxidize
 		many types of sugars and alcohols to organic acids as end products during fermentation
 		process. Useful for making vinegar.</resource>
@@ -651,10 +808,8 @@
 		from the air and convert it into ammonia, a form of nitrogen that plants can use.
 		In return, legumes feed the bacteria a steady diet of plant sugars.
 	 </resource>
-    <!--
-    http://en.wiki2.org/wiki/Sewage_treatment : Nitrification itself is a two-step aerobic process, each step facilitated by a different type of bacteria. The oxidation of ammonia (NH3) to nitrite (NO2−) is most often facilitated by Nitrosomonas spp. ("nitroso" referring to the formation of a nitroso functional group). Nitrite oxidation to nitrate (NO3−), though traditionally believed to be facilitated by Nitrobacter spp. (nitro referring the formation of a nitro functional group), is now known to be facilitated in the environment almost exclusively by Nitrospira spp.
-	http://www.the-compost-gardener.com/nitrogen-fixing-bacteria.html
-	-->
+	 
+
 
 <!-- Misc. -->
 	<resource name="Glass" type="gemstone" phase="solid" demand="2" >For making vessels</resource>

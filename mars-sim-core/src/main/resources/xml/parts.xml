@@ -31,7 +31,7 @@
 		<maintenance-entity-list>
 			<entity name="rover" probability="5" max-number="4" />
 			<entity name="farming" probability="5" max-number="6" />
-			<entity name="living accommodations" probability="5" max-number="4" />
+			<entity name="living accommodation" probability="5" max-number="4" />
 			<entity name="manufacture" probability="5" max-number="6" />
 			<entity name="eva suit" probability="5" max-number="1" />
 			<entity name="thermal generation" probability="5" max-number="1" />
@@ -42,7 +42,7 @@
 		<maintenance-entity-list>
 			<entity name="rover" probability="5" max-number="2" />
 			<entity name="farming" probability="5" max-number="3" />
-			<entity name="living accommodations" probability="5" max-number="2" />
+			<entity name="living accommodation" probability="5" max-number="2" />
 			<entity name="manufacture" probability="5" max-number="3" />
 			<entity name="eva suit" probability="5" max-number="1" />
 			<entity name="areothermal power source" probability="5" max-number="1" />
@@ -56,7 +56,7 @@
 		<maintenance-entity-list>
 			<entity name="vehicle" probability="5" max-number="6" />
 			<entity name="farming" probability="5" max-number="12" />
-			<entity name="living accommodations" probability="5" max-number="4" />
+			<entity name="living accommodation" probability="5" max-number="4" />
 			<entity name="manufacture" probability="5" max-number="6" />
 			<entity name="eva suit" probability="5" max-number="1" />
 			<entity name="resource processing" probability="5" max-number="5" />	
@@ -76,7 +76,7 @@
 		</maintenance-entity-list>
 	</part>
 
-	<part name="Plastic Tubing" type="utility" mass=".1">
+	<part name="Plastic Tubing" type="utility" mass=".05">
 		<maintenance-entity-list>
 			<entity name="rover" probability="5" max-number="2" />
 			<entity name="farming" probability="5" max-number="5" />
@@ -227,7 +227,7 @@
 	<part name="Copper Pipe" type="metallic" mass="	1.011">
 		<description>A density of 8.94 g/cm3. length of 1m. Thickness of 2mm. Diameter of 20mm</description>
 		<maintenance-entity-list>
-			<entity name="living accommodations" probability="2" max-number="1" />
+			<entity name="living accommodation" probability="2" max-number="1" />
 			<entity name="farming" probability="2" max-number="2" />
 			<entity name="manufacture" probability="2" max-number="2" />
 			<entity name="resource processing" probability="5" max-number="3" />
@@ -237,7 +237,7 @@
 
 	<part name="Plastic Pipe" type="utility" mass="1.0">
 		<maintenance-entity-list>
-			<entity name="living accommodations" probability="5" max-number="2" />
+			<entity name="living accommodation" probability="5" max-number="2" />
 			<entity name="farming" probability="5" max-number="4" />
 			<entity name="manufacture" probability="5" max-number="2" />
 			<entity name="rover" probability="5" max-number="1" />
@@ -255,14 +255,22 @@
 	<!-- 1m x 1m square of thin plastic sheet -->
 	<part name="Plastic Sheet" type="utility" mass=".1" />
 
-	<!-- 1m x 1m x 1cm square of glass  -->
-	<part name="Glass Sheet" type="utility" mass="26.0" />
+	<!-- 1m x 1m x .5cm square of glass  -->
+	<part name="Glass Sheet" type="utility" mass="27.56" />
 
 	<part name="Garment" type="utility" mass="0.5" >
 		<description>a standard set of clothing for indoor use.</description>
 	</part>
 
-	<part name="EVA Helmet" type="EVA" mass="1.0" >
+	<part name="Liquid Cooling Garment" type="utility" mass="1.5" >
+		<description>The innermost layer of the EVA suit. Provides thermal control
+			by circulating air and water cooled by a sublimator over crew member's
+			body. Can handle peak loads of up to 500 kcal/hr for 15 minutes, 
+			400 kcal/hr for up to an hour, or 250 kcal/hr for up to 7 hours.			
+		</description>
+	</part>
+	
+	<part name="EVA Helmet" type="EVA" mass="2.0" >
 		<maintenance-entity-list>
 			<entity name="eva suit" probability="5" max-number="1" />
 		</maintenance-entity-list>
@@ -328,50 +336,38 @@
 		</maintenance-entity-list>
 	</part>
 
-	<part name="EVA Battery" type="EVA" mass="1.2" >
-		<description>Assuming the future achievement of 1 kg/kWh or 1 kWh/kg, this 
-		rechargeable battery module is rated for 150 W at 18V 
-		for providing 8 hrs of electrical power to the EVA suit. 
-		Total energy capacity is 150 * 8 = 1.2 kWh. Weight: 1.2/1 = 1.2 kg
-		</description>
-		<maintenance-entity-list>
-			<entity name="eva suit" probability="2" max-number="1" />
-		</maintenance-entity-list>
-	</part>
-
 	<part name="EVA Radio" type="EVA" mass="0.25" >
 		<maintenance-entity-list>
 			<entity name="eva suit" probability="2" max-number="1" />
 		</maintenance-entity-list>
 	</part>
 
-
-	<part name="Vehicle Frame small" type="vehicle" mass="15.0" >
-		<description>Small steel frame</description>
-	</part>
-		
-	<part name="Vehicle Frame large" type="vehicle" mass="50.0">
-		<description>Heavy steel frame</description>
-	</part>
-
-	
-	<part name="Vehicle Chassis Panel" type="vehicle" mass="20.0" >
-		<description>Reinforced fiberglass panels.</description>
+	<part name="EVA Battery" type="EVA" mass="1.2" >
+		<description>Assuming the future achievement of 1 kg/kWh or 1 kWh/kg, 
+		 (as of 4 Aug 2024 CATL Condensed battery has 500 Wh/kg)
+		 this rechargeable battery module is rated for 150 W at 18V.  
+		 for providing 8 hrs of electrical power to the EVA suit. 
+		 Energy capacity: 150 W * 8 hrs = 1.2 kWh.  
+		 Weight: 1.2 kWh / 1 kWh/kg = 1.2 kg. 
+		 Amperage: 1.2 kWh / 18 Volt = 66.67 Ah.
+		</description>
 		<maintenance-entity-list>
-			<entity name="rover" probability="5" max-number="2" />
-			<entity name="delivery drone" probability="5" max-number="1" />	
-			<entity name="light utility vehicle" probability="5" max-number="1" />						
+			<entity name="eva suit" probability="2" max-number="1" />
 		</maintenance-entity-list>
 	</part>
-
+	
+	<!--
+		See https://newatlas.com/aircraft/catl-worlds-largest-ev-battery-manufacturer-aircraft/
+	-->
+	
 	<part name="Battery Module" type="vehicle" mass="15.0">
 		<description>Assuming the future achievement of 1 kg/kWh or 1 kWh/kg, 
-		this 15kWh rechargeable battery provides 'auxiliary' 
-		electrical power to the vehicle, on top of the primary
-		fuel cell stack. It operates at 400V. With 15 kWh capacity,
-		or 37.5 Ah (= 15/.4). Assume 6.43 km/kWh (based on a Tesla Model S
-		battery pack weighing 2240 kg with 100 kWh capacity that can travel 
-		643 km), this battery allows traveling a distance of 96.5 km on a single charge.
+		 this 15 kWh rechargeable battery provides 'auxiliary' electrical power to 
+		 the vehicle, on top of the primary fuel cell stack.
+		 With 15 kWh capacity, or it's 37.5 Ah (= 15/.4) and is rated to operate at 400V.
+		 Assume 6.43 km/kWh (based on a Tesla Model S battery pack weighing 2240 kg 
+		 with 100 kWh capacity that can travel 643 km), 
+		 this battery allows traveling a distance of 96.5 km on a single charge.
 		</description>
 		<maintenance-entity-list>
 			<entity name="rover" probability="2" max-number="2" />
@@ -381,6 +377,31 @@
 		</maintenance-entity-list>
 	</part>
 
+	<part name="Vehicle Frame small" type="vehicle" mass="15.0" >
+		<description>Small steel frame</description>
+	</part>
+		
+	<part name="Vehicle Frame large" type="vehicle" mass="50.0">
+		<description>Heavy steel frame</description>
+	</part>
+
+	<part name="Vehicle Chassis Panel" type="vehicle" mass="20.0" >
+		<description>Reinforced fiberglass panels.</description>
+		<maintenance-entity-list>
+			<entity name="rover" probability="5" max-number="2" />
+			<entity name="light utility vehicle" probability="5" max-number="1" />						
+		</maintenance-entity-list>
+	</part>
+
+
+	<part name="Drone Chassis Panel" type="vehicle" mass="20.0" >
+		<description>Reinforced fiberglass panels.</description>
+		<maintenance-entity-list>
+			<entity name="delivery drone" probability="5" max-number="1" />	
+			<entity name="cargo drone" probability="5" max-number="1" />							
+		</maintenance-entity-list>
+	</part>
+	
 	<part name="Rover Wheel" type="vehicle" mass="8.9">
 		<description>Rover wheels are made of durable steel wires and Nickel-titanium alloy wires.
 			See 'kinky' wire wheel at https://www.youtube.com/watch?v=vSNtifE0Z2Q
@@ -400,22 +421,52 @@
 		</maintenance-entity-list>
 	</part>
 
-	<part name="Rover Window" type="vehicle" mass="25.0" >
+	<part name="Window" type="construction" mass="25.0" >
 		<maintenance-entity-list>
-			<entity name="rover" probability=".5" max-number="5" />
+			<entity name="rover" probability=".5" max-number="1" />
+			<entity name="life support" probability=".5" max-number="1" />				
+			<entity name="farming" probability=".5" max-number="1" />			
 		</maintenance-entity-list>
 	</part>
 
-	<part name="Rover Generator" type="vehicle" mass="80.0" >
+	<part name="Propeller" type="vehicle" mass="2.0" >
+		<description>polycarbonate propeller for drones</description>
+		<maintenance-entity-list>
+			<entity name="delivery drone" probability="5" max-number="4" />
+		</maintenance-entity-list>
+	</part>
+
+	<part name="Stepper Motor" type="electrical" mass="1">
+		<description>A 24 V precision motor for use in 3D printing</description>
+		<maintenance-entity-list>
+			<entity name="manufacture" probability="1" max-number="2" />
+			<entity name="solar heating source" probability="1" max-number="2" />
+			<entity name="solar power source" probability="1" max-number="2" />		
+			<entity name="fuel power source" probability="1" max-number="2" />
+		</maintenance-entity-list>
+	</part>
+	
+	<part name="Motor 5 kW" type="electrical" mass="5.0" >
+		<description>A motor with 5 kW power output.</description>
+		<maintenance-entity-list>
+			<entity name="robot" probability="1" max-number="4" />
+		</maintenance-entity-list>
+	</part>
+
+	<part name="Motor 10 kW" type="vehicle" mass="10.0" >
+		<description>An induction motor with 10 kW power output.</description>
+		<maintenance-entity-list>
+			<entity name="rover" probability="1" max-number="4" />
+			<entity name="light utility vehicle" probability="1" max-number="2" />
+			<entity name="delivery drone" probability="1" max-number="4" />	
+		</maintenance-entity-list>
+	</part>
+
+	<part name="Motor 30 kW" type="vehicle" mass="30.0" >
+		<description>An induction motor with 30 kW power output.</description>
 		<maintenance-entity-list>
 			<entity name="rover" probability="5" max-number="1" />
-			<entity name="fuel power source" probability="5" max-number="1" />
-		</maintenance-entity-list>
-	</part>
-
-	<part name="Motor Large" type="vehicle" mass="40.0" >
-		<maintenance-entity-list>
-			<entity name="rover" probability="5" max-number="4" />
+			<entity name="fuel power source" probability="1" max-number="1" />
 			<entity name="wind power source" probability="1" max-number="1" />
 		</maintenance-entity-list>
 	</part>
@@ -487,21 +538,6 @@
 
 	<part name="Crane Boom" type="attachment" mass="75.0">
 		<description>Attachment part for LUV. A long, telescopic or fixed arm for moving objects</description>
-	</part>
-
-	<part name="Motor small" type="electrical" mass="10.0" >
-		<maintenance-entity-list>
-			<entity name="robot" probability="1" max-number="1" />
-			<entity name="light utility vehicle" probability="1" max-number="4" />
-			<entity name="delivery drone" probability="1" max-number="4" />
-		</maintenance-entity-list>
-	</part>
-
-	<part name="Propeller" type="vehicle" mass="2.0" >
-		<description>polycarbonate propeller for drones</description>
-		<maintenance-entity-list>
-			<entity name="delivery drone" probability="5" max-number="4" />
-		</maintenance-entity-list>
 	</part>
 
 	<part name="Wheel small" type="vehicle"  mass="4.45" >
@@ -628,10 +664,10 @@
 		<maintenance-entity-list>
 		<entity name="farming" probability="1" max-number="2" />
 		<entity name="vehicle" probability="1" max-number="2" />
-		<entity name="astronomical observations" probability="1" max-number="1" />			
+		<entity name="astronomical observation" probability="1" max-number="1" />			
 		<entity name="communication" probability="1" max-number="1" />		
 		<entity name="manufacture" probability="1" max-number="2" />
-		<entity name="living accommodations" probability="1" max-number="1" />
+		<entity name="living accommodation" probability="1" max-number="1" />
 		</maintenance-entity-list>
 	</part>
 
@@ -642,10 +678,10 @@
 		<entity name="farming" probability="1" max-number="1" />
 		<entity name="vehicle" probability="1" max-number="1" />
 		<entity name="manufacture" probability="1" max-number="1" />
-		<entity name="astronomical observations" probability="1" max-number="1" />
+		<entity name="astronomical observation" probability="1" max-number="1" />
 		<entity name="communication" probability="1" max-number="1" />	
 		<entity name="computation" probability="1" max-number="1" />	
-		<entity name="living accommodations" probability="1" max-number="1" />
+		<entity name="living accommodation" probability="1" max-number="1" />
 		</maintenance-entity-list>
 	</part>
 
@@ -655,10 +691,10 @@
 		<entity name="farming" probability="3" max-number="1" />
 		<entity name="vehicle" probability="3" max-number="1" />
 		<entity name="manufacture" probability="3" max-number="2" />
-		<entity name="astronomical observations" probability="1" max-number="1" />
+		<entity name="astronomical observation" probability="1" max-number="1" />
 		<entity name="communication" probability="1" max-number="1" />	
 		<entity name="computation" probability="1" max-number="1" />			
-		<entity name="living accommodations" probability="3" max-number="1" />
+		<entity name="living accommodation" probability="3" max-number="1" />
 		</maintenance-entity-list>
 	</part>
 
@@ -687,7 +723,7 @@
 			<entity name="farming" probability="3" max-number="3" />
 			<entity name="vehicle" probability="3" max-number="1" />
 			<entity name="manufacture" probability="3" max-number="3" />
-			<entity name="living accommodations" probability="3" max-number="2" />
+			<entity name="living accommodation" probability="3" max-number="2" />
 		</maintenance-entity-list>
 	</part>
 
@@ -715,7 +751,7 @@
 			<entity name="farming" probability="3" max-number="15" />
 			<entity name="vehicle" probability="3" max-number="3" />
 			<entity name="manufacture" probability="3" max-number="10" />
-			<entity name="living accommodations" probability="3" max-number="10" />
+			<entity name="living accommodation" probability="3" max-number="10" />
 			<entity name="life support" probability="5" max-number="4" />
 		</maintenance-entity-list>
 	</part>
@@ -741,7 +777,7 @@
 
 	<part name="Semiconductor Wafer" type="electronic" mass="1"/>
 
-	<part name="Laser Sintering 3D printer" type="electronic" mass="50.0">
+	<part name="SLS 3D Printer" type="electronic" mass="50.0">
 		<maintenance-entity-list>
 			<entity name="manufacture" probability="3" max-number="2" />
 		</maintenance-entity-list>
@@ -777,7 +813,7 @@
 		<maintenance-entity-list>
 			<entity name="farming" probability="1" max-number="2" />
 			<entity name="dining" probability="2" max-number="2" />
-			<entity name="living accommodations" probability="2" max-number="2" />
+			<entity name="living accommodation" probability="2" max-number="2" />
 			<entity name="eva" probability="3" max-number="2" />
 			<entity name="exercise" probability="1" max-number="1" />
 			<entity name="waste processing" probability="3" max-number="1" />
@@ -791,7 +827,7 @@
 		<maintenance-entity-list>
 			<entity name="farming" probability="1" max-number="2" />
 			<entity name="dining" probability="2" max-number="2" />
-			<entity name="living accommodations" probability="2" max-number="2" />
+			<entity name="living accommodation" probability="2" max-number="2" />
 			<entity name="eva" probability="3" max-number="2" />
 			<entity name="exercise" probability="1" max-number="1" />
 			<entity name="waste processing" probability="3" max-number="1" />
@@ -809,7 +845,7 @@
 		<maintenance-entity-list>
 			<entity name="farming" probability="1" max-number="1" />
 			<entity name="dining" probability="2" max-number="1" />
-			<entity name="living accommodations" probability="2" max-number="1" />
+			<entity name="living accommodation" probability="2" max-number="1" />
 			<entity name="eva" probability="3" max-number="1" />
 			<entity name="waste processing" probability="3" max-number="1" />
 			<entity name="resource processing" probability="3" max-number="1" />			
@@ -823,28 +859,19 @@
 			<entity name="cooking" probability="2" max-number="2" />
 			<entity name="farming" probability="2" max-number="2" />
 			<entity name="manufacture" probability="2" max-number="2" />
-			<entity name="living accommodations" probability="2" max-number="2" />
+			<entity name="living accommodation" probability="2" max-number="2" />
 			<entity name="life support" probability="2" max-number="2" />
 		</maintenance-entity-list>
 	</part>
 
 	<part name="Flexible hose" type="utility" mass=".1"/>
 
-	<part name="Polycarbonate roofing" type="utility" mass="1">
-		<description>highly transparent, "bullet-resistant" plastic cladding
+	<part name="Polycarbonate roofing" type="construction" mass="1">
+		<description>Assume 2m x 2m, highly transparent, "bullet-resistant" plastic cladding
 			roofing for greenhouses</description>
 		<maintenance-entity-list>
 			<entity name="farming" probability="2" max-number="2" />
 		</maintenance-entity-list>			
-	</part>
-
-	<part name="Stepper Motor small" type="electrical" mass="2">
-		<description>precision motor for use in 3D printing</description>
-		<maintenance-entity-list>
-			<entity name="manufacture" probability="1" max-number="2" />
-			<entity name="solar heating source" probability="1" max-number="2" />
-			<entity name="solar power source" probability="1" max-number="2" />						
-		</maintenance-entity-list>
 	</part>
 
 	<part name="Methane Fuel cell" type="electronic" mass=".2">
@@ -927,7 +954,7 @@
 		<maintenance-entity-list>
 			<entity name="manufacture" probability="5" max-number="1" />
 			<entity name="vehicle" probability="5" max-number="1" />
-			<entity name="Living Accommodations" probability="5" max-number="1" />
+			<entity name="Living accommodation" probability="5" max-number="1" />
 			<entity name="Life Support" probability="5" max-number="1" />
 			<entity name="Farming" probability="5" max-number="1" />
 			<entity name="thermal generation" probability="1" max-number="2" />
@@ -991,7 +1018,7 @@
 			<entity name="vehicle" probability="3" max-number="1" />
 			<entity name="manufacture" probability="3" max-number="2" />
 			<entity name="Areothermal Power Source" probability="1" max-number="2" />
-			<entity name="living accommodations" probability="3" max-number="1" />
+			<entity name="living accommodation" probability="3" max-number="1" />
 			<entity name="resource processing" probability="3" max-number="1" />			
 		</maintenance-entity-list>
 	</part>
@@ -1006,7 +1033,7 @@
 			<entity name="Areothermal Power Source" probability="1" max-number="3" />
 			<entity name="life support" probability="1" max-number="1" />
 			<entity name="manufacture" probability="1" max-number="1" />
-			<entity name="living accommodations" probability="3" max-number="2" />		
+			<entity name="living accommodation" probability="3" max-number="2" />		
 			<entity name="thermal generation" probability="1" max-number="1" />
 			<entity name="vehicle" probability="1" max-number="1" />		
 			<entity name="resource processing" probability="3" max-number="1" />	
@@ -1103,8 +1130,9 @@
 		<description>a LED outdoor weather-proof, adjustable flood light with tripod stand</description>
 	</part>
 
-	<part name="Aerogel tile" type="construction" mass="0.5">
-		<description>Excellent for transparent insulation, a silica aerogel tile contain nanoscale networks of interconnecting silica clusters, 
+	<part name="Aerogel tile" type="construction" mass="0.3">
+		<description>Assume each tile is about 1m x 1m. Excellent for transparent insulation, 
+		a silica aerogel tile contain nanoscale networks of interconnecting silica clusters, 
 		contain over 97% air by volume and have some of the lowest measured thermal conductivities of 
 		any known material (of 0.02 W/m/K at 1 bar pressure or 0.01 W/m/K at Martian atmospheric 
 		pressure). Routinely employed in many engineering applications, including 
@@ -1114,10 +1142,11 @@
 	</part>
 	
 	<part name="Insulation board" type="construction" mass="1">
-		<description>Extruded polystyrene (XPS) and expanded polystyrene insulation (EPS) contain millions of 
-		air pockets trapped within the foam. Because the polystyrene itself is also highly resistant to heat, 
-		the result is a great thermal insulator which can give excellent R-ratings. In addition to this, 
-		XPS is often lined with aluminium foil </description>
+		<description>Assume each tile is about 1m x 1m. Each board comprises extruded polystyrene (XPS) 
+		and expanded polystyrene insulation (EPS) that contain millions of air pockets trapped 
+		within the foam. Because the polystyrene itself is also highly resistant to heat, 
+		the result is a great thermal insulator which can give excellent R-ratings. 
+		XPS is often lined with aluminium foil. </description>
 	</part>
 
 	<part name="biosensor" type="electronic" mass="0.1">
@@ -1135,22 +1164,33 @@
 		of millions of pixel sensors, each of which includes a photodetector.</description>
 	</part>	
 		
-<!-- Future:
-	1. work glove
+	<part name="Power Panel" type="electrical" mass="5">
 		<maintenance-entity-list>
-			<entity name="manufacture" probability="1" max-number="5" />
+			<entity name="power generation" probability="5" max-number="1" />
+			<entity name="power storage" probability="5" max-number="1" />
 		</maintenance-entity-list>
-	2.<part name="knife" mass=".5">
+	</part>
+	
+	<part name="Surge Protector" type="electrical" mass="1">
+		<maintenance-entity-list>
+			<entity name="building" probability="5" max-number="1" />
+		</maintenance-entity-list>
+	</part>
+	
+	<part name="Metal Oxide Varistor" type="electronic" mass=".2" />				
+	
+<!-- Future:
+	<part name="knife" mass=".5">
 	- utility knife
 	- kitchen knives set
 		<maintenance-entity-list>
 			<entity name="cooking" probability="1" max-number="1" />
 		</maintenance-entity-list>
 	</part>
-	3. water heater 12kW
-	4. ceramic tile.
-	2. water heater
-	3. laser headlights
+	water heater 12kW
+	ceramic tile.
+	water heater
+	laser headlights
 
 
 -->
